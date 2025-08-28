@@ -17,6 +17,10 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
   - `js/`
   - `images/`
 - `test/` : 簡易テスト
+- `server/` : 重い処理を担うサーバサイドコード (Python/Java 等)
+  - `python/ai/`
+  - `java/rendering/`
+  - `db/`
 
 ## 基本機能（予定）
 - PMX インポート
