@@ -1,0 +1,10 @@
+const express = require('express');
+const { getHello } = require('../controllers/helloController');
+
+const router = express.Router();
+
+router.get('/hello', (req, res) => {
+  res.json({ message: getHello() });
+});
+
+module.exports = router;
