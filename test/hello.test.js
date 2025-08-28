@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { getHello } = require('../src/controllers/helloController');
+const { getHello } = require('../backend/controllers/helloController');
 
 assert.strictEqual(getHello(), 'バックエンドからこんにちは！');
 
