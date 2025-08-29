@@ -10,9 +10,7 @@
   - `src/main/java/com/mmd/service/` : サービスクラス
   - `src/main/java/com/mmd/security/` : セキュリティ関連クラス
   - `src/main/java/com/mmd/repository/` : リポジトリクラス
-  - `src/main/java/com/mmd/model/` : ドメインモデル
   - `src/main/java/com/mmd/entity/` : エンティティ
-  - `src/main/java/com/mmd/dto/` : DTO
   - `src/main/resources/` : リソース
 - `db/` : 今後実装予定のデータベース関連
 
