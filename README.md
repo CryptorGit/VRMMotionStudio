@@ -4,23 +4,36 @@
 MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance の制作体験を提供する Web アプリケーションです。MMD 制作の手間を軽減し、直感的で効率的なクリエイティブ環境を目指します。
 
 ## ディレクトリ構成
- - `web/` : Webアプリ (フロントエンド + バックエンド) の Node.js プロジェクト
-  - `backend/` : Express を用いたバックエンド
-    - `controllers/`
-    - `routes/`
-    - `middleware/`
-    - `models/`
-    - `services/`
-    - `utils/`
-    - `config/`
-  - `frontend/` : フロントエンドの静的ファイル
-    - `css/`
-    - `js/`
-    - `images/`
- - `secure/` : セキュリティやAIなど負荷の高い処理を担うサーバサイドコード (Python/Java 等)
-  - `python/ai/`
-  - `java/rendering/`
+- `frontend/` : HTML/CSS/JavaScript からなるフロントエンド
+  - `css/`
+  - `js/`
+  - `images/`
+- `backend/` : Python と Java によるバックエンド
+  - `python/`
+  - `java/`
   - `db/`
+
+## 起動方法
+### フロントエンド
+静的ファイルを提供するだけであれば、`frontend` ディレクトリで簡易サーバを起動しブラウザでアクセスします。
+```bash
+cd frontend
+python -m http.server 3000
+```
+ブラウザで `http://localhost:3000/index.html` を開いてください。
+
+### バックエンド (Python)
+```bash
+cd backend/python
+python app.py
+```
+
+### バックエンド (Java)
+```bash
+cd backend/java
+javac App.java
+java App
+```
 
 ## 基本機能（予定）
 - PMX インポート
