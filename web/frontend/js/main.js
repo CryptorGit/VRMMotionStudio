@@ -58,16 +58,27 @@ function animate() {
 init();
 
 function handleFiles(files) {
+  const fileMap = {};
   let modelFile = null;
   let poseFile = null;
   for (const file of files) {
+    const path = file.webkitRelativePath || file.name;
+    const shortPath = path.replace(/^[^/]*\//, '');
+    fileMap[shortPath] = URL.createObjectURL(file);
     if (/\.(pmx|pmd)$/i.test(file.name)) modelFile = file;
     if (/\.vpd$/i.test(file.name)) poseFile = file;
   }
   if (!modelFile) return;
 
-  const loader = new MMDLoader();
-  const url = URL.createObjectURL(modelFile);
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => {
+    const normalized = url.replace(/^\.\//, '');
+    return fileMap[normalized] || url;
+  });
+
+  const loader = new MMDLoader(manager);
+  const modelPath = (modelFile.webkitRelativePath || modelFile.name).replace(/^[^/]*\//, '');
+  const url = fileMap[modelPath];
   loader.load(
     url,
     (mesh) => {
@@ -75,19 +86,23 @@ function handleFiles(files) {
       helper.add(mesh, { physics: true });
 
       if (poseFile) {
-        const poseUrl = URL.createObjectURL(poseFile);
+        const posePath = (poseFile.webkitRelativePath || poseFile.name).replace(/^[^/]*\//, '');
+        const poseUrl = fileMap[posePath];
         loader.loadVPD(poseUrl, true, (pose) => {
           helper.pose(mesh, pose);
-          URL.revokeObjectURL(poseUrl);
         });
       }
 
-      URL.revokeObjectURL(url);
+      for (const key in fileMap) {
+        URL.revokeObjectURL(fileMap[key]);
+      }
     },
     undefined,
     (error) => {
       console.error(error);
-      URL.revokeObjectURL(url);
+      for (const key in fileMap) {
+        URL.revokeObjectURL(fileMap[key]);
+      }
     }
   );
 }
