@@ -1,1 +1,7 @@
-// TODO: ユーザー関連のビジネスロジックを実装
+const { users } = require('../models/userModel');
+
+function getAllUsers() {
+  return users;
+}
+
+module.exports = { getAllUsers };
