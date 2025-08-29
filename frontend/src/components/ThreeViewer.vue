@@ -15,6 +15,7 @@
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
+      <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
       <li id="physics-option" @click="openPhysics"><i class="fa-solid fa-cog"></i> 物理設定</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
@@ -23,6 +24,12 @@
       <li id="bone-option" @click="openBoneManipulator"><i class="fa-solid fa-bone"></i> ボーン直接操作</li>
       <li id="pose-option" @click="openPoseManager"><i class="fa-solid fa-person-running"></i> ポーズ管理</li>
     </ul>
+  </div>
+  <div v-if="poses.length" id="pose-selector">
+    <select v-model="selectedPose" @change="applyPose">
+      <option disabled value="">ポーズを選択</option>
+      <option v-for="p in poses" :key="p.name" :value="p">{{ p.name }}</option>
+    </select>
   </div>
   <input
     type="file"
@@ -59,6 +66,7 @@ import MorphEditor from './MorphEditor.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
+import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 // Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
@@ -73,6 +81,8 @@ import PhysicsPanel from './PhysicsPanel.vue'
 const viewer = ref(null)
 const fileInput = ref(null)
 const menuOpen = ref(false)
+const poses = ref([])
+const selectedPose = ref(null)
 const physicsPanelOpen = ref(false)
 const lightingPanelOpen = ref(false)
 const ambientLight = ref(null)
@@ -89,7 +99,7 @@ const panelTitles = {
   pose: 'ポーズ管理'
 }
 
-let scene, camera, renderer, effect, controls, helper
+let scene, camera, renderer, effect, controls, helper, loader, currentMesh
 const clock = new THREE.Clock()
 
 function logToServer(data) {
@@ -182,19 +192,26 @@ function onDrop(e) {
 }
 
 function handleFiles(files) {
+  poses.value.forEach(p => URL.revokeObjectURL(p.url))
+  poses.value = []
+  selectedPose.value = null
+
   const fileMap = {}
   let modelFile = null
-  let poseFile = null
+  const poseFiles = []
   for (const file of files) {
     const path = file.webkitRelativePath || file.name
     const shortPath = path
       .replace(/^[^/]*\\\//, '')
       .replace(/\\/g, '/')
-    fileMap[shortPath] = URL.createObjectURL(file)
+    const url = URL.createObjectURL(file)
+    fileMap[shortPath] = url
     if (/\.(pmx|pmd)$/i.test(file.name)) modelFile = file
-    if (/\.vpd$/i.test(file.name)) poseFile = file
+    if (/\.vpd$/i.test(file.name)) poseFiles.push({ name: file.name, url })
   }
   if (!modelFile) return
+
+  poses.value = poseFiles
 
   const names = Array.from(files).map(f => f.name)
   console.log('Selected files:', names)
@@ -203,11 +220,12 @@ function handleFiles(files) {
   const modelPath = (modelFile.webkitRelativePath || modelFile.name)
     .replace(/^[^/]*\\\//, '')
     .replace(/\\/g, '/')
-  const posePath = poseFile
-    ? (poseFile.webkitRelativePath || poseFile.name)
-        .replace(/^[^/]*\\\//, '')
-        .replace(/\\/g, '/')
-    : null
+
+  if (currentMesh) {
+    helper.remove(currentMesh)
+    scene.remove(currentMesh)
+    currentMesh = null
+  }
 
   const manager = new THREE.LoadingManager()
   manager.onLoad = () => {
@@ -216,7 +234,6 @@ function handleFiles(files) {
   manager.setURLModifier(url => {
     const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '')
     if (normalized === modelPath) return fileMap[modelPath]
-    if (posePath && normalized === posePath) return fileMap[posePath]
     return fileMap[normalized] || url
   })
   manager.onError = url => {
@@ -224,9 +241,15 @@ function handleFiles(files) {
     logToServer({ event: 'resource-error', url })
   }
 
-  const loader = new MMDLoader(manager)
+  loader = new MMDLoader(manager)
   loader.load(
     modelPath,
+    mesh => {
+      scene.add(mesh)
+      helper.add(mesh, { physics: true })
+      currentMesh = mesh
+      console.log('Model loaded:', modelFile.name)
+      logToServer({ event: 'loaded', model: modelFile.name })
       mesh => {
         scene.add(mesh)
         helper.add(mesh, { physics: true })
@@ -250,6 +273,31 @@ function handleFiles(files) {
       for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
     }
   )
+}
+
+function applyPose() {
+  if (!selectedPose.value || !loader || !currentMesh) return
+  loader.loadVPD(selectedPose.value.url, true, pose => {
+    helper.pose(currentMesh, pose)
+    console.log('Pose applied:', selectedPose.value.name)
+    logToServer({ event: 'pose', file: selectedPose.value.name })
+  })
+}
+
+function exportPose() {
+  if (!currentMesh) return
+  const exporter = new MMDExporter()
+  const result = exporter.parseVpd(currentMesh, 'pose', {})
+  const blob = new Blob([result], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'pose.vpd'
+  a.click()
+  URL.revokeObjectURL(url)
+  console.log('Pose exported')
+  logToServer({ event: 'export' })
+  menuOpen.value = false
 }
 
 function onWindowResize() {
