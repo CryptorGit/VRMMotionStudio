@@ -8,7 +8,7 @@
   ></div>
   <MorphEditor
     v-if="morphOpen"
-    :mesh="currentMesh"
+    :mesh="currentMeshRef"
     @close="morphOpen = false"
   />
   <div id="menu">
@@ -77,6 +77,7 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
 import PhysicsPanel from './PhysicsPanel.vue'
+import BoneManipulator from '../utils/BoneManipulator.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -88,8 +89,9 @@ const lightingPanelOpen = ref(false)
 const ambientLight = ref(null)
 const directionalLight = ref(null)
 const morphOpen = ref(false)
-const currentMesh = ref(null)
+const currentMeshRef = ref(null)
 const activePanel = ref(null)
+const boneMode = ref(false)
 
 const panelTitles = {
   morph: 'モーフ編集',
@@ -99,7 +101,7 @@ const panelTitles = {
   pose: 'ポーズ管理'
 }
 
-let scene, camera, renderer, effect, controls, helper, loader, currentMesh
+let scene, camera, renderer, effect, controls, helper, loader, currentMesh, boneManipulator
 const clock = new THREE.Clock()
 
 function logToServer(data) {
@@ -147,11 +149,6 @@ function openMorphEditor() {
   menuOpen.value = false
 }
 
-  console.log('Morph editor opened')
-  activePanel.value = 'morph'
-  menuOpen.value = false
-}
-
 function openLightingSettings() {
   console.log('Lighting settings opened')
   activePanel.value = 'lighting'
@@ -165,8 +162,19 @@ function openPhysicsSettings() {
 }
 
 function openBoneManipulator() {
-  console.log('Bone manipulation opened')
-  activePanel.value = 'bone'
+  if (!currentMesh) return
+  boneMode.value = !boneMode.value
+  if (boneMode.value) {
+    if (!boneManipulator) {
+      boneManipulator = new BoneManipulator(camera, renderer.domElement, scene)
+    }
+    boneManipulator.selectBone(currentMesh.skeleton.bones[0])
+    boneManipulator.activate()
+    activePanel.value = null
+  } else if (boneManipulator) {
+    boneManipulator.deactivate()
+    boneManipulator = null
+  }
   menuOpen.value = false
 }
 
@@ -225,6 +233,8 @@ function handleFiles(files) {
     helper.remove(currentMesh)
     scene.remove(currentMesh)
     currentMesh = null
+    currentMeshRef.value = null
+    if (boneManipulator) boneManipulator.detach()
   }
 
   const manager = new THREE.LoadingManager()
@@ -248,15 +258,12 @@ function handleFiles(files) {
       scene.add(mesh)
       helper.add(mesh, { physics: true })
       currentMesh = mesh
+      currentMeshRef.value = mesh
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
-      mesh => {
-        scene.add(mesh)
-        helper.add(mesh, { physics: true })
-        currentMesh.value = mesh
-        console.log('Model loaded:', modelFile.name)
-        logToServer({ event: 'loaded', model: modelFile.name })
-
+      if (boneMode.value && boneManipulator) {
+        boneManipulator.selectBone(currentMesh.skeleton.bones[0])
+      }
       if (poseFile) {
         loader.loadVPD(posePath, true, pose => {
           helper.pose(mesh, pose)
