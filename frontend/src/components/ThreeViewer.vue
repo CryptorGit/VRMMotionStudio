@@ -199,8 +199,12 @@ onMounted(async () => {
     // Ensure the WASM binary is loaded from the resolved asset URL
     locateFile: (file) => (file.endsWith('.wasm') ? ammoWasmUrl : file)
   })
-  // Expose Ammo globally for three.js MMDAnimationHelper which expects window.Ammo
-  window.Ammo = AmmoLib
+  // Expose Ammo globally for three.js MMDAnimationHelper
+  if (typeof window !== 'undefined') {
+    window.Ammo = AmmoLib
+  } else {
+    globalThis.Ammo = AmmoLib
+  }
   helper = new MMDAnimationHelper()
 
   window.addEventListener('resize', onWindowResize)
