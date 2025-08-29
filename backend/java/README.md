@@ -7,8 +7,10 @@
 Gradle もしくは Maven でビルドしてください。
 
 ### Gradle の場合
+このリポジトリには `gradle-wrapper.jar` を含めていません。初回は `gradle wrapper` を実行してラッパーを生成してください。
 ```bash
-gradle build
+gradle wrapper
+./gradlew build
 java -cp build/classes/java/main com.mmd.App
 ```
 

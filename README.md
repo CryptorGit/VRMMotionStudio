@@ -35,10 +35,12 @@ python app.py
 ```
 
 ### バックエンド (Java)
+このリポジトリには `gradle-wrapper.jar` を含めていません。Gradle を使用する場合は、初回に `gradle wrapper` を実行してラッパーを生成してください。
 ```bash
 cd backend/java
-# Gradle の場合
-gradle build
+# Gradle の場合 (初回のみ wrapper を生成)
+gradle wrapper
+./gradlew build
 java -cp build/classes/java/main com.mmd.App
 
 # Maven の場合
