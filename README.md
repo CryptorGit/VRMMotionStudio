@@ -15,9 +15,7 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
     - `src/main/java/com/mmd/service/`
     - `src/main/java/com/mmd/security/`
     - `src/main/java/com/mmd/repository/`
-    - `src/main/java/com/mmd/model/`
     - `src/main/java/com/mmd/entity/`
-    - `src/main/java/com/mmd/dto/`
     - `src/main/resources/`
   - `db/`
 

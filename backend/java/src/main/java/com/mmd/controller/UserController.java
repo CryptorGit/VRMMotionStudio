@@ -2,7 +2,7 @@ package com.mmd.controller;
 
 import com.mmd.security.SecurityConfig;
 import com.mmd.service.UserService;
-import com.mmd.dto.UserDTO;
+import com.mmd.entity.UserEntity;
 
 public class UserController {
     private final UserService userService = new UserService();
@@ -12,7 +12,7 @@ public class UserController {
         if (!security.isAuthorized(token)) {
             return "Unauthorized";
         }
-        UserDTO user = userService.getUser(userId);
+        UserEntity user = userService.getUser(userId);
         return "Hello, " + user.getName();
     }
 }
