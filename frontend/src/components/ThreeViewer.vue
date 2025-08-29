@@ -221,6 +221,9 @@ function handleFiles(files) {
 
   poses.value = poseFiles
 
+  const poseFile = poseFiles[0]
+  const posePath = poseFile && poseFile.url
+
   const names = Array.from(files).map(f => f.name)
   console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
