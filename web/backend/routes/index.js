@@ -12,4 +12,9 @@ router.get('/hello', (req, res) => {
 router.use('/users', userRoutes);
 router.use('/upload', uploadRoutes);
 
+router.post('/log', (req, res) => {
+  console.log('Client log:', req.body);
+  res.status(204).end();
+});
+
 module.exports = router;
