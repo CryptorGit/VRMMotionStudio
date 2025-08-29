@@ -4,7 +4,7 @@
 MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance の制作体験を提供する Web アプリケーションです。MMD 制作の手間を軽減し、直感的で効率的なクリエイティブ環境を目指します。
 
 ## ディレクトリ構成
-- `serverA/` : Webアプリ (フロントエンド + バックエンド)
+- `serverA/` : Webアプリ (フロントエンド + バックエンド) の Node.js プロジェクト
   - `backend/` : Express を用いたバックエンド
     - `controllers/`
     - `routes/`
