@@ -92,7 +92,9 @@ function handleFiles(files) {
   let poseFile = null
   for (const file of files) {
     const path = file.webkitRelativePath || file.name
-    const shortPath = path.replace(/^[^/]*\\\//, '')
+    const shortPath = path
+      .replace(/^[^/]*\\\//, '')
+      .replace(/\\/g, '/')
     fileMap[shortPath] = URL.createObjectURL(file)
     if (/\.(pmx|pmd)$/i.test(file.name)) modelFile = file
     if (/\.vpd$/i.test(file.name)) poseFile = file
@@ -103,9 +105,13 @@ function handleFiles(files) {
   console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
 
-  const modelPath = (modelFile.webkitRelativePath || modelFile.name).replace(/^[^/]*\\\//, '')
+  const modelPath = (modelFile.webkitRelativePath || modelFile.name)
+    .replace(/^[^/]*\\\//, '')
+    .replace(/\\/g, '/')
   const posePath = poseFile
-    ? (poseFile.webkitRelativePath || poseFile.name).replace(/^[^/]*\\\//, '')
+    ? (poseFile.webkitRelativePath || poseFile.name)
+        .replace(/^[^/]*\\\//, '')
+        .replace(/\\/g, '/')
     : null
 
   const manager = new THREE.LoadingManager()
@@ -113,7 +119,7 @@ function handleFiles(files) {
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
   }
   manager.setURLModifier(url => {
-    const normalized = url.replace(/^\.\//, '')
+    const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '')
     if (normalized === modelPath) return fileMap[modelPath]
     if (posePath && normalized === posePath) return fileMap[posePath]
     return fileMap[normalized] || url
