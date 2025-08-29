@@ -109,6 +109,9 @@ function handleFiles(files) {
     : null
 
   const manager = new THREE.LoadingManager()
+  manager.onLoad = () => {
+    for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
+  }
   manager.setURLModifier(url => {
     const normalized = url.replace(/^\.\//, '')
     if (normalized === modelPath) return fileMap[modelPath]
@@ -136,8 +139,6 @@ function handleFiles(files) {
           logToServer({ event: 'pose', file: poseFile.name })
         })
       }
-
-      for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
     },
     undefined,
     error => {
