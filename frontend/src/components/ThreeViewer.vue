@@ -15,6 +15,7 @@
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
+      <li id="physics-option" @click="openPhysics"><i class="fa-solid fa-cog"></i> 物理設定</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
       <li id="lighting-option" @click="openLightingSettings"><i class="fa-solid fa-lightbulb"></i> ライティング設定</li>
@@ -31,6 +32,11 @@
     webkitdirectory
     style="display:none"
     @change="onFileChange"
+  />
+  <PhysicsPanel
+    v-if="physicsPanelOpen"
+    :helper="helper"
+    @close="physicsPanelOpen = false"
   />
   <LightingPanel
     v-if="lightingPanelOpen"
@@ -62,10 +68,12 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // We import it as an asset URL and pass it via locateFile.
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
+import PhysicsPanel from './PhysicsPanel.vue'
 
 const viewer = ref(null)
 const fileInput = ref(null)
 const menuOpen = ref(false)
+const physicsPanelOpen = ref(false)
 const lightingPanelOpen = ref(false)
 const ambientLight = ref(null)
 const directionalLight = ref(null)
@@ -111,6 +119,11 @@ function openFile() {
   console.log('Import option clicked')
   logToServer({ event: 'import' })
   fileInput.value && fileInput.value.click()
+  menuOpen.value = false
+}
+
+function openPhysics() {
+  physicsPanelOpen.value = true
   menuOpen.value = false
 }
 
