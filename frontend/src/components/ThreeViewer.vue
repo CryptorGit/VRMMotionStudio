@@ -6,6 +6,11 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   ></div>
+  <MorphEditor
+    v-if="morphOpen"
+    :mesh="currentMesh"
+    @close="morphOpen = false"
+  />
   <div id="menu">
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
@@ -36,6 +41,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import MorphEditor from './MorphEditor.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
@@ -52,6 +58,8 @@ import { API_BASE_URL } from '../config.js'
 const viewer = ref(null)
 const fileInput = ref(null)
 const menuOpen = ref(false)
+const morphOpen = ref(false)
+const currentMesh = ref(null)
 const activePanel = ref(null)
 
 const panelTitles = {
@@ -96,6 +104,10 @@ function openFile() {
 }
 
 function openMorphEditor() {
+  morphOpen.value = true
+  menuOpen.value = false
+}
+
   console.log('Morph editor opened')
   activePanel.value = 'morph'
   menuOpen.value = false
@@ -186,11 +198,12 @@ function handleFiles(files) {
   const loader = new MMDLoader(manager)
   loader.load(
     modelPath,
-    mesh => {
-      scene.add(mesh)
-      helper.add(mesh, { physics: true })
-      console.log('Model loaded:', modelFile.name)
-      logToServer({ event: 'loaded', model: modelFile.name })
+      mesh => {
+        scene.add(mesh)
+        helper.add(mesh, { physics: true })
+        currentMesh.value = mesh
+        console.log('Model loaded:', modelFile.name)
+        logToServer({ event: 'loaded', model: modelFile.name })
 
       if (poseFile) {
         loader.loadVPD(posePath, true, pose => {
