@@ -4,10 +4,9 @@
 MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance の制作体験を提供する Web アプリケーションです。MMD 制作の手間を軽減し、直感的で効率的なクリエイティブ環境を目指します。
 
 ## ディレクトリ構成
-- `frontend/` : HTML/CSS/JavaScript からなるフロントエンド
-  - `css/`
-  - `js/`
-  - `images/`
+- `frontend/` : Vite + Vue 3 によるフロントエンド
+  - `src/`
+  - `public/`
 - `backend/` : Python と Java によるバックエンド
   - `python/`
   - `java/`
@@ -21,12 +20,13 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
 
 ## 起動方法
 ### フロントエンド
-静的ファイルを提供するだけであれば、`frontend` ディレクトリで簡易サーバを起動しブラウザでアクセスします。
+開発サーバを起動するには以下を実行します。
 ```bash
 cd frontend
-python -m http.server 3000
+npm install
+npm run dev
 ```
-ブラウザで `http://localhost:3000/index.html` を開いてください。
+ブラウザで `http://localhost:5173` を開いてください。
 
 ### バックエンド (Python)
 ```bash
