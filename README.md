@@ -11,6 +11,9 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
 - `backend/` : Python と Java によるバックエンド
   - `python/`
   - `java/`
+    - `com/mmd/controller/`
+    - `com/mmd/service/`
+    - `com/mmd/security/`
   - `db/`
 
 ## 起動方法
@@ -31,8 +34,8 @@ python app.py
 ### バックエンド (Java)
 ```bash
 cd backend/java
-javac App.java
-java App
+javac $(find com -name "*.java")
+java com.mmd.App
 ```
 
 ## 基本機能（予定）
