@@ -9,6 +9,10 @@
   - `com/mmd/controller/` : コントローラクラス
   - `com/mmd/service/` : サービスクラス
   - `com/mmd/security/` : セキュリティ関連クラス
+  - `com/mmd/repository/` : リポジトリクラス
+  - `com/mmd/model/` : ドメインモデル
+  - `com/mmd/entity/` : エンティティ
+  - `com/mmd/dto/` : DTO
 - `db/` : 今後実装予定のデータベース関連
 
 ## 実行方法
