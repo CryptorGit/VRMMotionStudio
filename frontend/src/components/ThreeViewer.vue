@@ -98,9 +98,16 @@ function handleFiles(files) {
   console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
 
+  const modelPath = (modelFile.webkitRelativePath || modelFile.name).replace(/^[^/]*\\\//, '')
+  const posePath = poseFile
+    ? (poseFile.webkitRelativePath || poseFile.name).replace(/^[^/]*\\\//, '')
+    : null
+
   const manager = new THREE.LoadingManager()
   manager.setURLModifier(url => {
     const normalized = url.replace(/^\.\//, '')
+    if (normalized === modelPath) return fileMap[modelPath]
+    if (posePath && normalized === posePath) return fileMap[posePath]
     return fileMap[normalized] || url
   })
   manager.onError = url => {
@@ -109,10 +116,8 @@ function handleFiles(files) {
   }
 
   const loader = new MMDLoader(manager)
-  const modelPath = (modelFile.webkitRelativePath || modelFile.name).replace(/^[^/]*\\\//, '')
-  const url = fileMap[modelPath]
   loader.load(
-    url,
+    modelPath,
     mesh => {
       scene.add(mesh)
       helper.add(mesh, { physics: true })
@@ -120,9 +125,7 @@ function handleFiles(files) {
       logToServer({ event: 'loaded', model: modelFile.name })
 
       if (poseFile) {
-        const posePath = (poseFile.webkitRelativePath || poseFile.name).replace(/^[^/]*\\\//, '')
-        const poseUrl = fileMap[posePath]
-        loader.loadVPD(poseUrl, true, pose => {
+        loader.loadVPD(posePath, true, pose => {
           helper.pose(mesh, pose)
           console.log('Pose applied:', poseFile.name)
           logToServer({ event: 'pose', file: poseFile.name })
