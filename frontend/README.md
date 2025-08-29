@@ -1,10 +1,16 @@
 # フロントエンド
 
-静的ファイルで構成されており、開発時は簡易サーバで提供できます。
+[Vite](https://vite.dev/) と [Vue 3](https://vuejs.org/) を用いて構築しています。
 
-## 起動方法
+## 開発サーバの起動
 ```bash
-cd frontend
-python -m http.server 3000
+npm install
+npm run dev
 ```
-ブラウザで [http://localhost:3000/index.html](http://localhost:3000/index.html) を開いてください。
+ブラウザで [http://localhost:5173](http://localhost:5173) を開いてください。
+
+## ビルド
+```bash
+npm run build
+```
+`dist/` ディレクトリにビルド成果物が生成されます。
