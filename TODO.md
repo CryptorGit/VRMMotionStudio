@@ -4,10 +4,18 @@
 - [ ] デフォルトポーズの読み込み強化
 - [ ] モーフ調整 UI
 - [ ] 物理設定パネルの機能拡張と設定保存
+  - [ ] `frontend/src/components/MorphEditor.vue` を作成し、モデルの `mesh.morphTargetDictionary` からモーフ名を列挙してスライダー表示
+  - [ ] スライダー操作で `mesh.morphTargetInfluences` を更新する処理を `ThreeViewer.vue` と連携
+  - [ ] `ThreeViewer.vue` のメニュー項目から `MorphEditor.vue` を開けるようにする
+- [ ] ライティング設定パネルの実装
+- [ ] 物理設定パネルの実装
 - [x] dat.GUI または lil-gui を用いたパラメータ調整 GUI の実装
+- [x] ライト設定パネルの実装
 - [ ] TransformControls によるボーン編集機能
+- [ ] ボーン直接操作 UI の実装
 - [ ] VPD/VMD などのポーズ・モーションデータの入出力
 - [ ] タイムライン編集 UI とカメラモーション編集
+- [ ] ポーズ管理パネルの実装
 - [ ] Web カメラを用いたモーショントラッキング・姿勢推定
 - [ ] スクリーンショット撮影と MediaRecorder による動画録画
 - [ ] glTF や VMD 形式でのエクスポート機能
