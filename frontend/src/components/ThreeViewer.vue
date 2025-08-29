@@ -31,7 +31,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 // Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
-import Ammo from 'three/examples/jsm/libs/ammo.wasm.js'
+import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // Ensure Vite serves the WASM binary correctly
 // three's ammo wrapper expects the .wasm file next to the js file.
 // We import it as an asset URL and pass it via locateFile.
@@ -195,7 +195,7 @@ onMounted(async () => {
   directional.position.set(1, 1, 1)
   scene.add(directional)
 
-  const AmmoLib = await Ammo({
+  const AmmoLib = await AmmoModule.default({
     // Ensure the WASM binary is loaded from the resolved asset URL
     locateFile: (file) => (file.endsWith('.wasm') ? ammoWasmUrl : file)
   })
