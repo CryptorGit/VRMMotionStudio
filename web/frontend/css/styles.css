@@ -1,17 +1,45 @@
 body {
+  margin: 0;
+  overflow: hidden;
   font-family: sans-serif;
-  margin: 2rem;
 }
 
-h1 {
-  color: #333;
+#viewer {
+  width: 100vw;
+  height: 100vh;
 }
 
-#users {
+#viewer.dragover {
+  outline: 2px dashed #ffffff;
+}
+
+#menu {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+}
+
+#menu-button {
+  background: rgba(255, 255, 255, 0.8);
+  border: none;
+  font-size: 24px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+#menu-list {
   list-style: none;
-  padding: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
-#users li {
-  margin: 0.5rem 0;
+#menu-list li {
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.hidden {
+  display: none;
 }

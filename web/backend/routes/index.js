@@ -1,6 +1,7 @@
 const express = require('express');
 const { getHello } = require('../controllers/helloController');
 const userRoutes = require('./userRoutes');
+const uploadRoutes = require('./uploadRoutes');
 
 const router = express.Router();
 
@@ -9,5 +10,6 @@ router.get('/hello', (req, res) => {
 });
 
 router.use('/users', userRoutes);
+router.use('/upload', uploadRoutes);
 
 module.exports = router;
