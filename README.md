@@ -14,6 +14,10 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
     - `com/mmd/controller/`
     - `com/mmd/service/`
     - `com/mmd/security/`
+    - `com/mmd/repository/`
+    - `com/mmd/model/`
+    - `com/mmd/entity/`
+    - `com/mmd/dto/`
   - `db/`
 
 ## 起動方法
