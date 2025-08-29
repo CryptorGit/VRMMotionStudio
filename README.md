@@ -7,14 +7,14 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
 - `frontend/` : Vite + Vue 3 によるフロントエンド
   - `src/`
   - `public/`
-- `backend/` : Python と Java によるバックエンド
+- `backend/` : Python と Java によるバックエンド（Maven マルチモジュール）
   - `python/`
   - `java/`
     - `src/main/java/com/mmd/controller/`
     - `src/main/java/com/mmd/service/`
     - `src/main/java/com/mmd/security/`
     - `src/main/java/com/mmd/repository/`
-    - `src/main/java/com/mmd/entity/`
+    - `src/main/java/com/mmd/model/entity/`
     - `src/main/resources/`
   - `db/`
 
@@ -34,18 +34,14 @@ cd backend/python
 python app.py
 ```
 
-### バックエンド (Java)
-このリポジトリには `gradle-wrapper.jar` を含めていません。Gradle を使用する場合は、初回に `gradle wrapper` を実行してラッパーを生成してください。
+### バックエンド (Java / Maven)
 ```bash
-cd backend/java
-# Gradle の場合 (初回のみ wrapper を生成)
-gradle wrapper
-./gradlew build
-java -cp build/classes/java/main com.mmd.App
-
-# Maven の場合
+# backend 直下で Java モジュールをビルド
+cd backend
 mvn package
-java -cp target/classes com.mmd.App
+
+# 実行
+java -cp java/target/classes com.mmd.App
 ```
 
 ## 基本機能（予定）

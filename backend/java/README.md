@@ -1,21 +1,22 @@
-# Java バックエンド
+# Java バックエンド (Maven)
 
-標準的な Maven/Gradle のプロジェクト構成で、`src/main/java` 以下にソースコードを、`src/main/resources` 以下にリソースを配置しています。
+標準的な Maven プロジェクト構成で、`src/main/java` 以下にソースコード、`src/main/resources` 以下にリソースを配置しています。
 
-## 実行方法
+主なパッケージ構成:
+- `com.mmd.App` : エントリーポイント
+- `com.mmd.controller` : コントローラ
+- `com.mmd.service` : サービス
+- `com.mmd.security` : セキュリティ
+- `com.mmd.repository` : リポジトリ
+- `com.mmd.model.entity` : エンティティ（model 配下に整理）
 
-Gradle もしくは Maven でビルドしてください。
-
-### Gradle の場合
-このリポジトリには `gradle-wrapper.jar` を含めていません。初回は `gradle wrapper` を実行してラッパーを生成してください。
+## ビルド & 実行
 ```bash
-gradle wrapper
-./gradlew build
-java -cp build/classes/java/main com.mmd.App
-```
-
-### Maven の場合
-```bash
+# バックエンド直下から全体ビルド
+cd ../
 mvn package
+
+# 実行（Java モジュールの classes を指定）
+cd java
 java -cp target/classes com.mmd.App
 ```

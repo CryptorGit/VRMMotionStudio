@@ -1,4 +1,4 @@
-package com.mmd.entity;
+package com.mmd.model.entity;
 
 public class UserEntity {
     private final int id;
@@ -17,3 +17,4 @@ public class UserEntity {
         return name;
     }
 }
+ 

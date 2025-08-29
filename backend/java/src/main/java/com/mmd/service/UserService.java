@@ -1,10 +1,18 @@
 package com.mmd.service;
 
 import com.mmd.repository.UserRepository;
-import com.mmd.entity.UserEntity;
+import com.mmd.model.entity.UserEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
+@Service
 public class UserService {
-    private final UserRepository repository = new UserRepository();
+    private final UserRepository repository;
+
+    @Autowired
+    public UserService(UserRepository repository) {
+        this.repository = repository;
+    }
 
     public UserEntity getUser(int id) {
         return repository.findById(id);

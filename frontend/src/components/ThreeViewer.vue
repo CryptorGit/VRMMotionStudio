@@ -30,7 +30,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
-import Ammo from 'ammo.js'
+// Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
+import Ammo from 'three/examples/jsm/libs/ammo.wasm.js'
+// Ensure Vite serves the WASM binary correctly
+// three's ammo wrapper expects the .wasm file next to the js file.
+// We import it as an asset URL and pass it via locateFile.
+import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
 
 const viewer = ref(null)
@@ -190,7 +195,12 @@ onMounted(async () => {
   directional.position.set(1, 1, 1)
   scene.add(directional)
 
-  await Ammo()
+  const AmmoLib = await Ammo({
+    // Ensure the WASM binary is loaded from the resolved asset URL
+    locateFile: (file) => (file.endsWith('.wasm') ? ammoWasmUrl : file)
+  })
+  // Expose Ammo globally for three.js MMDAnimationHelper which expects window.Ammo
+  window.Ammo = AmmoLib
   helper = new MMDAnimationHelper()
 
   window.addEventListener('resize', onWindowResize)

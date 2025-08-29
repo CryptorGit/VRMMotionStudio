@@ -1,10 +1,11 @@
 package com.mmd;
 
-import com.mmd.controller.UserController;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+@SpringBootApplication
 public class App {
     public static void main(String[] args) {
-        UserController controller = new UserController();
-        System.out.println(controller.getGreeting("token", 1));
+        SpringApplication.run(App.class, args);
     }
 }
