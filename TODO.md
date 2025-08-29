@@ -3,6 +3,9 @@
 - [x] 物理演算とライティングの適用
 - [ ] デフォルトポーズの読み込み強化
 - [ ] モーフ調整 UI
+  - [ ] `frontend/src/components/MorphEditor.vue` を作成し、モデルの `mesh.morphTargetDictionary` からモーフ名を列挙してスライダー表示
+  - [ ] スライダー操作で `mesh.morphTargetInfluences` を更新する処理を `ThreeViewer.vue` と連携
+  - [ ] `ThreeViewer.vue` のメニュー項目から `MorphEditor.vue` を開けるようにする
 - [x] dat.GUI または lil-gui を用いたパラメータ調整 GUI の実装
 - [ ] TransformControls によるボーン編集機能
 - [ ] VPD/VMD などのポーズ・モーションデータの入出力

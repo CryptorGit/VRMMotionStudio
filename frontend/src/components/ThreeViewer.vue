@@ -6,10 +6,16 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   ></div>
+  <MorphEditor
+    v-if="morphOpen"
+    :mesh="currentMesh"
+    @close="morphOpen = false"
+  />
   <div id="menu">
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
+      <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-sliders"></i> モーフ</li>
     </ul>
   </div>
   <input
@@ -25,6 +31,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import MorphEditor from './MorphEditor.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
@@ -41,6 +48,8 @@ import { API_BASE_URL } from '../config.js'
 const viewer = ref(null)
 const fileInput = ref(null)
 const menuOpen = ref(false)
+const morphOpen = ref(false)
+const currentMesh = ref(null)
 
 let scene, camera, renderer, effect, controls, helper
 const clock = new THREE.Clock()
@@ -72,6 +81,11 @@ function openFile() {
   console.log('Import option clicked')
   logToServer({ event: 'import' })
   fileInput.value && fileInput.value.click()
+  menuOpen.value = false
+}
+
+function openMorphEditor() {
+  morphOpen.value = true
   menuOpen.value = false
 }
 
@@ -132,11 +146,12 @@ function handleFiles(files) {
   const loader = new MMDLoader(manager)
   loader.load(
     modelPath,
-    mesh => {
-      scene.add(mesh)
-      helper.add(mesh, { physics: true })
-      console.log('Model loaded:', modelFile.name)
-      logToServer({ event: 'loaded', model: modelFile.name })
+      mesh => {
+        scene.add(mesh)
+        helper.add(mesh, { physics: true })
+        currentMesh.value = mesh
+        console.log('Model loaded:', modelFile.name)
+        logToServer({ event: 'loaded', model: modelFile.name })
 
       if (poseFile) {
         loader.loadVPD(posePath, true, pose => {
