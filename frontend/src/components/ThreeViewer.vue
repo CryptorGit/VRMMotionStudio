@@ -15,6 +15,7 @@
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
+      <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
       <li id="lighting-option" @click="openLightingSettings"><i class="fa-solid fa-lightbulb"></i> ライティング設定</li>
       <li id="physics-option" @click="openPhysicsSettings"><i class="fa-solid fa-atom"></i> 物理設定</li>
@@ -31,6 +32,12 @@
     style="display:none"
     @change="onFileChange"
   />
+  <LightingPanel
+    v-if="lightingPanelOpen"
+    :ambient="ambientLight"
+    :directional="directionalLight"
+    @close="lightingPanelOpen = false"
+  />
   <div v-if="activePanel" class="modal">
     <div class="modal-content">
       <h2>{{ panelTitles[activePanel] }}</h2>
@@ -41,6 +48,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -58,6 +66,9 @@ import { API_BASE_URL } from '../config.js'
 const viewer = ref(null)
 const fileInput = ref(null)
 const menuOpen = ref(false)
+const lightingPanelOpen = ref(false)
+const ambientLight = ref(null)
+const directionalLight = ref(null)
 const morphOpen = ref(false)
 const currentMesh = ref(null)
 const activePanel = ref(null)
@@ -100,6 +111,11 @@ function openFile() {
   console.log('Import option clicked')
   logToServer({ event: 'import' })
   fileInput.value && fileInput.value.click()
+  menuOpen.value = false
+}
+
+function openLighting() {
+  lightingPanelOpen.value = true
   menuOpen.value = false
 }
 
@@ -272,10 +288,12 @@ onMounted(async () => {
 
   const ambient = new THREE.AmbientLight(0x666666)
   scene.add(ambient)
+  ambientLight.value = ambient
 
   const directional = new THREE.DirectionalLight(0xffffff)
   directional.position.set(1, 1, 1)
   scene.add(directional)
+  directionalLight.value = directional
 
   const AmmoLib = await AmmoModule.default({
     // Ensure the WASM binary is loaded from the resolved asset URL
