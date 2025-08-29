@@ -46,11 +46,16 @@ let scene, camera, renderer, effect, controls, helper
 const clock = new THREE.Clock()
 
 function logToServer(data) {
+  if (import.meta.env.DEV) return
   fetch(`${API_BASE_URL}/log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).catch(err => console.error('log error:', err))
+  })
+    .then(response => {
+      if (!response.ok) console.debug('log failed:', response.status)
+    })
+    .catch(err => console.debug('log error:', err))
 }
 
 function onFileChange(e) {
