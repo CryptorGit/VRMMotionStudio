@@ -2,10 +2,9 @@
   "name": "mokumokudanceweb",
   "version": "1.0.0",
   "description": "MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance の制作体験を提供する Web アプリケーションです。MMD 制作の手間を軽減し、直感的で効率的なクリエイティブ環境を目指します。",
-  "main": "backend/app.js",
+  "main": "serverA/backend/app.js",
   "scripts": {
-    "start": "node backend/app.js",
-    "test": "node test/hello.test.js"
+    "start": "node serverA/backend/app.js"
   },
   "keywords": [],
   "author": "",
