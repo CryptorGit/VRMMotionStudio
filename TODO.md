@@ -6,6 +6,9 @@
 - [x] dat.GUI または lil-gui を用いたパラメータ調整 GUI の実装
 - [ ] TransformControls によるボーン編集機能
 - [ ] VPD/VMD などのポーズ・モーションデータの入出力
+  - [x] VPD ファイルの複数選択とリスト表示
+  - [x] 選択ポーズを MMDLoader.loadVPD + helper.pose で適用
+  - [x] 現在のボーン状態を VPD 形式でエクスポートし保存
 - [ ] タイムライン編集 UI とカメラモーション編集
 - [ ] Web カメラを用いたモーショントラッキング・姿勢推定
 - [ ] スクリーンショット撮影と MediaRecorder による動画録画
