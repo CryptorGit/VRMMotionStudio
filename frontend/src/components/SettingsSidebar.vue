@@ -41,6 +41,7 @@
               v-model:directional-intensity="directionalIntensity"
               v-model:show-light-marker="showLightMarker"
               v-model:marker-color="markerColor"
+              v-model:marker-length="markerLength"
             />
             <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
           </div>
@@ -61,13 +62,15 @@ const props = defineProps({
   mesh: Object,
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
-  directionalIntensity: { type: Number, required: true }
+  directionalIntensity: { type: Number, required: true },
+  markerLength: { type: Number, required: true }
 })
 const { ambient, directional, mesh } = props
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
-  'update:directionalIntensity'
+  'update:directionalIntensity',
+  'update:markerLength'
 ])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
@@ -80,6 +83,10 @@ const markerColor = computed({
 const directionalIntensity = computed({
   get: () => props.directionalIntensity,
   set: v => emit('update:directionalIntensity', v)
+})
+const markerLength = computed({
+  get: () => props.markerLength,
+  set: v => emit('update:markerLength', v)
 })
 
 const collapsed = ref(false)
@@ -217,7 +224,8 @@ defineExpose({
   visibleSections,
   expandedSections,
   showLightMarker,
-  markerColor
+  markerColor,
+  markerLength
 })
 </script>
 
