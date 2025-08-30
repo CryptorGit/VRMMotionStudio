@@ -44,11 +44,16 @@
     @toggle-model="toggleModelVisibility"
     @remove-model="removeModel"
   />
+  <BasicSettingsPanel
+    v-model:mode="mode"
+    v-model:show-bones="showBones"
+  />
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
+import BasicSettingsPanel from './BasicSettingsPanel.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
@@ -84,6 +89,8 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
+const mode = ref('camera')
+const showBones = ref(false)
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
