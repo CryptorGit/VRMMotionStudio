@@ -260,13 +260,14 @@ function onPointerMove(event) {
   if (draggingRot && selectedIKBone) {
     const dx = (event.clientX - startPointer.x) * 0.01
     const dy = (event.clientY - startPointer.y) * 0.01
-  selectedIKBone.rotation.y = startEuler.y + dx
-  selectedIKBone.rotation.x = startEuler.x + dy
-  helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-  currentMeshRef.value?.updateMatrixWorld(true)
-  updateIKMarkers()
-  return
-}
+    selectedIKBone.rotation.y = startEuler.y + dx
+    selectedIKBone.rotation.x = startEuler.x + dy
+    currentMeshRef.value?.updateMatrixWorld(true)
+    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.updateMatrixWorld(true)
+    updateIKMarkers()
+    return
+  }
   if (!draggingIK || !dragPlane || !selectedIKBone) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -275,11 +276,12 @@ function onPointerMove(event) {
   const point = new THREE.Vector3()
   if (raycaster.ray.intersectPlane(dragPlane, point)) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
-  selectedIKBone.position.copy(local)
-  helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-  currentMeshRef.value?.updateMatrixWorld(true)
-  updateIKMarkers()
-}
+    selectedIKBone.position.copy(local)
+    currentMeshRef.value?.updateMatrixWorld(true)
+    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.updateMatrixWorld(true)
+    updateIKMarkers()
+  }
 }
 function onPointerUp() {
   draggingIK = false
