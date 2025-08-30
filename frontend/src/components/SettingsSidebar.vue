@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
@@ -46,6 +46,34 @@ const props = defineProps({
 
 const collapsed = ref(false)
 const activeSection = ref(null)
+
+// ローカルストレージに状態を保持するキー
+const STORAGE_KEY = 'settingsSidebar'
+
+// 状態を保存
+function saveState() {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ collapsed: collapsed.value, activeSection: activeSection.value })
+  )
+}
+
+// 初期化時に保存された状態を読み込む
+onMounted(() => {
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (saved) {
+    try {
+      const { collapsed: savedCollapsed, activeSection: savedSection } = JSON.parse(saved)
+      collapsed.value = savedCollapsed ?? false
+      activeSection.value = savedSection ?? null
+    } catch (_) {
+      // JSON パース失敗時は何もしない
+    }
+  }
+})
+
+// 変更があれば状態を保存
+watch([collapsed, activeSection], saveState)
 
 function toggleSection(section) {
   activeSection.value = activeSection.value === section ? null : section
