@@ -503,7 +503,18 @@ function removeModel(index) {
       helper.remove(mesh)
     }
     try {
+      mesh.traverse(child => {
+        if (!child.isMesh) return
+        if (child.geometry) child.geometry.dispose()
+        const material = child.material
+        if (Array.isArray(material)) {
+          material.forEach(m => m?.dispose && m.dispose())
+        } else if (material) {
+          material.dispose()
+        }
+      })
       scene.remove(mesh)
+      renderer.renderLists.dispose()
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
       return
