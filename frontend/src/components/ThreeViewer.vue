@@ -228,7 +228,7 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (event.button === 1) return
+  if (event.button !== 0 && event.button !== 2) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -242,15 +242,18 @@ function onPointerDown(event) {
   if (!target) return
   selectedIKBone = target.bone
   if (event.button === 2) {
+    event.preventDefault()
     draggingRot = true
     startPointer.set(event.clientX, event.clientY)
     startEuler.copy(selectedIKBone.rotation)
-  } else {
+    renderer.domElement.setPointerCapture(event.pointerId)
+  } else if (event.button === 0) {
     const bonePos = new THREE.Vector3()
     selectedIKBone.getWorldPosition(bonePos)
     const normal = bonePos.clone().sub(camera.position).normalize()
     dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
     draggingIK = true
+    renderer.domElement.setPointerCapture(event.pointerId)
   }
   controls.enabled = false
   renderer.domElement.addEventListener('pointermove', onPointerMove)
@@ -287,7 +290,8 @@ function onPointerMove(event) {
     updateIKMarkers()
   }
 }
-function onPointerUp() {
+function onPointerUp(event) {
+  renderer.domElement.releasePointerCapture(event.pointerId)
   draggingIK = false
   draggingRot = false
   dragPlane = null
