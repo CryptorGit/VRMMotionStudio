@@ -726,23 +726,27 @@ function animate() {
   directionalLightHelper.update()
 }
 
+function handleError(e) {
+  try {
+    console.error('Unhandled error:', e.error || e.message)
+  } catch (err) {
+    console.error('Error handler failed:', err)
+  }
+}
+
+function handleUnhandledRejection(e) {
+  try {
+    console.error('Unhandled rejection:', e.reason)
+  } catch (err) {
+    console.error('Unhandledrejection handler failed:', err)
+  }
+}
+
 onMounted(async () => {
   loadLightingSettings()
   await loadIKConfig()
-  window.addEventListener('error', e => {
-    try {
-      console.error('Unhandled error:', e.error || e.message)
-    } catch (err) {
-      console.error('Error handler failed:', err)
-    }
-  })
-  window.addEventListener('unhandledrejection', e => {
-    try {
-      console.error('Unhandled rejection:', e.reason)
-    } catch (err) {
-      console.error('Unhandledrejection handler failed:', err)
-    }
-  })
+  window.addEventListener('error', handleError)
+  window.addEventListener('unhandledrejection', handleUnhandledRejection)
 
   const container = viewer.value
 
@@ -804,6 +808,9 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('error', handleError)
+  window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+  window.removeEventListener('resize', onWindowResize)
   disposeTransformControls()
 })
 </script>
