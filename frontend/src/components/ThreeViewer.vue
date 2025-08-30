@@ -78,7 +78,10 @@ watch(showLightMarker, v => {
   directionalLightHelper.visible = v
 })
 watch(lightMarkerColor, c => {
-  directionalLightHelper.material.color.set(c)
+  if (directionalLightHelper) {
+    directionalLightHelper.color.set(c)
+    directionalLightHelper.update()
+  }
 })
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
