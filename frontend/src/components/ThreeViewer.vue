@@ -32,6 +32,15 @@
     style="display:none"
     @change="onFileChange"
   />
+  <div id="basic-settings">
+    <div class="mode-toggle">
+      <button @click="poseMode = false" :class="{ active: !poseMode }">カメラ</button>
+      <button @click="poseMode = true" :class="{ active: poseMode }">ポーズ</button>
+    </div>
+    <label class="bones-toggle"
+      ><input type="checkbox" v-model="showBones" /> ボーン表示</label
+    >
+  </div>
   <SettingsSidebar
     ref="settingsSidebar"
     :ambient="ambientLight"
@@ -70,6 +79,8 @@ const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
 const models = ref([])
+const poseMode = ref(false)
+const showBones = ref(false)
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(0, 0, 0)
@@ -122,6 +133,16 @@ watch(showLightMarker, v => {
   } catch (e) {
     console.error('Failed to toggle light marker:', e)
   }
+})
+
+watch(poseMode, v => {
+  if (controls) controls.enabled = !v
+})
+
+watch(showBones, v => {
+  models.value.forEach(m => {
+    if (m.skeleton) m.skeleton.visible = v && m.visible
+  })
 })
 watch(lightMarkerColor, c => {
   try {
@@ -317,6 +338,7 @@ function toggleModelVisibility(index, visible) {
   if (model) {
     model.visible = visible
     model.mesh.visible = visible
+    if (model.skeleton) model.skeleton.visible = visible && showBones.value
   }
 }
 
@@ -325,6 +347,7 @@ function removeModel(index) {
   if (model) {
     helper.remove(model.mesh)
     scene.remove(model.mesh)
+    if (model.skeleton) scene.remove(model.skeleton)
     models.value.splice(index, 1)
     if (currentMeshRef.value === model.mesh) {
       currentMeshRef.value = models.value[0]?.mesh || null
@@ -415,7 +438,10 @@ async function handleFiles(files) {
     mesh => {
       scene.add(mesh)
       helper.add(mesh, { physics: true })
-      models.value.push({ mesh, name: modelFile.name, visible: true })
+      const skeleton = new THREE.SkeletonHelper(mesh)
+      skeleton.visible = showBones.value
+      scene.add(skeleton)
+      models.value.push({ mesh, skeleton, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })

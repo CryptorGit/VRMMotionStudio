@@ -381,8 +381,11 @@ defineExpose({
   cursor: pointer;
 }
 .section h3 .close-icon {
-  margin-left: 0.5rem;
+  margin-left: auto;
   cursor: pointer;
+}
+.section h3 .reload-icon + .close-icon {
+  margin-left: 0.5rem;
 }
 .section-content {
   padding: 0.5rem;

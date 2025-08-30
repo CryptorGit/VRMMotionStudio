@@ -62,3 +62,29 @@ body {
   padding: 20px;
   border-radius: 4px;
 }
+
+#basic-settings {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#basic-settings .mode-toggle button {
+  margin-right: 4px;
+}
+
+#basic-settings .mode-toggle button.active {
+  background: #ccc;
+}
+
+#basic-settings label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
