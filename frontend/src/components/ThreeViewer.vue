@@ -200,7 +200,16 @@ function setupIKTargets(mesh) {
   const bones = mesh.skeleton?.bones || []
 
   // Collect unique target bone indices from IK chains
-  const iks = (mesh.geometry?.iks || []).concat(extraIKChains)
+  const baseIks =
+    mesh.geometry?.iks ||
+    mesh.geometry?.userData?.mmd?.iks ||
+    mesh.geometry?.ik ||
+    mesh.geometry?.userData?.mmd?.ik ||
+    []
+  if (baseIks.length === 0) {
+    console.warn('IK definitions not found for mesh', mesh)
+  }
+  const iks = baseIks.concat(extraIKChains)
   const targetIndices = new Set()
   iks.forEach(ik => {
     if (typeof ik.target === 'number') targetIndices.add(ik.target)
@@ -243,7 +252,15 @@ function updateIKMarkers() {
 
 function initIKSolver(mesh) {
   if (!mesh || !helper) return
-  const base = mesh.geometry.iks || []
+  const base =
+    mesh.geometry?.iks ||
+    mesh.geometry?.userData?.mmd?.iks ||
+    mesh.geometry?.ik ||
+    mesh.geometry?.userData?.mmd?.ik ||
+    []
+  if (base.length === 0) {
+    console.warn('IK definitions not found for mesh', mesh)
+  }
   const iks = base.concat(extraIKChains)
   const solver = new CCDIKSolver(mesh, iks)
   const obj = helper.objects.get(mesh)
