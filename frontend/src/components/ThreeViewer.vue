@@ -17,6 +17,20 @@
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
+  <div id="transform-controls">
+    <button
+      :class="{ active: transformMode === 'translate' }"
+      @click="setTransformMode('translate')"
+    >
+      <i class="fa-solid fa-up-down-left-right"></i>
+    </button>
+    <button
+      :class="{ active: transformMode === 'rotate' }"
+      @click="setTransformMode('rotate')"
+    >
+      <i class="fa-solid fa-rotate"></i>
+    </button>
+  </div>
   <div v-if="poses.length" id="pose-selector">
     <select v-model="selectedPose" @change="applyPose">
       <option disabled value="">ポーズを選択</option>
@@ -88,6 +102,7 @@ directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 const showIkMarkers = ref(true)
+const transformMode = ref('translate')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -294,7 +309,7 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (event.button === 1) return
+  if (event.button !== 0) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -311,12 +326,18 @@ function onPointerDown(event) {
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
   selectedIKBone = target.bone
-  if (event.button === 2) {
-    transformControls?.setMode('rotate')
-  } else {
-    transformControls?.setMode('translate')
-  }
   transformControls?.attach(selectedIKBone)
+}
+function setTransformMode(mode) {
+  transformMode.value = mode
+  transformControls?.setMode(mode)
+}
+function onKeyDown(event) {
+  const tag = event.target?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  const key = event.key.toLowerCase()
+  if (key === 'w') setTransformMode('translate')
+  else if (key === 'e') setTransformMode('rotate')
 }
 function onTransformChange() {
   const mesh = currentMeshRef.value
@@ -335,16 +356,15 @@ function initTransformControls() {
   if (!renderer || !camera || !scene) return
   transformControls = new TransformControls(camera, renderer.domElement)
   transformControls.setSpace('local')
+  transformControls.setMode(transformMode.value)
   transformControls.addEventListener('dragging-changed', onTransformDragging)
   transformControls.addEventListener('change', onTransformChange)
   scene.add(transformControls)
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
-  renderer.domElement.addEventListener('contextmenu', preventContextMenu)
 }
 function disposeTransformControls() {
   ikTargets.forEach(t => (t.marker.visible = false))
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
-  renderer?.domElement?.removeEventListener('contextmenu', preventContextMenu)
   if (transformControls) {
     transformControls.removeEventListener('dragging-changed', onTransformDragging)
     transformControls.removeEventListener('change', onTransformChange)
@@ -353,9 +373,6 @@ function disposeTransformControls() {
     transformControls = null
   }
   selectedIKBone = null
-}
-function preventContextMenu(e) {
-  e.preventDefault()
 }
 const settingsSidebar = ref(null)
 
@@ -778,6 +795,7 @@ onMounted(async () => {
   helper = new MMDAnimationHelper()
 
   window.addEventListener('resize', onWindowResize)
+  window.addEventListener('keydown', onKeyDown)
   document.addEventListener('click', handleDocumentClick)
 
   console.log('API base URL:', API_BASE_URL)
@@ -790,6 +808,23 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
+  window.removeEventListener('keydown', onKeyDown)
   disposeTransformControls()
 })
 </script>
+
+<style scoped>
+#transform-controls {
+  position: absolute;
+  top: 10px;
+  left: 60px;
+  display: flex;
+  gap: 4px;
+}
+#transform-controls button {
+  padding: 4px;
+}
+#transform-controls button.active {
+  background-color: #ccc;
+}
+</style>
