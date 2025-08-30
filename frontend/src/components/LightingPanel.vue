@@ -36,7 +36,7 @@
         強度
         <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensity" />
       </label>
-      <p class="section-description">ライトの位置と向き（ターゲット）をXYZ軸で指定</p>
+      <p class="section-description">ライトの位置と方向を角度で指定</p>
       <div class="position-inputs">
         <label>
           ライト位置X
@@ -53,16 +53,24 @@
       </div>
       <div class="position-inputs">
         <label>
-          ターゲットX
-          <input type="number" v-model.number="directionalTargetX" />
+          方位角 (°)
+          <input
+            type="range"
+            min="0"
+            max="360"
+            step="1"
+            v-model.number="directionalAzimuth"
+          />
         </label>
         <label>
-          ターゲットY
-          <input type="number" v-model.number="directionalTargetY" />
-        </label>
-        <label>
-          ターゲットZ
-          <input type="number" v-model.number="directionalTargetZ" />
+          仰角 (°)
+          <input
+            type="range"
+            min="-90"
+            max="90"
+            step="1"
+            v-model.number="directionalElevation"
+          />
         </label>
       </div>
     </section>
@@ -71,6 +79,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import * as THREE from 'three'
 
 const props = defineProps({
   ambient: { type: Object, required: true },
@@ -121,17 +130,39 @@ const directionalZ = computed({
   set: v => (props.directional.position.z = v)
 })
 
-const directionalTargetX = computed({
-  get: () => props.directional.target.position.x,
-  set: v => (props.directional.target.position.x = v)
+function setTargetFromAngles(azimuthDeg, elevationDeg) {
+  const dir = props.directional.target.position
+    .clone()
+    .sub(props.directional.position)
+  const r = dir.length() || 1
+  const theta = THREE.MathUtils.degToRad(azimuthDeg)
+  const phi = THREE.MathUtils.degToRad(90 - elevationDeg)
+  const vec = new THREE.Vector3().setFromSphericalCoords(r, phi, theta)
+  props.directional.target.position.copy(
+    props.directional.position.clone().add(vec)
+  )
+}
+
+const directionalAzimuth = computed({
+  get: () => {
+    const dir = props.directional.target.position
+      .clone()
+      .sub(props.directional.position)
+    const s = new THREE.Spherical().setFromVector3(dir)
+    return THREE.MathUtils.radToDeg(s.theta)
+  },
+  set: v => setTargetFromAngles(v, directionalElevation.value)
 })
-const directionalTargetY = computed({
-  get: () => props.directional.target.position.y,
-  set: v => (props.directional.target.position.y = v)
-})
-const directionalTargetZ = computed({
-  get: () => props.directional.target.position.z,
-  set: v => (props.directional.target.position.z = v)
+
+const directionalElevation = computed({
+  get: () => {
+    const dir = props.directional.target.position
+      .clone()
+      .sub(props.directional.position)
+    const s = new THREE.Spherical().setFromVector3(dir)
+    return 90 - THREE.MathUtils.radToDeg(s.phi)
+  },
+  set: v => setTargetFromAngles(directionalAzimuth.value, v)
 })
 </script>
 

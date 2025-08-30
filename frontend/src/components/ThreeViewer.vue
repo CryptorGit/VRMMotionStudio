@@ -83,6 +83,19 @@ watch(lightMarkerColor, c => {
     directionalLightHelper.update()
   }
 })
+watch(
+  () => [
+    directionalLight.value.position.x,
+    directionalLight.value.position.y,
+    directionalLight.value.position.z,
+    directionalLight.value.target.position.x,
+    directionalLight.value.target.position.y,
+    directionalLight.value.target.position.z
+  ],
+  () => {
+    directionalLightHelper.update()
+  }
+)
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
