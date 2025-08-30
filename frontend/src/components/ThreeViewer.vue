@@ -16,13 +16,9 @@
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
-      <li id="physics-option" @click="openPhysics"><i class="fa-solid fa-cog"></i> 物理設定</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
-      <li id="lighting-option" @click="openLightingSettings"><i class="fa-solid fa-lightbulb"></i> ライティング設定</li>
-      <li id="physics-option" @click="openPhysicsSettings"><i class="fa-solid fa-atom"></i> 物理設定</li>
       <li id="bone-option" @click="openBoneManipulator"><i class="fa-solid fa-bone"></i> ボーン直接操作</li>
-      <li id="pose-option" @click="openPoseManager"><i class="fa-solid fa-person-running"></i> ポーズ管理</li>
     </ul>
   </div>
   <div v-if="poses.length" id="pose-selector">
@@ -40,23 +36,12 @@
     style="display:none"
     @change="onFileChange"
   />
-  <PhysicsPanel
-    v-if="physicsPanelOpen"
-    :helper="helper"
-    @close="physicsPanelOpen = false"
-  />
   <LightingPanel
     v-if="lightingPanelOpen"
     :ambient="ambientLight"
     :directional="directionalLight"
     @close="lightingPanelOpen = false"
   />
-  <div v-if="activePanel" class="modal">
-    <div class="modal-content">
-      <h2>{{ panelTitles[activePanel] }}</h2>
-      <button @click="closePanel">閉じる</button>
-    </div>
-  </div>
 </template>
 
 <script setup>
@@ -76,7 +61,6 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // We import it as an asset URL and pass it via locateFile.
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
-import PhysicsPanel from './PhysicsPanel.vue'
 import BoneManipulator from '../utils/BoneManipulator.js'
 
 const viewer = ref(null)
@@ -84,22 +68,12 @@ const fileInput = ref(null)
 const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
-const physicsPanelOpen = ref(false)
 const lightingPanelOpen = ref(false)
 const ambientLight = ref(null)
 const directionalLight = ref(null)
 const morphOpen = ref(false)
 const currentMeshRef = ref(null)
-const activePanel = ref(null)
 const boneMode = ref(false)
-
-const panelTitles = {
-  morph: 'モーフ編集',
-  lighting: 'ライティング設定',
-  physics: '物理設定',
-  bone: 'ボーン直接操作',
-  pose: 'ポーズ管理'
-}
 
 let scene, camera, renderer, effect, controls, helper, loader, currentMesh, boneManipulator
 const clock = new THREE.Clock()
@@ -134,11 +108,6 @@ function openFile() {
   menuOpen.value = false
 }
 
-function openPhysics() {
-  physicsPanelOpen.value = true
-  menuOpen.value = false
-}
-
 function openLighting() {
   lightingPanelOpen.value = true
   menuOpen.value = false
@@ -146,18 +115,6 @@ function openLighting() {
 
 function openMorphEditor() {
   morphOpen.value = true
-  menuOpen.value = false
-}
-
-function openLightingSettings() {
-  console.log('Lighting settings opened')
-  activePanel.value = 'lighting'
-  menuOpen.value = false
-}
-
-function openPhysicsSettings() {
-  console.log('Physics settings opened')
-  activePanel.value = 'physics'
   menuOpen.value = false
 }
 
@@ -170,22 +127,11 @@ function openBoneManipulator() {
     }
     boneManipulator.selectBone(currentMesh.skeleton.bones[0])
     boneManipulator.activate()
-    activePanel.value = null
   } else if (boneManipulator) {
     boneManipulator.deactivate()
     boneManipulator = null
   }
   menuOpen.value = false
-}
-
-function openPoseManager() {
-  console.log('Pose manager opened')
-  activePanel.value = 'pose'
-  menuOpen.value = false
-}
-
-function closePanel() {
-  activePanel.value = null
 }
 
 function onDragOver() {
