@@ -161,9 +161,13 @@ const directionalAzimuth = computed({
       .clone()
       .sub(props.directional.position)
     const s = new THREE.Spherical().setFromVector3(dir)
-    return THREE.MathUtils.radToDeg(s.theta)
+    const deg = THREE.MathUtils.radToDeg(s.theta)
+    return ((deg % 360) + 360) % 360
   },
-  set: v => setTargetFromAngles(v, directionalElevation.value)
+  set: v => {
+    const normalized = ((v % 360) + 360) % 360
+    setTargetFromAngles(normalized, directionalElevation.value)
+  }
 })
 
 const directionalElevation = computed({
