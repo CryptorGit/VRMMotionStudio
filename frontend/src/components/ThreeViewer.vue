@@ -95,7 +95,6 @@ const IK_MARKER_PIXEL_SIZE = 16
 let ikTargets = []
 const selectedIKBone = ref(null)
 let dragPlane = null
-let ikUpdateHandle = 0
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
 const rotationAxis = new THREE.Vector3()
@@ -338,18 +337,12 @@ function onPointerDown(event) {
 }
 
 function applyIKUpdate() {
-  ikUpdateHandle = 0
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   solver?.update()
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkers()
-}
-
-function scheduleIKUpdate() {
-  if (ikUpdateHandle) return
-  ikUpdateHandle = requestAnimationFrame(applyIKUpdate)
 }
 
 function onPointerMove(event) {
@@ -359,7 +352,7 @@ function onPointerMove(event) {
     _quat.setFromAxisAngle(rotationAxis, angle)
     selectedIKBone.value.quaternion.premultiply(_quat)
     selectedIKBone.value.updateMatrixWorld(true)
-    scheduleIKUpdate()
+    applyIKUpdate()
     return
   }
   if (!dragPlane) return
@@ -371,7 +364,7 @@ function onPointerMove(event) {
     selectedIKBone.value.parent.worldToLocal(_dragPoint)
     selectedIKBone.value.position.copy(_dragPoint)
     selectedIKBone.value.updateMatrixWorld(true)
-    scheduleIKUpdate()
+    applyIKUpdate()
   }
 }
 
@@ -381,21 +374,14 @@ function onPointerUp() {
   controls.enabled = true
   if (isRotating) {
     isRotating = false
-    scheduleIKUpdate()
   }
   dragPlane = null
-  const mesh = currentMeshRef.value
-  const solver = helper?.objects.get(mesh)?.ikSolver
-  solver?.update()
-  mesh?.skeleton?.update()
-  mesh?.updateMatrixWorld(true)
-  updateIKMarkers()
+  applyIKUpdate()
   selectedIKBone.value = null
 }
 const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader
-const clock = new THREE.Clock()
 
 function handleDocumentClick(e) {
   if (menuOpen.value && menu.value && !menu.value.contains(e.target)) {
@@ -746,10 +732,13 @@ function onWindowResize() {
 
 function animate() {
   requestAnimationFrame(animate)
-  const delta = clock.getDelta()
-  if (helper) {
-    helper.update(delta)
-  }
+  models.value.forEach(({ mesh, visible }) => {
+    if (!visible || !mesh.visible) return
+    const solver = helper?.objects.get(mesh)?.ikSolver
+    solver?.update()
+    mesh.skeleton?.update()
+    mesh.updateMatrixWorld(true)
+  })
   updateIKMarkers()
   effect.render(scene, camera)
   directionalLightHelper.update()
