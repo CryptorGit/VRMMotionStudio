@@ -14,6 +14,18 @@
           <input type="color" v-model="markerColor" />
         </label>
       </div>
+      <div>
+        <label>
+          マーカー長さ
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            v-model.number="markerLength"
+          />
+        </label>
+      </div>
     </div>
     <section>
       <h3>Ambient Light</h3>
@@ -86,12 +98,14 @@ const props = defineProps({
   directional: { type: Object, required: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
-  directionalIntensity: { type: Number, required: true }
+  directionalIntensity: { type: Number, required: true },
+  markerLength: { type: Number, required: true }
 })
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
-  'update:directionalIntensity'
+  'update:directionalIntensity',
+  'update:markerLength'
 ])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
@@ -100,6 +114,10 @@ const showLightMarker = computed({
 const markerColor = computed({
   get: () => props.markerColor,
   set: v => emit('update:markerColor', v)
+})
+const markerLength = computed({
+  get: () => props.markerLength,
+  set: v => emit('update:markerLength', v)
 })
 
 const ambientColor = computed({
