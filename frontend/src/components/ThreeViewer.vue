@@ -300,11 +300,18 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (event.button !== 0) return
+  if (event.button !== 0 || transformControls?.dragging) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
   raycaster.setFromCamera(mouse, camera)
+  const gizmoHits = transformControls
+    ? raycaster.intersectObjects(
+        transformControls._gizmo?.picker?.children || [],
+        true
+      )
+    : []
+  if (gizmoHits.length > 0) return
   const intersects = raycaster.intersectObjects(
     ikTargets.map(t => t.marker),
     false
