@@ -197,18 +197,17 @@ function getDB() {
 }
 async function cacheFiles(files) {
   try {
+    const list = await Promise.all(
+      [...files].map(async f => ({
+        name: f.name,
+        path: f.webkitRelativePath || f.name,
+        data: await f.arrayBuffer()
+      }))
+    )
+
     const db = await getDB()
     const tx = db.transaction(DB_STORE, 'readwrite')
     const store = tx.objectStore(DB_STORE)
-    const list = []
-    for (const file of files) {
-      const data = await file.arrayBuffer()
-      list.push({
-        name: file.name,
-        path: file.webkitRelativePath || file.name,
-        data
-      })
-    }
     store.put(list, 'current')
     await new Promise((res, rej) => {
       tx.oncomplete = res
