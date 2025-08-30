@@ -192,6 +192,7 @@ function isPhysicalBone(bone) {
 // モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
   setupIKTargets(mesh)
+  initIKSolver(mesh)
 })
 function setupIKTargets(mesh) {
   ikTargets.forEach(t => scene.remove(t.marker))
