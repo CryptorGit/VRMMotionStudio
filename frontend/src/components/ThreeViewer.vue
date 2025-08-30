@@ -483,12 +483,20 @@ function toggleModelVisibility(index, visible) {
 function removeModel(index) {
   const model = models.value[index]
   if (model) {
-    helper.remove(model.mesh)
-    scene.remove(model.mesh)
+    const mesh = model.mesh
+    if (helper?.objects?.has(mesh)) {
+      helper.remove(mesh)
+    }
+    try {
+      scene.remove(mesh)
+    } catch (e) {
+      console.error('Failed to remove mesh from scene:', e)
+    }
     models.value.splice(index, 1)
-    if (currentMeshRef.value === model.mesh) {
+    if (currentMeshRef.value === mesh) {
       currentMeshRef.value = models.value[0]?.mesh || null
     }
+    setupIKTargets(currentMeshRef.value)
   }
 }
 
@@ -500,11 +508,19 @@ async function clearCache() {
   poses.value = []
   selectedPose.value = null
   models.value.forEach(m => {
-    helper.remove(m.mesh)
-    scene.remove(m.mesh)
+    const mesh = m.mesh
+    if (helper?.objects?.has(mesh)) {
+      helper.remove(mesh)
+    }
+    try {
+      scene.remove(mesh)
+    } catch (e) {
+      console.error('Failed to remove mesh from scene:', e)
+    }
   })
   models.value = []
   currentMeshRef.value = null
+  setupIKTargets(currentMeshRef.value)
   menuOpen.value = false
 }
 
