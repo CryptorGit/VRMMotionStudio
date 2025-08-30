@@ -339,11 +339,9 @@ function applyIKUpdate() {
   ikUpdateHandle = 0
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
-  mesh?.skeleton?.update()
   solver?.update()
-  selectedIKBone.value?.updateMatrixWorld()
+  mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
-  helper?.update(0)
   updateIKMarkers()
 }
 
@@ -386,12 +384,11 @@ function onPointerUp() {
   dragPlane = null
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
-  mesh?.skeleton?.update()
   solver?.update()
-  selectedIKBone.value?.updateMatrixWorld()
+  mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
-  helper?.update(0)
   updateIKMarkers()
+  selectedIKBone.value = null
 }
 const settingsSidebar = ref(null)
 
