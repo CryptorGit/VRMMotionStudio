@@ -247,8 +247,14 @@ function setupIKTargets(mesh) {
     if (/(?:ＩＫ|IK)$/i.test(bone.name) || extraIKBoneNames.includes(bone.name)) {
       const marker = new THREE.Mesh(
         new THREE.BoxGeometry(0.4, 0.4, 0.4),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+        new THREE.MeshBasicMaterial({
+          color: 0xff0000,
+          depthTest: false,
+          depthWrite: false,
+          transparent: true
+        })
       )
+      marker.renderOrder = 999
       marker.visible = currentMode.value === 'pose'
       scene.add(marker)
       ikTargets.push({ bone, marker })
