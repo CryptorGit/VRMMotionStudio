@@ -1,6 +1,5 @@
 <template>
   <div id="morph-editor">
-    <button id="close-button" @click="$emit('close')">×</button>
     <div v-if="morphs.length">
       <div
         v-for="[name, index] in morphs"
@@ -45,17 +44,11 @@ function update(index, event) {
 
 <style scoped>
 #morph-editor {
-  position: absolute;
-  top: 0;
-  right: 0;
   background: rgba(255, 255, 255, 0.9);
   padding: 10px;
   max-height: 100vh;
   overflow-y: auto;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-}
-#morph-editor #close-button {
-  float: right;
 }
 .morph-row {
   display: flex;

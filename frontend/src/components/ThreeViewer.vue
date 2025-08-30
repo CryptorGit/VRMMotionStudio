@@ -6,11 +6,6 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   ></div>
-  <MorphEditor
-    v-if="morphOpen"
-    :mesh="currentMeshRef"
-    @close="morphOpen = false"
-  />
   <div id="menu">
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
@@ -36,18 +31,17 @@
     style="display:none"
     @change="onFileChange"
   />
-  <LightingPanel
-    v-if="lightingPanelOpen"
+  <SettingsSidebar
+    ref="settingsSidebar"
     :ambient="ambientLight"
     :directional="directionalLight"
-    @close="lightingPanelOpen = false"
+    :mesh="currentMeshRef"
   />
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import LightingPanel from './LightingPanel.vue'
-import MorphEditor from './MorphEditor.vue'
+import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
@@ -68,12 +62,11 @@ const fileInput = ref(null)
 const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
-const lightingPanelOpen = ref(false)
 const ambientLight = ref(null)
 const directionalLight = ref(null)
-const morphOpen = ref(false)
 const currentMeshRef = ref(null)
 const boneMode = ref(false)
+const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader, currentMesh, boneManipulator
 const clock = new THREE.Clock()
@@ -109,12 +102,12 @@ function openFile() {
 }
 
 function openLighting() {
-  lightingPanelOpen.value = true
+  settingsSidebar.value && settingsSidebar.value.openSection('lighting')
   menuOpen.value = false
 }
 
 function openMorphEditor() {
-  morphOpen.value = true
+  settingsSidebar.value && settingsSidebar.value.openSection('morph')
   menuOpen.value = false
 }
 
@@ -131,6 +124,7 @@ function openBoneManipulator() {
     boneManipulator.deactivate()
     boneManipulator = null
   }
+  settingsSidebar.value && settingsSidebar.value.openSection('bone')
   menuOpen.value = false
 }
 

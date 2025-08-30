@@ -37,7 +37,6 @@
         </label>
       </div>
     </section>
-    <button @click="$emit('close')">閉じる</button>
   </div>
 </template>
 
@@ -85,15 +84,11 @@ const directionalZ = computed({
 
 <style scoped>
 .lighting-panel {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   background: #fff;
   padding: 1rem;
   border: 1px solid #ccc;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  width: 250px;
 }
 .lighting-panel h2 {
   margin-top: 0;
