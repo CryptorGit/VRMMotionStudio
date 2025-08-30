@@ -1,6 +1,6 @@
 <template>
   <ul class="model-list">
-    <li v-for="(m, i) in models" :key="i">
+    <li v-for="(m, i) in models" :key="m.id">
       <label>
         <input type="checkbox" :checked="m.visible" @change="onToggle(i, $event.target.checked)" />
         {{ m.name }}
