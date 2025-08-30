@@ -26,6 +26,10 @@
         マーカー表示
         <input type="checkbox" v-model="showLightMarker" />
       </label>
+      <label>
+        マーカー色
+        <input type="color" v-model="markerColor" />
+      </label>
       <p class="section-description">ライトの位置と向き（ターゲット）をXYZ軸で指定</p>
       <div class="position-inputs">
         <label>
@@ -65,12 +69,17 @@ import { computed } from 'vue'
 const props = defineProps({
   ambient: { type: Object, required: true },
   directional: { type: Object, required: true },
-  showLightMarker: { type: Boolean, required: true }
+  showLightMarker: { type: Boolean, required: true },
+  markerColor: { type: String, required: true }
 })
-const emit = defineEmits(['update:showLightMarker'])
+const emit = defineEmits(['update:showLightMarker', 'update:markerColor'])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
   set: v => emit('update:showLightMarker', v)
+})
+const markerColor = computed({
+  get: () => props.markerColor,
+  set: v => emit('update:markerColor', v)
 })
 
 const ambientColor = computed({
