@@ -173,11 +173,34 @@ watch(currentMode, mode => {
     controls.enabled = mode === 'camera'
   }
 })
+// ボーン表示切り替え
+watch(showBones, v => {
+  if (!currentMeshRef.value) return
+  if (v) {
+    if (!skeletonHelper) {
+      skeletonHelper = new THREE.SkeletonHelper(currentMeshRef.value)
+    }
+    scene.add(skeletonHelper)
+  } else if (skeletonHelper) {
+    scene.remove(skeletonHelper)
+  }
+})
+// モデル切り替え時にヘルパーを再生成
+watch(currentMeshRef, mesh => {
+  if (skeletonHelper) {
+    scene.remove(skeletonHelper)
+    skeletonHelper = null
+  }
+  if (mesh && showBones.value) {
+    skeletonHelper = new THREE.SkeletonHelper(mesh)
+    scene.add(skeletonHelper)
+  }
+})
 
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
-let scene, camera, renderer, effect, controls, helper, loader
+let scene, camera, renderer, effect, controls, helper, loader, skeletonHelper
 const clock = new THREE.Clock()
 
 function handleDocumentClick(e) {
