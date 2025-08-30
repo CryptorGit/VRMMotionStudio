@@ -168,6 +168,25 @@ watch(directionalIntensity, i => {
     console.error('Failed to update light marker intensity:', e)
   }
 })
+
+function isPhysicalBone(bone) {
+  if (bone.userData && bone.userData.rigidBodyType !== undefined) return true
+  const name = bone.name ? bone.name.toLowerCase() : ''
+  return /^(?:physics|rigid|rb_)/i.test(name)
+}
+
+function createSkeletonHelper(mesh) {
+  const bones = mesh.skeleton?.bones ?? []
+  const filtered = bones.filter(b => !isPhysicalBone(b))
+  const helper = new THREE.SkeletonHelper(mesh)
+  helper.bones = filtered
+  helper.geometry.dispose()
+  const position = new Float32Array(filtered.length * 2 * 3)
+  helper.geometry = new THREE.BufferGeometry()
+  helper.geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3))
+  helper.update()
+  return helper
+}
 // モード変更時に OrbitControls の有効/無効を切り替える
 watch(currentMode, mode => {
   if (controls) {
@@ -179,7 +198,7 @@ watch(showBones, v => {
   if (!currentMeshRef.value) return
   if (v) {
     if (!skeletonHelper) {
-      skeletonHelper = new THREE.SkeletonHelper(currentMeshRef.value)
+      skeletonHelper = createSkeletonHelper(currentMeshRef.value)
     }
     scene.add(skeletonHelper)
   } else if (skeletonHelper) {
@@ -193,7 +212,7 @@ watch(currentMeshRef, mesh => {
     skeletonHelper = null
   }
   if (mesh && showBones.value) {
-    skeletonHelper = new THREE.SkeletonHelper(mesh)
+    skeletonHelper = createSkeletonHelper(mesh)
     scene.add(skeletonHelper)
   }
 })
