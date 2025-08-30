@@ -85,9 +85,14 @@ const props = defineProps({
   ambient: { type: Object, required: true },
   directional: { type: Object, required: true },
   showLightMarker: { type: Boolean, required: true },
-  markerColor: { type: String, required: true }
+  markerColor: { type: String, required: true },
+  directionalIntensity: { type: Number, required: true }
 })
-const emit = defineEmits(['update:showLightMarker', 'update:markerColor'])
+const emit = defineEmits([
+  'update:showLightMarker',
+  'update:markerColor',
+  'update:directionalIntensity'
+])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
   set: v => emit('update:showLightMarker', v)
@@ -113,8 +118,8 @@ const directionalColor = computed({
 })
 
 const directionalIntensity = computed({
-  get: () => props.directional.intensity,
-  set: v => (props.directional.intensity = v)
+  get: () => props.directionalIntensity,
+  set: v => emit('update:directionalIntensity', v)
 })
 
 const directionalX = computed({
