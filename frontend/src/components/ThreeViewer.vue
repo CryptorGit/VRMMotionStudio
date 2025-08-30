@@ -76,16 +76,20 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const showLightMarker = ref(false)
 watch(showLightMarker, v => {
-  directionalLightHelper.visible = v
+  try {
+    directionalLightHelper.visible = v
+  } catch (e) {
+    console.error('Failed to toggle light marker:', e)
+  }
 })
 watch(lightMarkerColor, c => {
-  if (directionalLightHelper) {
-    try {
+  try {
+    if (directionalLightHelper) {
       directionalLightHelper.color = new THREE.Color(c)
       directionalLightHelper.update()
-    } catch (e) {
-      console.error('Failed to set light marker color:', e)
     }
+  } catch (e) {
+    console.error('Failed to set light marker color:', e)
   }
 })
 watch(
@@ -98,12 +102,20 @@ watch(
     directionalLight.value.target.position.z
   ],
   () => {
-    directionalLightHelper.update()
+    try {
+      directionalLightHelper.update()
+    } catch (e) {
+      console.error('Failed to update light marker position:', e)
+    }
   }
 )
 watch(() => directionalLight.value.intensity, i => {
-  directionalLightHelper.scale.setScalar(markerBaseLength * i)
-  directionalLightHelper.update()
+  try {
+    directionalLightHelper.scale.setScalar(markerBaseLength * i)
+    directionalLightHelper.update()
+  } catch (e) {
+    console.error('Failed to update light marker intensity:', e)
+  }
 })
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
@@ -302,10 +314,18 @@ function animate() {
 
 onMounted(async () => {
   window.addEventListener('error', e => {
-    console.error('Unhandled error:', e.error || e.message)
+    try {
+      console.error('Unhandled error:', e.error || e.message)
+    } catch (err) {
+      console.error('Error handler failed:', err)
+    }
   })
   window.addEventListener('unhandledrejection', e => {
-    console.error('Unhandled rejection:', e.reason)
+    try {
+      console.error('Unhandled rejection:', e.reason)
+    } catch (err) {
+      console.error('Unhandledrejection handler failed:', err)
+    }
   })
 
   const container = viewer.value
