@@ -16,36 +16,33 @@
       </button>
     </div>
     <div class="sections" v-if="!collapsed">
-      <div
-        v-for="section in sectionOrder"
-        :key="section"
-        v-if="visibleSections[section]"
-        class="section"
-      >
-        <h3 @click="toggleSection(section)">
-          <i
-            :class="
-              activeSection === section
-                ? 'fa-solid fa-chevron-down'
-                : 'fa-solid fa-chevron-right'
-            "
-            class="toggle-icon"
-          ></i>
-          {{ sectionTitles[section] }}
-          <i
-            class="fa-solid fa-times close-icon"
-            @click.stop="hideSection(section)"
-          ></i>
-        </h3>
-        <div v-show="activeSection === section" class="section-content">
-          <LightingPanel
-            v-if="section === 'lighting' && ambient && directional"
-            :ambient="ambient"
-            :directional="directional"
-          />
-          <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
+      <template v-for="section in sectionOrder" :key="section">
+        <div v-if="visibleSections[section]" class="section">
+          <h3 @click="toggleSection(section)">
+            <i
+              :class="
+                activeSection === section
+                  ? 'fa-solid fa-chevron-down'
+                  : 'fa-solid fa-chevron-right'
+              "
+              class="toggle-icon"
+            ></i>
+            {{ sectionTitles[section] }}
+            <i
+              class="fa-solid fa-times close-icon"
+              @click.stop="hideSection(section)"
+            ></i>
+          </h3>
+          <div v-show="activeSection === section" class="section-content">
+            <LightingPanel
+              v-if="section === 'lighting' && ambient && directional"
+              :ambient="ambient"
+              :directional="directional"
+            />
+            <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
