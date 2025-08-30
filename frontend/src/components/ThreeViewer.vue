@@ -46,7 +46,6 @@
   />
   <BasicSettingsPanel
     v-model:mode="currentMode"
-    v-model:show-bones="showBones"
   />
 </template>
 
@@ -92,7 +91,6 @@ const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 // 現在の操作モードを保持（'camera' | 'pose'）
 const currentMode = ref('camera')
-const showBones = ref(false)
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -184,21 +182,8 @@ watch(directionalIntensity, i => {
 
 function isPhysicalBone(bone) {
   if (bone.userData && bone.userData.rigidBodyType !== undefined) return true
-  const name = bone.name ? bone.name.toLowerCase() : ''
-  return /^(?:physics|rigid|rb_)/i.test(name)
-}
-
-function createSkeletonHelper(mesh) {
-  const bones = mesh.skeleton?.bones ?? []
-  const filtered = bones.filter(b => !isPhysicalBone(b))
-  const helper = new THREE.SkeletonHelper(mesh)
-  helper.bones = filtered
-  helper.geometry.dispose()
-  const position = new Float32Array(filtered.length * 2 * 3)
-  helper.geometry = new THREE.BufferGeometry()
-  helper.geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3))
-  helper.updateMatrixWorld(true)
-  return helper
+  const name = bone.name || ''
+  return /(?:physics|rigid|rb_|col|collision|dummy)/i.test(name) || name.includes('ダミー')
 }
 // モード変更時に OrbitControls や TransformControls を切り替える
 watch(currentMode, mode => {
@@ -211,30 +196,8 @@ watch(currentMode, mode => {
     disposeTransformControls()
   }
 })
-// ボーン表示切り替え
-watch(showBones, v => {
-  if (!currentMeshRef.value) return
-  if (v) {
-    if (!skeletonHelper) {
-      skeletonHelper = createSkeletonHelper(currentMeshRef.value)
-    }
-    scene.add(skeletonHelper)
-  } else if (skeletonHelper) {
-    scene.remove(skeletonHelper)
-  }
-  skeletonHelper?.updateMatrixWorld(true)
-})
-// モデル切り替え時にヘルパーを再生成
+// モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
-  if (skeletonHelper) {
-    scene.remove(skeletonHelper)
-    skeletonHelper = null
-  }
-  if (mesh && showBones.value) {
-    skeletonHelper = createSkeletonHelper(mesh)
-    scene.add(skeletonHelper)
-    skeletonHelper.updateMatrixWorld(true)
-  }
   setupIKTargets(mesh)
 })
 function setupIKTargets(mesh) {
@@ -316,14 +279,13 @@ function onPointerMove(event) {
   if (draggingRot && selectedIKBone) {
     const dx = (event.clientX - startPointer.x) * 0.01
     const dy = (event.clientY - startPointer.y) * 0.01
-    selectedIKBone.rotation.y = startEuler.y + dx
-    selectedIKBone.rotation.x = startEuler.x + dy
-    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-    currentMeshRef.value?.updateMatrixWorld(true)
-    skeletonHelper?.updateMatrixWorld(true)
-    updateIKMarkers()
-    return
-  }
+  selectedIKBone.rotation.y = startEuler.y + dx
+  selectedIKBone.rotation.x = startEuler.x + dy
+  helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+  currentMeshRef.value?.updateMatrixWorld(true)
+  updateIKMarkers()
+  return
+}
   if (!draggingIK || !dragPlane || !selectedIKBone) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -332,12 +294,11 @@ function onPointerMove(event) {
   const point = new THREE.Vector3()
   if (raycaster.ray.intersectPlane(dragPlane, point)) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
-    selectedIKBone.position.copy(local)
-    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-    currentMeshRef.value?.updateMatrixWorld(true)
-    skeletonHelper?.updateMatrixWorld(true)
-    updateIKMarkers()
-  }
+  selectedIKBone.position.copy(local)
+  helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+  currentMeshRef.value?.updateMatrixWorld(true)
+  updateIKMarkers()
+}
 }
 function onPointerUp() {
   draggingIK = false
@@ -370,7 +331,7 @@ function preventContextMenu(e) {
 }
 const settingsSidebar = ref(null)
 
-let scene, camera, renderer, effect, controls, helper, loader, skeletonHelper
+let scene, camera, renderer, effect, controls, helper, loader
 const clock = new THREE.Clock()
 
 function handleDocumentClick(e) {
@@ -629,12 +590,11 @@ async function handleFiles(files) {
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
       if (poseFile) {
-        loader.loadVPD(posePath, true, pose => {
-          helper.pose(mesh, pose)
-          skeletonHelper?.updateMatrixWorld(true)
-          console.log('Pose applied:', poseFile.name)
-          logToServer({ event: 'pose', file: poseFile.name })
-        })
+      loader.loadVPD(posePath, true, pose => {
+        helper.pose(mesh, pose)
+        console.log('Pose applied:', poseFile.name)
+        logToServer({ event: 'pose', file: poseFile.name })
+      })
       }
     },
     undefined,
@@ -649,13 +609,12 @@ async function handleFiles(files) {
 
 function applyPose() {
   if (!selectedPose.value || !loader || !currentMeshRef.value) return
-  loader.loadVPD(selectedPose.value.url, true, pose => {
-    helper.pose(currentMeshRef.value, pose)
-    skeletonHelper?.updateMatrixWorld(true)
-    console.log('Pose applied:', selectedPose.value.name)
-    logToServer({ event: 'pose', file: selectedPose.value.name })
-  })
-}
+    loader.loadVPD(selectedPose.value.url, true, pose => {
+      helper.pose(currentMeshRef.value, pose)
+      console.log('Pose applied:', selectedPose.value.name)
+      logToServer({ event: 'pose', file: selectedPose.value.name })
+    })
+  }
 
 function exportPose() {
   if (!currentMeshRef.value) return
