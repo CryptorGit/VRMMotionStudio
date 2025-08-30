@@ -36,6 +36,7 @@
     :directional="directionalLight"
     :mesh="currentMeshRef"
     v-model:show-light-marker="showLightMarker"
+    v-model:marker-color="lightMarkerColor"
   />
 </template>
 
@@ -65,11 +66,19 @@ const selectedPose = ref(null)
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(1, 1, 1)
-const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight.value, 0.2)
+const lightMarkerColor = ref('#ffff00')
+const directionalLightHelper = new THREE.DirectionalLightHelper(
+  directionalLight.value,
+  0.2,
+  lightMarkerColor.value
+)
 directionalLightHelper.visible = false
 const showLightMarker = ref(false)
 watch(showLightMarker, v => {
   directionalLightHelper.visible = v
+})
+watch(lightMarkerColor, c => {
+  directionalLightHelper.material.color.set(c)
 })
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)

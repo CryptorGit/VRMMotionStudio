@@ -39,6 +39,7 @@
               :ambient="ambient"
               :directional="directional"
               v-model:show-light-marker="showLightMarker"
+              v-model:marker-color="markerColor"
             />
             <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
           </div>
@@ -57,13 +58,18 @@ const props = defineProps({
   ambient: Object,
   directional: Object,
   mesh: Object,
-  showLightMarker: { type: Boolean, required: true }
+  showLightMarker: { type: Boolean, required: true },
+  markerColor: { type: String, required: true }
 })
 const { ambient, directional, mesh } = props
-const emit = defineEmits(['update:showLightMarker'])
+const emit = defineEmits(['update:showLightMarker', 'update:markerColor'])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
   set: v => emit('update:showLightMarker', v)
+})
+const markerColor = computed({
+  get: () => props.markerColor,
+  set: v => emit('update:markerColor', v)
 })
 
 const collapsed = ref(false)
@@ -196,7 +202,13 @@ const sidebarStyle = computed(() => {
   return style
 })
 
-defineExpose({ openSection, visibleSections, expandedSections, showLightMarker })
+defineExpose({
+  openSection,
+  visibleSections,
+  expandedSections,
+  showLightMarker,
+  markerColor
+})
 </script>
 
 <style scoped>
