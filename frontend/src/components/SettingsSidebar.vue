@@ -21,7 +21,7 @@
           <h3 @click="toggleSection(section)">
             <i
               :class="
-                activeSection === section
+                expandedSections[section]
                   ? 'fa-solid fa-chevron-down'
                   : 'fa-solid fa-chevron-right'
               "
@@ -33,7 +33,7 @@
               @click.stop="hideSection(section)"
             ></i>
           </h3>
-          <div v-show="activeSection === section" class="section-content">
+          <div v-show="expandedSections[section]" class="section-content">
             <LightingPanel
               v-if="section === 'lighting' && ambient && directional"
               :ambient="ambient"
@@ -59,7 +59,10 @@ const props = defineProps({
 })
 
 const collapsed = ref(false)
-const activeSection = ref(null)
+const expandedSections = reactive({
+  lighting: false,
+  morph: false
+})
 const width = ref(300)
 const isResizing = ref(false)
 const headerRef = ref(null)
@@ -88,9 +91,9 @@ function saveState() {
     STORAGE_KEY,
     JSON.stringify({
       collapsed: collapsed.value,
-      activeSection: activeSection.value,
       width: width.value,
-      visibleSections: { ...visibleSections }
+      visibleSections: { ...visibleSections },
+      expandedSections: { ...expandedSections }
     })
   )
 }
@@ -105,16 +108,19 @@ onMounted(() => {
     try {
       const {
         collapsed: savedCollapsed,
-        activeSection: savedSection,
         width: savedWidth,
-        visibleSections: savedVisible
+        visibleSections: savedVisible,
+        expandedSections: savedExpanded
       } = JSON.parse(saved)
       collapsed.value = savedCollapsed ?? false
-      activeSection.value = savedSection ?? null
       width.value = savedWidth ?? 300
       if (savedVisible) {
         visibleSections.lighting = savedVisible.lighting ?? false
         visibleSections.morph = savedVisible.morph ?? false
+      }
+      if (savedExpanded) {
+        expandedSections.lighting = savedExpanded.lighting ?? false
+        expandedSections.morph = savedExpanded.morph ?? false
       }
     } catch (_) {
       // JSON パース失敗時は何もしない
@@ -123,23 +129,22 @@ onMounted(() => {
 })
 
 // 変更があれば状態を保存
-watch([collapsed, activeSection], saveState)
+watch(collapsed, saveState)
 watch(visibleSections, saveState, { deep: true })
+watch(expandedSections, saveState, { deep: true })
 
 function toggleSection(section) {
-  activeSection.value = activeSection.value === section ? null : section
+  expandedSections[section] = !expandedSections[section]
 }
 
 function openSection(section) {
   collapsed.value = false
-  activeSection.value = section
+  expandedSections[section] = true
 }
 
 function hideSection(section) {
   visibleSections[section] = false
-  if (activeSection.value === section) {
-    activeSection.value = null
-  }
+  expandedSections[section] = false
 }
 
 function startResize(e) {
@@ -183,7 +188,7 @@ const sidebarStyle = computed(() => {
   return style
 })
 
-defineExpose({ openSection, visibleSections })
+defineExpose({ openSection, visibleSections, expandedSections })
 </script>
 
 <style scoped>

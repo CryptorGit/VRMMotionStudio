@@ -111,9 +111,7 @@ function openLighting() {
     if (!settingsSidebar.value.visibleSections.lighting) {
       settingsSidebar.value.visibleSections.lighting = true
     }
-    if (settingsSidebar.value.activeSection !== 'lighting') {
-      settingsSidebar.value.openSection('lighting')
-    }
+    settingsSidebar.value.expandedSections.lighting = true
   }
   menuOpen.value = false
 }
@@ -123,9 +121,7 @@ function openMorphEditor() {
     if (!settingsSidebar.value.visibleSections.morph) {
       settingsSidebar.value.visibleSections.morph = true
     }
-    if (settingsSidebar.value.activeSection !== 'morph') {
-      settingsSidebar.value.openSection('morph')
-    }
+    settingsSidebar.value.expandedSections.morph = true
   }
   menuOpen.value = false
 }
