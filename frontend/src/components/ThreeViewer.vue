@@ -13,6 +13,7 @@
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
+      <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
   <div v-if="poses.length" id="pose-selector">
@@ -178,6 +179,88 @@ function logToServer(data) {
     .catch(err => console.debug('log error:', err))
 }
 
+const DB_NAME = 'mmd-viewer'
+const DB_STORE = 'model'
+let dbPromise
+function getDB() {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1)
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore(DB_STORE)
+      }
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+  }
+  return dbPromise
+}
+async function cacheFiles(files) {
+  try {
+    const db = await getDB()
+    const tx = db.transaction(DB_STORE, 'readwrite')
+    const store = tx.objectStore(DB_STORE)
+    const list = []
+    for (const file of files) {
+      const data = await file.arrayBuffer()
+      list.push({
+        name: file.name,
+        path: file.webkitRelativePath || file.name,
+        data
+      })
+    }
+    store.put(list, 'current')
+    await new Promise((res, rej) => {
+      tx.oncomplete = res
+      tx.onerror = () => rej(tx.error)
+    })
+    console.log('Model cached')
+  } catch (e) {
+    console.error('Failed to cache model:', e)
+  }
+}
+async function loadCachedFiles() {
+  try {
+    const db = await getDB()
+    const tx = db.transaction(DB_STORE)
+    const store = tx.objectStore(DB_STORE)
+    const files = await new Promise((res, rej) => {
+      const req = store.get('current')
+      req.onsuccess = () => res(req.result)
+      req.onerror = () => rej(req.error)
+    })
+    return files || null
+  } catch (e) {
+    console.error('Failed to load cached model:', e)
+    return null
+  }
+}
+async function deleteCachedFiles() {
+  try {
+    const db = await getDB()
+    const tx = db.transaction(DB_STORE, 'readwrite')
+    tx.objectStore(DB_STORE).delete('current')
+    await new Promise((res, rej) => {
+      tx.oncomplete = res
+      tx.onerror = () => rej(tx.error)
+    })
+    console.log('Model cache cleared')
+  } catch (e) {
+    console.error('Failed to clear model cache:', e)
+  }
+}
+
+async function restoreCachedModel() {
+  const saved = await loadCachedFiles()
+  if (!saved) return
+  const files = saved.map(f => {
+    const file = new File([f.data], f.name)
+    if (f.path) Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
+    return file
+  })
+  await handleFiles(files)
+}
+
 function onFileChange(e) {
   handleFiles(e.target.files)
 }
@@ -215,6 +298,22 @@ function openMorphEditor() {
   menuOpen.value = false
 }
 
+async function clearCache() {
+  console.log('Clear cache clicked')
+  logToServer({ event: 'clear-cache' })
+  await deleteCachedFiles()
+  poses.value.forEach(p => URL.revokeObjectURL(p.url))
+  poses.value = []
+  selectedPose.value = null
+  if (currentMesh) {
+    helper.remove(currentMesh)
+    scene.remove(currentMesh)
+    currentMesh = null
+    currentMeshRef.value = null
+  }
+  menuOpen.value = false
+}
+
 function onDragOver() {
   viewer.value.classList.add('dragover')
 }
@@ -226,7 +325,7 @@ function onDrop(e) {
   handleFiles(e.dataTransfer.files)
 }
 
-function handleFiles(files) {
+async function handleFiles(files) {
   poses.value.forEach(p => URL.revokeObjectURL(p.url))
   poses.value = []
   selectedPose.value = null
@@ -247,6 +346,9 @@ function handleFiles(files) {
   if (!modelFile) return
 
   poses.value = poseFiles
+
+  // save files to IndexedDB for restoration
+  await cacheFiles(Array.from(files))
 
   const poseFile = poseFiles[0]
   const posePath = poseFile && poseFile.url
@@ -412,6 +514,8 @@ onMounted(async () => {
 
   console.log('API base URL:', API_BASE_URL)
   logToServer({ event: 'init' })
+
+  await restoreCachedModel()
 
   animate()
 })
