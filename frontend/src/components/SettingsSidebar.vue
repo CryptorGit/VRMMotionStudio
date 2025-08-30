@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, computed, nextTick, toRefs } from 'vue'
+import { ref, reactive, onMounted, watchEffect, computed, nextTick, toRefs } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 import ModelList from './ModelList.vue'
@@ -172,6 +172,12 @@ function saveState() {
   )
 }
 
+let saveStateTimeout
+function scheduleSaveState() {
+  clearTimeout(saveStateTimeout)
+  saveStateTimeout = setTimeout(saveState, 200)
+}
+
 // 初期化時に保存された状態を読み込む
 onMounted(() => {
   nextTick(() => {
@@ -234,24 +240,28 @@ onMounted(() => {
 })
 
 // 変更があれば状態を保存
-watch(collapsed, saveState)
-watch(visibleSections, saveState, { deep: true })
-watch(expandedSections, saveState, { deep: true })
-watch(showLightMarker, saveState)
-watch(showIkMarkers, saveState)
-watch(markerColor, saveState)
-watch(directionalIntensity, saveState)
-watch(
-  () => [
-    directional.value.position.x,
-    directional.value.position.y,
-    directional.value.position.z,
-    directional.value.target.position.x,
-    directional.value.target.position.y,
-    directional.value.target.position.z
-  ],
-  saveState
-)
+watchEffect(() => {
+  collapsed.value
+  width.value
+  visibleSections.lighting
+  visibleSections.morph
+  visibleSections.models
+  expandedSections.lighting
+  expandedSections.morph
+  expandedSections.models
+  showLightMarker.value
+  showIkMarkers.value
+  markerColor.value
+  directionalIntensity.value
+  directional.value.position.x
+  directional.value.position.y
+  directional.value.position.z
+  directional.value.target.position.x
+  directional.value.target.position.y
+  directional.value.target.position.z
+
+  scheduleSaveState()
+})
 
 function toggleSection(section) {
   expandedSections[section] = !expandedSections[section]
@@ -289,7 +299,7 @@ function startResize(e) {
     if (frameId) cancelAnimationFrame(frameId)
     document.body.style.userSelect = ''
     isResizing.value = false
-    saveState()
+    scheduleSaveState()
   }
 
   document.addEventListener('mousemove', onMouseMove)
