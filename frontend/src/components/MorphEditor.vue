@@ -44,11 +44,8 @@ function update(index, event) {
 
 <style scoped>
 #morph-editor {
-  background: rgba(255, 255, 255, 0.9);
+  width: 100%;
   padding: 10px;
-  max-height: 100vh;
-  overflow-y: auto;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 .morph-row {
   display: flex;
