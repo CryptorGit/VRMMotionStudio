@@ -56,6 +56,7 @@ function update(index, event) {
   }
 }
 
+// SettingsSidebar から呼び出すためにメソッドを公開
 defineExpose({ reloadMorphs })
 </script>
 

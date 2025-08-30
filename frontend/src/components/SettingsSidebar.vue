@@ -266,7 +266,7 @@ function startResize(e) {
 }
 
 function reloadMorphs() {
-  morphEditorRef.value?.reloadMorphs()
+  morphEditorRef.value?.reloadMorphs?.()
 }
 
 const hasSections = computed(() =>
