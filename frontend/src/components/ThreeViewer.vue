@@ -178,6 +178,7 @@ watch(directionalIntensity, i => {
 watch(showIkMarkers, v => {
   try {
     ikTargets.forEach(t => (t.marker.visible = v))
+    updateIKMarkers()
   } catch (e) {
     console.error('Failed to toggle IK markers:', e)
   }
