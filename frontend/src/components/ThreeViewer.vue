@@ -87,6 +87,7 @@ const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
 const models = ref([])
+let nextModelId = 1
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(0, 0, 0)
@@ -565,6 +566,7 @@ async function clearCache() {
     }
   })
   models.value = []
+  nextModelId = 1
   currentMeshRef.value = null
   setupIKTargets(currentMeshRef.value)
   menuOpen.value = false
@@ -641,7 +643,7 @@ async function handleFiles(files) {
       scene.add(mesh)
       helper.add(mesh, { physics: false })
       initIKSolver(mesh)
-      models.value.push({ mesh, name: modelFile.name, visible: true })
+      models.value.push({ id: nextModelId++, mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
       setupIKTargets(mesh)
       console.log('Model loaded:', modelFile.name)
