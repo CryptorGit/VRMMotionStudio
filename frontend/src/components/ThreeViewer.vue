@@ -679,6 +679,7 @@ onMounted(async () => {
   camera.position.set(0, 10, 30)
 
     controls = new OrbitControls(camera, renderer.domElement)
+    controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY }
     controls.enabled = true
 
   scene.add(ambientLight.value)
