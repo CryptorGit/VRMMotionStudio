@@ -13,7 +13,6 @@
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
-      <li id="bone-option" @click="openBoneManipulator"><i class="fa-solid fa-bone"></i> ボーン直接操作</li>
     </ul>
   </div>
   <div v-if="poses.length" id="pose-selector">
@@ -55,7 +54,6 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // We import it as an asset URL and pass it via locateFile.
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
-import BoneManipulator from '../utils/BoneManipulator.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -66,10 +64,9 @@ const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(1, 1, 1)
 const currentMeshRef = ref(null)
-const boneMode = ref(false)
 const settingsSidebar = ref(null)
 
-let scene, camera, renderer, effect, controls, helper, loader, currentMesh, boneManipulator
+let scene, camera, renderer, effect, controls, helper, loader, currentMesh
 const clock = new THREE.Clock()
 
 function logToServer(data) {
@@ -109,23 +106,6 @@ function openLighting() {
 
 function openMorphEditor() {
   settingsSidebar.value && settingsSidebar.value.openSection('morph')
-  menuOpen.value = false
-}
-
-function openBoneManipulator() {
-  if (!currentMesh) return
-  boneMode.value = !boneMode.value
-  if (boneMode.value) {
-    if (!boneManipulator) {
-      boneManipulator = new BoneManipulator(camera, renderer.domElement, scene)
-    }
-    boneManipulator.selectBone(currentMesh.skeleton.bones[0])
-    boneManipulator.activate()
-  } else if (boneManipulator) {
-    boneManipulator.deactivate()
-    boneManipulator = null
-  }
-  settingsSidebar.value && settingsSidebar.value.openSection('bone')
   menuOpen.value = false
 }
 
@@ -178,7 +158,6 @@ function handleFiles(files) {
     scene.remove(currentMesh)
     currentMesh = null
     currentMeshRef.value = null
-    if (boneManipulator) boneManipulator.detach()
   }
 
   const manager = new THREE.LoadingManager()
@@ -205,9 +184,6 @@ function handleFiles(files) {
       currentMeshRef.value = mesh
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
-      if (boneMode.value && boneManipulator) {
-        boneManipulator.selectBone(currentMesh.skeleton.bones[0])
-      }
       if (poseFile) {
         loader.loadVPD(posePath, true, pose => {
           helper.pose(mesh, pose)
