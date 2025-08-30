@@ -67,9 +67,10 @@ const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(1, 1, 1)
 const lightMarkerColor = ref('#ffff00')
+const markerBaseLength = 0.2
 const directionalLightHelper = new THREE.DirectionalLightHelper(
   directionalLight.value,
-  0.2,
+  markerBaseLength,
   lightMarkerColor.value
 )
 directionalLightHelper.visible = false
@@ -100,6 +101,10 @@ watch(
     directionalLightHelper.update()
   }
 )
+watch(() => directionalLight.value.intensity, i => {
+  directionalLightHelper.scale.setScalar(markerBaseLength * i)
+  directionalLightHelper.update()
+})
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
