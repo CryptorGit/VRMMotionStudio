@@ -38,6 +38,7 @@
               v-if="section === 'lighting' && ambient && directional"
               :ambient="ambient"
               :directional="directional"
+              :show-light-marker="showLightMarker"
             />
             <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
           </div>
@@ -52,10 +53,11 @@ import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
-const props = defineProps({
+const { ambient, directional, mesh, showLightMarker } = defineProps({
   ambient: Object,
   directional: Object,
-  mesh: Object
+  mesh: Object,
+  showLightMarker: Object
 })
 
 const collapsed = ref(false)
@@ -188,7 +190,7 @@ const sidebarStyle = computed(() => {
   return style
 })
 
-defineExpose({ openSection, visibleSections, expandedSections })
+defineExpose({ openSection, visibleSections, expandedSections, showLightMarker })
 </script>
 
 <style scoped>

@@ -23,6 +23,10 @@
         強度
         <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensity" />
       </label>
+      <label>
+        マーカー表示
+        <input type="checkbox" v-model="showLightMarker" />
+      </label>
       <div class="position-inputs">
         <label>
           ライト位置X
@@ -46,8 +50,11 @@ import { computed } from 'vue'
 
 const props = defineProps({
   ambient: { type: Object, required: true },
-  directional: { type: Object, required: true }
+  directional: { type: Object, required: true },
+  showLightMarker: { type: Object, required: true }
 })
+
+const showLightMarker = props.showLightMarker
 
 const ambientColor = computed({
   get: () => '#' + props.ambient.color.getHexString(),
