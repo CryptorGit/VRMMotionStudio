@@ -107,6 +107,7 @@ const transformMode = ref('translate')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
+const IK_MARKER_PIXEL_SIZE = 16
 let ikTargets = []
 let selectedIKBone = null
 let transformControls = null
@@ -115,7 +116,6 @@ const _dragPoint = new THREE.Vector3()
 let reattachTransform = false
 const extraIKBoneNames = []
 const extraIKChains = []
-const _q = new THREE.Quaternion()
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -264,13 +264,13 @@ function setupIKTargets(mesh) {
   targetIndices.forEach(idx => {
     const bone = bones[idx]
     if (!bone) return
-    const marker = new THREE.Mesh(
-      new THREE.BoxGeometry(0.4, 0.4, 0.4),
-      new THREE.MeshBasicMaterial({
+    const marker = new THREE.Sprite(
+      new THREE.SpriteMaterial({
         color: 0xff0000,
+        opacity: 0.5,
+        transparent: true,
         depthTest: false,
-        depthWrite: false,
-        transparent: true
+        depthWrite: false
       })
     )
     marker.renderOrder = 999
@@ -283,13 +283,24 @@ function setupIKTargets(mesh) {
 }
 function updateIKMarkers() {
   const visible = showIkMarkers.value
+  const height = renderer.domElement.clientHeight
+  const fov = THREE.MathUtils.degToRad(camera.fov)
+  let maxScale = 0
   ikTargets.forEach(t => {
     t.bone.updateMatrixWorld(true)
     t.bone.getWorldPosition(t.marker.position)
-    t.bone.getWorldQuaternion(_q)
-    t.marker.quaternion.copy(_q)
+    const dist = t.marker.position.distanceTo(camera.position)
+    const scale =
+      (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
+    t.marker.scale.set(scale, scale, scale)
     t.marker.visible = visible
+    if (scale > maxScale) maxScale = scale
   })
+  if (maxScale > 0) {
+    const threshold = maxScale / 2
+    raycaster.params.Sprite.threshold = threshold
+    raycaster.params.Points.threshold = threshold
+  }
 }
 
 function initIKSolver(mesh) {
