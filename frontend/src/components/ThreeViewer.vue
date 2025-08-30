@@ -66,8 +66,9 @@ const poses = ref([])
 const selectedPose = ref(null)
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
-directionalLight.value.position.set(1, 1, 1)
-const lightMarkerColor = ref('#ffff00')
+directionalLight.value.position.set(0, 0, 0)
+directionalLight.value.target.position.set(1, 0, 0)
+const lightMarkerColor = ref('#ff0000')
 const LIGHT_MARKER_LENGTH = 0.2
 const directionalLightHelper = new THREE.DirectionalLightHelper(
   directionalLight.value,
