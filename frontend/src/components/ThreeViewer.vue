@@ -194,7 +194,7 @@ function createSkeletonHelper(mesh) {
   const position = new Float32Array(filtered.length * 2 * 3)
   helper.geometry = new THREE.BufferGeometry()
   helper.geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3))
-  helper.update()
+  helper.updateMatrixWorld(true)
   return helper
 }
 // モード変更時に OrbitControls や TransformControls を切り替える
@@ -219,6 +219,7 @@ watch(showBones, v => {
   } else if (skeletonHelper) {
     scene.remove(skeletonHelper)
   }
+  skeletonHelper?.updateMatrixWorld(true)
 })
 // モデル切り替え時にヘルパーを再生成
 watch(currentMeshRef, mesh => {
@@ -229,6 +230,7 @@ watch(currentMeshRef, mesh => {
   if (mesh && showBones.value) {
     skeletonHelper = createSkeletonHelper(mesh)
     scene.add(skeletonHelper)
+    skeletonHelper.updateMatrixWorld(true)
   }
   setupIKTargets(mesh)
 })
@@ -297,6 +299,7 @@ function onPointerMove(event) {
     selectedIKBone.rotation.x = startEuler.x + dy
     updateIKMarkers()
     helper?.update(0)
+    skeletonHelper?.updateMatrixWorld(true)
     return
   }
   if (!draggingIK || !dragPlane || !selectedIKBone) return
@@ -310,6 +313,7 @@ function onPointerMove(event) {
     selectedIKBone.position.copy(local)
     updateIKMarkers()
     helper?.update(0)
+    skeletonHelper?.updateMatrixWorld(true)
   }
 }
 function onPointerUp() {
@@ -603,6 +607,7 @@ async function handleFiles(files) {
       if (poseFile) {
         loader.loadVPD(posePath, true, pose => {
           helper.pose(mesh, pose)
+          skeletonHelper?.updateMatrixWorld(true)
           console.log('Pose applied:', poseFile.name)
           logToServer({ event: 'pose', file: poseFile.name })
         })
@@ -622,6 +627,7 @@ function applyPose() {
   if (!selectedPose.value || !loader || !currentMeshRef.value) return
   loader.loadVPD(selectedPose.value.url, true, pose => {
     helper.pose(currentMeshRef.value, pose)
+    skeletonHelper?.updateMatrixWorld(true)
     console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })

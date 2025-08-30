@@ -8,6 +8,7 @@
   - [ ] スライダー操作で `mesh.morphTargetInfluences` を更新する処理を `ThreeViewer.vue` と連携
   - [ ] `ThreeViewer.vue` のメニュー項目から `MorphEditor.vue` を開けるようにする
 - [ ] サイドバー全体の overflow 動作をブラウザで手動確認する
+- [ ] ボーン表示ボタンの動作をブラウザで手動確認する
 - [ ] ライティング設定パネルの実装
 - [ ] 物理設定パネルの実装
 - [ ] 物理ボーン判定の名前規則を詳細化する
