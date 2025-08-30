@@ -127,7 +127,22 @@ function saveState() {
       collapsed: collapsed.value,
       width: width.value,
       visibleSections: { ...visibleSections },
-      expandedSections: { ...expandedSections }
+      expandedSections: { ...expandedSections },
+      showLightMarker: showLightMarker.value,
+      markerColor: markerColor.value,
+      directionalIntensity: directionalIntensity.value,
+      directional: {
+        position: {
+          x: directional.value.position.x,
+          y: directional.value.position.y,
+          z: directional.value.position.z
+        },
+        target: {
+          x: directional.value.target.position.x,
+          y: directional.value.target.position.y,
+          z: directional.value.target.position.z
+        }
+      }
     })
   )
 }
@@ -144,7 +159,11 @@ onMounted(() => {
         collapsed: savedCollapsed,
         width: savedWidth,
         visibleSections: savedVisible,
-        expandedSections: savedExpanded
+        expandedSections: savedExpanded,
+        showLightMarker: savedShowMarker,
+        markerColor: savedMarkerColor,
+        directionalIntensity: savedDirectionalIntensity,
+        directional: savedDirectional
       } = JSON.parse(saved)
       collapsed.value = savedCollapsed ?? false
       width.value = savedWidth ?? 300
@@ -156,6 +175,28 @@ onMounted(() => {
         expandedSections.lighting = savedExpanded.lighting ?? false
         expandedSections.morph = savedExpanded.morph ?? false
       }
+      if (savedShowMarker !== undefined)
+        emit('update:showLightMarker', savedShowMarker)
+      if (savedMarkerColor !== undefined)
+        emit('update:markerColor', savedMarkerColor)
+      if (savedDirectionalIntensity !== undefined)
+        emit('update:directionalIntensity', savedDirectionalIntensity)
+      if (savedDirectional?.position) {
+        const p = savedDirectional.position
+        directional.value.position.set(
+          p.x ?? directional.value.position.x,
+          p.y ?? directional.value.position.y,
+          p.z ?? directional.value.position.z
+        )
+      }
+      if (savedDirectional?.target) {
+        const t = savedDirectional.target
+        directional.value.target.position.set(
+          t.x ?? directional.value.target.position.x,
+          t.y ?? directional.value.target.position.y,
+          t.z ?? directional.value.target.position.z
+        )
+      }
     } catch (_) {
       // JSON パース失敗時は何もしない
     }
@@ -166,6 +207,20 @@ onMounted(() => {
 watch(collapsed, saveState)
 watch(visibleSections, saveState, { deep: true })
 watch(expandedSections, saveState, { deep: true })
+watch(showLightMarker, saveState)
+watch(markerColor, saveState)
+watch(directionalIntensity, saveState)
+watch(
+  () => [
+    directional.value.position.x,
+    directional.value.position.y,
+    directional.value.position.z,
+    directional.value.target.position.x,
+    directional.value.target.position.y,
+    directional.value.target.position.z
+  ],
+  saveState
+)
 
 function toggleSection(section) {
   expandedSections[section] = !expandedSections[section]

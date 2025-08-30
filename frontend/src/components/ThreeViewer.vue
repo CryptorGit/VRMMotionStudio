@@ -78,6 +78,38 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
+const STORAGE_KEY = 'settingsSidebar'
+function loadLightingSettings() {
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (!saved) return
+  try {
+    const data = JSON.parse(saved)
+    if (data.markerColor !== undefined)
+      lightMarkerColor.value = data.markerColor
+    if (data.showLightMarker !== undefined)
+      showLightMarker.value = data.showLightMarker
+    if (data.directionalIntensity !== undefined)
+      directionalIntensity.value = data.directionalIntensity
+    if (data.directional?.position) {
+      const p = data.directional.position
+      directionalLight.value.position.set(
+        p.x ?? directionalLight.value.position.x,
+        p.y ?? directionalLight.value.position.y,
+        p.z ?? directionalLight.value.position.z
+      )
+    }
+    if (data.directional?.target) {
+      const t = data.directional.target
+      directionalLight.value.target.position.set(
+        t.x ?? directionalLight.value.target.position.x,
+        t.y ?? directionalLight.value.target.position.y,
+        t.z ?? directionalLight.value.target.position.z
+      )
+    }
+  } catch (e) {
+    console.error('Failed to load lighting settings:', e)
+  }
+}
 watch(showLightMarker, v => {
   try {
     directionalLightHelper.visible = v
@@ -317,6 +349,7 @@ function animate() {
 }
 
 onMounted(async () => {
+  loadLightingSettings()
   window.addEventListener('error', e => {
     try {
       console.error('Unhandled error:', e.error || e.message)
