@@ -1,5 +1,14 @@
 <template>
-  <div class="settings-sidebar" :class="{ collapsed }">
+  <div
+    class="settings-sidebar"
+    :class="{ collapsed, resizing: isResizing }"
+    :style="collapsed ? {} : { width: width + 'px' }"
+  >
+    <div
+      class="resize-handle"
+      v-if="!collapsed"
+      @mousedown="startResize"
+    ></div>
     <div class="header">
       <span>設定</span>
       <button @click="collapsed = !collapsed">
@@ -46,6 +55,8 @@ const props = defineProps({
 
 const collapsed = ref(false)
 const activeSection = ref(null)
+const width = ref(300)
+const isResizing = ref(false)
 
 // ローカルストレージに状態を保持するキー
 const STORAGE_KEY = 'settingsSidebar'
@@ -54,7 +65,11 @@ const STORAGE_KEY = 'settingsSidebar'
 function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify({ collapsed: collapsed.value, activeSection: activeSection.value })
+    JSON.stringify({
+      collapsed: collapsed.value,
+      activeSection: activeSection.value,
+      width: width.value
+    })
   )
 }
 
@@ -63,9 +78,14 @@ onMounted(() => {
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) {
     try {
-      const { collapsed: savedCollapsed, activeSection: savedSection } = JSON.parse(saved)
+      const {
+        collapsed: savedCollapsed,
+        activeSection: savedSection,
+        width: savedWidth
+      } = JSON.parse(saved)
       collapsed.value = savedCollapsed ?? false
       activeSection.value = savedSection ?? null
+      width.value = savedWidth ?? 300
     } catch (_) {
       // JSON パース失敗時は何もしない
     }
@@ -73,7 +93,7 @@ onMounted(() => {
 })
 
 // 変更があれば状態を保存
-watch([collapsed, activeSection], saveState)
+watch([collapsed, activeSection, width], saveState)
 
 function toggleSection(section) {
   activeSection.value = activeSection.value === section ? null : section
@@ -82,6 +102,29 @@ function toggleSection(section) {
 function openSection(section) {
   collapsed.value = false
   activeSection.value = section
+}
+
+function startResize(e) {
+  e.preventDefault()
+  const startX = e.clientX
+  const startWidth = width.value
+  isResizing.value = true
+  document.body.style.userSelect = 'none'
+
+  function onMouseMove(ev) {
+    const delta = startX - ev.clientX
+    width.value = Math.max(150, startWidth + delta)
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    document.body.style.userSelect = ''
+    isResizing.value = false
+  }
+
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
 }
 
 defineExpose({ openSection })
@@ -99,6 +142,9 @@ defineExpose({ openSection })
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
+}
+.settings-sidebar.resizing {
+  user-select: none;
 }
 .settings-sidebar.collapsed {
   width: 40px;
@@ -120,6 +166,15 @@ defineExpose({ openSection })
   background: none;
   border: none;
   cursor: pointer;
+}
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: ew-resize;
+  user-select: none;
 }
 .sections {
   flex: 1;
