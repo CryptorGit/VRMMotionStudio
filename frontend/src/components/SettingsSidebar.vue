@@ -28,6 +28,7 @@
               class="toggle-icon"
             ></i>
             {{ sectionTitles[section] }}
+            <span class="spacer"></span>
             <i
               v-if="section === 'morph'"
               class="fa-solid fa-rotate-right reload-icon"
@@ -375,9 +376,11 @@ defineExpose({
 .section h3 .toggle-icon {
   margin-right: 0.5rem;
 }
+.section h3 .spacer {
+  flex: 1;
+}
 .section h3 .reload-icon {
-  margin-left: auto;
-  margin-right: 0.5rem;
+  margin-left: 0.5rem;
   cursor: pointer;
 }
 .section h3 .close-icon {
