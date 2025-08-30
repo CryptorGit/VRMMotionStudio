@@ -102,6 +102,8 @@ const rotationAxis = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
 const extraIKBoneNames = []
 const extraIKChains = []
+let ikConfigLoaded = false
+const ikConfigPromise = loadIKConfig()
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -114,10 +116,7 @@ async function loadIKConfig() {
     if (extraIKBoneNames.length === 0)
       extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
   }
-  if (currentMeshRef.value) {
-    setupIKTargets(currentMeshRef.value)
-    initIKSolver(currentMeshRef.value)
-  }
+  ikConfigLoaded = true
 }
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -667,6 +666,14 @@ async function handleFiles(files) {
       models.value.push({ id: nextModelId++, mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
       setupIKTargets(mesh)
+      if (!ikConfigLoaded) {
+        ikConfigPromise.then(() => {
+          if (currentMeshRef.value === mesh) {
+            setupIKTargets(mesh)
+            initIKSolver(mesh)
+          }
+        })
+      }
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
       if (poseFile) {
@@ -755,7 +762,7 @@ function handleUnhandledRejection(e) {
 
 onMounted(async () => {
   loadLightingSettings()
-  await loadIKConfig()
+  await ikConfigPromise
   window.addEventListener('error', handleError)
   window.addEventListener('unhandledrejection', handleUnhandledRejection)
 
