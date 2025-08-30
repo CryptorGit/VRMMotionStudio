@@ -41,6 +41,7 @@
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
+    v-model:show-ik-markers="showIKMarkers"
   @toggle-model="toggleModelVisibility"
   @remove-model="removeModel"
 />
@@ -85,6 +86,7 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
+const showIKMarkers = ref(true)
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -108,6 +110,8 @@ function loadLightingSettings() {
       lightMarkerColor.value = data.markerColor
     if (data.showLightMarker !== undefined)
       showLightMarker.value = data.showLightMarker
+    if (data.showIKMarkers !== undefined)
+      showIKMarkers.value = data.showIKMarkers
     if (data.directionalIntensity !== undefined)
       directionalIntensity.value = data.directionalIntensity
     if (data.directional?.position) {
@@ -174,6 +178,14 @@ watch(directionalIntensity, i => {
   }
 })
 
+watch(showIKMarkers, v => {
+  try {
+    ikTargets.forEach(t => (t.marker.visible = v))
+  } catch (e) {
+    console.error('Failed to toggle IK markers:', e)
+  }
+})
+
 function isPhysicalBone(bone) {
   if (bone.userData && bone.userData.rigidBodyType !== undefined) return true
   const name = bone.name || ''
@@ -215,7 +227,7 @@ function setupIKTargets(mesh) {
       })
     )
     marker.renderOrder = 999
-    marker.visible = true
+    marker.visible = showIKMarkers.value
     scene.add(marker)
     ikTargets.push({ bone, marker })
   })
@@ -223,10 +235,12 @@ function setupIKTargets(mesh) {
   updateIKMarkers()
 }
 function updateIKMarkers() {
+  const visible = showIKMarkers.value
   ikTargets.forEach(t => {
     t.bone.getWorldPosition(t.marker.position)
     t.bone.getWorldQuaternion(_q)
     t.marker.quaternion.copy(_q)
+    t.marker.visible = visible
   })
 }
 
@@ -611,6 +625,7 @@ async function handleFiles(files) {
       initIKSolver(mesh)
       models.value.push({ mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
+      setupIKTargets(mesh)
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
       if (poseFile) {

@@ -53,12 +53,16 @@
               :mesh="mesh"
               ref="morphEditorRef"
             />
-            <ModelList
-              v-else-if="section === 'models'"
-              :models="models"
-              @toggle="toggleModel"
-              @remove="removeModel"
-            />
+            <div v-else-if="section === 'models'">
+              <label>
+                <input type="checkbox" v-model="showIKMarkers" /> IKボーン表示
+              </label>
+              <ModelList
+                :models="models"
+                @toggle="toggleModel"
+                @remove="removeModel"
+              />
+            </div>
           </div>
         </div>
       </template>
@@ -79,13 +83,15 @@ const props = defineProps({
   models: { type: Array, required: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
-  directionalIntensity: { type: Number, required: true }
+  directionalIntensity: { type: Number, required: true },
+  showIKMarkers: { type: Boolean, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
+  'update:showIKMarkers',
   'toggle-model',
   'remove-model'
 ])
@@ -100,6 +106,10 @@ const markerColor = computed({
 const directionalIntensity = computed({
   get: () => props.directionalIntensity,
   set: v => emit('update:directionalIntensity', v)
+})
+const showIKMarkers = computed({
+  get: () => props.showIKMarkers,
+  set: v => emit('update:showIKMarkers', v)
 })
 
 const collapsed = ref(false)
@@ -143,6 +153,7 @@ function saveState() {
       visibleSections: { ...visibleSections },
       expandedSections: { ...expandedSections },
       showLightMarker: showLightMarker.value,
+      showIKMarkers: showIKMarkers.value,
       markerColor: markerColor.value,
       directionalIntensity: directionalIntensity.value,
       directional: {
@@ -175,6 +186,7 @@ onMounted(() => {
         visibleSections: savedVisible,
         expandedSections: savedExpanded,
         showLightMarker: savedShowMarker,
+        showIKMarkers: savedShowIK,
         markerColor: savedMarkerColor,
         directionalIntensity: savedDirectionalIntensity,
         directional: savedDirectional
@@ -193,6 +205,8 @@ onMounted(() => {
       }
       if (savedShowMarker !== undefined)
         emit('update:showLightMarker', savedShowMarker)
+      if (savedShowIK !== undefined)
+        emit('update:showIKMarkers', savedShowIK)
       if (savedMarkerColor !== undefined)
         emit('update:markerColor', savedMarkerColor)
       if (savedDirectionalIntensity !== undefined)
@@ -224,6 +238,7 @@ watch(collapsed, saveState)
 watch(visibleSections, saveState, { deep: true })
 watch(expandedSections, saveState, { deep: true })
 watch(showLightMarker, saveState)
+watch(showIKMarkers, saveState)
 watch(markerColor, saveState)
 watch(directionalIntensity, saveState)
 watch(
@@ -310,6 +325,7 @@ defineExpose({
   visibleSections,
   expandedSections,
   showLightMarker,
+  showIKMarkers,
   markerColor
 })
 </script>
