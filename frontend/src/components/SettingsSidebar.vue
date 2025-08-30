@@ -75,6 +75,7 @@ import { ref, reactive, onMounted, watchEffect, computed, nextTick, toRefs } fro
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 import ModelList from './ModelList.vue'
+import { STORAGE_KEY } from '../config.js'
 
 const props = defineProps({
   ambient: Object,
@@ -139,9 +140,6 @@ const sectionTitles = {
   morph: 'モーフ編集',
   models: 'モデル管理'
 }
-
-// ローカルストレージに状態を保持するキー
-const STORAGE_KEY = 'settingsSidebar'
 
 // 状態を保存
 function saveState() {
