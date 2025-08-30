@@ -78,7 +78,7 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // three's ammo wrapper expects the .wasm file next to the js file.
 // We import it as an asset URL and pass it via locateFile.
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
-import { API_BASE_URL } from '../config.js'
+import { API_BASE_URL, STORAGE_KEY } from '../config.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -112,8 +112,6 @@ let transformControls = null
 const extraIKBoneNames = []
 const extraIKChains = []
 const _q = new THREE.Quaternion()
-const STORAGE_KEY = 'settingsSidebar'
-
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
