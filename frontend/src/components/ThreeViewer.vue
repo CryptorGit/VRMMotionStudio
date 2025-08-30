@@ -497,11 +497,7 @@ function openSidebarSection(section) {
       settingsSidebar.value.expandedSections[section] = false
     } else {
       settingsSidebar.value.visibleSections[section] = true
-      if (settingsSidebar.value.openSection) {
-        settingsSidebar.value.openSection(section)
-      } else {
-        settingsSidebar.value.expandedSections[section] = true
-      }
+      settingsSidebar.value.openSection(section)
     }
   }
   menuOpen.value = false
