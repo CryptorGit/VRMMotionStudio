@@ -297,9 +297,10 @@ function onPointerMove(event) {
     const dy = (event.clientY - startPointer.y) * 0.01
     selectedIKBone.rotation.y = startEuler.y + dx
     selectedIKBone.rotation.x = startEuler.x + dy
-    updateIKMarkers()
-    helper?.update(0)
+    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.updateMatrixWorld(true)
     skeletonHelper?.updateMatrixWorld(true)
+    updateIKMarkers()
     return
   }
   if (!draggingIK || !dragPlane || !selectedIKBone) return
@@ -311,9 +312,10 @@ function onPointerMove(event) {
   if (raycaster.ray.intersectPlane(dragPlane, point)) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
     selectedIKBone.position.copy(local)
-    updateIKMarkers()
-    helper?.update(0)
+    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.updateMatrixWorld(true)
     skeletonHelper?.updateMatrixWorld(true)
+    updateIKMarkers()
   }
 }
 function onPointerUp() {
