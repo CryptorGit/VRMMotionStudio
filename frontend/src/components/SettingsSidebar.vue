@@ -52,6 +52,12 @@
               :mesh="mesh"
               ref="morphEditorRef"
             />
+            <ModelList
+              v-else-if="section === 'models'"
+              :models="models"
+              @toggle="toggleModel"
+              @remove="removeModel"
+            />
           </div>
         </div>
       </template>
@@ -63,20 +69,24 @@
 import { ref, reactive, onMounted, watch, computed, nextTick, toRefs } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
+import ModelList from './ModelList.vue'
 
 const props = defineProps({
   ambient: Object,
   directional: Object,
   mesh: Object,
+  models: { type: Array, required: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true }
 })
-const { ambient, directional, mesh } = toRefs(props)
+const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
-  'update:directionalIntensity'
+  'update:directionalIntensity',
+  'toggle-model',
+  'remove-model'
 ])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
@@ -94,7 +104,8 @@ const directionalIntensity = computed({
 const collapsed = ref(false)
 const expandedSections = reactive({
   lighting: false,
-  morph: false
+  morph: false,
+  models: false
 })
 const width = ref(300)
 const isResizing = ref(false)
@@ -105,15 +116,17 @@ const morphEditorRef = ref(null)
 // セクションの表示状態
 const visibleSections = reactive({
   lighting: false,
-  morph: false
+  morph: false,
+  models: false
 })
 
 // 固定された表示順
-const sectionOrder = ['lighting', 'morph']
+const sectionOrder = ['lighting', 'morph', 'models']
 
 const sectionTitles = {
   lighting: 'ライト設定',
-  morph: 'モーフ編集'
+  morph: 'モーフ編集',
+  models: 'モデル管理'
 }
 
 // ローカルストレージに状態を保持するキー
@@ -170,10 +183,12 @@ onMounted(() => {
       if (savedVisible) {
         visibleSections.lighting = savedVisible.lighting ?? false
         visibleSections.morph = savedVisible.morph ?? false
+        visibleSections.models = savedVisible.models ?? false
       }
       if (savedExpanded) {
         expandedSections.lighting = savedExpanded.lighting ?? false
         expandedSections.morph = savedExpanded.morph ?? false
+        expandedSections.models = savedExpanded.models ?? false
       }
       if (savedShowMarker !== undefined)
         emit('update:showLightMarker', savedShowMarker)
@@ -267,6 +282,14 @@ function startResize(e) {
 
 function reloadMorphs() {
   morphEditorRef.value?.reloadMorphs?.()
+}
+
+function toggleModel(index, visible) {
+  emit('toggle-model', index, visible)
+}
+
+function removeModel(index) {
+  emit('remove-model', index)
 }
 
 const hasSections = computed(() =>

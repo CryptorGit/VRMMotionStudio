@@ -13,6 +13,7 @@
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
       <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
       <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
+      <li id="models-option" @click="openModelManager"><i class="fa-solid fa-list"></i> モデル一覧</li>
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
@@ -36,9 +37,12 @@
     :ambient="ambientLight"
     :directional="directionalLight"
     :mesh="currentMeshRef"
+    :models="models"
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
+    @toggle-model="toggleModelVisibility"
+    @remove-model="removeModel"
   />
 </template>
 
@@ -65,6 +69,7 @@ const menu = ref(null)
 const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
+const models = ref([])
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(0, 0, 0)
@@ -157,7 +162,7 @@ watch(directionalIntensity, i => {
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
-let scene, camera, renderer, effect, controls, helper, loader, currentMesh
+let scene, camera, renderer, effect, controls, helper, loader
 const clock = new THREE.Clock()
 
 function handleDocumentClick(e) {
@@ -297,6 +302,36 @@ function openMorphEditor() {
   menuOpen.value = false
 }
 
+function openModelManager() {
+  if (settingsSidebar.value) {
+    if (!settingsSidebar.value.visibleSections.models) {
+      settingsSidebar.value.visibleSections.models = true
+    }
+    settingsSidebar.value.expandedSections.models = true
+  }
+  menuOpen.value = false
+}
+
+function toggleModelVisibility(index, visible) {
+  const model = models.value[index]
+  if (model) {
+    model.visible = visible
+    model.mesh.visible = visible
+  }
+}
+
+function removeModel(index) {
+  const model = models.value[index]
+  if (model) {
+    helper.remove(model.mesh)
+    scene.remove(model.mesh)
+    models.value.splice(index, 1)
+    if (currentMeshRef.value === model.mesh) {
+      currentMeshRef.value = models.value[0]?.mesh || null
+    }
+  }
+}
+
 async function clearCache() {
   console.log('Clear cache clicked')
   logToServer({ event: 'clear-cache' })
@@ -304,12 +339,12 @@ async function clearCache() {
   poses.value.forEach(p => URL.revokeObjectURL(p.url))
   poses.value = []
   selectedPose.value = null
-  if (currentMesh) {
-    helper.remove(currentMesh)
-    scene.remove(currentMesh)
-    currentMesh = null
-    currentMeshRef.value = null
-  }
+  models.value.forEach(m => {
+    helper.remove(m.mesh)
+    scene.remove(m.mesh)
+  })
+  models.value = []
+  currentMeshRef.value = null
   menuOpen.value = false
 }
 
@@ -360,13 +395,6 @@ async function handleFiles(files) {
     .replace(/^[^/]*\\\//, '')
     .replace(/\\/g, '/')
 
-  if (currentMesh) {
-    helper.remove(currentMesh)
-    scene.remove(currentMesh)
-    currentMesh = null
-    currentMeshRef.value = null
-  }
-
   const manager = new THREE.LoadingManager()
   manager.onLoad = () => {
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
@@ -387,7 +415,7 @@ async function handleFiles(files) {
     mesh => {
       scene.add(mesh)
       helper.add(mesh, { physics: true })
-      currentMesh = mesh
+      models.value.push({ mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
       console.log('Model loaded:', modelFile.name)
       logToServer({ event: 'loaded', model: modelFile.name })
@@ -410,18 +438,18 @@ async function handleFiles(files) {
 }
 
 function applyPose() {
-  if (!selectedPose.value || !loader || !currentMesh) return
+  if (!selectedPose.value || !loader || !currentMeshRef.value) return
   loader.loadVPD(selectedPose.value.url, true, pose => {
-    helper.pose(currentMesh, pose)
+    helper.pose(currentMeshRef.value, pose)
     console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })
 }
 
 function exportPose() {
-  if (!currentMesh) return
+  if (!currentMeshRef.value) return
   const exporter = new MMDExporter()
-  const result = exporter.parseVpd(currentMesh, 'pose', {})
+  const result = exporter.parseVpd(currentMeshRef.value, 'pose', {})
   const blob = new Blob([result], { type: 'text/plain' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
