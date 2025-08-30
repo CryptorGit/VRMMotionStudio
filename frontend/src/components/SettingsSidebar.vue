@@ -68,8 +68,8 @@ const isResizing = ref(false)
 
 // セクションの表示状態
 const visibleSections = reactive({
-  lighting: true,
-  morph: true
+  lighting: false,
+  morph: false
 })
 
 // 固定された表示順
@@ -111,8 +111,8 @@ onMounted(() => {
       activeSection.value = savedSection ?? null
       width.value = savedWidth ?? 300
       if (savedVisible) {
-        visibleSections.lighting = savedVisible.lighting ?? true
-        visibleSections.morph = savedVisible.morph ?? true
+        visibleSections.lighting = savedVisible.lighting ?? false
+        visibleSections.morph = savedVisible.morph ?? false
       }
     } catch (_) {
       // JSON パース失敗時は何もしない
