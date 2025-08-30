@@ -227,6 +227,20 @@ watch(currentMeshRef, mesh => {
   setupIKTargets(mesh)
   initIKSolver(mesh)
 })
+function getIKDefinitions(geometry) {
+  const iks =
+    geometry?.iks ||
+    geometry?.userData?.mmd?.iks ||
+    geometry?.userData?.MMD?.iks ||
+    geometry?.ik ||
+    geometry?.userData?.mmd?.ik ||
+    geometry?.userData?.MMD?.ik ||
+    []
+  if (iks.length === 0) {
+    console.warn('IK definitions not found for geometry', geometry)
+  }
+  return iks.concat(extraIKChains)
+}
 function setupIKTargets(mesh) {
   ikTargets.forEach(t => scene.remove(t.marker))
   ikTargets = []
@@ -234,19 +248,7 @@ function setupIKTargets(mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
 
-  // Collect unique target bone indices from IK chains
-  const baseIks =
-    mesh.geometry?.iks ||
-    mesh.geometry?.userData?.mmd?.iks ||
-    mesh.geometry?.userData?.MMD?.iks ||
-    mesh.geometry?.ik ||
-    mesh.geometry?.userData?.mmd?.ik ||
-    mesh.geometry?.userData?.MMD?.ik ||
-    []
-  if (baseIks.length === 0) {
-    console.warn('IK definitions not found for mesh', mesh)
-  }
-  const iks = baseIks.concat(extraIKChains)
+  const iks = getIKDefinitions(mesh.geometry)
   const targetIndices = new Set()
   iks.forEach(ik => {
     if (typeof ik.target === 'number') targetIndices.add(ik.target)
@@ -289,18 +291,7 @@ function updateIKMarkers() {
 
 function initIKSolver(mesh) {
   if (!mesh || !helper) return
-  const base =
-    mesh.geometry?.iks ||
-    mesh.geometry?.userData?.mmd?.iks ||
-    mesh.geometry?.userData?.MMD?.iks ||
-    mesh.geometry?.ik ||
-    mesh.geometry?.userData?.mmd?.ik ||
-    mesh.geometry?.userData?.MMD?.ik ||
-    []
-  if (base.length === 0) {
-    console.warn('IK definitions not found for mesh', mesh)
-  }
-  const iks = base.concat(extraIKChains)
+  const iks = getIKDefinitions(mesh.geometry)
   const solver = new CCDIKSolver(mesh, iks)
   const obj = helper.objects.get(mesh)
   if (obj) {
