@@ -119,15 +119,27 @@ const directionalIntensity = computed({
 
 const directionalX = computed({
   get: () => props.directional.position.x,
-  set: v => (props.directional.position.x = v)
+  set: v => {
+    const delta = v - props.directional.position.x
+    props.directional.position.x = v
+    props.directional.target.position.x += delta
+  }
 })
 const directionalY = computed({
   get: () => props.directional.position.y,
-  set: v => (props.directional.position.y = v)
+  set: v => {
+    const delta = v - props.directional.position.y
+    props.directional.position.y = v
+    props.directional.target.position.y += delta
+  }
 })
 const directionalZ = computed({
   get: () => props.directional.position.z,
-  set: v => (props.directional.position.z = v)
+  set: v => {
+    const delta = v - props.directional.position.z
+    props.directional.position.z = v
+    props.directional.target.position.z += delta
+  }
 })
 
 function setTargetFromAngles(azimuthDeg, elevationDeg) {
