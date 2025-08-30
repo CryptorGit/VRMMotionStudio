@@ -262,8 +262,10 @@ function onPointerMove(event) {
     const dy = (event.clientY - startPointer.y) * 0.01
     selectedIKBone.rotation.y = startEuler.y + dx
     selectedIKBone.rotation.x = startEuler.x + dy
-    currentMeshRef.value?.updateMatrixWorld(true)
+    selectedIKBone.updateMatrixWorld(true)
+    currentMeshRef.value?.skeleton?.update()
     helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.skeleton?.update()
     currentMeshRef.value?.updateMatrixWorld(true)
     updateIKMarkers()
     return
@@ -277,8 +279,10 @@ function onPointerMove(event) {
   if (raycaster.ray.intersectPlane(dragPlane, point)) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
     selectedIKBone.position.copy(local)
-    currentMeshRef.value?.updateMatrixWorld(true)
+    selectedIKBone.updateMatrixWorld(true)
+    currentMeshRef.value?.skeleton?.update()
     helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.skeleton?.update()
     currentMeshRef.value?.updateMatrixWorld(true)
     updateIKMarkers()
   }
@@ -624,7 +628,11 @@ function onWindowResize() {
 function animate() {
   requestAnimationFrame(animate)
   const delta = clock.getDelta()
-  if (helper) helper.update(delta)
+  if (helper) {
+    helper.update(delta)
+    helper.objects.get(currentMeshRef.value)?.ikSolver?.update()
+    currentMeshRef.value?.skeleton?.update()
+  }
   updateIKMarkers()
   effect.render(scene, camera)
   directionalLightHelper.update()
