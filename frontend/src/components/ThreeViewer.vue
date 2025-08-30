@@ -282,6 +282,7 @@ function setupIKTargets(mesh) {
 function updateIKMarkers() {
   const visible = showIkMarkers.value
   ikTargets.forEach(t => {
+    t.bone.updateMatrixWorld(true)
     t.bone.getWorldPosition(t.marker.position)
     t.bone.getWorldQuaternion(_q)
     t.marker.quaternion.copy(_q)
