@@ -11,9 +11,9 @@
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
-      <li id="light-option" @click="openLighting"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
-      <li id="morph-option" @click="openMorphEditor"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
-      <li id="models-option" @click="openModelManager"><i class="fa-solid fa-list"></i> モデル一覧</li>
+      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
+      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
+      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル一覧</li>
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
@@ -488,32 +488,20 @@ function openFile() {
   menuOpen.value = false
 }
 
-function openLighting() {
+function openSidebarSection(section) {
   if (settingsSidebar.value) {
-    if (!settingsSidebar.value.visibleSections.lighting) {
-      settingsSidebar.value.visibleSections.lighting = true
+    const isVisible = settingsSidebar.value.visibleSections[section]
+    if (isVisible) {
+      settingsSidebar.value.visibleSections[section] = false
+      settingsSidebar.value.expandedSections[section] = false
+    } else {
+      settingsSidebar.value.visibleSections[section] = true
+      if (settingsSidebar.value.openSection) {
+        settingsSidebar.value.openSection(section)
+      } else {
+        settingsSidebar.value.expandedSections[section] = true
+      }
     }
-    settingsSidebar.value.expandedSections.lighting = true
-  }
-  menuOpen.value = false
-}
-
-function openMorphEditor() {
-  if (settingsSidebar.value) {
-    if (!settingsSidebar.value.visibleSections.morph) {
-      settingsSidebar.value.visibleSections.morph = true
-    }
-    settingsSidebar.value.expandedSections.morph = true
-  }
-  menuOpen.value = false
-}
-
-function openModelManager() {
-  if (settingsSidebar.value) {
-    if (!settingsSidebar.value.visibleSections.models) {
-      settingsSidebar.value.visibleSections.models = true
-    }
-    settingsSidebar.value.expandedSections.models = true
   }
   menuOpen.value = false
 }
