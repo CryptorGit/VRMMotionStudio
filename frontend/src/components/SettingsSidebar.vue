@@ -2,20 +2,20 @@
   <div
     class="settings-sidebar"
     :class="{ collapsed, resizing: isResizing }"
-    :style="collapsed ? {} : { width: width + 'px' }"
+    :style="sidebarStyle"
   >
     <div
       class="resize-handle"
       v-if="!collapsed"
       @mousedown="startResize"
     ></div>
-    <div class="header">
+    <div class="header" ref="headerRef">
       <span>設定</span>
       <button @click="collapsed = !collapsed">
         <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
       </button>
     </div>
-    <div class="sections" v-if="!collapsed">
+    <div class="sections" v-if="!collapsed && hasSections">
       <template v-for="section in sectionOrder" :key="section">
         <div v-if="visibleSections[section]" class="section">
           <h3 @click="toggleSection(section)">
@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
@@ -62,6 +62,8 @@ const collapsed = ref(false)
 const activeSection = ref(null)
 const width = ref(300)
 const isResizing = ref(false)
+const headerRef = ref(null)
+const headerHeight = ref(0)
 
 // セクションの表示状態
 const visibleSections = reactive({
@@ -95,6 +97,9 @@ function saveState() {
 
 // 初期化時に保存された状態を読み込む
 onMounted(() => {
+  nextTick(() => {
+    headerHeight.value = headerRef.value?.offsetHeight ?? 0
+  })
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) {
     try {
@@ -166,6 +171,18 @@ function startResize(e) {
   document.addEventListener('mouseup', onMouseUp)
 }
 
+const hasSections = computed(() =>
+  sectionOrder.some(section => visibleSections[section])
+)
+
+const sidebarStyle = computed(() => {
+  const style = { '--header-height': headerHeight.value + 'px' }
+  if (!collapsed.value) {
+    style.width = width.value + 'px'
+  }
+  return style
+})
+
 defineExpose({ openSection, visibleSections })
 </script>
 
@@ -174,7 +191,8 @@ defineExpose({ openSection, visibleSections })
   position: fixed;
   top: 0;
   right: 0;
-  height: 100vh;
+  height: auto;
+  max-height: 100vh;
   width: 300px;
   background: #f9f9f9;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
@@ -216,7 +234,7 @@ defineExpose({ openSection, visibleSections })
   user-select: none;
 }
 .sections {
-  flex: 1;
+  max-height: calc(100vh - var(--header-height));
   overflow-y: auto;
 }
 .section h3 {
