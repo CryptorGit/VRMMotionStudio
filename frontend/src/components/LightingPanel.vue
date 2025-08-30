@@ -26,7 +26,7 @@
         マーカー表示
         <input type="checkbox" v-model="showLightMarker" />
       </label>
-      <p class="section-description">ライトの位置をXYZ軸で指定</p>
+      <p class="section-description">ライトの位置と向き（ターゲット）をXYZ軸で指定</p>
       <div class="position-inputs">
         <label>
           ライト位置X
@@ -39,6 +39,20 @@
         <label>
           ライト位置Z
           <input type="number" v-model.number="directionalZ" />
+        </label>
+      </div>
+      <div class="position-inputs">
+        <label>
+          ターゲットX
+          <input type="number" v-model.number="directionalTargetX" />
+        </label>
+        <label>
+          ターゲットY
+          <input type="number" v-model.number="directionalTargetY" />
+        </label>
+        <label>
+          ターゲットZ
+          <input type="number" v-model.number="directionalTargetZ" />
         </label>
       </div>
     </section>
@@ -90,6 +104,19 @@ const directionalY = computed({
 const directionalZ = computed({
   get: () => props.directional.position.z,
   set: v => (props.directional.position.z = v)
+})
+
+const directionalTargetX = computed({
+  get: () => props.directional.target.position.x,
+  set: v => (props.directional.target.position.x = v)
+})
+const directionalTargetY = computed({
+  get: () => props.directional.target.position.y,
+  set: v => (props.directional.target.position.y = v)
+})
+const directionalTargetZ = computed({
+  get: () => props.directional.target.position.z,
+  set: v => (props.directional.target.position.z = v)
 })
 </script>
 
