@@ -56,6 +56,7 @@ import SettingsSidebar from './SettingsSidebar.vue'
 import BasicSettingsPanel from './BasicSettingsPanel.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
@@ -93,6 +94,11 @@ const showLightMarker = ref(false)
 const currentMode = ref('camera')
 const showBones = ref(false)
 const currentMeshRef = ref(null)
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+let transformControls
+let ikTargets = []
+let selectedIKBone = null
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -187,10 +193,15 @@ function createSkeletonHelper(mesh) {
   helper.update()
   return helper
 }
-// モード変更時に OrbitControls の有効/無効を切り替える
+// モード変更時に OrbitControls や TransformControls を切り替える
 watch(currentMode, mode => {
   if (controls) {
     controls.enabled = mode === 'camera'
+  }
+  if (mode === 'pose') {
+    initTransformControls()
+  } else {
+    disposeTransformControls()
   }
 })
 // ボーン表示切り替え
@@ -215,7 +226,80 @@ watch(currentMeshRef, mesh => {
     skeletonHelper = createSkeletonHelper(mesh)
     scene.add(skeletonHelper)
   }
+  setupIKTargets(mesh)
 })
+function setupIKTargets(mesh) {
+  ikTargets.forEach(t => scene.remove(t.marker))
+  ikTargets = []
+  if (transformControls) transformControls.detach()
+  selectedIKBone = null
+  if (!mesh) return
+  const bones = mesh.skeleton?.bones || []
+  bones.forEach(bone => {
+    if (/(?:ＩＫ|IK)$/i.test(bone.name)) {
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3),
+        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      )
+      marker.visible = currentMode.value === 'pose'
+      scene.add(marker)
+      ikTargets.push({ bone, marker })
+    }
+  })
+  updateIKMarkers()
+}
+function updateIKMarkers() {
+  ikTargets.forEach(t => {
+    t.bone.getWorldPosition(t.marker.position)
+  })
+}
+function onPointerDown(event) {
+  if (currentMode.value !== 'pose') return
+  const rect = renderer.domElement.getBoundingClientRect()
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+  raycaster.setFromCamera(mouse, camera)
+  const intersects = raycaster.intersectObjects(
+    ikTargets.map(t => t.marker),
+    false
+  )
+  if (intersects.length > 0) {
+    const target = ikTargets.find(t => t.marker === intersects[0].object)
+    if (target && transformControls) {
+      selectedIKBone = target.bone
+      transformControls.attach(target.bone)
+    }
+  }
+}
+function initTransformControls() {
+  if (!renderer || !camera) return
+  if (!transformControls) {
+    transformControls = new TransformControls(camera, renderer.domElement)
+    transformControls.setMode('translate')
+    transformControls.addEventListener('dragging-changed', e => {
+      if (controls) controls.enabled = !e.value
+    })
+    transformControls.addEventListener('objectChange', () => {
+      if (selectedIKBone && helper) {
+        helper.update(0)
+      }
+    })
+    scene.add(transformControls)
+  }
+  ikTargets.forEach(t => (t.marker.visible = true))
+  renderer.domElement.addEventListener('pointerdown', onPointerDown)
+}
+function disposeTransformControls() {
+  if (transformControls) {
+    transformControls.detach()
+    scene.remove(transformControls)
+    transformControls.dispose?.()
+    transformControls = null
+  }
+  ikTargets.forEach(t => (t.marker.visible = false))
+  renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
+  selectedIKBone = null
+}
 const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader, skeletonHelper
@@ -529,6 +613,7 @@ function animate() {
   requestAnimationFrame(animate)
   const delta = clock.getDelta()
   if (helper) helper.update(delta)
+  updateIKMarkers()
   effect.render(scene, camera)
   directionalLightHelper.update()
 }
@@ -606,5 +691,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
+  disposeTransformControls()
 })
 </script>
