@@ -110,6 +110,9 @@ const mouse = new THREE.Vector2()
 let ikTargets = []
 let selectedIKBone = null
 let transformControls = null
+let dragPlane = null
+const _dragPoint = new THREE.Vector3()
+let reattachTransform = false
 const extraIKBoneNames = []
 const extraIKChains = []
 const _q = new THREE.Quaternion()
@@ -324,7 +327,52 @@ function onPointerDown(event) {
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
   selectedIKBone = target.bone
-  transformControls?.attach(selectedIKBone)
+  const pos = new THREE.Vector3()
+  selectedIKBone.getWorldPosition(pos)
+  const normal = pos.clone().sub(camera.position).normalize()
+  dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
+  if (transformControls?.object) {
+    transformControls.detach()
+    transformControls.visible = false
+    reattachTransform = true
+  }
+  controls.enabled = false
+  renderer.domElement.addEventListener('pointermove', onPointerMove)
+  renderer.domElement.addEventListener('pointerup', onPointerUp)
+}
+
+function onPointerMove(event) {
+  if (!selectedIKBone || !dragPlane) return
+  const rect = renderer.domElement.getBoundingClientRect()
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+  raycaster.setFromCamera(mouse, camera)
+  if (raycaster.ray.intersectPlane(dragPlane, _dragPoint)) {
+    selectedIKBone.parent.worldToLocal(_dragPoint)
+    selectedIKBone.position.copy(_dragPoint)
+    selectedIKBone.updateMatrixWorld(true)
+    updateIKMarkers()
+  }
+}
+
+function onPointerUp() {
+  renderer.domElement.removeEventListener('pointermove', onPointerMove)
+  renderer.domElement.removeEventListener('pointerup', onPointerUp)
+  controls.enabled = true
+  dragPlane = null
+  const mesh = currentMeshRef.value
+  const solver = helper?.objects.get(mesh)?.ikSolver
+  mesh?.skeleton?.update()
+  solver?.update()
+  selectedIKBone?.updateMatrixWorld()
+  mesh?.updateMatrixWorld(true)
+  helper?.update(0)
+  updateIKMarkers()
+  if (reattachTransform && transformControls) {
+    transformControls.attach(selectedIKBone)
+    transformControls.visible = true
+  }
+  reattachTransform = false
 }
 function setTransformMode(mode) {
   transformMode.value = mode
@@ -363,6 +411,8 @@ function initTransformControls() {
 function disposeTransformControls() {
   ikTargets.forEach(t => (t.marker.visible = false))
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
+  renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
+  renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
   if (transformControls) {
     transformControls.removeEventListener('dragging-changed', onTransformDragging)
     transformControls.removeEventListener('change', onTransformChange)
