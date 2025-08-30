@@ -41,7 +41,7 @@
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
-    v-model:show-ik-markers="showIKMarkers"
+    v-model:showIkMarkers="showIkMarkers"
   @toggle-model="toggleModelVisibility"
   @remove-model="removeModel"
 />
@@ -86,7 +86,7 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
-const showIKMarkers = ref(true)
+const showIkMarkers = ref(true)
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -110,8 +110,8 @@ function loadLightingSettings() {
       lightMarkerColor.value = data.markerColor
     if (data.showLightMarker !== undefined)
       showLightMarker.value = data.showLightMarker
-    if (data.showIKMarkers !== undefined)
-      showIKMarkers.value = data.showIKMarkers
+    if (data.showIkMarkers !== undefined)
+      showIkMarkers.value = data.showIkMarkers
     if (data.directionalIntensity !== undefined)
       directionalIntensity.value = data.directionalIntensity
     if (data.directional?.position) {
@@ -178,7 +178,7 @@ watch(directionalIntensity, i => {
   }
 })
 
-watch(showIKMarkers, v => {
+watch(showIkMarkers, v => {
   try {
     ikTargets.forEach(t => (t.marker.visible = v))
   } catch (e) {
@@ -227,7 +227,7 @@ function setupIKTargets(mesh) {
       })
     )
     marker.renderOrder = 999
-    marker.visible = showIKMarkers.value
+    marker.visible = showIkMarkers.value
     scene.add(marker)
     ikTargets.push({ bone, marker })
   })
@@ -235,7 +235,7 @@ function setupIKTargets(mesh) {
   updateIKMarkers()
 }
 function updateIKMarkers() {
-  const visible = showIKMarkers.value
+  const visible = showIkMarkers.value
   ikTargets.forEach(t => {
     t.bone.getWorldPosition(t.marker.position)
     t.bone.getWorldQuaternion(_q)
