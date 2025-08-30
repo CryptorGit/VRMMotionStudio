@@ -611,7 +611,10 @@ async function handleFiles(files) {
     if (/\.(pmx|pmd)$/i.test(file.name)) modelFile = file
     if (/\.vpd$/i.test(file.name)) poseFiles.push({ name: file.name, url })
   }
-  if (!modelFile) return
+  if (!modelFile) {
+    for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
+    return
+  }
 
   poses.value = poseFiles
 
