@@ -60,6 +60,7 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
+import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
 // Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
 import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // Ensure Vite serves the WASM binary correctly
@@ -100,6 +101,8 @@ let selectedIKBone = null
 let dragPlane = null
 let draggingIK = false
 let draggingRot = false
+const extraIKBoneNames = []
+const extraIKChains = []
 const startPointer = new THREE.Vector2()
 const startEuler = new THREE.Euler()
 const _q = new THREE.Quaternion()
@@ -241,7 +244,7 @@ function setupIKTargets(mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
   bones.forEach(bone => {
-    if (/(?:ＩＫ|IK)$/i.test(bone.name)) {
+    if (/(?:ＩＫ|IK)$/i.test(bone.name) || extraIKBoneNames.includes(bone.name)) {
       const marker = new THREE.Mesh(
         new THREE.BoxGeometry(0.4, 0.4, 0.4),
         new THREE.MeshBasicMaterial({ color: 0xff0000 })
@@ -259,6 +262,18 @@ function updateIKMarkers() {
     t.bone.getWorldQuaternion(_q)
     t.marker.quaternion.copy(_q)
   })
+}
+
+function initIKSolver(mesh) {
+  if (!mesh || !helper) return
+  const base = mesh.geometry?.userData?.iks || []
+  const iks = base.concat(extraIKChains)
+  const solver = new CCDIKSolver(mesh, iks)
+  const obj = helper.objects.get(mesh)
+  if (obj) {
+    obj.ikSolver = solver
+  }
+  solver.update()
 }
 function onPointerDown(event) {
   if (currentMode.value !== 'pose' || event.button === 1) return
@@ -602,6 +617,7 @@ async function handleFiles(files) {
     mesh => {
       scene.add(mesh)
       helper.add(mesh, { physics: true })
+      initIKSolver(mesh)
       models.value.push({ mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
       console.log('Model loaded:', modelFile.name)
