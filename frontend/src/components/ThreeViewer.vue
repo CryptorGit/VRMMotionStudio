@@ -17,7 +17,7 @@
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
-  <div id="transform-controls">
+  <div id="transform-controls" v-if="selectedIKBone">
     <button
       :class="{ active: transformMode === 'translate' }"
       @click="setTransformMode('translate')"
@@ -109,7 +109,7 @@ const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const IK_MARKER_PIXEL_SIZE = 16
 let ikTargets = []
-let selectedIKBone = null
+const selectedIKBone = ref(null)
 let transformControls = null
 let dragPlane = null
 const _dragPoint = new THREE.Vector3()
@@ -246,7 +246,7 @@ function getIKDefinitions(geometry) {
 function setupIKTargets(mesh) {
   ikTargets.forEach(t => scene.remove(t.marker))
   ikTargets = []
-  selectedIKBone = null
+  selectedIKBone.value = null
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
 
@@ -332,14 +332,14 @@ function onPointerDown(event) {
   )
   if (intersects.length === 0) {
     transformControls?.detach()
-    selectedIKBone = null
+    selectedIKBone.value = null
     return
   }
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
-  selectedIKBone = target.bone
+  selectedIKBone.value = target.bone
   const pos = new THREE.Vector3()
-  selectedIKBone.getWorldPosition(pos)
+  selectedIKBone.value.getWorldPosition(pos)
   const normal = pos.clone().sub(camera.position).normalize()
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
   if (transformControls?.object) {
@@ -353,15 +353,15 @@ function onPointerDown(event) {
 }
 
 function onPointerMove(event) {
-  if (!selectedIKBone || !dragPlane) return
+  if (!selectedIKBone.value || !dragPlane) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
   raycaster.setFromCamera(mouse, camera)
   if (raycaster.ray.intersectPlane(dragPlane, _dragPoint)) {
-    selectedIKBone.parent.worldToLocal(_dragPoint)
-    selectedIKBone.position.copy(_dragPoint)
-    selectedIKBone.updateMatrixWorld(true)
+    selectedIKBone.value.parent.worldToLocal(_dragPoint)
+    selectedIKBone.value.position.copy(_dragPoint)
+    selectedIKBone.value.updateMatrixWorld(true)
     updateIKMarkers()
   }
 }
@@ -375,12 +375,12 @@ function onPointerUp() {
   const solver = helper?.objects.get(mesh)?.ikSolver
   mesh?.skeleton?.update()
   solver?.update()
-  selectedIKBone?.updateMatrixWorld()
+  selectedIKBone.value?.updateMatrixWorld()
   mesh?.updateMatrixWorld(true)
   helper?.update(0)
   updateIKMarkers()
   if (reattachTransform && transformControls) {
-    transformControls.attach(selectedIKBone)
+    transformControls.attach(selectedIKBone.value)
     transformControls.visible = true
   }
   reattachTransform = false
@@ -401,7 +401,7 @@ function onTransformChange() {
   const solver = helper?.objects.get(mesh)?.ikSolver
   mesh?.skeleton?.update()
   solver?.update()
-  selectedIKBone?.updateMatrixWorld()
+  selectedIKBone.value?.updateMatrixWorld()
   mesh?.updateMatrixWorld(true)
   helper?.update(0)
   updateIKMarkers()
@@ -431,7 +431,7 @@ function disposeTransformControls() {
     transformControls.dispose()
     transformControls = null
   }
-  selectedIKBone = null
+  selectedIKBone.value = null
 }
 const settingsSidebar = ref(null)
 
