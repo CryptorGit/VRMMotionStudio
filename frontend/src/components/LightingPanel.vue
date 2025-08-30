@@ -14,6 +14,7 @@
     </section>
     <section>
       <h3>Directional Light</h3>
+      <p class="section-description">ライトの位置をXYZ軸で指定</p>
       <label>
         色
         <input type="color" v-model="directionalColor" />
@@ -24,15 +25,15 @@
       </label>
       <div class="position-inputs">
         <label>
-          X
+          ライト位置X
           <input type="number" v-model.number="directionalX" />
         </label>
         <label>
-          Y
+          ライト位置Y
           <input type="number" v-model.number="directionalY" />
         </label>
         <label>
-          Z
+          ライト位置Z
           <input type="number" v-model.number="directionalZ" />
         </label>
       </div>
@@ -98,11 +99,17 @@ const directionalZ = computed({
 }
 .position-inputs {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 .position-inputs label {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+.section-description {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 0.5rem;
 }
 </style>
