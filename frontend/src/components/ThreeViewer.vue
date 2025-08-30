@@ -79,8 +79,12 @@ watch(showLightMarker, v => {
 })
 watch(lightMarkerColor, c => {
   if (directionalLightHelper) {
-    directionalLightHelper.color.set(c)
-    directionalLightHelper.update()
+    try {
+      directionalLightHelper.color = new THREE.Color(c)
+      directionalLightHelper.update()
+    } catch (e) {
+      console.error('Failed to set light marker color:', e)
+    }
   }
 })
 watch(
