@@ -314,6 +314,12 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
+  if (event.button === 2) {
+    event.preventDefault()
+    setTransformMode('rotate')
+    transformControls && (transformControls.visible = true)
+    return
+  }
   if (event.button !== 0 || transformControls?.dragging) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
