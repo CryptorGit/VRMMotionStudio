@@ -51,10 +51,13 @@ import { computed } from 'vue'
 const props = defineProps({
   ambient: { type: Object, required: true },
   directional: { type: Object, required: true },
-  showLightMarker: { type: Object, required: true }
+  showLightMarker: { type: Boolean, required: true }
 })
-
-const showLightMarker = props.showLightMarker
+const emit = defineEmits(['update:showLightMarker'])
+const showLightMarker = computed({
+  get: () => props.showLightMarker,
+  set: v => emit('update:showLightMarker', v)
+})
 
 const ambientColor = computed({
   get: () => '#' + props.ambient.color.getHexString(),

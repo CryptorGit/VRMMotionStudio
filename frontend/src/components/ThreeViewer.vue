@@ -35,7 +35,7 @@
     :ambient="ambientLight"
     :directional="directionalLight"
     :mesh="currentMeshRef"
-    :show-light-marker="showLightMarker"
+    v-model:show-light-marker="showLightMarker"
   />
 </template>
 
