@@ -35,11 +35,12 @@
     :ambient="ambientLight"
     :directional="directionalLight"
     :mesh="currentMeshRef"
+    :show-light-marker="showLightMarker"
   />
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -64,6 +65,12 @@ const selectedPose = ref(null)
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(1, 1, 1)
+const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight.value, 0.2)
+directionalLightHelper.visible = false
+const showLightMarker = ref(false)
+watch(showLightMarker, v => {
+  directionalLightHelper.visible = v
+})
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
@@ -256,6 +263,7 @@ function animate() {
   const delta = clock.getDelta()
   if (helper) helper.update(delta)
   effect.render(scene, camera)
+  directionalLightHelper.update()
 }
 
 onMounted(async () => {
@@ -293,6 +301,7 @@ onMounted(async () => {
 
   scene.add(ambientLight.value)
   scene.add(directionalLight.value)
+  scene.add(directionalLightHelper)
 
   const AmmoLib = await AmmoModule.default({
     // Ensure the WASM binary is loaded from the resolved asset URL
