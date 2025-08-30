@@ -92,6 +92,7 @@ const showLightMarker = ref(false)
 // 現在の操作モードを保持（'camera' | 'pose'）
 const currentMode = ref('camera')
 const showBones = ref(false)
+const currentMeshRef = ref(null)
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -196,8 +197,6 @@ watch(currentMeshRef, mesh => {
     scene.add(skeletonHelper)
   }
 })
-
-const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader, skeletonHelper
