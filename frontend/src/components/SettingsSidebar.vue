@@ -16,26 +16,34 @@
       </button>
     </div>
     <div class="sections" v-if="!collapsed">
-      <div class="section">
-        <h3 @click="toggleSection('lighting')">
-          <i :class="activeSection === 'lighting' ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" class="toggle-icon"></i>
-          ライト設定
+      <div
+        v-for="section in sectionOrder"
+        :key="section"
+        v-if="visibleSections[section]"
+        class="section"
+      >
+        <h3 @click="toggleSection(section)">
+          <i
+            :class="
+              activeSection === section
+                ? 'fa-solid fa-chevron-down'
+                : 'fa-solid fa-chevron-right'
+            "
+            class="toggle-icon"
+          ></i>
+          {{ sectionTitles[section] }}
+          <i
+            class="fa-solid fa-times close-icon"
+            @click.stop="hideSection(section)"
+          ></i>
         </h3>
-        <div v-show="activeSection === 'lighting'" class="section-content">
+        <div v-show="activeSection === section" class="section-content">
           <LightingPanel
-            v-if="ambient && directional"
+            v-if="section === 'lighting' && ambient && directional"
             :ambient="ambient"
             :directional="directional"
           />
-        </div>
-      </div>
-      <div class="section">
-        <h3 @click="toggleSection('morph')">
-          <i :class="activeSection === 'morph' ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" class="toggle-icon"></i>
-          モーフ編集
-        </h3>
-        <div v-show="activeSection === 'morph'" class="section-content">
-          <MorphEditor :mesh="mesh" />
+          <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
         </div>
       </div>
     </div>
@@ -43,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
@@ -58,6 +66,20 @@ const activeSection = ref(null)
 const width = ref(300)
 const isResizing = ref(false)
 
+// セクションの表示状態
+const visibleSections = reactive({
+  lighting: true,
+  morph: true
+})
+
+// 固定された表示順
+const sectionOrder = ['lighting', 'morph']
+
+const sectionTitles = {
+  lighting: 'ライト設定',
+  morph: 'モーフ編集'
+}
+
 // ローカルストレージに状態を保持するキー
 const STORAGE_KEY = 'settingsSidebar'
 
@@ -68,7 +90,8 @@ function saveState() {
     JSON.stringify({
       collapsed: collapsed.value,
       activeSection: activeSection.value,
-      width: width.value
+      width: width.value,
+      visibleSections: { ...visibleSections }
     })
   )
 }
@@ -81,11 +104,16 @@ onMounted(() => {
       const {
         collapsed: savedCollapsed,
         activeSection: savedSection,
-        width: savedWidth
+        width: savedWidth,
+        visibleSections: savedVisible
       } = JSON.parse(saved)
       collapsed.value = savedCollapsed ?? false
       activeSection.value = savedSection ?? null
       width.value = savedWidth ?? 300
+      if (savedVisible) {
+        visibleSections.lighting = savedVisible.lighting ?? true
+        visibleSections.morph = savedVisible.morph ?? true
+      }
     } catch (_) {
       // JSON パース失敗時は何もしない
     }
@@ -94,6 +122,7 @@ onMounted(() => {
 
 // 変更があれば状態を保存
 watch([collapsed, activeSection, width], saveState)
+watch(visibleSections, saveState, { deep: true })
 
 function toggleSection(section) {
   activeSection.value = activeSection.value === section ? null : section
@@ -102,6 +131,13 @@ function toggleSection(section) {
 function openSection(section) {
   collapsed.value = false
   activeSection.value = section
+}
+
+function hideSection(section) {
+  visibleSections[section] = false
+  if (activeSection.value === section) {
+    activeSection.value = null
+  }
 }
 
 function startResize(e) {
@@ -127,7 +163,7 @@ function startResize(e) {
   document.addEventListener('mouseup', onMouseUp)
 }
 
-defineExpose({ openSection })
+defineExpose({ openSection, visibleSections })
 </script>
 
 <style scoped>
@@ -190,6 +226,10 @@ defineExpose({ openSection })
 }
 .section h3 .toggle-icon {
   margin-right: 0.5rem;
+}
+.section h3 .close-icon {
+  margin-left: auto;
+  cursor: pointer;
 }
 .section-content {
   padding: 0.5rem;
