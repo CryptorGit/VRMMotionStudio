@@ -710,6 +710,9 @@ function applyPose() {
 function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
+  const solver = helper?.objects.get(mesh)?.ikSolver
+  selectedIKBone.value?.updateMatrixWorld(true)
+  solver?.update()
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
   const exporter = new MMDExporter()
