@@ -99,6 +99,10 @@ let ikTargets = []
 let selectedIKBone = null
 let dragPlane = null
 let draggingIK = false
+let draggingRot = false
+const startPointer = new THREE.Vector2()
+const startEuler = new THREE.Euler()
+const _q = new THREE.Quaternion()
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -237,7 +241,7 @@ function setupIKTargets(mesh) {
   bones.forEach(bone => {
     if (/(?:ＩＫ|IK)$/i.test(bone.name)) {
       const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3),
+        new THREE.BoxGeometry(0.4, 0.4, 0.4),
         new THREE.MeshBasicMaterial({ color: 0xff0000 })
       )
       marker.visible = currentMode.value === 'pose'
@@ -250,10 +254,12 @@ function setupIKTargets(mesh) {
 function updateIKMarkers() {
   ikTargets.forEach(t => {
     t.bone.getWorldPosition(t.marker.position)
+    t.bone.getWorldQuaternion(_q)
+    t.marker.quaternion.copy(_q)
   })
 }
 function onPointerDown(event) {
-  if (currentMode.value !== 'pose') return
+  if (currentMode.value !== 'pose' || event.button === 1) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -266,11 +272,17 @@ function onPointerDown(event) {
     const target = ikTargets.find(t => t.marker === intersects[0].object)
     if (target) {
       selectedIKBone = target.bone
-      const bonePos = new THREE.Vector3()
-      selectedIKBone.getWorldPosition(bonePos)
-      const normal = bonePos.clone().sub(camera.position).normalize()
-      dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
-      draggingIK = true
+      if (event.button === 2) {
+        draggingRot = true
+        startPointer.set(event.clientX, event.clientY)
+        startEuler.copy(selectedIKBone.rotation)
+      } else {
+        const bonePos = new THREE.Vector3()
+        selectedIKBone.getWorldPosition(bonePos)
+        const normal = bonePos.clone().sub(camera.position).normalize()
+        dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
+        draggingIK = true
+      }
       if (controls) controls.enabled = false
       renderer.domElement.addEventListener('pointermove', onPointerMove)
       renderer.domElement.addEventListener('pointerup', onPointerUp)
@@ -278,6 +290,15 @@ function onPointerDown(event) {
   }
 }
 function onPointerMove(event) {
+  if (draggingRot && selectedIKBone) {
+    const dx = (event.clientX - startPointer.x) * 0.01
+    const dy = (event.clientY - startPointer.y) * 0.01
+    selectedIKBone.rotation.y = startEuler.y + dx
+    selectedIKBone.rotation.x = startEuler.x + dy
+    updateIKMarkers()
+    helper?.update(0)
+    return
+  }
   if (!draggingIK || !dragPlane || !selectedIKBone) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -293,6 +314,7 @@ function onPointerMove(event) {
 }
 function onPointerUp() {
   draggingIK = false
+  draggingRot = false
   dragPlane = null
   if (controls) controls.enabled = true
   renderer.domElement.removeEventListener('pointermove', onPointerMove)
@@ -303,15 +325,21 @@ function initTransformControls() {
   if (!renderer || !camera) return
   ikTargets.forEach(t => (t.marker.visible = true))
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
+  renderer.domElement.addEventListener('contextmenu', preventContextMenu)
 }
 function disposeTransformControls() {
   ikTargets.forEach(t => (t.marker.visible = false))
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
   renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
   renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
+  renderer?.domElement?.removeEventListener('contextmenu', preventContextMenu)
   dragPlane = null
   draggingIK = false
+  draggingRot = false
   selectedIKBone = null
+}
+function preventContextMenu(e) {
+  e.preventDefault()
 }
 const settingsSidebar = ref(null)
 
