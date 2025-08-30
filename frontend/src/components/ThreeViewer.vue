@@ -189,25 +189,39 @@ function setupIKTargets(mesh) {
   selectedIKBone = null
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
-  bones.forEach(bone => {
-    if (/(?:ＩＫ|IK)$/i.test(bone.name) || extraIKBoneNames.includes(bone.name)) {
-      const marker = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.4, 0.4),
-        new THREE.MeshBasicMaterial({
-          color: 0xff0000,
-          depthTest: false,
-          depthWrite: false,
-          transparent: true
-        })
-      )
-        marker.renderOrder = 999
-        marker.visible = true
-        scene.add(marker)
-        ikTargets.push({ bone, marker })
-      }
-    })
-    updateIKMarkers()
-  }
+
+  // Collect unique target bone indices from IK chains
+  const iks = (mesh.geometry?.iks || []).concat(extraIKChains)
+  const targetIndices = new Set()
+  iks.forEach(ik => {
+    if (typeof ik.target === 'number') targetIndices.add(ik.target)
+  })
+
+  // Add extra IK bones specified by name
+  bones.forEach((bone, idx) => {
+    if (extraIKBoneNames.includes(bone.name)) targetIndices.add(idx)
+  })
+
+  targetIndices.forEach(idx => {
+    const bone = bones[idx]
+    if (!bone) return
+    const marker = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.4, 0.4),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true
+      })
+    )
+    marker.renderOrder = 999
+    marker.visible = true
+    scene.add(marker)
+    ikTargets.push({ bone, marker })
+  })
+
+  updateIKMarkers()
+}
 function updateIKMarkers() {
   ikTargets.forEach(t => {
     t.bone.getWorldPosition(t.marker.position)
@@ -263,9 +277,9 @@ function onPointerMove(event) {
     const dy = (event.clientY - startPointer.y) * 0.01
     selectedIKBone.rotation.y = startEuler.y + dx
     selectedIKBone.rotation.x = startEuler.x + dy
-    selectedIKBone.updateMatrixWorld(true)
-    mesh?.skeleton?.update()
-    helper?.objects.get(mesh)?.ikSolver?.update()
+    const solver = helper?.objects.get(mesh)?.ikSolver
+    mesh?.updateMatrixWorld(true)
+    solver?.update()
     mesh?.skeleton?.update()
     mesh?.updateMatrixWorld(true)
     updateIKMarkers()
@@ -280,9 +294,9 @@ function onPointerMove(event) {
   if (raycaster.ray.intersectPlane(dragPlane, point)) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
     selectedIKBone.position.copy(local)
-    selectedIKBone.updateMatrixWorld(true)
-    mesh?.skeleton?.update()
-    helper?.objects.get(mesh)?.ikSolver?.update()
+    const solver = helper?.objects.get(mesh)?.ikSolver
+    mesh?.updateMatrixWorld(true)
+    solver?.update()
     mesh?.skeleton?.update()
     mesh?.updateMatrixWorld(true)
     updateIKMarkers()
@@ -296,7 +310,9 @@ function onPointerUp() {
   renderer.domElement.removeEventListener('pointermove', onPointerMove)
   renderer.domElement.removeEventListener('pointerup', onPointerUp)
   const mesh = currentMeshRef.value
-  helper?.objects.get(mesh)?.ikSolver?.update()
+  const solver = helper?.objects.get(mesh)?.ikSolver
+  mesh?.updateMatrixWorld(true)
+  solver?.update()
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   selectedIKBone = null
@@ -651,10 +667,6 @@ function animate() {
   const delta = clock.getDelta()
   if (helper) {
     helper.update(delta)
-    const mesh = currentMeshRef.value
-    helper.objects.get(mesh)?.ikSolver?.update()
-    mesh?.skeleton?.update()
-    mesh?.updateMatrixWorld(true)
   }
   updateIKMarkers()
   effect.render(scene, camera)
