@@ -218,7 +218,7 @@ function updateIKMarkers() {
 
 function initIKSolver(mesh) {
   if (!mesh || !helper) return
-  const base = mesh.geometry?.userData?.iks || []
+  const base = mesh.geometry.iks || []
   const iks = base.concat(extraIKChains)
   const solver = new CCDIKSolver(mesh, iks)
   const obj = helper.objects.get(mesh)
