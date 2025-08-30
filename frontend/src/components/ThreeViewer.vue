@@ -229,7 +229,10 @@ function getIKDefinitions(geometry) {
   return iks.concat(extraIKChains)
 }
 function setupIKTargets(mesh) {
-  ikTargets.forEach(t => scene.remove(t.marker))
+  ikTargets.forEach(t => {
+    scene.remove(t.marker)
+    t.marker.material?.dispose()
+  })
   ikTargets = []
   selectedIKBone.value = null
   if (!mesh) return
@@ -561,6 +564,11 @@ function removeModel(index) {
     }
     models.value.splice(index, 1)
     if (currentMeshRef.value === mesh) {
+      ikTargets.forEach(t => {
+        scene.remove(t.marker)
+        t.marker.material?.dispose()
+      })
+      ikTargets = []
       currentMeshRef.value = models.value[0]?.mesh || null
       setupIKTargets(currentMeshRef.value)
     }
