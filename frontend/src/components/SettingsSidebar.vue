@@ -38,7 +38,7 @@
               v-if="section === 'lighting' && ambient && directional"
               :ambient="ambient"
               :directional="directional"
-              :show-light-marker="showLightMarker"
+              v-model:show-light-marker="showLightMarker"
             />
             <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
           </div>
@@ -53,11 +53,17 @@ import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
-const { ambient, directional, mesh, showLightMarker } = defineProps({
+const props = defineProps({
   ambient: Object,
   directional: Object,
   mesh: Object,
-  showLightMarker: Object
+  showLightMarker: { type: Boolean, required: true }
+})
+const { ambient, directional, mesh } = props
+const emit = defineEmits(['update:showLightMarker'])
+const showLightMarker = computed({
+  get: () => props.showLightMarker,
+  set: v => emit('update:showLightMarker', v)
 })
 
 const collapsed = ref(false)
