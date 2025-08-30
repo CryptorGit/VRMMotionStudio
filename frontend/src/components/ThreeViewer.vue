@@ -205,8 +205,10 @@ function setupIKTargets(mesh) {
   const baseIks =
     mesh.geometry?.iks ||
     mesh.geometry?.userData?.mmd?.iks ||
+    mesh.geometry?.userData?.MMD?.iks ||
     mesh.geometry?.ik ||
     mesh.geometry?.userData?.mmd?.ik ||
+    mesh.geometry?.userData?.MMD?.ik ||
     []
   if (baseIks.length === 0) {
     console.warn('IK definitions not found for mesh', mesh)
@@ -257,8 +259,10 @@ function initIKSolver(mesh) {
   const base =
     mesh.geometry?.iks ||
     mesh.geometry?.userData?.mmd?.iks ||
+    mesh.geometry?.userData?.MMD?.iks ||
     mesh.geometry?.ik ||
     mesh.geometry?.userData?.mmd?.ik ||
+    mesh.geometry?.userData?.MMD?.ik ||
     []
   if (base.length === 0) {
     console.warn('IK definitions not found for mesh', mesh)
