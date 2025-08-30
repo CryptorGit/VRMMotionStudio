@@ -213,17 +213,18 @@ watch(currentMeshRef, mesh => {
   setupIKTargets(mesh)
   initIKSolver(mesh)
 })
-function getIKDefinitions(geometry) {
+function getIKDefinitions(geometry, modelName = '') {
+  console.log('getIKDefinitions geometry:', geometry)
   const iks =
-    geometry?.iks ||
-    geometry?.userData?.mmd?.iks ||
-    geometry?.userData?.MMD?.iks ||
-    geometry?.ik ||
-    geometry?.userData?.mmd?.ik ||
     geometry?.userData?.MMD?.ik ||
+    geometry?.userData?.MMD?.iks ||
+    geometry?.userData?.mmd?.ik ||
+    geometry?.userData?.mmd?.iks ||
+    geometry?.ik ||
+    geometry?.iks ||
     []
   if (iks.length === 0) {
-    console.warn('IK definitions not found for geometry', geometry)
+    console.warn(`IK definitions not found for model ${modelName}`, geometry)
   }
   return iks.concat(extraIKChains)
 }
@@ -237,7 +238,7 @@ function setupIKTargets(mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
 
-  const iks = getIKDefinitions(mesh.geometry)
+  const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const targetIndices = new Set()
   iks.forEach(ik => {
     if (typeof ik.target === 'number') targetIndices.add(ik.target)
@@ -292,13 +293,22 @@ function updateIKMarkers() {
 
 function initIKSolver(mesh) {
   if (!mesh || !helper) return
-  const iks = getIKDefinitions(mesh.geometry)
+  const iks = getIKDefinitions(mesh.geometry, mesh.name)
+  iks.forEach((ik, idx) => {
+    const len = Array.isArray(ik.links) ? ik.links.length : 0
+    console.log(`IK chain ${idx} for ${mesh.name} length: ${len}`)
+  })
   const solver = new CCDIKSolver(mesh, iks)
   const obj = helper.objects.get(mesh)
   if (obj) {
     obj.ikSolver = solver
   }
+  console.log('initIKSolver: running solver.update for', mesh.name)
   solver.update()
+  if (mesh.skeleton) {
+    mesh.skeleton.update()
+    console.log('initIKSolver: skeleton updated for', mesh.name)
+  }
 }
 function onPointerDown(event) {
   const rect = renderer.domElement.getBoundingClientRect()
@@ -340,7 +350,10 @@ function applyIKUpdate() {
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   solver?.update()
-  mesh?.skeleton?.update()
+  if (mesh?.skeleton) {
+    mesh.skeleton.update()
+    console.log('applyIKUpdate: skeleton updated for', mesh.name)
+  }
   mesh?.updateMatrixWorld(true)
   updateIKMarkers()
 }
