@@ -300,6 +300,7 @@ onMounted(async () => {
   controls = new OrbitControls(camera, renderer.domElement)
 
   scene.add(ambientLight.value)
+  scene.add(directionalLight.value.target)
   scene.add(directionalLight.value)
   scene.add(directionalLightHelper)
 
