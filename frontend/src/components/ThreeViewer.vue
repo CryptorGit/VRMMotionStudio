@@ -38,7 +38,6 @@
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
-    v-model:marker-length="lightMarkerLength"
   />
 </template>
 
@@ -69,10 +68,10 @@ const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(1, 1, 1)
 const lightMarkerColor = ref('#ffff00')
-const lightMarkerLength = ref(0.2)
+const LIGHT_MARKER_LENGTH = 0.2
 const directionalLightHelper = new THREE.DirectionalLightHelper(
   directionalLight.value,
-  lightMarkerLength.value,
+  LIGHT_MARKER_LENGTH,
   lightMarkerColor.value
 )
 directionalLightHelper.visible = false
@@ -115,18 +114,10 @@ watch(
 watch(directionalIntensity, i => {
   try {
     directionalLight.value.intensity = i
-    directionalLightHelper.scale.setScalar(lightMarkerLength.value * i)
+    directionalLightHelper.scale.setScalar(LIGHT_MARKER_LENGTH * i)
     directionalLightHelper.update()
   } catch (e) {
     console.error('Failed to update light marker intensity:', e)
-  }
-})
-watch(lightMarkerLength, l => {
-  try {
-    directionalLightHelper.scale.setScalar(l * directionalIntensity.value)
-    directionalLightHelper.update()
-  } catch (e) {
-    console.error('Failed to update light marker length:', e)
   }
 })
 const currentMeshRef = ref(null)
