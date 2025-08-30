@@ -17,20 +17,6 @@
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
-  <div id="transform-controls" v-if="selectedIKBone">
-    <button
-      :class="{ active: transformMode === 'translate' }"
-      @click="setTransformMode('translate')"
-    >
-      <i class="fa-solid fa-up-down-left-right"></i>
-    </button>
-    <button
-      :class="{ active: transformMode === 'rotate' }"
-      @click="setTransformMode('rotate')"
-    >
-      <i class="fa-solid fa-rotate"></i>
-    </button>
-  </div>
   <div v-if="poses.length" id="pose-selector">
     <select v-model="selectedPose" @change="applyPose">
       <option disabled value="">ポーズを選択</option>
@@ -893,18 +879,3 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-#transform-controls {
-  position: absolute;
-  top: 10px;
-  left: 60px;
-  display: flex;
-  gap: 4px;
-}
-#transform-controls button {
-  padding: 4px;
-}
-#transform-controls button.active {
-  background-color: #ccc;
-}
-</style>
