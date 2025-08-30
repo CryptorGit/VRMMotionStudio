@@ -41,18 +41,14 @@
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
-    @toggle-model="toggleModelVisibility"
-    @remove-model="removeModel"
-  />
-  <BasicSettingsPanel
-    v-model:mode="currentMode"
-  />
+  @toggle-model="toggleModelVisibility"
+  @remove-model="removeModel"
+/>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
-import BasicSettingsPanel from './BasicSettingsPanel.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
@@ -89,8 +85,6 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
-// 現在の操作モードを保持（'camera' | 'pose'）
-const currentMode = ref('camera')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -185,17 +179,6 @@ function isPhysicalBone(bone) {
   const name = bone.name || ''
   return /(?:physics|rigid|rb_|col|collision|dummy)/i.test(name) || name.includes('ダミー')
 }
-// モード変更時に OrbitControls や TransformControls を切り替える
-watch(currentMode, mode => {
-  if (controls) {
-    controls.enabled = mode === 'camera'
-  }
-  if (mode === 'pose') {
-    initTransformControls()
-  } else {
-    disposeTransformControls()
-  }
-})
 // モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
   setupIKTargets(mesh)
@@ -217,14 +200,14 @@ function setupIKTargets(mesh) {
           transparent: true
         })
       )
-      marker.renderOrder = 999
-      marker.visible = currentMode.value === 'pose'
-      scene.add(marker)
-      ikTargets.push({ bone, marker })
-    }
-  })
-  updateIKMarkers()
-}
+        marker.renderOrder = 999
+        marker.visible = true
+        scene.add(marker)
+        ikTargets.push({ bone, marker })
+      }
+    })
+    updateIKMarkers()
+  }
 function updateIKMarkers() {
   ikTargets.forEach(t => {
     t.bone.getWorldPosition(t.marker.position)
@@ -245,7 +228,7 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (currentMode.value !== 'pose' || event.button === 1) return
+  if (event.button === 1) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -688,8 +671,8 @@ onMounted(async () => {
   )
   camera.position.set(0, 10, 30)
 
-  controls = new OrbitControls(camera, renderer.domElement)
-  controls.enabled = currentMode.value === 'camera'
+    controls = new OrbitControls(camera, renderer.domElement)
+    controls.enabled = true
 
   scene.add(ambientLight.value)
   scene.add(directionalLight.value.target)
