@@ -3,9 +3,6 @@
     <button @click="mode = mode === 'camera' ? 'pose' : 'camera'">
       {{ mode === 'camera' ? 'カメラモード' : 'ポーズモード' }}
     </button>
-    <label>
-      <input type="checkbox" v-model="showBones" /> ボーン表示
-    </label>
   </div>
 </template>
 
@@ -13,20 +10,14 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  mode: { type: String, default: 'camera' },
-  showBones: { type: Boolean, default: false }
+  mode: { type: String, default: 'camera' }
 })
 
-const emit = defineEmits(['update:mode', 'update:showBones'])
+const emit = defineEmits(['update:mode'])
 
 const mode = computed({
   get: () => props.mode,
   set: v => emit('update:mode', v)
-})
-
-const showBones = computed({
-  get: () => props.showBones,
-  set: v => emit('update:showBones', v)
 })
 </script>
 
