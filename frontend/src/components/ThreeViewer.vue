@@ -43,6 +43,7 @@
     v-model:marker-color="lightMarkerColor"
     v-model:showIkMarkers="showIkMarkers"
   @toggle-model="toggleModelVisibility"
+  @toggle-bone="toggleBoneVisibility"
   @remove-model="removeModel"
 />
 </template>
@@ -534,13 +535,24 @@ function toggleModelVisibility(index, visible) {
   if (model) {
     model.visible = visible
     model.mesh.visible = visible
+    if (model.skeletonHelper) {
+      model.skeletonHelper.visible = visible && model.bonesVisible
+    }
+  }
+}
+
+function toggleBoneVisibility(index, visible) {
+  const model = models.value[index]
+  if (model && model.skeletonHelper) {
+    model.bonesVisible = visible
+    model.skeletonHelper.visible = visible && model.visible
   }
 }
 
 function removeModel(index) {
   const model = models.value[index]
   if (model) {
-    const mesh = model.mesh
+    const { mesh, skeletonHelper } = model
     if (helper?.objects?.has(mesh)) {
       helper.remove(mesh)
     }
@@ -556,6 +568,11 @@ function removeModel(index) {
         }
       })
       scene.remove(mesh)
+      if (skeletonHelper) {
+        scene.remove(skeletonHelper)
+        skeletonHelper.geometry?.dispose?.()
+        skeletonHelper.material?.dispose?.()
+      }
       renderer.renderLists.dispose()
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
@@ -582,12 +599,17 @@ async function clearCache() {
   poses.value = []
   selectedPose.value = null
   models.value.forEach(m => {
-    const mesh = m.mesh
+    const { mesh, skeletonHelper } = m
     if (helper?.objects?.has(mesh)) {
       helper.remove(mesh)
     }
     try {
       scene.remove(mesh)
+      if (skeletonHelper) {
+        scene.remove(skeletonHelper)
+        skeletonHelper.geometry?.dispose?.()
+        skeletonHelper.material?.dispose?.()
+      }
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
     }
@@ -670,7 +692,17 @@ async function handleFiles(files) {
       scene.add(mesh)
       helper.add(mesh, { physics: false })
       initIKSolver(mesh)
-      models.value.push({ id: nextModelId++, mesh, name: modelFile.name, visible: true })
+      const skeletonHelper = new THREE.SkeletonHelper(mesh)
+      skeletonHelper.visible = false
+      scene.add(skeletonHelper)
+      models.value.push({
+        id: nextModelId++,
+        mesh,
+        name: modelFile.name,
+        visible: true,
+        skeletonHelper,
+        bonesVisible: false
+      })
       currentMeshRef.value = mesh
       setupIKTargets(mesh)
       if (!ikConfigLoaded) {

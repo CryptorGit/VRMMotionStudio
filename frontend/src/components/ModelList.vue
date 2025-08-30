@@ -5,6 +5,14 @@
         <input type="checkbox" :checked="m.visible" @change="onToggle(i, $event.target.checked)" />
         {{ m.name }}
       </label>
+      <label>
+        <input
+          type="checkbox"
+          :checked="m.bonesVisible"
+          @change="onToggleBone(i, $event.target.checked)"
+        />
+        ボーン表示
+      </label>
       <button @click="$emit('remove', i)">削除</button>
     </li>
   </ul>
@@ -14,9 +22,12 @@
 const props = defineProps({
   models: { type: Array, required: true }
 })
-const emit = defineEmits(['toggle', 'remove'])
+const emit = defineEmits(['toggle', 'toggle-bone', 'remove'])
 function onToggle(index, visible) {
   emit('toggle', index, visible)
+}
+function onToggleBone(index, visible) {
+  emit('toggle-bone', index, visible)
 }
 </script>
 
@@ -30,6 +41,9 @@ function onToggle(index, visible) {
   display: flex;
   align-items: center;
   margin-bottom: 4px;
+}
+.model-list label + label {
+  margin-left: 8px;
 }
 .model-list button {
   margin-left: auto;
