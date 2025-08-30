@@ -507,12 +507,13 @@ function removeModel(index) {
       scene.remove(mesh)
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
+      return
     }
     models.value.splice(index, 1)
     if (currentMeshRef.value === mesh) {
       currentMeshRef.value = models.value[0]?.mesh || null
+      setupIKTargets(currentMeshRef.value)
     }
-    setupIKTargets(currentMeshRef.value)
   }
 }
 
