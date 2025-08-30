@@ -237,26 +237,24 @@ function onPointerDown(event) {
     ikTargets.map(t => t.marker),
     false
   )
-  if (intersects.length > 0) {
-    const target = ikTargets.find(t => t.marker === intersects[0].object)
-    if (target) {
-      selectedIKBone = target.bone
-      if (event.button === 2) {
-        draggingRot = true
-        startPointer.set(event.clientX, event.clientY)
-        startEuler.copy(selectedIKBone.rotation)
-      } else {
-        const bonePos = new THREE.Vector3()
-        selectedIKBone.getWorldPosition(bonePos)
-        const normal = bonePos.clone().sub(camera.position).normalize()
-        dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
-        draggingIK = true
-      }
-      if (controls) controls.enabled = false
-      renderer.domElement.addEventListener('pointermove', onPointerMove)
-      renderer.domElement.addEventListener('pointerup', onPointerUp)
-    }
+  if (intersects.length === 0) return
+  const target = ikTargets.find(t => t.marker === intersects[0].object)
+  if (!target) return
+  selectedIKBone = target.bone
+  if (event.button === 2) {
+    draggingRot = true
+    startPointer.set(event.clientX, event.clientY)
+    startEuler.copy(selectedIKBone.rotation)
+  } else {
+    const bonePos = new THREE.Vector3()
+    selectedIKBone.getWorldPosition(bonePos)
+    const normal = bonePos.clone().sub(camera.position).normalize()
+    dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
+    draggingIK = true
   }
+  controls.enabled = false
+  renderer.domElement.addEventListener('pointermove', onPointerMove)
+  renderer.domElement.addEventListener('pointerup', onPointerUp)
 }
 function onPointerMove(event) {
   if (draggingRot && selectedIKBone) {
@@ -287,7 +285,7 @@ function onPointerUp() {
   draggingIK = false
   draggingRot = false
   dragPlane = null
-  if (controls) controls.enabled = true
+  controls.enabled = true
   renderer.domElement.removeEventListener('pointermove', onPointerMove)
   renderer.domElement.removeEventListener('pointerup', onPointerUp)
   selectedIKBone = null
@@ -689,6 +687,7 @@ onMounted(async () => {
   } else {
     globalThis.Ammo = AmmoLib
   }
+  initTransformControls()
   helper = new MMDAnimationHelper()
 
   window.addEventListener('resize', onWindowResize)
