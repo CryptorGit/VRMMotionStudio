@@ -13,7 +13,6 @@
 - [x] ライト設定パネルの実装
 - [ ] TransformControls によるボーン編集機能
 - [ ] ボーン直接操作 UI の実装
-  - [ ] BoneManipulator のボーン選択や回転精度の向上
 - [ ] VPD/VMD などのポーズ・モーションデータの入出力
   - [x] VPD ファイルの複数選択とリスト表示
   - [x] 選択ポーズを MMDLoader.loadVPD + helper.pose で適用

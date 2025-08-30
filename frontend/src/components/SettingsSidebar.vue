@@ -23,12 +23,6 @@
           <MorphEditor :mesh="mesh" />
         </div>
       </div>
-      <div class="section">
-        <h3 @click="toggleSection('bone')">ボーン直接操作</h3>
-        <div v-show="activeSection === 'bone'" class="section-content">
-          <!-- TODO: ボーン操作UIをここに実装 -->
-        </div>
-      </div>
     </div>
   </div>
 </template>
