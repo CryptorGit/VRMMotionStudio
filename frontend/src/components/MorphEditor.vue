@@ -23,16 +23,31 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   mesh: Object
 })
 
-const morphs = computed(() => {
-  if (!props.mesh || !props.mesh.morphTargetDictionary) return []
-  return Object.entries(props.mesh.morphTargetDictionary)
-})
+const morphs = ref([])
+
+function computeMorphs() {
+  if (!props.mesh || !props.mesh.morphTargetDictionary) {
+    morphs.value = []
+  } else {
+    morphs.value = Object.entries(props.mesh.morphTargetDictionary)
+  }
+}
+
+watch(
+  () => props.mesh,
+  () => computeMorphs(),
+  { immediate: true }
+)
+
+function reloadMorphs() {
+  computeMorphs()
+}
 
 function update(index, event) {
   const value = parseFloat(event.target.value)
@@ -40,6 +55,8 @@ function update(index, event) {
     props.mesh.morphTargetInfluences[index] = value
   }
 }
+
+defineExpose({ reloadMorphs })
 </script>
 
 <style scoped>

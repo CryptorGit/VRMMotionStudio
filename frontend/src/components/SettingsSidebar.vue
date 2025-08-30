@@ -29,6 +29,11 @@
             ></i>
             {{ sectionTitles[section] }}
             <i
+              v-if="section === 'morph'"
+              class="fa-solid fa-rotate-right reload-icon"
+              @click.stop="reloadMorphs"
+            ></i>
+            <i
               class="fa-solid fa-times close-icon"
               @click.stop="hideSection(section)"
             ></i>
@@ -42,7 +47,11 @@
               v-model:show-light-marker="showLightMarker"
               v-model:marker-color="markerColor"
             />
-            <MorphEditor v-else-if="section === 'morph'" :mesh="mesh" />
+            <MorphEditor
+              v-else-if="section === 'morph'"
+              :mesh="mesh"
+              ref="morphEditorRef"
+            />
           </div>
         </div>
       </template>
@@ -51,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, watch, computed, nextTick, toRefs } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 
@@ -63,7 +72,7 @@ const props = defineProps({
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true }
 })
-const { ambient, directional, mesh } = props
+const { ambient, directional, mesh } = toRefs(props)
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
@@ -91,6 +100,7 @@ const width = ref(300)
 const isResizing = ref(false)
 const headerRef = ref(null)
 const headerHeight = ref(0)
+const morphEditorRef = ref(null)
 
 // セクションの表示状態
 const visibleSections = reactive({
@@ -200,6 +210,10 @@ function startResize(e) {
   document.addEventListener('mouseup', onMouseUp)
 }
 
+function reloadMorphs() {
+  morphEditorRef.value?.reloadMorphs()
+}
+
 const hasSections = computed(() =>
   sectionOrder.some(section => visibleSections[section])
 )
@@ -283,8 +297,13 @@ defineExpose({
 .section h3 .toggle-icon {
   margin-right: 0.5rem;
 }
-.section h3 .close-icon {
+.section h3 .reload-icon {
   margin-left: auto;
+  margin-right: 0.5rem;
+  cursor: pointer;
+}
+.section h3 .close-icon {
+  margin-left: 0.5rem;
   cursor: pointer;
 }
 .section-content {
