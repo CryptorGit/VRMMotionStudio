@@ -473,6 +473,7 @@ async function restoreCachedModel() {
 
 function onFileChange(e) {
   handleFiles(e.target.files)
+  e.target.value = ''
 }
 
 function toggleMenu() {
