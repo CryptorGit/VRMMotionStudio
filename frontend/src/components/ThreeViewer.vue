@@ -97,6 +97,9 @@ const selectedIKBone = ref(null)
 let dragPlane = null
 let ikUpdateHandle = 0
 const _dragPoint = new THREE.Vector3()
+let isRotating = false
+const rotationAxis = new THREE.Vector3()
+const _quat = new THREE.Quaternion()
 const extraIKBoneNames = []
 const extraIKChains = []
 async function loadIKConfig() {
@@ -297,7 +300,6 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (event.button !== 0) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -313,6 +315,17 @@ function onPointerDown(event) {
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
   selectedIKBone.value = target.bone
+  if (event.button === 2) {
+    event.preventDefault()
+    isRotating = true
+    selectedIKBone.value.getWorldPosition(_dragPoint)
+    rotationAxis.copy(_dragPoint).sub(camera.position).normalize()
+    controls.enabled = false
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    return
+  }
+  if (event.button !== 0) return
   const pos = new THREE.Vector3()
   selectedIKBone.value.getWorldPosition(pos)
   const normal = pos.clone().sub(camera.position).normalize()
@@ -340,7 +353,16 @@ function scheduleIKUpdate() {
 }
 
 function onPointerMove(event) {
-  if (!selectedIKBone.value || !dragPlane) return
+  if (!selectedIKBone.value) return
+  if (isRotating) {
+    const angle = event.movementX * 0.01
+    _quat.setFromAxisAngle(rotationAxis, angle)
+    selectedIKBone.value.quaternion.premultiply(_quat)
+    selectedIKBone.value.updateMatrixWorld(true)
+    scheduleIKUpdate()
+    return
+  }
+  if (!dragPlane) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -357,6 +379,10 @@ function onPointerUp() {
   renderer.domElement.removeEventListener('pointermove', onPointerMove)
   renderer.domElement.removeEventListener('pointerup', onPointerUp)
   controls.enabled = true
+  if (isRotating) {
+    isRotating = false
+    scheduleIKUpdate()
+  }
   dragPlane = null
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
