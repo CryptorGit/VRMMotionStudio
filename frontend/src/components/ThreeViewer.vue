@@ -112,6 +112,7 @@ let ikTargets = []
 const selectedIKBone = ref(null)
 let transformControls = null
 let dragPlane = null
+let ikUpdateHandle = 0
 const _dragPoint = new THREE.Vector3()
 let reattachTransform = false
 const extraIKBoneNames = []
@@ -358,6 +359,23 @@ function onPointerDown(event) {
   renderer.domElement.addEventListener('pointerup', onPointerUp)
 }
 
+function applyIKUpdate() {
+  ikUpdateHandle = 0
+  const mesh = currentMeshRef.value
+  const solver = helper?.objects.get(mesh)?.ikSolver
+  mesh?.skeleton?.update()
+  solver?.update()
+  selectedIKBone.value?.updateMatrixWorld()
+  mesh?.updateMatrixWorld(true)
+  helper?.update(0)
+  updateIKMarkers()
+}
+
+function scheduleIKUpdate() {
+  if (ikUpdateHandle) return
+  ikUpdateHandle = requestAnimationFrame(applyIKUpdate)
+}
+
 function onPointerMove(event) {
   if (!selectedIKBone.value || !dragPlane) return
   const rect = renderer.domElement.getBoundingClientRect()
@@ -368,7 +386,7 @@ function onPointerMove(event) {
     selectedIKBone.value.parent.worldToLocal(_dragPoint)
     selectedIKBone.value.position.copy(_dragPoint)
     selectedIKBone.value.updateMatrixWorld(true)
-    updateIKMarkers()
+    scheduleIKUpdate()
   }
 }
 
