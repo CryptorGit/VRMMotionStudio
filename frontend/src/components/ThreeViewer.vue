@@ -17,20 +17,6 @@
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
-  <div id="transform-controls" v-if="selectedIKBone">
-    <button
-      :class="{ active: transformMode === 'translate' }"
-      @click="setTransformMode('translate')"
-    >
-      <i class="fa-solid fa-up-down-left-right"></i>
-    </button>
-    <button
-      :class="{ active: transformMode === 'rotate' }"
-      @click="setTransformMode('rotate')"
-    >
-      <i class="fa-solid fa-rotate"></i>
-    </button>
-  </div>
   <div v-if="poses.length" id="pose-selector">
     <select v-model="selectedPose" @change="applyPose">
       <option disabled value="">ポーズを選択</option>
@@ -66,7 +52,6 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
@@ -103,18 +88,15 @@ directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 const showIkMarkers = ref(true)
-const transformMode = ref('translate')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const IK_MARKER_PIXEL_SIZE = 16
 let ikTargets = []
 const selectedIKBone = ref(null)
-let transformControls = null
 let dragPlane = null
 let ikUpdateHandle = 0
 const _dragPoint = new THREE.Vector3()
-let reattachTransform = false
 const extraIKBoneNames = []
 const extraIKChains = []
 async function loadIKConfig() {
@@ -315,30 +297,16 @@ function initIKSolver(mesh) {
   solver.update()
 }
 function onPointerDown(event) {
-  if (event.button === 2) {
-    event.preventDefault()
-    setTransformMode('rotate')
-    transformControls && (transformControls.visible = true)
-    return
-  }
-  if (event.button !== 0 || transformControls?.dragging) return
+  if (event.button !== 0) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
   raycaster.setFromCamera(mouse, camera)
-  const gizmoHits = transformControls
-    ? raycaster.intersectObjects(
-        transformControls._gizmo?.picker?.children || [],
-        true
-      )
-    : []
-  if (gizmoHits.length > 0) return
   const intersects = raycaster.intersectObjects(
     ikTargets.map(t => t.marker),
     false
   )
   if (intersects.length === 0) {
-    transformControls?.detach()
     selectedIKBone.value = null
     return
   }
@@ -349,11 +317,6 @@ function onPointerDown(event) {
   selectedIKBone.value.getWorldPosition(pos)
   const normal = pos.clone().sub(camera.position).normalize()
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
-  if (transformControls?.object) {
-    transformControls.detach()
-    transformControls.visible = false
-    reattachTransform = true
-  }
   controls.enabled = false
   renderer.domElement.addEventListener('pointermove', onPointerMove)
   renderer.domElement.addEventListener('pointerup', onPointerUp)
@@ -403,59 +366,6 @@ function onPointerUp() {
   mesh?.updateMatrixWorld(true)
   helper?.update(0)
   updateIKMarkers()
-  if (reattachTransform && transformControls) {
-    transformControls.attach(selectedIKBone.value)
-    transformControls.visible = true
-  }
-  reattachTransform = false
-}
-function setTransformMode(mode) {
-  transformMode.value = mode
-  transformControls?.setMode(mode)
-}
-function onKeyDown(event) {
-  const tag = event.target?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return
-  const key = event.key.toLowerCase()
-  if (key === 'w') setTransformMode('translate')
-  else if (key === 'e') setTransformMode('rotate')
-}
-function onTransformChange() {
-  const mesh = currentMeshRef.value
-  const solver = helper?.objects.get(mesh)?.ikSolver
-  mesh?.skeleton?.update()
-  solver?.update()
-  selectedIKBone.value?.updateMatrixWorld()
-  mesh?.updateMatrixWorld(true)
-  helper?.update(0)
-  updateIKMarkers()
-}
-function onTransformDragging(event) {
-  controls.enabled = !event.value
-}
-function initTransformControls() {
-  if (!renderer || !camera || !scene) return
-  transformControls = new TransformControls(camera, renderer.domElement)
-  transformControls.setSpace('local')
-  transformControls.setMode(transformMode.value)
-  transformControls.addEventListener('dragging-changed', onTransformDragging)
-  transformControls.addEventListener('change', onTransformChange)
-  scene.add(transformControls)
-  renderer.domElement.addEventListener('pointerdown', onPointerDown)
-}
-function disposeTransformControls() {
-  ikTargets.forEach(t => (t.marker.visible = false))
-  renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
-  renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
-  renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
-  if (transformControls) {
-    transformControls.removeEventListener('dragging-changed', onTransformDragging)
-    transformControls.removeEventListener('change', onTransformChange)
-    scene?.remove(transformControls)
-    transformControls.dispose()
-    transformControls = null
-  }
-  selectedIKBone.value = null
 }
 const settingsSidebar = ref(null)
 
@@ -868,11 +778,10 @@ onMounted(async () => {
   } else {
     globalThis.Ammo = AmmoLib
   }
-  initTransformControls()
   helper = new MMDAnimationHelper()
+  renderer.domElement.addEventListener('pointerdown', onPointerDown)
 
   window.addEventListener('resize', onWindowResize)
-  window.addEventListener('keydown', onKeyDown)
   document.addEventListener('click', handleDocumentClick)
 
   console.log('API base URL:', API_BASE_URL)
@@ -885,26 +794,13 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
-  window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('error', handleError)
   window.removeEventListener('unhandledrejection', handleUnhandledRejection)
   window.removeEventListener('resize', onWindowResize)
-  disposeTransformControls()
+  renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
+  renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
+  renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
+  ikTargets.forEach(t => (t.marker.visible = false))
+  selectedIKBone.value = null
 })
 </script>
-
-<style scoped>
-#transform-controls {
-  position: absolute;
-  top: 10px;
-  left: 60px;
-  display: flex;
-  gap: 4px;
-}
-#transform-controls button {
-  padding: 4px;
-}
-#transform-controls button.active {
-  background-color: #ccc;
-}
-</style>
