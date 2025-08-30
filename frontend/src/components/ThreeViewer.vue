@@ -35,6 +35,7 @@
     :ambient="ambientLight"
     :directional="directionalLight"
     :mesh="currentMeshRef"
+    v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
   />
@@ -74,6 +75,7 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
   lightMarkerColor.value
 )
 directionalLightHelper.visible = false
+const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 watch(showLightMarker, v => {
   try {
@@ -109,8 +111,9 @@ watch(
     }
   }
 )
-watch(() => directionalLight.value.intensity, i => {
+watch(directionalIntensity, i => {
   try {
+    directionalLight.value.intensity = i
     directionalLightHelper.scale.setScalar(markerBaseLength * i)
     directionalLightHelper.update()
   } catch (e) {

@@ -15,10 +15,10 @@
         <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
       </button>
     </div>
-    <div class="sections" v-if="!collapsed && hasSections">
-      <template v-for="section in sectionOrder" :key="section">
-        <div v-if="visibleSections[section]" class="section">
-          <h3 @click="toggleSection(section)">
+  <div class="sections" v-if="!collapsed && hasSections">
+    <template v-for="section in sectionOrder" :key="section">
+      <div v-if="visibleSections[section]" class="section">
+        <h3 @click="toggleSection(section)">
             <i
               :class="
                 expandedSections[section]
@@ -38,6 +38,7 @@
               v-if="section === 'lighting' && ambient && directional"
               :ambient="ambient"
               :directional="directional"
+              v-model:directional-intensity="directionalIntensity"
               v-model:show-light-marker="showLightMarker"
               v-model:marker-color="markerColor"
             />
@@ -59,10 +60,15 @@ const props = defineProps({
   directional: Object,
   mesh: Object,
   showLightMarker: { type: Boolean, required: true },
-  markerColor: { type: String, required: true }
+  markerColor: { type: String, required: true },
+  directionalIntensity: { type: Number, required: true }
 })
 const { ambient, directional, mesh } = props
-const emit = defineEmits(['update:showLightMarker', 'update:markerColor'])
+const emit = defineEmits([
+  'update:showLightMarker',
+  'update:markerColor',
+  'update:directionalIntensity'
+])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
   set: v => emit('update:showLightMarker', v)
@@ -70,6 +76,10 @@ const showLightMarker = computed({
 const markerColor = computed({
   get: () => props.markerColor,
   set: v => emit('update:markerColor', v)
+})
+const directionalIntensity = computed({
+  get: () => props.directionalIntensity,
+  set: v => emit('update:directionalIntensity', v)
 })
 
 const collapsed = ref(false)
