@@ -3,12 +3,15 @@
     <div class="header">
       <span>設定</span>
       <button @click="collapsed = !collapsed">
-        <i :class="collapsed ? 'fa-solid fa-chevron-left' : 'fa-solid fa-chevron-right'"></i>
+        <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
       </button>
     </div>
     <div class="sections" v-if="!collapsed">
       <div class="section">
-        <h3 @click="toggleSection('lighting')">ライト設定</h3>
+        <h3 @click="toggleSection('lighting')">
+          <i :class="activeSection === 'lighting' ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" class="toggle-icon"></i>
+          ライト設定
+        </h3>
         <div v-show="activeSection === 'lighting'" class="section-content">
           <LightingPanel
             v-if="ambient && directional"
@@ -18,7 +21,10 @@
         </div>
       </div>
       <div class="section">
-        <h3 @click="toggleSection('morph')">モーフ編集</h3>
+        <h3 @click="toggleSection('morph')">
+          <i :class="activeSection === 'morph' ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" class="toggle-icon"></i>
+          モーフ編集
+        </h3>
         <div v-show="activeSection === 'morph'" class="section-content">
           <MorphEditor :mesh="mesh" />
         </div>
@@ -96,6 +102,11 @@ defineExpose({ openSection })
   padding: 0.5rem;
   background: #ddd;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.section h3 .toggle-icon {
+  margin-right: 0.5rem;
 }
 .section-content {
   padding: 0.5rem;
