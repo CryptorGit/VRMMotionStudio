@@ -292,7 +292,6 @@ function onPointerUp() {
 }
 function initTransformControls() {
   if (!renderer || !camera) return
-  ikTargets.forEach(t => (t.marker.visible = true))
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
   renderer.domElement.addEventListener('contextmenu', preventContextMenu)
 }
