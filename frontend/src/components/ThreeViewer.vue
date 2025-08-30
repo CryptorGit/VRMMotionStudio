@@ -408,13 +408,14 @@ function getDB() {
 }
 async function cacheFiles(files) {
   try {
-    const list = await Promise.all(
-      [...files].map(async f => ({
+    const list = []
+    for (const f of files) {
+      list.push({
         name: f.name,
         path: f.webkitRelativePath || f.name,
         data: await f.arrayBuffer()
-      }))
-    )
+      })
+    }
 
     const db = await getDB()
     const tx = db.transaction(DB_STORE, 'readwrite')
