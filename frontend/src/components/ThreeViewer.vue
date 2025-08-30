@@ -45,7 +45,7 @@
     @remove-model="removeModel"
   />
   <BasicSettingsPanel
-    v-model:mode="mode"
+    v-model:mode="currentMode"
     v-model:show-bones="showBones"
   />
 </template>
@@ -89,7 +89,8 @@ const directionalLightHelper = new THREE.DirectionalLightHelper(
 directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
-const mode = ref('camera')
+// 現在の操作モードを保持（'camera' | 'pose'）
+const currentMode = ref('camera')
 const showBones = ref(false)
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
@@ -166,6 +167,13 @@ watch(directionalIntensity, i => {
     console.error('Failed to update light marker intensity:', e)
   }
 })
+// モード変更時に OrbitControls の有効/無効を切り替える
+watch(currentMode, mode => {
+  if (controls) {
+    controls.enabled = mode === 'camera'
+  }
+})
+
 const currentMeshRef = ref(null)
 const settingsSidebar = ref(null)
 
@@ -525,6 +533,7 @@ onMounted(async () => {
   camera.position.set(0, 10, 30)
 
   controls = new OrbitControls(camera, renderer.domElement)
+  controls.enabled = currentMode.value === 'camera'
 
   scene.add(ambientLight.value)
   scene.add(directionalLight.value.target)
