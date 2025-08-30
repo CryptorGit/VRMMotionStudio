@@ -257,16 +257,17 @@ function onPointerDown(event) {
   renderer.domElement.addEventListener('pointerup', onPointerUp)
 }
 function onPointerMove(event) {
+  const mesh = currentMeshRef.value
   if (draggingRot && selectedIKBone) {
     const dx = (event.clientX - startPointer.x) * 0.01
     const dy = (event.clientY - startPointer.y) * 0.01
     selectedIKBone.rotation.y = startEuler.y + dx
     selectedIKBone.rotation.x = startEuler.x + dy
     selectedIKBone.updateMatrixWorld(true)
-    currentMeshRef.value?.skeleton?.update()
-    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-    currentMeshRef.value?.skeleton?.update()
-    currentMeshRef.value?.updateMatrixWorld(true)
+    mesh?.skeleton?.update()
+    helper?.objects.get(mesh)?.ikSolver?.update()
+    mesh?.skeleton?.update()
+    mesh?.updateMatrixWorld(true)
     updateIKMarkers()
     return
   }
@@ -280,10 +281,10 @@ function onPointerMove(event) {
     const local = selectedIKBone.parent.worldToLocal(point.clone())
     selectedIKBone.position.copy(local)
     selectedIKBone.updateMatrixWorld(true)
-    currentMeshRef.value?.skeleton?.update()
-    helper?.objects.get(currentMeshRef.value)?.ikSolver?.update()
-    currentMeshRef.value?.skeleton?.update()
-    currentMeshRef.value?.updateMatrixWorld(true)
+    mesh?.skeleton?.update()
+    helper?.objects.get(mesh)?.ikSolver?.update()
+    mesh?.skeleton?.update()
+    mesh?.updateMatrixWorld(true)
     updateIKMarkers()
   }
 }
@@ -294,6 +295,10 @@ function onPointerUp() {
   controls.enabled = true
   renderer.domElement.removeEventListener('pointermove', onPointerMove)
   renderer.domElement.removeEventListener('pointerup', onPointerUp)
+  const mesh = currentMeshRef.value
+  helper?.objects.get(mesh)?.ikSolver?.update()
+  mesh?.skeleton?.update()
+  mesh?.updateMatrixWorld(true)
   selectedIKBone = null
 }
 function initTransformControls() {
@@ -569,7 +574,7 @@ async function handleFiles(files) {
     modelPath,
     mesh => {
       scene.add(mesh)
-      helper.add(mesh, { physics: true })
+      helper.add(mesh, { physics: false })
       initIKSolver(mesh)
       models.value.push({ mesh, name: modelFile.name, visible: true })
       currentMeshRef.value = mesh
@@ -630,8 +635,10 @@ function animate() {
   const delta = clock.getDelta()
   if (helper) {
     helper.update(delta)
-    helper.objects.get(currentMeshRef.value)?.ikSolver?.update()
-    currentMeshRef.value?.skeleton?.update()
+    const mesh = currentMeshRef.value
+    helper.objects.get(mesh)?.ikSolver?.update()
+    mesh?.skeleton?.update()
+    mesh?.updateMatrixWorld(true)
   }
   updateIKMarkers()
   effect.render(scene, camera)
