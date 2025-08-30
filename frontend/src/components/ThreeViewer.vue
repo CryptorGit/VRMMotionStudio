@@ -62,8 +62,9 @@ const fileInput = ref(null)
 const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
-const ambientLight = ref(null)
-const directionalLight = ref(null)
+const ambientLight = ref(new THREE.AmbientLight(0x666666))
+const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
+directionalLight.value.position.set(1, 1, 1)
 const currentMeshRef = ref(null)
 const boneMode = ref(false)
 const settingsSidebar = ref(null)
@@ -297,14 +298,8 @@ onMounted(async () => {
 
   controls = new OrbitControls(camera, renderer.domElement)
 
-  const ambient = new THREE.AmbientLight(0x666666)
-  scene.add(ambient)
-  ambientLight.value = ambient
-
-  const directional = new THREE.DirectionalLight(0xffffff)
-  directional.position.set(1, 1, 1)
-  scene.add(directional)
-  directionalLight.value = directional
+  scene.add(ambientLight.value)
+  scene.add(directionalLight.value)
 
   const AmmoLib = await AmmoModule.default({
     // Ensure the WASM binary is loaded from the resolved asset URL
