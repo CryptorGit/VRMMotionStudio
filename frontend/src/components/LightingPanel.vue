@@ -14,7 +14,6 @@
     </section>
     <section>
       <h3>Directional Light</h3>
-      <p class="section-description">ライトの位置をXYZ軸で指定</p>
       <label>
         色
         <input type="color" v-model="directionalColor" />
@@ -27,6 +26,7 @@
         マーカー表示
         <input type="checkbox" v-model="showLightMarker" />
       </label>
+      <p class="section-description">ライトの位置をXYZ軸で指定</p>
       <div class="position-inputs">
         <label>
           ライト位置X
@@ -120,6 +120,6 @@ const directionalZ = computed({
 .section-description {
   font-size: 0.9rem;
   color: #555;
-  margin-bottom: 0.5rem;
+  margin: 0.5rem 0;
 }
 </style>
