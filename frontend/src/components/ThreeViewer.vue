@@ -6,7 +6,7 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   ></div>
-  <div id="menu">
+  <div id="menu" ref="menu">
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -57,6 +57,7 @@ import { API_BASE_URL } from '../config.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
+const menu = ref(null)
 const menuOpen = ref(false)
 const poses = ref([])
 const selectedPose = ref(null)
@@ -68,6 +69,12 @@ const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader, currentMesh
 const clock = new THREE.Clock()
+
+function handleDocumentClick(e) {
+  if (menuOpen.value && menu.value && !menu.value.contains(e.target)) {
+    menuOpen.value = false
+  }
+}
 
 function logToServer(data) {
   if (import.meta.env.DEV) return
@@ -290,10 +297,15 @@ onMounted(async () => {
   helper = new MMDAnimationHelper()
 
   window.addEventListener('resize', onWindowResize)
+  document.addEventListener('click', handleDocumentClick)
 
   console.log('API base URL:', API_BASE_URL)
   logToServer({ event: 'init' })
 
   animate()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
