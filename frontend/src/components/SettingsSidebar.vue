@@ -118,7 +118,7 @@ onMounted(() => {
 })
 
 // 変更があれば状態を保存
-watch([collapsed, activeSection, width], saveState)
+watch([collapsed, activeSection], saveState)
 watch(visibleSections, saveState, { deep: true })
 
 function toggleSection(section) {
@@ -144,16 +144,22 @@ function startResize(e) {
   isResizing.value = true
   document.body.style.userSelect = 'none'
 
+  let frameId
   function onMouseMove(ev) {
-    const delta = startX - ev.clientX
-    width.value = Math.max(150, startWidth + delta)
+    if (frameId) cancelAnimationFrame(frameId)
+    frameId = requestAnimationFrame(() => {
+      const delta = startX - ev.clientX
+      width.value = Math.max(150, startWidth + delta)
+    })
   }
 
   function onMouseUp() {
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
+    if (frameId) cancelAnimationFrame(frameId)
     document.body.style.userSelect = ''
     isResizing.value = false
+    saveState()
   }
 
   document.addEventListener('mousemove', onMouseMove)
