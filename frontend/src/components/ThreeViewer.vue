@@ -98,6 +98,24 @@ const extraIKBoneNames = []
 const extraIKChains = []
 const _q = new THREE.Quaternion()
 const STORAGE_KEY = 'settingsSidebar'
+
+async function loadIKConfig() {
+  try {
+    const res = await fetch('/ik-config.json')
+    if (!res.ok) throw new Error('Config not found')
+    const data = await res.json()
+    extraIKBoneNames.push(...(data.extraIKBoneNames || []))
+    extraIKChains.push(...(data.extraIKChains || []))
+  } catch (e) {
+    console.warn('Failed to load IK config, applying defaults:', e)
+    if (extraIKBoneNames.length === 0)
+      extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
+  }
+  if (currentMeshRef.value) {
+    setupIKTargets(currentMeshRef.value)
+    initIKSolver(currentMeshRef.value)
+  }
+}
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
   if (!saved) return
@@ -698,6 +716,7 @@ function animate() {
 
 onMounted(async () => {
   loadLightingSettings()
+  await loadIKConfig()
   window.addEventListener('error', e => {
     try {
       console.error('Unhandled error:', e.error || e.message)
