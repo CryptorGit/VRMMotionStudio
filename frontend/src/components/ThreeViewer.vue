@@ -52,6 +52,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
@@ -92,13 +93,9 @@ const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 let ikTargets = []
 let selectedIKBone = null
-let dragPlane = null
-let draggingIK = false
-let draggingRot = false
+let transformControls = null
 const extraIKBoneNames = []
 const extraIKChains = []
-const startPointer = new THREE.Vector2()
-const startEuler = new THREE.Euler()
 const _q = new THREE.Quaternion()
 const STORAGE_KEY = 'settingsSidebar'
 function loadLightingSettings() {
@@ -265,86 +262,55 @@ function onPointerDown(event) {
     ikTargets.map(t => t.marker),
     false
   )
-  if (intersects.length === 0) return
+  if (intersects.length === 0) {
+    transformControls?.detach()
+    selectedIKBone = null
+    return
+  }
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
   selectedIKBone = target.bone
   if (event.button === 2) {
-    draggingRot = true
-    startPointer.set(event.clientX, event.clientY)
-    startEuler.copy(selectedIKBone.rotation)
+    transformControls?.setMode('rotate')
   } else {
-    const bonePos = new THREE.Vector3()
-    selectedIKBone.getWorldPosition(bonePos)
-    const normal = bonePos.clone().sub(camera.position).normalize()
-    dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, bonePos)
-    draggingIK = true
+    transformControls?.setMode('translate')
   }
-  controls.enabled = false
-  renderer.domElement.addEventListener('pointermove', onPointerMove)
-  renderer.domElement.addEventListener('pointerup', onPointerUp)
+  transformControls?.attach(selectedIKBone)
 }
-function onPointerMove(event) {
-  const mesh = currentMeshRef.value
-  if (draggingRot && selectedIKBone) {
-    const dx = (event.clientX - startPointer.x) * 0.01
-    const dy = (event.clientY - startPointer.y) * 0.01
-    selectedIKBone.rotation.y = startEuler.y + dx
-    selectedIKBone.rotation.x = startEuler.x + dy
-    const solver = helper?.objects.get(mesh)?.ikSolver
-    mesh?.updateMatrixWorld(true)
-    solver?.update()
-    mesh?.skeleton?.update()
-    mesh?.updateMatrixWorld(true)
-    updateIKMarkers()
-    return
-  }
-  if (!draggingIK || !dragPlane || !selectedIKBone) return
-  const rect = renderer.domElement.getBoundingClientRect()
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-  raycaster.setFromCamera(mouse, camera)
-  const point = new THREE.Vector3()
-  if (raycaster.ray.intersectPlane(dragPlane, point)) {
-    const local = selectedIKBone.parent.worldToLocal(point.clone())
-    selectedIKBone.position.copy(local)
-    const solver = helper?.objects.get(mesh)?.ikSolver
-    mesh?.updateMatrixWorld(true)
-    solver?.update()
-    mesh?.skeleton?.update()
-    mesh?.updateMatrixWorld(true)
-    updateIKMarkers()
-  }
-}
-function onPointerUp() {
-  draggingIK = false
-  draggingRot = false
-  dragPlane = null
-  controls.enabled = true
-  renderer.domElement.removeEventListener('pointermove', onPointerMove)
-  renderer.domElement.removeEventListener('pointerup', onPointerUp)
+function onTransformChange() {
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   mesh?.updateMatrixWorld(true)
   solver?.update()
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
-  selectedIKBone = null
+  helper?.update(0)
+  updateIKMarkers()
+}
+function onTransformDragging(event) {
+  controls.enabled = !event.value
 }
 function initTransformControls() {
-  if (!renderer || !camera) return
+  if (!renderer || !camera || !scene) return
+  transformControls = new TransformControls(camera, renderer.domElement)
+  transformControls.setSpace('local')
+  transformControls.addEventListener('dragging-changed', onTransformDragging)
+  transformControls.addEventListener('change', onTransformChange)
+  scene.add(transformControls)
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
   renderer.domElement.addEventListener('contextmenu', preventContextMenu)
 }
 function disposeTransformControls() {
   ikTargets.forEach(t => (t.marker.visible = false))
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
-  renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
-  renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
   renderer?.domElement?.removeEventListener('contextmenu', preventContextMenu)
-  dragPlane = null
-  draggingIK = false
-  draggingRot = false
+  if (transformControls) {
+    transformControls.removeEventListener('dragging-changed', onTransformDragging)
+    transformControls.removeEventListener('change', onTransformChange)
+    scene?.remove(transformControls)
+    transformControls.dispose()
+    transformControls = null
+  }
   selectedIKBone = null
 }
 function preventContextMenu(e) {
@@ -648,17 +614,24 @@ async function handleFiles(files) {
 
 function applyPose() {
   if (!selectedPose.value || !loader || !currentMeshRef.value) return
-    loader.loadVPD(selectedPose.value.url, true, pose => {
-      helper.pose(currentMeshRef.value, pose)
-      console.log('Pose applied:', selectedPose.value.name)
-      logToServer({ event: 'pose', file: selectedPose.value.name })
-    })
-  }
+  loader.loadVPD(selectedPose.value.url, true, pose => {
+    const mesh = currentMeshRef.value
+    helper.pose(mesh, pose)
+    mesh.skeleton.update()
+    mesh.updateMatrixWorld(true)
+    updateIKMarkers()
+    console.log('Pose applied:', selectedPose.value.name)
+    logToServer({ event: 'pose', file: selectedPose.value.name })
+  })
+}
 
 function exportPose() {
-  if (!currentMeshRef.value) return
+  const mesh = currentMeshRef.value
+  if (!mesh) return
+  mesh.skeleton.update()
+  mesh.updateMatrixWorld(true)
   const exporter = new MMDExporter()
-  const result = exporter.parseVpd(currentMeshRef.value, 'pose', {})
+  const result = exporter.parseVpd(mesh, 'pose', {})
   const blob = new Blob([result], { type: 'text/plain' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
