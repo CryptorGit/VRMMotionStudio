@@ -1,6 +1,20 @@
 <template>
   <div class="lighting-panel">
     <h2>ライト設定</h2>
+    <div class="marker-controls">
+      <div>
+        <label>
+          マーカー表示
+          <input type="checkbox" v-model="showLightMarker" />
+        </label>
+      </div>
+      <div>
+        <label>
+          マーカー色
+          <input type="color" v-model="markerColor" />
+        </label>
+      </div>
+    </div>
     <section>
       <h3>Ambient Light</h3>
       <label>
@@ -21,14 +35,6 @@
       <label>
         強度
         <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensity" />
-      </label>
-      <label>
-        マーカー表示
-        <input type="checkbox" v-model="showLightMarker" />
-      </label>
-      <label>
-        マーカー色
-        <input type="color" v-model="markerColor" />
       </label>
       <p class="section-description">ライトの位置と向き（ターゲット）をXYZ軸で指定</p>
       <div class="position-inputs">
@@ -142,6 +148,13 @@ const directionalTargetZ = computed({
 }
 .lighting-panel section {
   margin-bottom: 1rem;
+}
+.marker-controls {
+  margin-bottom: 1rem;
+}
+.marker-controls label {
+  display: block;
+  margin: 0.5rem 0;
 }
 .position-inputs {
   display: flex;
