@@ -342,9 +342,9 @@ function onKeyDown(event) {
 function onTransformChange() {
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
-  mesh?.updateMatrixWorld(true)
-  solver?.update()
   mesh?.skeleton?.update()
+  solver?.update()
+  selectedIKBone?.updateMatrixWorld()
   mesh?.updateMatrixWorld(true)
   helper?.update(0)
   updateIKMarkers()
