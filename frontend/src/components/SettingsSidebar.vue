@@ -10,7 +10,11 @@
       <div class="section">
         <h3 @click="toggleSection('lighting')">ライト設定</h3>
         <div v-show="activeSection === 'lighting'" class="section-content">
-          <LightingPanel :ambient="ambient" :directional="directional" />
+          <LightingPanel
+            v-if="ambient && directional"
+            :ambient="ambient"
+            :directional="directional"
+          />
         </div>
       </div>
       <div class="section">
