@@ -115,6 +115,8 @@ let physicsWasEnabled = false
 const extraIKBoneNames = []
 // モデルごとの追加IKチェーン設定
 const extraIKChains = {}
+// IKボーンの回転・位置を実ボーンへコピーするためのマップ
+const boneCopyMap = new Map()
 let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
@@ -134,6 +136,11 @@ async function loadIKConfig() {
     extraIKBoneNames.push(...(data.extraIKBoneNames || []))
     if (data.extraIKChains)
       Object.assign(extraIKChains, data.extraIKChains)
+    if (data.boneCopyMap) {
+      for (const [model, mapping] of Object.entries(data.boneCopyMap)) {
+        boneCopyMap.set(model, new Map(Object.entries(mapping)))
+      }
+    }
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0)
@@ -151,6 +158,14 @@ async function loadIKConfig() {
           links: ['右ひざ', '右足']
         }
       ]
+    if (boneCopyMap.size === 0)
+      boneCopyMap.set(
+        'default',
+        new Map([
+          ['左足ＩＫ', '左足'],
+          ['右足ＩＫ', '右足']
+        ])
+      )
   } finally {
     ikConfigLoaded = true
   }
@@ -569,10 +584,23 @@ function applyIKUpdate() {
   const start = performance.now()
   helper?.update(0)
   solver?.update()
+  const copyMap =
+    boneCopyMap.get(mesh?.name) || boneCopyMap.get('default')
+  copyMap?.forEach((realName, ikName) => {
+    const ikBone = mesh?.skeleton?.getBoneByName(ikName)
+    const realBone = mesh?.skeleton?.getBoneByName(realName)
+    if (ikBone && realBone) {
+      realBone.quaternion.copy(ikBone.quaternion)
+      realBone.position.copy(ikBone.position)
+      realBone.updateMatrixWorld(true)
+    }
+  })
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
   )
+  mesh?.updateMatrixWorld(true)
+  mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkers()
   console.debug(
