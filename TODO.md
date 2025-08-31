@@ -4,6 +4,7 @@
 - [ ] デフォルトポーズの読み込み強化
 - [ ] モーフ調整 UI
 - [ ] 物理設定パネルの機能拡張と設定保存
+- [ ] 物理ボーンが正しく動作することをブラウザで手動確認する
   - [ ] `frontend/src/components/MorphEditor.vue` を作成し、モデルの `mesh.morphTargetDictionary` からモーフ名を列挙してスライダー表示
   - [ ] スライダー操作で `mesh.morphTargetInfluences` を更新する処理を `ThreeViewer.vue` と連携
   - [ ] `ThreeViewer.vue` のメニュー項目から `MorphEditor.vue` を開けるようにする

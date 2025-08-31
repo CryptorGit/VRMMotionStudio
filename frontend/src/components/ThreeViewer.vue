@@ -42,6 +42,7 @@
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
     v-model:showIkMarkers="showIkMarkers"
+    v-model:enable-physics="enablePhysics"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @remove-model="removeModel"
@@ -109,7 +110,7 @@ let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
 // 物理演算の有効/無効を切り替えるためのフラグ
-const ENABLE_PHYSICS = false
+const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
 const DEBUG_SKINNING = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 async function loadIKConfig() {
@@ -137,6 +138,8 @@ function loadLightingSettings() {
       showLightMarker.value = data.showLightMarker
     if (data.showIkMarkers !== undefined)
       showIkMarkers.value = data.showIkMarkers
+    if (data.enablePhysics !== undefined)
+      enablePhysics.value = data.enablePhysics
     if (data.directionalIntensity !== undefined)
       directionalIntensity.value = data.directionalIntensity
     if (data.directional?.position) {
@@ -369,7 +372,7 @@ function initIKSolver(mesh) {
     skinnedMesh.geometry.userData.MMD =
       skinnedMesh.geometry.userData.MMD || {}
     skinnedMesh.geometry.userData.MMD.iks = iks
-    helper.add(skinnedMesh, { physics: false, ik: true })
+    helper.add(skinnedMesh, { physics: true, ik: true })
     obj = helper.objects.get(skinnedMesh)
   } else {
     obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
@@ -439,7 +442,7 @@ function applyIKUpdate() {
   const solver = obj?.ikSolver
   const start = performance.now()
   solver?.update()
-  if (ENABLE_PHYSICS) helper?.update(0)
+  if (enablePhysics.value) helper?.update(0)
   // currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
   //   b.updateMatrixWorld(true)
   // )
