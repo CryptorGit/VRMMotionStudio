@@ -270,7 +270,9 @@ watch(currentMeshRef, mesh => {
   initIKSolver(mesh)
 })
 function getIKDefinitions(geometry, modelName = '') {
-  console.log('getIKDefinitions geometry:', geometry)
+  if (import.meta.env.DEV) {
+    console.debug('getIKDefinitions geometry:', geometry)
+  }
   let iks =
     geometry?.userData?.MMD?.ik ||
     geometry?.userData?.MMD?.iks ||
@@ -308,18 +310,20 @@ function getIKDefinitions(geometry, modelName = '') {
       const fallback = extraIKChains[modelName]
       if (Array.isArray(fallback) && fallback.length > 0) {
         iks = fallback
-        console.log(
-          `IK definitions loaded from config for model ${modelName}`,
-          iks
-        )
-      } else {
+        if (import.meta.env.DEV) {
+          console.debug(
+            `IK definitions loaded from config for model ${modelName}`,
+            iks
+          )
+        }
+      } else if (import.meta.env.DEV) {
         console.warn(
           `IK definitions not found for model ${modelName}`,
           geometry?.userData || geometry
         )
       }
-    } else {
-      console.log(
+    } else if (import.meta.env.DEV) {
+      console.debug(
         `IK definitions recovered for model ${modelName}`,
         iks
       )
