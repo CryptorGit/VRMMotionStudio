@@ -43,6 +43,7 @@
     v-model:marker-color="lightMarkerColor"
     v-model:showIkMarkers="showIkMarkers"
     v-model:enable-physics="enablePhysics"
+    v-model:ik-marker-size="ikMarkerSize"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @remove-model="removeModel"
@@ -100,7 +101,7 @@ const planeMode = ref('view')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
-const IK_MARKER_PIXEL_SIZE = 16
+const ikMarkerSize = ref(16)
 let ikTargets = []
 // 選択中のIKターゲット（effectorとターゲットボーンを保持）
 const selectedIK = ref(null)
@@ -150,6 +151,8 @@ function loadLightingSettings() {
       showLightMarker.value = data.showLightMarker
     if (data.showIkMarkers !== undefined)
       showIkMarkers.value = data.showIkMarkers
+    if (data.ikMarkerSize !== undefined)
+      ikMarkerSize.value = data.ikMarkerSize
     if (data.enablePhysics !== undefined)
       enablePhysics.value = data.enablePhysics
     if (data.directionalIntensity !== undefined)
@@ -224,6 +227,14 @@ watch(showIkMarkers, v => {
     updateIKMarkers()
   } catch (e) {
     console.error('Failed to toggle IK markers:', e)
+  }
+})
+
+watch(ikMarkerSize, () => {
+  try {
+    updateIKMarkers()
+  } catch (e) {
+    console.error('Failed to update IK marker size:', e)
   }
 })
 
@@ -398,7 +409,7 @@ function updateIKMarkers() {
     const dist = t.marker.position.distanceTo(camera.position)
     t.marker.position.x += t.offset || 0
     const scale =
-      (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
+      (2 * dist * Math.tan(fov / 2) * ikMarkerSize.value) / height
     t.marker.scale.set(scale, scale, scale)
     t.marker.visible = visible
     if (scale > maxScale) maxScale = scale
