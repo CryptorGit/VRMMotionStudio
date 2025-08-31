@@ -217,7 +217,7 @@ watch(currentMeshRef, mesh => {
 })
 function getIKDefinitions(geometry, modelName = '') {
   console.log('getIKDefinitions geometry:', geometry)
-  const iks =
+  let iks =
     geometry?.userData?.MMD?.ik ||
     geometry?.userData?.MMD?.iks ||
     geometry?.userData?.mmd?.ik ||
@@ -225,10 +225,44 @@ function getIKDefinitions(geometry, modelName = '') {
     geometry?.ik ||
     geometry?.iks ||
     []
-  if (iks.length === 0) {
-    console.warn(`IK definitions not found for model ${modelName}`, geometry)
+  if (!Array.isArray(iks) || iks.length === 0) {
+    const ud = geometry?.userData
+    if (ud) {
+      const loaderGeom =
+        ud.MMDLoader?.geometry ||
+        ud.mmdLoader?.geometry ||
+        ud.MMDLoader ||
+        ud.mmdLoader
+      if (loaderGeom?.userData) {
+        iks =
+          loaderGeom.userData?.MMD?.ik ||
+          loaderGeom.userData?.MMD?.iks ||
+          loaderGeom.userData?.mmd?.ik ||
+          loaderGeom.userData?.mmd?.iks ||
+          loaderGeom.userData?.ik ||
+          loaderGeom.userData?.iks ||
+          iks
+      }
+      if ((Array.isArray(ud.ik) || Array.isArray(ud.iks)) && iks.length === 0) {
+        iks = ud.ik || ud.iks
+      }
+      if (iks.length === 0 && ud.metadata) {
+        iks = ud.metadata.ik || ud.metadata.iks || iks
+      }
+    }
+    if (!iks || iks.length === 0) {
+      console.warn(
+        `IK definitions not found for model ${modelName}`,
+        geometry?.userData || geometry
+      )
+    } else {
+      console.log(
+        `IK definitions recovered for model ${modelName}`,
+        iks
+      )
+    }
   }
-  return iks.concat(extraIKChains)
+  return (Array.isArray(iks) ? iks : []).concat(extraIKChains)
 }
 function setupIKTargets(mesh) {
   ikTargets.forEach(t => {
@@ -302,8 +336,13 @@ function initIKSolver(mesh) {
   })
   const solver = new CCDIKSolver(mesh, iks)
   const obj = helper.objects.get(mesh)
-  if (obj) {
+  if (!obj) {
+    console.error('initIKSolver: helper object not found for', mesh.name)
+  } else {
     obj.ikSolver = solver
+    if (iks.length > 0 && helper.objects.get(mesh)?.ikSolver !== solver) {
+      console.error('initIKSolver: failed to set ikSolver for', mesh.name)
+    }
   }
   console.log('initIKSolver: running solver.update for', mesh.name)
   solver.update()
