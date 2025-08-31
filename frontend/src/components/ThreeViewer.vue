@@ -567,15 +567,15 @@ function applyIKUpdate() {
     obj = helper?.objects.get(mesh)
   }
   const start = performance.now()
-  // solver?.update() は helper.update(0) が内部で処理するため不要。
-  // solver を個別に呼び出す場合は solver.update() を先に実行し、
-  // その後で helper.update(0) を再度呼び出して Grant を適用し直してください。
-  helper?.update(0)
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
   )
   mesh?.updateMatrixWorld(true)
+  // IK 計算後に GrantSolver を適用するため、最後に helper.update(0) を呼び出す
+  // solver?.update() は helper.update(0) 内で処理されるため不要。
+  // solver を直接呼ぶ場合は solver.update() の後に helper.update(0) を再度実行してください。
+  helper?.update(0)
   updateIKMarkers()
   console.debug(
     `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
@@ -1099,6 +1099,11 @@ async function handleFiles(files) {
           if (poseFile) {
             loader.loadVPD(posePath, true, pose => {
               helper.pose(skinnedMesh, pose)
+              // Bone matrices を更新した後に GrantSolver を適用する
+              skinnedMesh.skeleton.update()
+              skinnedMesh.updateMatrixWorld(true)
+              helper.update(0)
+              updateIKMarkers()
               console.log('Pose applied:', poseFile.name)
               logToServer({ event: 'pose', file: poseFile.name })
             })
@@ -1123,9 +1128,10 @@ function applyPose() {
   loader.loadVPD(selectedPose.value.url, true, pose => {
     const mesh = currentMeshRef.value
     helper.pose(mesh, pose)
-    helper.update(0)
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
+    // Pose 反映後に GrantSolver を適用するため最後に helper.update(0) を呼ぶ
+    helper.update(0)
     updateIKMarkers()
     console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
@@ -1136,9 +1142,10 @@ function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
   selectedIK.value?.target.updateMatrixWorld(true)
-  helper.update(0)
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
+  // Export 前に GrantSolver を適用して最終姿勢を取得する
+  helper.update(0)
   const exporter = new MMDExporter()
   const result = exporter.parseVpd(mesh, 'pose', {})
   const blob = new Blob([result], { type: 'text/plain' })
