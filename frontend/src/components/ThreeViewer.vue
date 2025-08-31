@@ -123,7 +123,7 @@ let Ammo
 // 物理演算の有効/無効を切り替えるためのフラグ
 const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
-const DEBUG_SKINNING = import.meta.env.VITE_DEBUG_SKINNING === 'true'
+const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -927,7 +927,7 @@ async function handleFiles(files) {
           scene.add(skinnedMesh)
           initIKSolver(skinnedMesh)
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
-          skeletonHelper.visible = false
+          skeletonHelper.visible = debugSkinning
           scene.add(skeletonHelper)
           models.value.push({
             id: nextModelId++,
@@ -935,9 +935,13 @@ async function handleFiles(files) {
             name: modelFile.name,
             visible: true,
             skeletonHelper,
-            bonesVisible: false,
+            bonesVisible: debugSkinning,
             files: modelSpecificFiles
           })
+          if (debugSkinning) {
+            const boneNames = skinnedMesh.skeleton.bones.map(b => b.name)
+            console.log('Skinning bones:', boneNames)
+          }
           currentMeshRef.value = skinnedMesh
           setupIKTargets(skinnedMesh)
           if (!ikConfigLoaded) {
