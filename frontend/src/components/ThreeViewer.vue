@@ -719,6 +719,8 @@ async function removeModel(index) {
 async function clearCache() {
   console.log('Clear cache clicked')
   logToServer({ event: 'clear-cache' })
+  effect?.clearCache?.()
+  renderer?.renderLists?.dispose?.()
   await deleteCachedFiles()
   poses.value.forEach(p => URL.revokeObjectURL(p.url))
   poses.value = []
