@@ -342,14 +342,17 @@ function initIKSolver(mesh) {
     console.log(`IK chain ${idx} for ${skinnedMesh.name} length: ${len}`)
   })
   const solver = new CCDIKSolver(skinnedMesh, iks)
+  if (!helper.objects.has(skinnedMesh)) {
+    helper.add(skinnedMesh, { physics: true })
+  }
   const obj = helper.objects.get(skinnedMesh)
   if (!obj) {
     console.error('initIKSolver: helper object not found for', skinnedMesh.name)
-  } else {
-    obj.ikSolver = solver
-    if (iks.length > 0 && helper.objects.get(skinnedMesh)?.ikSolver !== solver) {
-      console.error('initIKSolver: failed to set ikSolver for', skinnedMesh.name)
-    }
+    return
+  }
+  obj.ikSolver = solver
+  if (iks.length > 0 && helper.objects.get(skinnedMesh)?.ikSolver !== solver) {
+    console.error('initIKSolver: failed to set ikSolver for', skinnedMesh.name)
   }
   console.log('initIKSolver: running solver.update for', skinnedMesh.name)
   solver.update()
