@@ -107,6 +107,7 @@ const extraIKBoneNames = []
 const extraIKChains = []
 let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
+let ikUpdateScheduled = false
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -364,7 +365,7 @@ function initIKSolver(mesh) {
     skinnedMesh.geometry.userData.MMD =
       skinnedMesh.geometry.userData.MMD || {}
     skinnedMesh.geometry.userData.MMD.iks = iks
-    helper.add(skinnedMesh, { physics: true, ik: true })
+    helper.add(skinnedMesh, { physics: false, ik: true })
     obj = helper.objects.get(skinnedMesh)
   } else {
     obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
@@ -427,14 +428,25 @@ function applyIKUpdate() {
     obj = helper?.objects.get(mesh)
   }
   const solver = obj?.ikSolver
+  const start = performance.now()
   solver?.update()
-  helper?.update(0)
-  currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
-    b.updateMatrixWorld(true)
-  )
+  // helper?.update(0) // プロファイル用に一時的に無効化
+  // currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
+  //   b.updateMatrixWorld(true)
+  // )
   mesh?.skeleton?.update()
-  mesh?.updateMatrixWorld(true)
+  // mesh?.updateMatrixWorld(true)
   updateIKMarkers()
+  console.debug(`applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`)
+}
+
+function scheduleIKUpdate() {
+  if (ikUpdateScheduled) return
+  ikUpdateScheduled = true
+  requestAnimationFrame(() => {
+    ikUpdateScheduled = false
+    applyIKUpdate()
+  })
 }
 
 function onPointerMove(event) {
@@ -444,7 +456,7 @@ function onPointerMove(event) {
     _quat.setFromAxisAngle(rotationAxis, angle)
     selectedIK.value.bone.quaternion.premultiply(_quat)
     selectedIK.value.bone.updateMatrixWorld(true)
-    applyIKUpdate()
+    scheduleIKUpdate()
     return
   }
   if (!dragPlane) return
@@ -458,7 +470,7 @@ function onPointerMove(event) {
       target.parent.worldToLocal(_dragPoint)
       target.position.copy(_dragPoint)
       target.updateMatrixWorld(true)
-      applyIKUpdate()
+      scheduleIKUpdate()
     }
   }
 }
