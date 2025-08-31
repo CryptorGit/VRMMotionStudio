@@ -105,7 +105,8 @@ let isRotating = false
 const rotationAxis = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
 const extraIKBoneNames = []
-const extraIKChains = []
+// モデルごとの追加IKチェーン設定
+const extraIKChains = {}
 let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
@@ -119,7 +120,8 @@ async function loadIKConfig() {
     if (!res.ok) throw new Error('Config not found')
     const data = await res.json()
     extraIKBoneNames.push(...(data.extraIKBoneNames || []))
-    extraIKChains.push(...(data.extraIKChains || []))
+    if (data.extraIKChains)
+      Object.assign(extraIKChains, data.extraIKChains)
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0)
@@ -261,10 +263,19 @@ function getIKDefinitions(geometry, modelName = '') {
       }
     }
     if (!iks || iks.length === 0) {
-      console.warn(
-        `IK definitions not found for model ${modelName}`,
-        geometry?.userData || geometry
-      )
+      const fallback = extraIKChains[modelName]
+      if (Array.isArray(fallback) && fallback.length > 0) {
+        iks = fallback
+        console.log(
+          `IK definitions loaded from config for model ${modelName}`,
+          iks
+        )
+      } else {
+        console.warn(
+          `IK definitions not found for model ${modelName}`,
+          geometry?.userData || geometry
+        )
+      }
     } else {
       console.log(
         `IK definitions recovered for model ${modelName}`,
@@ -272,7 +283,7 @@ function getIKDefinitions(geometry, modelName = '') {
       )
     }
   }
-  return (Array.isArray(iks) ? iks : []).concat(extraIKChains)
+  return Array.isArray(iks) ? iks : []
 }
 function setupIKTargets(mesh) {
   ikTargets.forEach(t => {

@@ -1,4 +1,4 @@
 {
   "extraIKBoneNames": ["左足ＩＫ", "右足ＩＫ"],
-  "extraIKChains": []
+  "extraIKChains": {}
 }
