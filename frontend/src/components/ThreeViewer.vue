@@ -292,6 +292,18 @@ function setupIKTargets(mesh) {
       if (!targetMap.has(idx)) targetMap.set(idx, null)
   })
 
+  // Remove duplicates with same name and index
+  const registered = new Set()
+  for (const [idx] of Array.from(targetMap.entries())) {
+    const bone = bones[idx]
+    const key = bone ? `${bone.name}:${idx}` : String(idx)
+    if (registered.has(key)) {
+      targetMap.delete(idx)
+    } else {
+      registered.add(key)
+    }
+  }
+
   targetMap.forEach((target, idx) => {
     const bone = bones[idx]
     if (!bone || isPhysicalBone(bone)) return
@@ -307,7 +319,8 @@ function setupIKTargets(mesh) {
     marker.renderOrder = 999
     marker.visible = showIkMarkers.value
     scene.add(marker)
-    ikTargets.push({ bone, target, marker })
+    const offset = ikTargets.length * 0.02
+    ikTargets.push({ bone, target, marker, offset })
   })
 
   updateIKMarkers()
@@ -321,6 +334,7 @@ function updateIKMarkers() {
     t.bone.updateMatrixWorld(true)
     t.bone.getWorldPosition(t.marker.position)
     const dist = t.marker.position.distanceTo(camera.position)
+    t.marker.position.x += t.offset || 0
     const scale =
       (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
     t.marker.scale.set(scale, scale, scale)
