@@ -443,11 +443,11 @@ function applyIKUpdate() {
   const start = performance.now()
   solver?.update()
   if (enablePhysics.value) helper?.update(0)
-  // currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
-  //   b.updateMatrixWorld(true)
-  // )
+  currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
+    b.updateMatrixWorld(true)
+  )
   mesh?.skeleton?.update()
-  // mesh?.updateMatrixWorld(true)
+  mesh?.updateMatrixWorld(true)
   updateIKMarkers()
   console.debug(`applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`)
 }
