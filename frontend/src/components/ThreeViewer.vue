@@ -95,7 +95,8 @@ const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const IK_MARKER_PIXEL_SIZE = 16
 let ikTargets = []
-const selectedIKBone = ref(null)
+// 選択中のIKターゲット（effectorとターゲットボーンを保持）
+const selectedIK = ref(null)
 let dragPlane = null
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
@@ -270,26 +271,28 @@ function setupIKTargets(mesh) {
     t.marker.material?.dispose()
   })
   ikTargets = []
-  selectedIKBone.value = null
+  selectedIK.value = null
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
 
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
-  const targetIndices = new Set()
+  const targetMap = new Map()
   iks.forEach(ik => {
     if (typeof ik.effector === 'number') {
       const bone = bones[ik.effector]
-      if (bone && !isPhysicalBone(bone)) targetIndices.add(ik.effector)
+      const target = bones[ik.target]
+      if (bone && target && !isPhysicalBone(bone))
+        targetMap.set(ik.effector, target)
     }
   })
 
   // Add extra IK bones specified by name
   bones.forEach((bone, idx) => {
     if (extraIKBoneNames.includes(bone.name) && !isPhysicalBone(bone))
-      targetIndices.add(idx)
+      if (!targetMap.has(idx)) targetMap.set(idx, null)
   })
 
-  targetIndices.forEach(idx => {
+  targetMap.forEach((target, idx) => {
     const bone = bones[idx]
     if (!bone || isPhysicalBone(bone)) return
     const marker = new THREE.Sprite(
@@ -304,7 +307,7 @@ function setupIKTargets(mesh) {
     marker.renderOrder = 999
     marker.visible = showIkMarkers.value
     scene.add(marker)
-    ikTargets.push({ bone, marker })
+    ikTargets.push({ bone, target, marker })
   })
 
   updateIKMarkers()
@@ -375,16 +378,16 @@ function onPointerDown(event) {
     false
   )
   if (intersects.length === 0) {
-    selectedIKBone.value = null
+    selectedIK.value = null
     return
   }
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
-  selectedIKBone.value = target.bone
+  selectedIK.value = target
   if (event.button === 2) {
     event.preventDefault()
     isRotating = true
-    selectedIKBone.value.getWorldPosition(_dragPoint)
+    selectedIK.value.bone.getWorldPosition(_dragPoint)
     rotationAxis.copy(_dragPoint).sub(camera.position).normalize()
     controls.enabled = false
     renderer.domElement.addEventListener('pointermove', onPointerMove)
@@ -393,7 +396,7 @@ function onPointerDown(event) {
   }
   if (event.button !== 0) return
   const pos = new THREE.Vector3()
-  selectedIKBone.value.getWorldPosition(pos)
+  ;(selectedIK.value.target || selectedIK.value.bone).getWorldPosition(pos)
   const normal = pos.clone().sub(camera.position).normalize()
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
   controls.enabled = false
@@ -405,21 +408,16 @@ function applyIKUpdate() {
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   solver?.update()
-  if (mesh?.skeleton) {
-    mesh.skeleton.update()
-    console.log('applyIKUpdate: skeleton updated for', mesh.name)
-  }
-  mesh?.updateMatrixWorld(true)
   updateIKMarkers()
 }
 
 function onPointerMove(event) {
-  if (!selectedIKBone.value) return
+  if (!selectedIK.value) return
   if (isRotating) {
     const angle = event.movementX * 0.01
     _quat.setFromAxisAngle(rotationAxis, angle)
-    selectedIKBone.value.quaternion.premultiply(_quat)
-    selectedIKBone.value.updateMatrixWorld(true)
+    selectedIK.value.bone.quaternion.premultiply(_quat)
+    selectedIK.value.bone.updateMatrixWorld(true)
     applyIKUpdate()
     return
   }
@@ -429,10 +427,13 @@ function onPointerMove(event) {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
   raycaster.setFromCamera(mouse, camera)
   if (raycaster.ray.intersectPlane(dragPlane, _dragPoint)) {
-    selectedIKBone.value.parent.worldToLocal(_dragPoint)
-    selectedIKBone.value.position.copy(_dragPoint)
-    selectedIKBone.value.updateMatrixWorld(true)
-    applyIKUpdate()
+    const target = selectedIK.value.target
+    if (target) {
+      target.parent.worldToLocal(_dragPoint)
+      target.position.copy(_dragPoint)
+      target.updateMatrixWorld(true)
+      applyIKUpdate()
+    }
   }
 }
 
@@ -445,7 +446,7 @@ function onPointerUp() {
   }
   dragPlane = null
   applyIKUpdate()
-  selectedIKBone.value = null
+  selectedIK.value = null
 }
 const settingsSidebar = ref(null)
 
@@ -814,7 +815,7 @@ function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
   const solver = helper?.objects.get(mesh)?.ikSolver
-  selectedIKBone.value?.updateMatrixWorld(true)
+  selectedIK.value?.bone.updateMatrixWorld(true)
   solver?.update()
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
@@ -942,6 +943,6 @@ onUnmounted(() => {
   renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
   renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
   ikTargets.forEach(t => (t.marker.visible = false))
-  selectedIKBone.value = null
+  selectedIK.value = null
 })
 </script>
