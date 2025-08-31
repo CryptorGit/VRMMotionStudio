@@ -217,10 +217,19 @@ watch(showIkMarkers, v => {
   }
 })
 
+watch(enablePhysics, v => {
+  try {
+    helper?.enable('physics', v)
+  } catch (e) {
+    console.error('Failed to toggle physics:', e)
+  }
+})
+
 function isPhysicalBone(bone) {
   if (bone.userData && bone.userData.rigidBodyType !== undefined) return true
   const name = bone.name || ''
-  return /(?:physics|rigid|rb_|col|collision|dummy)/i.test(name) || name.includes('ダミー')
+  const physicalBoneRegex = /\b(?:physics|rigid(?:body)?|col(?:lision)?\d*|dummy)\b|rb_/i
+  return physicalBoneRegex.test(name) || name.includes('ダミー')
 }
 // モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
@@ -452,8 +461,13 @@ function applyIKUpdate() {
   }
   const solver = obj?.ikSolver
   const start = performance.now()
+  const physicsEnabled = enablePhysics.value
+  if (physicsEnabled) helper?.enable('physics', false)
   solver?.update()
-  if (enablePhysics.value) helper?.update(0)
+  if (physicsEnabled) {
+    helper?.enable('physics', true)
+    helper?.update(0)
+  }
   currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
     b.updateMatrixWorld(true)
   )
@@ -981,6 +995,7 @@ onMounted(async () => {
     globalThis.Ammo = AmmoLib
   }
   helper = new MMDAnimationHelper()
+  helper.enable('physics', enablePhysics.value)
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
 
   window.addEventListener('resize', onWindowResize)
