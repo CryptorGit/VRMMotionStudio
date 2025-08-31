@@ -292,35 +292,35 @@ function setupIKTargets(mesh) {
       if (!targetMap.has(idx)) targetMap.set(idx, null)
   })
 
-  // Remove duplicates with same name and index
-  const registered = new Set()
-  for (const [idx] of Array.from(targetMap.entries())) {
-    const bone = bones[idx]
-    const key = bone ? `${bone.name}:${idx}` : String(idx)
-    if (registered.has(key)) {
-      targetMap.delete(idx)
-    } else {
-      registered.add(key)
-    }
-  }
-
+  // Group IK targets by bone name so that duplicates can be separated visually
+  const nameGroups = new Map()
   targetMap.forEach((target, idx) => {
     const bone = bones[idx]
     if (!bone || isPhysicalBone(bone)) return
-    const marker = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        color: 0xff0000,
-        opacity: 0.5,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false
-      })
-    )
-    marker.renderOrder = 999
-    marker.visible = showIkMarkers.value
-    scene.add(marker)
-    const offset = ikTargets.length * 0.02
-    ikTargets.push({ bone, target, marker, offset })
+    const list = nameGroups.get(bone.name) || []
+    list.push({ bone, target })
+    nameGroups.set(bone.name, list)
+  })
+
+  // Calculate offsets independently for each bone name group
+  nameGroups.forEach(entries => {
+    const count = entries.length
+    entries.forEach((entry, i) => {
+      const marker = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          color: 0xff0000,
+          opacity: 0.5,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false
+        })
+      )
+      marker.renderOrder = 999
+      marker.visible = showIkMarkers.value
+      scene.add(marker)
+      const offset = (i - (count - 1) / 2) * 0.02
+      ikTargets.push({ bone: entry.bone, target: entry.target, marker, offset })
+    })
   })
 
   updateIKMarkers()
