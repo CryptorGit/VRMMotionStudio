@@ -13,6 +13,14 @@
         />
         ボーン表示
       </label>
+      <label>
+        <input
+          type="checkbox"
+          :checked="m.boneNameVisible"
+          @change="onToggleBoneName(i, $event.target.checked)"
+        />
+        ボーン名表示
+      </label>
       <button @click="$emit('remove', i)">削除</button>
     </li>
   </ul>
@@ -22,12 +30,15 @@
 const props = defineProps({
   models: { type: Array, required: true }
 })
-const emit = defineEmits(['toggle', 'toggle-bone', 'remove'])
+const emit = defineEmits(['toggle', 'toggle-bone', 'toggle-bone-names', 'remove'])
 function onToggle(index, visible) {
   emit('toggle', index, visible)
 }
 function onToggleBone(index, visible) {
   emit('toggle-bone', index, visible)
+}
+function onToggleBoneName(index, visible) {
+  emit('toggle-bone-names', index, visible)
 }
 </script>
 

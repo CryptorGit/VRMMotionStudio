@@ -64,6 +64,7 @@
                 :models="models"
                 @toggle="toggleModel"
                 @toggle-bone="toggleBoneVisibility"
+                @toggle-bone-names="toggleBoneNameVisibility"
                 @remove="removeModel"
               />
             </div>
@@ -101,6 +102,7 @@ const emit = defineEmits([
   'update:enablePhysics',
   'toggle-model',
   'toggle-bone',
+  'toggle-bone-names',
   'remove-model'
 ])
 const showLightMarker = computed({
@@ -330,6 +332,9 @@ function toggleModel(index, visible) {
 
 function toggleBoneVisibility(index, visible) {
   emit('toggle-bone', index, visible)
+}
+function toggleBoneNameVisibility(index, visible) {
+  emit('toggle-bone-names', index, visible)
 }
 
 function removeModel(index) {
