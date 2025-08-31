@@ -764,25 +764,33 @@ async function removeModel(index) {
   if (!model) return
 
   const { mesh, skeletonHelper } = model
-  if (helper?.objects?.has(mesh)) helper.remove(mesh)
+  // helper から確実に解除
+  helper?.remove?.(mesh)
 
+  // レンダラー関連のキャッシュを解放
   effect?.clearCache?.()
   renderer?.renderLists?.dispose?.()
+  renderer?.info?.reset?.()
 
   try {
     mesh.traverse(child => {
       if (!child.isMesh) return
-      if (child.geometry) child.geometry.dispose()
-      const material = child.material
-      if (Array.isArray(material)) {
-        material.forEach(m => m?.dispose && m.dispose())
-      } else if (material) {
-        material.dispose()
-      }
+      child.geometry?.dispose?.()
+      const materials = Array.isArray(child.material)
+        ? child.material
+        : [child.material]
+      materials.forEach(m => {
+        if (!m) return
+        // テクスチャなどの参照をまとめて破棄
+        Object.values(m).forEach(v => v?.isTexture && v.dispose?.())
+        m.dispose?.()
+      })
     })
     scene.remove(mesh)
+    mesh.removeFromParent?.()
     if (skeletonHelper) {
       scene.remove(skeletonHelper)
+      skeletonHelper.removeFromParent?.()
       skeletonHelper.geometry?.dispose?.()
       skeletonHelper.material?.dispose?.()
     }
@@ -806,7 +814,7 @@ async function removeModel(index) {
   } catch (e) {
     console.error('Failed to remove model:', e)
   } finally {
-    effect.render(scene, camera)
+    requestAnimationFrame(() => effect.render(scene, camera))
   }
 }
 
