@@ -549,7 +549,7 @@ function toggleBoneVisibility(index, visible) {
   }
 }
 
-function removeModel(index) {
+async function removeModel(index) {
   const model = models.value[index]
   if (model) {
     const { mesh, skeletonHelper } = model
@@ -573,7 +573,6 @@ function removeModel(index) {
         skeletonHelper.geometry?.dispose?.()
         skeletonHelper.material?.dispose?.()
       }
-      renderer.renderLists.dispose()
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
       return
@@ -588,6 +587,13 @@ function removeModel(index) {
       currentMeshRef.value = models.value[0]?.mesh || null
       setupIKTargets(currentMeshRef.value)
     }
+    if (models.value.length === 0) {
+      await deleteCachedFiles()
+    } else {
+      const remainingFiles = models.value.flatMap(m => m.files || [])
+      await cacheFiles(remainingFiles)
+    }
+    renderer.renderLists.dispose()
   }
 }
 
@@ -701,7 +707,8 @@ async function handleFiles(files) {
         name: modelFile.name,
         visible: true,
         skeletonHelper,
-        bonesVisible: false
+        bonesVisible: false,
+        files: Array.from(files)
       })
       currentMeshRef.value = mesh
       setupIKTargets(mesh)
