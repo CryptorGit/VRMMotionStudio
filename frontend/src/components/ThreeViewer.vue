@@ -277,17 +277,21 @@ function setupIKTargets(mesh) {
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const targetIndices = new Set()
   iks.forEach(ik => {
-    if (typeof ik.effector === 'number') targetIndices.add(ik.effector)
+    if (typeof ik.effector === 'number') {
+      const bone = bones[ik.effector]
+      if (bone && !isPhysicalBone(bone)) targetIndices.add(ik.effector)
+    }
   })
 
   // Add extra IK bones specified by name
   bones.forEach((bone, idx) => {
-    if (extraIKBoneNames.includes(bone.name)) targetIndices.add(idx)
+    if (extraIKBoneNames.includes(bone.name) && !isPhysicalBone(bone))
+      targetIndices.add(idx)
   })
 
   targetIndices.forEach(idx => {
     const bone = bones[idx]
-    if (!bone) return
+    if (!bone || isPhysicalBone(bone)) return
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
         color: 0xff0000,
