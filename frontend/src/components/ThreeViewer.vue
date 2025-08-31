@@ -329,6 +329,23 @@ function getIKDefinitions(geometry, modelName = '') {
       )
     }
   }
+  if (Array.isArray(iks) && iks.length > 0) {
+    const bones = geometry?.userData?.MMD?.bones || []
+    const hasFootChain = iks.some(ik => {
+      const targetName = bones[ik.target]?.name || ''
+      if (!/足ＩＫ/.test(targetName)) return false
+      const effectorName = bones[ik.effector]?.name || ''
+      if (/足/.test(effectorName)) return true
+      const links = Array.isArray(ik.links) ? ik.links : []
+      return links.some(l => {
+        const idx = l.index ?? l
+        return /足/.test(bones[idx]?.name || '')
+      })
+    })
+    if (!hasFootChain && import.meta.env.DEV) {
+      console.warn(`Foot IK chain missing for model ${modelName}`)
+    }
+  }
   return Array.isArray(iks) ? iks : []
 }
 function setupIKTargets(mesh) {
@@ -502,15 +519,17 @@ function applyIKUpdate() {
   }
   const solver = obj?.ikSolver
   const start = performance.now()
-  solver?.update()
   helper?.update(0)
-  currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
+  solver?.update()
+  mesh?.skeleton?.update()
+  currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
   )
   mesh?.updateMatrixWorld(true)
-  mesh?.skeleton?.update()
   updateIKMarkers()
-  console.debug(`applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`)
+  console.debug(
+    `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
+  )
 }
 
 function scheduleIKUpdate() {
