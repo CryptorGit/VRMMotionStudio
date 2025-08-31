@@ -55,6 +55,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
@@ -97,7 +98,6 @@ directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 const showIkMarkers = ref(true)
-const planeMode = ref('view')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -105,11 +105,6 @@ const ikMarkerSize = ref(16)
 let ikTargets = []
 // 選択中のIKターゲット（effectorとターゲットボーンを保持）
 const selectedIK = ref(null)
-let dragPlane = null
-const _dragPoint = new THREE.Vector3()
-let isRotating = false
-const rotationAxis = new THREE.Vector3()
-const _quat = new THREE.Quaternion()
 let physicsWasEnabled = false
 const extraIKBoneNames = []
 // モデルごとの追加IKチェーン設定
@@ -446,6 +441,7 @@ function initIKSolver(mesh) {
   ensureFloorRigidBody()
 }
 function onPointerDown(event) {
+  if (event.button !== 0) return
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -455,7 +451,15 @@ function onPointerDown(event) {
     false
   )
   if (intersects.length === 0) {
+    if (physicsWasEnabled) {
+      const mesh = currentMeshRef.value
+      helper?.enable('physics', true)
+      helper?.objects.get(mesh)?.physics?.reset()
+      helper?.update(0)
+      physicsWasEnabled = false
+    }
     selectedIK.value = null
+    transformControls?.detach()
     return
   }
   const target = ikTargets.find(t => t.marker === intersects[0].object)
@@ -463,30 +467,8 @@ function onPointerDown(event) {
   selectedIK.value = target
   physicsWasEnabled = enablePhysics.value
   if (physicsWasEnabled) helper?.enable('physics', false)
-  if (event.button === 2) {
-    event.preventDefault()
-    isRotating = true
-    selectedIK.value.bone.getWorldPosition(_dragPoint)
-    rotationAxis.copy(_dragPoint).sub(camera.position).normalize()
-    controls.enabled = false
-    renderer.domElement.addEventListener('pointermove', onPointerMove)
-    renderer.domElement.addEventListener('pointerup', onPointerUp)
-    renderer.domElement.addEventListener('pointercancel', onPointerUp)
-    renderer.domElement.addEventListener('pointerleave', onPointerUp)
-    return
-  }
-  if (event.button !== 0) return
-  const pos = new THREE.Vector3()
-  const boneOrTarget = selectedIK.value.target || selectedIK.value.bone
-  boneOrTarget.getWorldPosition(pos)
-  const normal = new THREE.Vector3()
-  camera.getWorldDirection(normal)
-  dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
-  controls.enabled = false
-  renderer.domElement.addEventListener('pointermove', onPointerMove)
-  renderer.domElement.addEventListener('pointerup', onPointerUp)
-  renderer.domElement.addEventListener('pointercancel', onPointerUp)
-  renderer.domElement.addEventListener('pointerleave', onPointerUp)
+  const boneOrTarget = target.target || target.bone
+  transformControls?.attach(boneOrTarget)
 }
 
 function applyIKUpdate() {
@@ -531,69 +513,27 @@ function scheduleIKUpdate() {
   })
 }
 
-function onPointerMove(event) {
-  if (!selectedIK.value) {
-    onPointerUp()
-    return
-  }
-  if (isRotating) {
-    const angle = event.movementX * 0.01
-    _quat.setFromAxisAngle(rotationAxis, angle)
-    selectedIK.value.bone.quaternion.premultiply(_quat)
-    selectedIK.value.bone.updateMatrixWorld(true)
-    scheduleIKUpdate()
-    return
-  }
-  if (!dragPlane) return
-  const rect = renderer.domElement.getBoundingClientRect()
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-  raycaster.setFromCamera(mouse, camera)
-  if (raycaster.ray.intersectPlane(dragPlane, _dragPoint)) {
-    const target = selectedIK.value.target
-    if (target) {
-      target.parent.worldToLocal(_dragPoint)
-      target.position.copy(_dragPoint)
-      target.updateMatrixWorld(true)
-      scheduleIKUpdate()
-    } else {
-      const bone = selectedIK.value.bone
-      bone.parent.worldToLocal(_dragPoint)
-      bone.position.copy(_dragPoint)
-      bone.updateMatrixWorld(true)
-      scheduleIKUpdate()
-    }
-  }
-}
-
-function onPointerUp() {
-  const dom = renderer.domElement
-  dom.removeEventListener('pointermove', onPointerMove)
-  dom.removeEventListener('pointerup', onPointerUp)
-  dom.removeEventListener('pointercancel', onPointerUp)
-  dom.removeEventListener('pointerleave', onPointerUp)
-  controls.enabled = true
-  if (isRotating) {
-    isRotating = false
-  }
-  dragPlane = null
-  applyIKUpdate()
-  if (physicsWasEnabled) {
-    const mesh = currentMeshRef.value
-    helper?.enable('physics', true)
-    helper?.objects.get(mesh)?.physics?.reset()
-    helper?.update(0)
-    physicsWasEnabled = false
-  }
-  selectedIK.value = null
-}
 const settingsSidebar = ref(null)
 
-let scene, camera, renderer, effect, controls, helper, loader
+let scene, camera, renderer, effect, controls, transformControls, helper, loader
 
 function handleDocumentClick(e) {
   if (menuOpen.value && menu.value && !menu.value.contains(e.target)) {
     menuOpen.value = false
+  }
+}
+
+function onKeyDown(e) {
+  switch (e.key.toLowerCase()) {
+    case 'w':
+      transformControls?.setMode('translate')
+      break
+    case 'e':
+      transformControls?.setMode('rotate')
+      break
+    case 'r':
+      transformControls?.setMode('scale')
+      break
   }
 }
 
@@ -1114,6 +1054,25 @@ onMounted(async () => {
     controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY }
     controls.enabled = true
 
+  transformControls = new TransformControls(camera, renderer.domElement)
+  transformControls.setSpace('local')
+  transformControls.addEventListener('dragging-changed', e => {
+    controls.enabled = !e.value
+    if (!e.value) {
+      scheduleIKUpdate()
+      if (physicsWasEnabled) {
+        const mesh = currentMeshRef.value
+        helper?.enable('physics', true)
+        helper?.objects.get(mesh)?.physics?.reset()
+        helper?.update(0)
+        physicsWasEnabled = false
+      }
+      transformControls.detach()
+      selectedIK.value = null
+    }
+  })
+  scene.add(transformControls)
+
   scene.add(ambientLight.value)
   scene.add(directionalLight.value.target)
   scene.add(directionalLight.value)
@@ -1137,6 +1096,7 @@ onMounted(async () => {
 
   window.addEventListener('resize', onWindowResize)
   document.addEventListener('click', handleDocumentClick)
+  window.addEventListener('keydown', onKeyDown)
 
   console.log('API base URL:', API_BASE_URL)
   logToServer({ event: 'init' })
@@ -1153,11 +1113,9 @@ onUnmounted(() => {
   window.removeEventListener('unhandledrejection', handleUnhandledRejection)
   window.removeEventListener('resize', onWindowResize)
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
-  renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
-  renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
-  renderer?.domElement?.removeEventListener('pointercancel', onPointerUp)
-  renderer?.domElement?.removeEventListener('pointerleave', onPointerUp)
+  window.removeEventListener('keydown', onKeyDown)
   ikTargets.forEach(t => (t.marker.visible = false))
+  transformControls?.detach()
   selectedIK.value = null
 })
 </script>
