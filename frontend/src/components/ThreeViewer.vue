@@ -344,28 +344,25 @@ function setupIKTargets(mesh) {
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const targetMap = new Map()
   iks.forEach(ik => {
-    if (typeof ik.effector === 'number') {
-      const bone = bones[ik.effector]
+    if (typeof ik.target === 'number') {
       const target = bones[ik.target]
-      if (bone && target && !isPhysicalBone(bone))
-        targetMap.set(ik.effector, target)
+      if (target && !isPhysicalBone(target)) targetMap.set(ik.target, target)
     }
   })
 
   // Add extra IK bones specified by name
   bones.forEach((bone, idx) => {
     if (extraIKBoneNames.includes(bone.name) && !isPhysicalBone(bone))
-      if (!targetMap.has(idx)) targetMap.set(idx, null)
+      if (!targetMap.has(idx)) targetMap.set(idx, bone)
   })
 
   // Group IK targets by bone name so that duplicates can be separated visually
   const nameGroups = new Map()
-  targetMap.forEach((target, idx) => {
-    const bone = bones[idx]
-    if (!bone || isPhysicalBone(bone)) return
-    const list = nameGroups.get(bone.name) || []
-    list.push({ bone, target })
-    nameGroups.set(bone.name, list)
+  targetMap.forEach(target => {
+    if (!target || isPhysicalBone(target)) return
+    const list = nameGroups.get(target.name) || []
+    list.push({ target })
+    nameGroups.set(target.name, list)
   })
 
   // Calculate offsets independently for each bone name group
@@ -385,7 +382,7 @@ function setupIKTargets(mesh) {
       marker.visible = showIkMarkers.value
       scene.add(marker)
       const offset = (i - (count - 1) / 2) * 0.02
-      ikTargets.push({ bone: entry.bone, target: entry.target, marker, offset })
+      ikTargets.push({ target: entry.target, marker, offset })
     })
   })
 
@@ -397,8 +394,8 @@ function updateIKMarkers() {
   const fov = THREE.MathUtils.degToRad(camera.fov)
   let maxScale = 0
   ikTargets.forEach(t => {
-    t.bone.updateMatrixWorld(true)
-    t.bone.getWorldPosition(t.marker.position)
+    t.target.updateMatrixWorld(true)
+    t.target.getWorldPosition(t.marker.position)
     const dist = t.marker.position.distanceTo(camera.position)
     t.marker.position.x += t.offset || 0
     const scale =
@@ -459,7 +456,7 @@ function onPointerDown(event) {
   if (event.button === 2) {
     event.preventDefault()
     isRotating = true
-    selectedIK.value.bone.getWorldPosition(_dragPoint)
+    selectedIK.value.target.getWorldPosition(_dragPoint)
     rotationAxis.copy(_dragPoint).sub(camera.position).normalize()
     controls.enabled = false
     renderer.domElement.addEventListener('pointermove', onPointerMove)
@@ -470,8 +467,8 @@ function onPointerDown(event) {
   }
   if (event.button !== 0) return
   const pos = new THREE.Vector3()
-  const boneOrTarget = selectedIK.value.target || selectedIK.value.bone
-  boneOrTarget.getWorldPosition(pos)
+  const targetBone = selectedIK.value.target
+  targetBone.getWorldPosition(pos)
   const normal = new THREE.Vector3()
   camera.getWorldDirection(normal)
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
@@ -533,8 +530,8 @@ function onPointerMove(event) {
   if (isRotating) {
     const angle = event.movementX * 0.01
     _quat.setFromAxisAngle(rotationAxis, angle)
-    selectedIK.value.bone.quaternion.premultiply(_quat)
-    selectedIK.value.bone.updateMatrixWorld(true)
+    selectedIK.value.target.quaternion.premultiply(_quat)
+    selectedIK.value.target.updateMatrixWorld(true)
     scheduleIKUpdate()
     return
   }
@@ -993,7 +990,7 @@ function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
   const solver = helper?.objects.get(mesh)?.ikSolver
-  selectedIK.value?.bone.updateMatrixWorld(true)
+  selectedIK.value?.target.updateMatrixWorld(true)
   solver?.update()
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
