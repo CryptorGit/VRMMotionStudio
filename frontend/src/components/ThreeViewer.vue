@@ -109,6 +109,7 @@ const _dragPoint = new THREE.Vector3()
 let isRotating = false
 const rotationAxis = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
+let physicsWasEnabled = false
 const extraIKBoneNames = []
 // モデルごとの追加IKチェーン設定
 const extraIKChains = {}
@@ -421,6 +422,8 @@ function onPointerDown(event) {
   const target = ikTargets.find(t => t.marker === intersects[0].object)
   if (!target) return
   selectedIK.value = target
+  physicsWasEnabled = enablePhysics.value
+  if (physicsWasEnabled) helper?.enable('physics', false)
   if (event.button === 2) {
     event.preventDefault()
     isRotating = true
@@ -466,13 +469,7 @@ function applyIKUpdate() {
   }
   const solver = obj?.ikSolver
   const start = performance.now()
-  const physicsEnabled = enablePhysics.value
-  if (physicsEnabled) helper?.enable('physics', false)
   solver?.update()
-  if (physicsEnabled) {
-    helper?.enable('physics', true)
-    helper?.update(0)
-  }
   currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
     b.updateMatrixWorld(true)
   )
@@ -526,6 +523,13 @@ function onPointerUp() {
   }
   dragPlane = null
   applyIKUpdate()
+  if (physicsWasEnabled) {
+    const mesh = currentMeshRef.value
+    helper?.enable('physics', true)
+    helper?.objects.get(mesh)?.physics?.reset()
+    helper?.update(0)
+    physicsWasEnabled = false
+  }
   selectedIK.value = null
 }
 const settingsSidebar = ref(null)
