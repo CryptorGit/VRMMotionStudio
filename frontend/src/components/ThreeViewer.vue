@@ -138,8 +138,22 @@ async function loadIKConfig() {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0)
       extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
+    if (Object.keys(extraIKChains).length === 0)
+      extraIKChains.default = [
+        {
+          target: '左足ＩＫ',
+          effector: '左足首',
+          links: ['左ひざ', '左足']
+        },
+        {
+          target: '右足ＩＫ',
+          effector: '右足首',
+          links: ['右ひざ', '右足']
+        }
+      ]
+  } finally {
+    ikConfigLoaded = true
   }
-  ikConfigLoaded = true
 }
 function loadLightingSettings() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -309,9 +323,26 @@ function getIKDefinitions(geometry, modelName = '') {
       }
     }
     if (!iks || iks.length === 0) {
-      const fallback = extraIKChains[modelName]
+      const fallback =
+        extraIKChains[modelName] || extraIKChains.default
       if (Array.isArray(fallback) && fallback.length > 0) {
-        iks = fallback
+        const bones = geometry?.userData?.MMD?.bones || []
+        const resolve = v =>
+          typeof v === 'number'
+            ? v
+            : bones.findIndex(b => b.name === v)
+        iks = fallback.map(ik => ({
+          target: resolve(ik.target),
+          effector: resolve(ik.effector),
+          links: (ik.links || []).map(l => {
+            if (typeof l === 'number' || typeof l === 'string')
+              return { index: resolve(l) }
+            return {
+              ...l,
+              index: resolve(l.index)
+            }
+          })
+        }))
         if (import.meta.env.DEV) {
           console.debug(
             `IK definitions loaded from config for model ${modelName}`,
