@@ -566,10 +566,11 @@ function applyIKUpdate() {
     initIKSolver(mesh)
     obj = helper?.objects.get(mesh)
   }
-  const solver = obj?.ikSolver
   const start = performance.now()
+  // solver?.update() は helper.update(0) が内部で処理するため不要。
+  // solver を個別に呼び出す場合は solver.update() を先に実行し、
+  // その後で helper.update(0) を再度呼び出して Grant を適用し直してください。
   helper?.update(0)
-  solver?.update()
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
