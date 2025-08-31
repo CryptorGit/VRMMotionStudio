@@ -23,6 +23,7 @@
       <option v-for="p in poses" :key="p.name" :value="p">{{ p.name }}</option>
     </select>
   </div>
+  <div v-if="ikWarning" id="ik-warning">{{ ikWarning }}</div>
   <input
     type="file"
     ref="fileInput"
@@ -96,6 +97,7 @@ directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 const showIkMarkers = ref(true)
+const ikWarning = ref('')
 const planeMode = ref('view')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
@@ -330,6 +332,7 @@ function getIKDefinitions(geometry, modelName = '') {
     }
   }
   if (Array.isArray(iks) && iks.length > 0) {
+    ikWarning.value = ''
     const bones = geometry?.userData?.MMD?.bones || []
     const hasFootChain = iks.some(ik => {
       const targetName = bones[ik.target]?.name || ''
@@ -345,6 +348,8 @@ function getIKDefinitions(geometry, modelName = '') {
     if (!hasFootChain && import.meta.env.DEV) {
       console.warn(`Foot IK chain missing for model ${modelName}`)
     }
+  } else {
+    ikWarning.value = 'IK定義が見つかりません'
   }
   return Array.isArray(iks) ? iks : []
 }
@@ -359,6 +364,12 @@ function setupIKTargets(mesh) {
   const bones = mesh.skeleton?.bones || []
 
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
+  if (!Array.isArray(iks) || iks.length === 0) {
+    ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
+    return
+  } else {
+    ikWarning.value = ''
+  }
   const targetMap = new Map()
   iks.forEach(ik => {
     if (typeof ik.target === 'number') {
@@ -438,6 +449,12 @@ function initIKSolver(mesh) {
     return
   }
   const iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
+  if (!Array.isArray(iks) || iks.length === 0) {
+    if (import.meta.env.DEV) {
+      console.warn(`IK definitions not found for ${skinnedMesh.name}, skipping solver`)
+    }
+    return
+  }
   let obj = helper.objects.get(skinnedMesh)
   if (!obj) {
     skinnedMesh.geometry.userData.MMD =
@@ -1181,3 +1198,17 @@ onUnmounted(() => {
   selectedIK.value = null
 })
 </script>
+
+<style scoped>
+#ik-warning {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 1000;
+}
+</style>
