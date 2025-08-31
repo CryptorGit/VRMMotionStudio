@@ -556,6 +556,12 @@ function onPointerMove(event) {
       target.position.copy(_dragPoint)
       target.updateMatrixWorld(true)
       scheduleIKUpdate()
+    } else {
+      const bone = selectedIK.value.bone
+      bone.parent.worldToLocal(_dragPoint)
+      bone.position.copy(_dragPoint)
+      bone.updateMatrixWorld(true)
+      scheduleIKUpdate()
     }
   }
 }
