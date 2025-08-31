@@ -620,6 +620,7 @@ async function cacheFiles(modelFiles) {
         list.push({
           name: f.name,
           path: f.webkitRelativePath || f.name,
+          type: f.type,
           data: await f.arrayBuffer()
         })
       }
@@ -699,7 +700,7 @@ async function restoreCachedModel() {
   const files = []
   for (const model of saved) {
     for (const f of model) {
-      const file = new File([f.data], f.name)
+      const file = new File([f.data], f.name, { type: f.type })
       if (f.path)
         Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
       files.push(file)
@@ -914,9 +915,12 @@ async function handleFiles(files) {
       const p = (f.webkitRelativePath || f.name)
         .replace(/^[^/]*\//, '')
         .replace(/\\/g, '/')
+      const isTexture = /\.(png|jpe?g|bmp|tga|gif|tiff|dds|svg|sph|spa)$/i.test(
+        f.name
+      )
       return dir
-        ? p.startsWith(dirPrefix)
-        : !p.includes('/')
+        ? p.startsWith(dirPrefix) || isTexture
+        : !p.includes('/') || isTexture
     })
     await new Promise(resolve => {
       loader.load(
