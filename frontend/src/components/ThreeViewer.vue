@@ -750,19 +750,19 @@ async function handleFiles(files) {
   selectedPose.value = null
 
   const fileMap = {}
-  let modelFile = null
+  const modelFiles = []
   const poseFiles = []
   for (const file of files) {
     const path = file.webkitRelativePath || file.name
     const shortPath = path
-      .replace(/^[^/]*\\\//, '')
+      .replace(/^[^/]*\//, '')
       .replace(/\\/g, '/')
     const url = URL.createObjectURL(file)
     fileMap[shortPath] = url
-    if (/\.(pmx|pmd)$/i.test(file.name)) modelFile = file
+    if (/\.(pmx|pmd)$/i.test(file.name)) modelFiles.push(file)
     if (/\.vpd$/i.test(file.name)) poseFiles.push({ name: file.name, url })
   }
-  if (!modelFile) {
+  if (modelFiles.length === 0) {
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
     return
   }
@@ -779,17 +779,9 @@ async function handleFiles(files) {
   console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
 
-  const modelPath = (modelFile.webkitRelativePath || modelFile.name)
-    .replace(/^[^/]*\\\//, '')
-    .replace(/\\/g, '/')
-
   const manager = new THREE.LoadingManager()
-  manager.onLoad = () => {
-    for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
-  }
   manager.setURLModifier(url => {
     const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '')
-    if (normalized === modelPath) return fileMap[modelPath]
     return fileMap[normalized] || url
   })
   manager.onError = url => {
@@ -798,60 +790,68 @@ async function handleFiles(files) {
   }
 
   loader = new MMDLoader(manager)
-  loader.load(
-    modelPath,
-    mesh => {
-      const skinnedMesh = mesh.isSkinnedMesh
-        ? mesh
-        : mesh.getObjectByProperty('type', 'SkinnedMesh')
-      if (!skinnedMesh) {
-        console.error('SkinnedMesh not found in model', modelFile.name)
-        return
-      }
-      scene.add(skinnedMesh)
-      initIKSolver(skinnedMesh)
-      const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
-      skeletonHelper.visible = false
-      scene.add(skeletonHelper)
-      models.value.push({
-        id: nextModelId++,
-        mesh: skinnedMesh,
-        name: modelFile.name,
-        visible: true,
-        skeletonHelper,
-        bonesVisible: false,
-        files: Array.from(files)
-      })
-      currentMeshRef.value = skinnedMesh
-      setupIKTargets(skinnedMesh)
-      if (!ikConfigLoaded) {
-        ikConfigPromise.then(() => {
-          if (currentMeshRef.value === skinnedMesh) {
-            setupIKTargets(skinnedMesh)
-            initIKSolver(skinnedMesh)
+  for (const modelFile of modelFiles) {
+    const modelPath = (modelFile.webkitRelativePath || modelFile.name)
+      .replace(/^[^/]*\//, '')
+      .replace(/\\/g, '/')
+    await new Promise(resolve => {
+      loader.load(
+        modelPath,
+        mesh => {
+          const skinnedMesh = mesh.isSkinnedMesh
+            ? mesh
+            : mesh.getObjectByProperty('type', 'SkinnedMesh')
+          if (!skinnedMesh) {
+            console.error('SkinnedMesh not found in model', modelFile.name)
+            return resolve()
           }
-        })
-      }
-      console.log('Model loaded:', modelFile.name)
-      logToServer({ event: 'loaded', model: modelFile.name })
-      if (poseFile) {
-      loader.loadVPD(posePath, true, pose => {
-        helper.pose(skinnedMesh, pose)
-        console.log('Pose applied:', poseFile.name)
-        logToServer({ event: 'pose', file: poseFile.name })
-      })
-      }
-    },
-    undefined,
-    error => {
-      const status = error && error.target && error.target.status
-      console.error('Load error:', status, error)
-      logToServer({ event: 'error', message: error.message, status })
-      for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
-    }
-  )
+          scene.add(skinnedMesh)
+          initIKSolver(skinnedMesh)
+          const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
+          skeletonHelper.visible = false
+          scene.add(skeletonHelper)
+          models.value.push({
+            id: nextModelId++,
+            mesh: skinnedMesh,
+            name: modelFile.name,
+            visible: true,
+            skeletonHelper,
+            bonesVisible: false,
+            files: Array.from(files)
+          })
+          currentMeshRef.value = skinnedMesh
+          setupIKTargets(skinnedMesh)
+          if (!ikConfigLoaded) {
+            ikConfigPromise.then(() => {
+              if (currentMeshRef.value === skinnedMesh) {
+                setupIKTargets(skinnedMesh)
+                initIKSolver(skinnedMesh)
+              }
+            })
+          }
+          console.log('Model loaded:', modelFile.name)
+          logToServer({ event: 'loaded', model: modelFile.name })
+          if (poseFile) {
+            loader.loadVPD(posePath, true, pose => {
+              helper.pose(skinnedMesh, pose)
+              console.log('Pose applied:', poseFile.name)
+              logToServer({ event: 'pose', file: poseFile.name })
+            })
+          }
+          resolve()
+        },
+        undefined,
+        error => {
+          const status = error && error.target && error.target.status
+          console.error('Load error:', status, error)
+          logToServer({ event: 'error', message: error.message, status })
+          resolve()
+        }
+      )
+    })
+  }
+  for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
 }
-
 function applyPose() {
   if (!selectedPose.value || !loader || !currentMeshRef.value) return
   loader.loadVPD(selectedPose.value.url, true, pose => {
