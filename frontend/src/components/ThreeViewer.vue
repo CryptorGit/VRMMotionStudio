@@ -460,6 +460,8 @@ function onPointerDown(event) {
     controls.enabled = false
     renderer.domElement.addEventListener('pointermove', onPointerMove)
     renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointercancel', onPointerUp)
+    renderer.domElement.addEventListener('pointerleave', onPointerUp)
     return
   }
   if (event.button !== 0) return
@@ -472,6 +474,8 @@ function onPointerDown(event) {
   controls.enabled = false
   renderer.domElement.addEventListener('pointermove', onPointerMove)
   renderer.domElement.addEventListener('pointerup', onPointerUp)
+  renderer.domElement.addEventListener('pointercancel', onPointerUp)
+  renderer.domElement.addEventListener('pointerleave', onPointerUp)
 }
 
 function applyIKUpdate() {
@@ -517,7 +521,10 @@ function scheduleIKUpdate() {
 }
 
 function onPointerMove(event) {
-  if (!selectedIK.value) return
+  if (!selectedIK.value) {
+    onPointerUp()
+    return
+  }
   if (isRotating) {
     const angle = event.movementX * 0.01
     _quat.setFromAxisAngle(rotationAxis, angle)
@@ -543,8 +550,11 @@ function onPointerMove(event) {
 }
 
 function onPointerUp() {
-  renderer.domElement.removeEventListener('pointermove', onPointerMove)
-  renderer.domElement.removeEventListener('pointerup', onPointerUp)
+  const dom = renderer.domElement
+  dom.removeEventListener('pointermove', onPointerMove)
+  dom.removeEventListener('pointerup', onPointerUp)
+  dom.removeEventListener('pointercancel', onPointerUp)
+  dom.removeEventListener('pointerleave', onPointerUp)
   controls.enabled = true
   if (isRotating) {
     isRotating = false
@@ -1128,6 +1138,8 @@ onUnmounted(() => {
   renderer?.domElement?.removeEventListener('pointerdown', onPointerDown)
   renderer?.domElement?.removeEventListener('pointermove', onPointerMove)
   renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
+  renderer?.domElement?.removeEventListener('pointercancel', onPointerUp)
+  renderer?.domElement?.removeEventListener('pointerleave', onPointerUp)
   ikTargets.forEach(t => (t.marker.visible = false))
   selectedIK.value = null
 })
