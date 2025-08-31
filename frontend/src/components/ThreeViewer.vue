@@ -554,7 +554,7 @@ async function removeModel(index) {
   const model = models.value[index]
   if (model) {
     const { mesh, skeletonHelper } = model
-    helper?.remove(mesh)
+    if (helper?.objects?.has(mesh)) helper.remove(mesh)
     try {
       mesh.traverse(child => {
         if (!child.isMesh) return
@@ -605,7 +605,7 @@ async function clearCache() {
   selectedPose.value = null
   models.value.forEach(m => {
     const { mesh, skeletonHelper } = m
-    helper?.remove(mesh)
+    if (helper?.objects?.has(mesh)) helper.remove(mesh)
     try {
       scene.remove(mesh)
       if (skeletonHelper) {
