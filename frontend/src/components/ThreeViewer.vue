@@ -656,30 +656,32 @@ function toggleBoneVisibility(index, visible) {
 
 async function removeModel(index) {
   const model = models.value[index]
-  if (model) {
-    const { mesh, skeletonHelper } = model
-    if (helper?.objects?.has(mesh)) helper.remove(mesh)
-    try {
-      mesh.traverse(child => {
-        if (!child.isMesh) return
-        if (child.geometry) child.geometry.dispose()
-        const material = child.material
-        if (Array.isArray(material)) {
-          material.forEach(m => m?.dispose && m.dispose())
-        } else if (material) {
-          material.dispose()
-        }
-      })
-      scene.remove(mesh)
-      if (skeletonHelper) {
-        scene.remove(skeletonHelper)
-        skeletonHelper.geometry?.dispose?.()
-        skeletonHelper.material?.dispose?.()
+  if (!model) return
+
+  const { mesh, skeletonHelper } = model
+  if (helper?.objects?.has(mesh)) helper.remove(mesh)
+
+  effect?.clearCache?.()
+  renderer?.renderLists?.dispose?.()
+
+  try {
+    mesh.traverse(child => {
+      if (!child.isMesh) return
+      if (child.geometry) child.geometry.dispose()
+      const material = child.material
+      if (Array.isArray(material)) {
+        material.forEach(m => m?.dispose && m.dispose())
+      } else if (material) {
+        material.dispose()
       }
-    } catch (e) {
-      console.error('Failed to remove mesh from scene:', e)
-      return
+    })
+    scene.remove(mesh)
+    if (skeletonHelper) {
+      scene.remove(skeletonHelper)
+      skeletonHelper.geometry?.dispose?.()
+      skeletonHelper.material?.dispose?.()
     }
+
     models.value.splice(index, 1)
     if (currentMeshRef.value === mesh) {
       ikTargets.forEach(t => {
@@ -696,7 +698,10 @@ async function removeModel(index) {
       const remainingFiles = models.value.flatMap(m => m.files || [])
       await cacheFiles(remainingFiles)
     }
-    renderer.renderLists.dispose()
+  } catch (e) {
+    console.error('Failed to remove model:', e)
+  } finally {
+    effect.render(scene, camera)
   }
 }
 
