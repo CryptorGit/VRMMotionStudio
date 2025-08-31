@@ -411,7 +411,7 @@ function onPointerDown(event) {
   const boneOrTarget = selectedIK.value.target || selectedIK.value.bone
   boneOrTarget.getWorldPosition(pos)
   const normal = new THREE.Vector3()
-  normal.copy(pos).sub(camera.position).normalize()
+  camera.getWorldDirection(normal)
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
   controls.enabled = false
   renderer.domElement.addEventListener('pointermove', onPointerMove)
