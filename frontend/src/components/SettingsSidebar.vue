@@ -55,6 +55,9 @@
             />
             <div v-else-if="section === 'models'">
               <label>
+                <input type="checkbox" v-model="enablePhysics" /> 物理演算
+              </label>
+              <label>
                 <input type="checkbox" v-model="showIkMarkers" /> IKボーン表示
               </label>
               <ModelList
@@ -86,7 +89,8 @@ const props = defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  showIkMarkers: { type: Boolean, required: true }
+  showIkMarkers: { type: Boolean, required: true },
+  enablePhysics: { type: Boolean, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
@@ -94,6 +98,7 @@ const emit = defineEmits([
   'update:markerColor',
   'update:directionalIntensity',
   'update:showIkMarkers',
+  'update:enablePhysics',
   'toggle-model',
   'toggle-bone',
   'remove-model'
@@ -113,6 +118,10 @@ const directionalIntensity = computed({
 const showIkMarkers = computed({
   get: () => props.showIkMarkers,
   set: v => emit('update:showIkMarkers', v)
+})
+const enablePhysics = computed({
+  get: () => props.enablePhysics,
+  set: v => emit('update:enablePhysics', v)
 })
 
 const collapsed = ref(false)
@@ -154,6 +163,7 @@ function saveState() {
       expandedSections: { ...expandedSections },
       showLightMarker: showLightMarker.value,
       showIkMarkers: showIkMarkers.value,
+      enablePhysics: enablePhysics.value,
       markerColor: markerColor.value,
       directionalIntensity: directionalIntensity.value,
       directional: {
@@ -193,6 +203,7 @@ onMounted(() => {
         expandedSections: savedExpanded,
         showLightMarker: savedShowMarker,
         showIkMarkers: savedShowIk,
+        enablePhysics: savedEnablePhysics,
         markerColor: savedMarkerColor,
         directionalIntensity: savedDirectionalIntensity,
         directional: savedDirectional
@@ -213,6 +224,8 @@ onMounted(() => {
         emit('update:showLightMarker', savedShowMarker)
       if (savedShowIk !== undefined)
         emit('update:showIkMarkers', savedShowIk)
+      if (savedEnablePhysics !== undefined)
+        emit('update:enablePhysics', savedEnablePhysics)
       if (savedMarkerColor !== undefined)
         emit('update:markerColor', savedMarkerColor)
       if (savedDirectionalIntensity !== undefined)
@@ -251,6 +264,7 @@ watchEffect(() => {
   expandedSections.models
   showLightMarker.value
   showIkMarkers.value
+  enablePhysics.value
   markerColor.value
   directionalIntensity.value
   directional.value.position.x
@@ -340,6 +354,7 @@ defineExpose({
   expandedSections,
   showLightMarker,
   showIkMarkers,
+  enablePhysics,
   markerColor
 })
 </script>
