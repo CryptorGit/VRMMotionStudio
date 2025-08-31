@@ -329,26 +329,33 @@ function updateIKMarkers() {
 
 function initIKSolver(mesh) {
   if (!mesh || !helper) return
-  const iks = getIKDefinitions(mesh.geometry, mesh.name)
+  const skinnedMesh = mesh.isSkinnedMesh
+    ? mesh
+    : mesh.getObjectByProperty('type', 'SkinnedMesh')
+  if (!skinnedMesh) {
+    console.error('initIKSolver: SkinnedMesh not found for', mesh.name)
+    return
+  }
+  const iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
   iks.forEach((ik, idx) => {
     const len = Array.isArray(ik.links) ? ik.links.length : 0
-    console.log(`IK chain ${idx} for ${mesh.name} length: ${len}`)
+    console.log(`IK chain ${idx} for ${skinnedMesh.name} length: ${len}`)
   })
-  const solver = new CCDIKSolver(mesh, iks)
-  const obj = helper.objects.get(mesh)
+  const solver = new CCDIKSolver(skinnedMesh, iks)
+  const obj = helper.objects.get(skinnedMesh)
   if (!obj) {
-    console.error('initIKSolver: helper object not found for', mesh.name)
+    console.error('initIKSolver: helper object not found for', skinnedMesh.name)
   } else {
     obj.ikSolver = solver
-    if (iks.length > 0 && helper.objects.get(mesh)?.ikSolver !== solver) {
-      console.error('initIKSolver: failed to set ikSolver for', mesh.name)
+    if (iks.length > 0 && helper.objects.get(skinnedMesh)?.ikSolver !== solver) {
+      console.error('initIKSolver: failed to set ikSolver for', skinnedMesh.name)
     }
   }
-  console.log('initIKSolver: running solver.update for', mesh.name)
+  console.log('initIKSolver: running solver.update for', skinnedMesh.name)
   solver.update()
-  if (mesh.skeleton) {
-    mesh.skeleton.update()
-    console.log('initIKSolver: skeleton updated for', mesh.name)
+  if (skinnedMesh.skeleton) {
+    skinnedMesh.skeleton.update()
+    console.log('initIKSolver: skeleton updated for', skinnedMesh.name)
   }
 }
 function onPointerDown(event) {
@@ -731,28 +738,35 @@ async function handleFiles(files) {
   loader.load(
     modelPath,
     mesh => {
-      scene.add(mesh)
-      helper.add(mesh, { physics: true })
-      initIKSolver(mesh)
-      const skeletonHelper = new THREE.SkeletonHelper(mesh)
+      const skinnedMesh = mesh.isSkinnedMesh
+        ? mesh
+        : mesh.getObjectByProperty('type', 'SkinnedMesh')
+      if (!skinnedMesh) {
+        console.error('SkinnedMesh not found in model', modelFile.name)
+        return
+      }
+      scene.add(skinnedMesh)
+      helper.add(skinnedMesh, { physics: true })
+      initIKSolver(skinnedMesh)
+      const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
       skeletonHelper.visible = false
       scene.add(skeletonHelper)
       models.value.push({
         id: nextModelId++,
-        mesh,
+        mesh: skinnedMesh,
         name: modelFile.name,
         visible: true,
         skeletonHelper,
         bonesVisible: false,
         files: Array.from(files)
       })
-      currentMeshRef.value = mesh
-      setupIKTargets(mesh)
+      currentMeshRef.value = skinnedMesh
+      setupIKTargets(skinnedMesh)
       if (!ikConfigLoaded) {
         ikConfigPromise.then(() => {
-          if (currentMeshRef.value === mesh) {
-            setupIKTargets(mesh)
-            initIKSolver(mesh)
+          if (currentMeshRef.value === skinnedMesh) {
+            setupIKTargets(skinnedMesh)
+            initIKSolver(skinnedMesh)
           }
         })
       }
@@ -760,7 +774,7 @@ async function handleFiles(files) {
       logToServer({ event: 'loaded', model: modelFile.name })
       if (poseFile) {
       loader.loadVPD(posePath, true, pose => {
-        helper.pose(mesh, pose)
+        helper.pose(skinnedMesh, pose)
         console.log('Pose applied:', poseFile.name)
         logToServer({ event: 'pose', file: poseFile.name })
       })
