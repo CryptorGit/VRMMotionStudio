@@ -116,6 +116,10 @@ const extraIKChains = {}
 let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
+let floorMesh = null
+let floorRigidBody = null
+let floorBodyAdded = false
+let Ammo
 // 物理演算の有効/無効を切り替えるためのフラグ
 const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
@@ -226,10 +230,33 @@ watch(showIkMarkers, v => {
 watch(enablePhysics, v => {
   try {
     helper?.enable('physics', v)
+    ensureFloorRigidBody()
   } catch (e) {
     console.error('Failed to toggle physics:', e)
   }
 })
+
+function ensureFloorRigidBody() {
+  if (floorBodyAdded || !helper?.physics?.world || !Ammo) return
+  const halfSize = 20
+  const halfHeight = 0.5
+  const transform = new Ammo.btTransform()
+  transform.setIdentity()
+  transform.setOrigin(new Ammo.btVector3(0, -halfHeight, 0))
+  const shape = new Ammo.btBoxShape(
+    new Ammo.btVector3(halfSize, halfHeight, halfSize)
+  )
+  const motionState = new Ammo.btDefaultMotionState(transform)
+  const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+    0,
+    motionState,
+    shape,
+    new Ammo.btVector3(0, 0, 0)
+  )
+  floorRigidBody = new Ammo.btRigidBody(rbInfo)
+  helper.physics.world.addRigidBody(floorRigidBody)
+  floorBodyAdded = true
+}
 
 function isPhysicalBone(bone) {
   if (bone.userData && bone.userData.rigidBodyType !== undefined) return true
@@ -405,6 +432,7 @@ function initIKSolver(mesh) {
   }
   obj?.ikSolver?.update()
   skinnedMesh.skeleton?.update()
+  ensureFloorRigidBody()
 }
 function onPointerDown(event) {
   const rect = renderer.domElement.getBoundingClientRect()
@@ -1030,6 +1058,13 @@ onMounted(async () => {
 
   const grid = new THREE.GridHelper(40, 40)
   scene.add(grid)
+  floorMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 1, 40),
+    new THREE.MeshBasicMaterial({ color: 0xcccccc })
+  )
+  floorMesh.position.set(0, -0.5, 0)
+  floorMesh.visible = false
+  scene.add(floorMesh)
 
   camera = new THREE.PerspectiveCamera(
     45,
@@ -1052,6 +1087,7 @@ onMounted(async () => {
     // Ensure the WASM binary is loaded from the resolved asset URL
     locateFile: (file) => (file.endsWith('.wasm') ? ammoWasmUrl : file)
   })
+  Ammo = AmmoLib
   // Expose Ammo globally for three.js MMDAnimationHelper
   if (typeof window !== 'undefined') {
     window.Ammo = AmmoLib
@@ -1060,6 +1096,7 @@ onMounted(async () => {
   }
   helper = new MMDAnimationHelper()
   helper.enable('physics', enablePhysics.value)
+  ensureFloorRigidBody()
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
 
   window.addEventListener('resize', onWindowResize)
@@ -1069,6 +1106,7 @@ onMounted(async () => {
   logToServer({ event: 'init' })
 
   await restoreCachedModel()
+  ensureFloorRigidBody()
 
   animate(0)
 })
