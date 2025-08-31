@@ -42,7 +42,6 @@
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
     v-model:showIkMarkers="showIkMarkers"
-    v-model:plane-mode="planeMode"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @remove-model="removeModel"
@@ -91,7 +90,7 @@ directionalLightHelper.visible = false
 const directionalIntensity = ref(directionalLight.value.intensity)
 const showLightMarker = ref(false)
 const showIkMarkers = ref(true)
-const planeMode = ref('ground')
+const planeMode = ref('view')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
@@ -133,8 +132,6 @@ function loadLightingSettings() {
       showLightMarker.value = data.showLightMarker
     if (data.showIkMarkers !== undefined)
       showIkMarkers.value = data.showIkMarkers
-    if (data.planeMode !== undefined)
-      planeMode.value = data.planeMode
     if (data.directionalIntensity !== undefined)
       directionalIntensity.value = data.directionalIntensity
     if (data.directional?.position) {
@@ -406,14 +403,7 @@ function onPointerDown(event) {
   const boneOrTarget = selectedIK.value.target || selectedIK.value.bone
   boneOrTarget.getWorldPosition(pos)
   const normal = new THREE.Vector3()
-  if (planeMode.value === 'ground') {
-    normal.set(0, 1, 0)
-  } else if (planeMode.value === 'bone') {
-    selectedIK.value.bone.getWorldQuaternion(_quat)
-    normal.set(0, 1, 0).applyQuaternion(_quat).normalize()
-  } else {
-    normal.copy(pos).sub(camera.position).normalize()
-  }
+  normal.copy(pos).sub(camera.position).normalize()
   dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
   controls.enabled = false
   renderer.domElement.addEventListener('pointermove', onPointerMove)
