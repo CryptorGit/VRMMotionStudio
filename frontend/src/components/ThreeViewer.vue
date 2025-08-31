@@ -408,9 +408,21 @@ function onPointerDown(event) {
 }
 
 function applyIKUpdate() {
+  if (
+    helper?.objects.get(currentMeshRef.value) === undefined &&
+    currentMeshRef.value?.type !== 'SkinnedMesh'
+  ) {
+    currentMeshRef.value = currentMeshRef.value?.getObjectByProperty(
+      'type',
+      'SkinnedMesh'
+    )
+  }
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   solver?.update()
+  currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
+    b.updateMatrixWorld(true)
+  )
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkers()
