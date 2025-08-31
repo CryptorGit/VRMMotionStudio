@@ -567,21 +567,27 @@ function getDB() {
   }
   return dbPromise
 }
-async function cacheFiles(files) {
+async function cacheFiles(modelFiles) {
   try {
-    const list = []
-    for (const f of files) {
-      list.push({
-        name: f.name,
-        path: f.webkitRelativePath || f.name,
-        data: await f.arrayBuffer()
-      })
-    }
-
     const db = await getDB()
     const tx = db.transaction(DB_STORE, 'readwrite')
     const store = tx.objectStore(DB_STORE)
-    store.put(list, 'current')
+    await new Promise((res, rej) => {
+      const clearReq = store.clear()
+      clearReq.onsuccess = res
+      clearReq.onerror = () => rej(clearReq.error)
+    })
+    for (let i = 0; i < modelFiles.length; i++) {
+      const list = []
+      for (const f of modelFiles[i]) {
+        list.push({
+          name: f.name,
+          path: f.webkitRelativePath || f.name,
+          data: await f.arrayBuffer()
+        })
+      }
+      store.put(list, i)
+    }
     await new Promise((res, rej) => {
       tx.oncomplete = res
       tx.onerror = () => rej(tx.error)
@@ -596,22 +602,34 @@ async function loadCachedFiles() {
     const db = await getDB()
     const tx = db.transaction(DB_STORE)
     const store = tx.objectStore(DB_STORE)
-    const files = await new Promise((res, rej) => {
-      const req = store.get('current')
-      req.onsuccess = () => res(req.result)
+    const result = []
+    await new Promise((res, rej) => {
+      const req = store.openCursor()
+      req.onsuccess = () => {
+        const cursor = req.result
+        if (cursor) {
+          result.push(cursor.value)
+          cursor.continue()
+        } else res()
+      }
       req.onerror = () => rej(req.error)
     })
-    return files || null
+    return result
   } catch (e) {
     console.error('Failed to load cached model:', e)
-    return null
+    return []
   }
 }
-async function deleteCachedFiles() {
+async function deleteCachedFiles(index) {
   try {
     const db = await getDB()
     const tx = db.transaction(DB_STORE, 'readwrite')
-    tx.objectStore(DB_STORE).delete('current')
+    const store = tx.objectStore(DB_STORE)
+    if (index === undefined) {
+      store.clear()
+    } else {
+      store.delete(index)
+    }
     await new Promise((res, rej) => {
       tx.oncomplete = res
       tx.onerror = () => rej(tx.error)
@@ -624,12 +642,16 @@ async function deleteCachedFiles() {
 
 async function restoreCachedModel() {
   const saved = await loadCachedFiles()
-  if (!saved) return
-  const files = saved.map(f => {
-    const file = new File([f.data], f.name)
-    if (f.path) Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
-    return file
-  })
+  if (!saved.length) return
+  const files = []
+  for (const model of saved) {
+    for (const f of model) {
+      const file = new File([f.data], f.name)
+      if (f.path)
+        Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
+      files.push(file)
+    }
+  }
   await handleFiles(files)
 }
 
@@ -725,8 +747,8 @@ async function removeModel(index) {
     if (models.value.length === 0) {
       await deleteCachedFiles()
     } else {
-      const remainingFiles = models.value.flatMap(m => m.files || [])
-      await cacheFiles(remainingFiles)
+      await deleteCachedFiles(index)
+      await cacheFiles(models.value.map(m => m.files || []))
     }
   } catch (e) {
     console.error('Failed to remove model:', e)
@@ -782,27 +804,27 @@ async function handleFiles(files) {
   selectedPose.value = null
 
   const fileMap = {}
-  const modelFiles = []
+  const modelEntries = []
   const poseFiles = []
   for (const file of files) {
     const path = file.webkitRelativePath || file.name
     const shortPath = path
       .replace(/^[^/]*\//, '')
       .replace(/\\/g, '/')
+    const dir = shortPath.includes('/')
+      ? shortPath.substring(0, shortPath.lastIndexOf('/'))
+      : ''
     const url = URL.createObjectURL(file)
     fileMap[shortPath] = url
-    if (/\.(pmx|pmd)$/i.test(file.name)) modelFiles.push(file)
+    if (/\.(pmx|pmd)$/i.test(file.name)) modelEntries.push({ file, dir })
     if (/\.vpd$/i.test(file.name)) poseFiles.push({ name: file.name, url })
   }
-  if (modelFiles.length === 0) {
+  if (modelEntries.length === 0) {
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
     return
   }
 
   poses.value = poseFiles
-
-  // save files to IndexedDB for restoration
-  await cacheFiles(Array.from(files))
 
   const poseFile = poseFiles[0]
   const posePath = poseFile && poseFile.url
@@ -822,10 +844,19 @@ async function handleFiles(files) {
   }
 
   loader = new MMDLoader(manager)
-  for (const modelFile of modelFiles) {
+  for (const { file: modelFile, dir } of modelEntries) {
     const modelPath = (modelFile.webkitRelativePath || modelFile.name)
       .replace(/^[^/]*\//, '')
       .replace(/\\/g, '/')
+    const dirPrefix = dir ? dir + '/' : ''
+    const modelSpecificFiles = Array.from(files).filter(f => {
+      const p = (f.webkitRelativePath || f.name)
+        .replace(/^[^/]*\//, '')
+        .replace(/\\/g, '/')
+      return dir
+        ? p.startsWith(dirPrefix)
+        : !p.includes('/')
+    })
     await new Promise(resolve => {
       loader.load(
         modelPath,
@@ -849,7 +880,7 @@ async function handleFiles(files) {
             visible: true,
             skeletonHelper,
             bonesVisible: false,
-            files: Array.from(files)
+            files: modelSpecificFiles
           })
           currentMeshRef.value = skinnedMesh
           setupIKTargets(skinnedMesh)
@@ -882,6 +913,7 @@ async function handleFiles(files) {
       )
     })
   }
+  await cacheFiles(models.value.map(m => m.files))
   for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
 }
 function applyPose() {
