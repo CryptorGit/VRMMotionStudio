@@ -111,7 +111,7 @@ let ikUpdateScheduled = false
 // 物理演算の有効/無効を切り替えるためのフラグ
 const ENABLE_PHYSICS = false
 // スキニング関連のデバッグ用フラグ
-const DEBUG_SKINNING = true
+const DEBUG_SKINNING = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -431,12 +431,6 @@ function applyIKUpdate() {
     'currentMeshRef should point to a SkinnedMesh',
     mesh
   )
-  if (DEBUG_SKINNING && mesh instanceof THREE.SkinnedMesh) {
-    mesh.pose()
-    mesh.normalizeSkinWeights()
-    mesh.skeleton?.calculateInverses()
-    mesh.bind(mesh.skeleton, mesh.bindMatrix)
-  }
   let obj = helper?.objects.get(mesh)
   if (mesh && (!obj || !obj.ikSolver)) {
     initIKSolver(mesh)
