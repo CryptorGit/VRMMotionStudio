@@ -492,7 +492,7 @@ function initIKSolver(mesh) {
     skinnedMesh.geometry.userData.MMD =
       skinnedMesh.geometry.userData.MMD || {}
     skinnedMesh.geometry.userData.MMD.iks = iks
-    helper.add(skinnedMesh, { physics: true, ik: true })
+    helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
     obj = helper.objects.get(skinnedMesh)
   } else {
     obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
