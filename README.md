@@ -63,6 +63,15 @@ java -cp java/target/classes com.mmd.App
 
 ### 3D モデルの読み込みとレンダリング
 - Three.js を基盤として使用し、MMD モデルの描画を行います。Three.js の拡張ローダーである MMDLoader（またはその TypeScript 版である three-mmd-loader）を用いて PMX 形式モデルのインポートと表示を実現します [1][2]。MMDLoader は PMX/PMD モデルだけでなく、モーションデータ（VMD）やポーズデータ（VPD）にも対応しており、モデルにボーンアニメーションや表情モーフを適用できます [1]。
+- Three.js で PMX モデルを利用する際は MMDAnimationHelper を併用し、`grant` オプションを有効にしないと膝D などのボーンにメッシュが追随しない場合があります。以下のように `helper.add` で `grant: true` を指定し、毎フレーム `helper.update(delta)` を呼び出してください。
+
+  ```ts
+  const helper = new MMDAnimationHelper();
+  helper.add(mesh, { animation, physics: false, ik: true, grant: true });
+
+  // アニメーション更新
+  helper.update(delta);
+  ```
 - 読み込んだモデルには MMD 特有のトゥーンレンダリングやアウトライン効果も再現します。Three.js のマテリアルやシェーダを調整し、モデルの輪郭線（アウトライン）を描画することで、MMD らしい見た目をブラウザ上で再現します（必要に応じて OutlineEffect の利用も検討します）。照明については Three.js のディレクショナルライト等を用いて MMD の照明モデルを再現し、シーン全体のライティングを調整します。カメラ制御は OrbitControls による手動操作に加え、MMD の VMD カメラモーションを読み込んで自動再生することも可能にします。
 
 ### 物理演算エンジン
