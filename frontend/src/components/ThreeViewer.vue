@@ -502,11 +502,12 @@ function applyIKUpdate() {
   const solver = obj?.ikSolver
   const start = performance.now()
   solver?.update()
+  helper?.update(0)
   currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
     b.updateMatrixWorld(true)
   )
-  mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
+  mesh?.skeleton?.update()
   updateIKMarkers()
   console.debug(`applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`)
 }
