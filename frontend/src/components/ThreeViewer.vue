@@ -431,8 +431,14 @@ function applyIKUpdate() {
     )
   }
   const mesh = currentMeshRef.value
-  const solver = helper?.objects.get(mesh)?.ikSolver
+  let obj = helper?.objects.get(mesh)
+  if (mesh && (!obj || !obj.ikSolver)) {
+    initIKSolver(mesh)
+    obj = helper?.objects.get(mesh)
+  }
+  const solver = obj?.ikSolver
   solver?.update()
+  helper?.update(0)
   currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
     b.updateMatrixWorld(true)
   )
