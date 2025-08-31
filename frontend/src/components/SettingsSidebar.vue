@@ -60,6 +60,16 @@
               <label>
                 <input type="checkbox" v-model="showIkMarkers" /> IKボーン表示
               </label>
+              <label>
+                IKマーカーサイズ
+                <input
+                  type="range"
+                  min="4"
+                  max="64"
+                  v-model.number="ikMarkerSize"
+                />
+                <span>{{ ikMarkerSize }}</span>
+              </label>
               <ModelList
                 :models="models"
                 @toggle="toggleModel"
@@ -90,7 +100,8 @@ const props = defineProps({
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
   showIkMarkers: { type: Boolean, required: true },
-  enablePhysics: { type: Boolean, required: true }
+  enablePhysics: { type: Boolean, required: true },
+  ikMarkerSize: { type: Number, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
@@ -99,6 +110,7 @@ const emit = defineEmits([
   'update:directionalIntensity',
   'update:showIkMarkers',
   'update:enablePhysics',
+  'update:ikMarkerSize',
   'toggle-model',
   'toggle-bone',
   'remove-model'
@@ -122,6 +134,10 @@ const showIkMarkers = computed({
 const enablePhysics = computed({
   get: () => props.enablePhysics,
   set: v => emit('update:enablePhysics', v)
+})
+const ikMarkerSize = computed({
+  get: () => props.ikMarkerSize,
+  set: v => emit('update:ikMarkerSize', v)
 })
 
 const collapsed = ref(false)
@@ -164,6 +180,7 @@ function saveState() {
       showLightMarker: showLightMarker.value,
       showIkMarkers: showIkMarkers.value,
       enablePhysics: enablePhysics.value,
+      ikMarkerSize: ikMarkerSize.value,
       markerColor: markerColor.value,
       directionalIntensity: directionalIntensity.value,
       directional: {
@@ -204,6 +221,7 @@ onMounted(() => {
         showLightMarker: savedShowMarker,
         showIkMarkers: savedShowIk,
         enablePhysics: savedEnablePhysics,
+        ikMarkerSize: savedIkMarkerSize,
         markerColor: savedMarkerColor,
         directionalIntensity: savedDirectionalIntensity,
         directional: savedDirectional
@@ -226,6 +244,8 @@ onMounted(() => {
         emit('update:showIkMarkers', savedShowIk)
       if (savedEnablePhysics !== undefined)
         emit('update:enablePhysics', savedEnablePhysics)
+      if (savedIkMarkerSize !== undefined)
+        emit('update:ikMarkerSize', savedIkMarkerSize)
       if (savedMarkerColor !== undefined)
         emit('update:markerColor', savedMarkerColor)
       if (savedDirectionalIntensity !== undefined)
@@ -265,6 +285,7 @@ watchEffect(() => {
   showLightMarker.value
   showIkMarkers.value
   enablePhysics.value
+  ikMarkerSize.value
   markerColor.value
   directionalIntensity.value
   directional.value.position.x
@@ -355,7 +376,8 @@ defineExpose({
   showLightMarker,
   showIkMarkers,
   enablePhysics,
-  markerColor
+  markerColor,
+  ikMarkerSize
 })
 </script>
 
