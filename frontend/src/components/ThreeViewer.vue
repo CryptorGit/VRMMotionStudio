@@ -242,7 +242,7 @@ function setupIKTargets(mesh) {
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const targetIndices = new Set()
   iks.forEach(ik => {
-    if (typeof ik.target === 'number') targetIndices.add(ik.target)
+    if (typeof ik.effector === 'number') targetIndices.add(ik.effector)
   })
 
   // Add extra IK bones specified by name
