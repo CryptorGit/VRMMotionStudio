@@ -30,7 +30,7 @@
 - [ ] requestAnimationFrame 経由の IK 更新が 1 フレームに 1 回のみ呼ばれることをブラウザで手動確認する
 - [x] 複数モデルをロードして切り替えた際にも IK 操作が可能であることをブラウザで手動確認する
 - [ ] IK 定義の拡張後の IK マーカー表示をブラウザで手動確認する
-- [ ] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
+- [x] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
 - [ ] IK情報を取得できなかったモデル名を一覧化する
 - [ ] モデル削除や並び替え時に ModelList と 3D 表示が正しく更新されることをブラウザで手動確認する
   - [ ] removeModel による helper/scene 解除とリソース解放が行われることをブラウザで手動確認する
