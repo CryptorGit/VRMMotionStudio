@@ -1123,6 +1123,7 @@ function applyPose() {
   loader.loadVPD(selectedPose.value.url, true, pose => {
     const mesh = currentMeshRef.value
     helper.pose(mesh, pose)
+    helper.update(0)
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
     updateIKMarkers()
@@ -1134,9 +1135,8 @@ function applyPose() {
 function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
-  const solver = helper?.objects.get(mesh)?.ikSolver
   selectedIK.value?.target.updateMatrixWorld(true)
-  solver?.update()
+  helper.update(0)
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
   const exporter = new MMDExporter()
