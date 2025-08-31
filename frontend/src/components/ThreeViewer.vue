@@ -108,6 +108,10 @@ const extraIKChains = []
 let ikConfigLoaded = false
 const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
+// 物理演算の有効/無効を切り替えるためのフラグ
+const ENABLE_PHYSICS = false
+// スキニング関連のデバッグ用フラグ
+const DEBUG_SKINNING = true
 async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -422,6 +426,17 @@ function applyIKUpdate() {
     )
   }
   const mesh = currentMeshRef.value
+  console.assert(
+    mesh instanceof THREE.SkinnedMesh,
+    'currentMeshRef should point to a SkinnedMesh',
+    mesh
+  )
+  if (DEBUG_SKINNING && mesh instanceof THREE.SkinnedMesh) {
+    mesh.pose()
+    mesh.normalizeSkinWeights()
+    mesh.skeleton?.calculateInverses()
+    mesh.bind(mesh.skeleton, mesh.bindMatrix)
+  }
   let obj = helper?.objects.get(mesh)
   if (mesh && (!obj || !obj.ikSolver)) {
     initIKSolver(mesh)
@@ -430,7 +445,7 @@ function applyIKUpdate() {
   const solver = obj?.ikSolver
   const start = performance.now()
   solver?.update()
-  // helper?.update(0) // プロファイル用に一時的に無効化
+  if (ENABLE_PHYSICS) helper?.update(0)
   // currentMeshRef.value?.skeleton?.bones?.forEach((b) =>
   //   b.updateMatrixWorld(true)
   // )
