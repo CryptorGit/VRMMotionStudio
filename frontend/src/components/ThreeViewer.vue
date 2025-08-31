@@ -74,6 +74,7 @@ const poses = ref([])
 const selectedPose = ref(null)
 const models = ref([])
 let nextModelId = 1
+const clock = new THREE.Clock()
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(0, 0, 0)
@@ -553,9 +554,7 @@ async function removeModel(index) {
   const model = models.value[index]
   if (model) {
     const { mesh, skeletonHelper } = model
-    if (helper?.objects?.has(mesh)) {
-      helper.remove(mesh)
-    }
+    helper?.remove(mesh)
     try {
       mesh.traverse(child => {
         if (!child.isMesh) return
@@ -606,9 +605,7 @@ async function clearCache() {
   selectedPose.value = null
   models.value.forEach(m => {
     const { mesh, skeletonHelper } = m
-    if (helper?.objects?.has(mesh)) {
-      helper.remove(mesh)
-    }
+    helper?.remove(mesh)
     try {
       scene.remove(mesh)
       if (skeletonHelper) {
@@ -696,7 +693,7 @@ async function handleFiles(files) {
     modelPath,
     mesh => {
       scene.add(mesh)
-      helper.add(mesh, { physics: false })
+      helper.add(mesh, { physics: true })
       initIKSolver(mesh)
       const skeletonHelper = new THREE.SkeletonHelper(mesh)
       skeletonHelper.visible = false
@@ -784,6 +781,8 @@ function onWindowResize() {
 
 function animate() {
   requestAnimationFrame(animate)
+  const delta = clock.getDelta()
+  helper?.update(delta)
   models.value.forEach(({ mesh, visible }) => {
     if (!visible || !mesh.visible) return
     const solver = helper?.objects.get(mesh)?.ikSolver
