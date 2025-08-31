@@ -344,29 +344,18 @@ function initIKSolver(mesh) {
     return
   }
   const iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
-  iks.forEach((ik, idx) => {
-    const len = Array.isArray(ik.links) ? ik.links.length : 0
-    console.log(`IK chain ${idx} for ${skinnedMesh.name} length: ${len}`)
-  })
-  const solver = new CCDIKSolver(skinnedMesh, iks)
-  if (!helper.objects.has(skinnedMesh)) {
-    helper.add(skinnedMesh, { physics: true })
-  }
-  const obj = helper.objects.get(skinnedMesh)
+  let obj = helper.objects.get(skinnedMesh)
   if (!obj) {
-    console.error('initIKSolver: helper object not found for', skinnedMesh.name)
-    return
+    skinnedMesh.geometry.userData.MMD =
+      skinnedMesh.geometry.userData.MMD || {}
+    skinnedMesh.geometry.userData.MMD.iks = iks
+    helper.add(skinnedMesh, { physics: true, ik: true })
+    obj = helper.objects.get(skinnedMesh)
+  } else {
+    obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
   }
-  obj.ikSolver = solver
-  if (iks.length > 0 && helper.objects.get(skinnedMesh)?.ikSolver !== solver) {
-    console.error('initIKSolver: failed to set ikSolver for', skinnedMesh.name)
-  }
-  console.log('initIKSolver: running solver.update for', skinnedMesh.name)
-  solver.update()
-  if (skinnedMesh.skeleton) {
-    skinnedMesh.skeleton.update()
-    console.log('initIKSolver: skeleton updated for', skinnedMesh.name)
-  }
+  obj?.ikSolver?.update()
+  skinnedMesh.skeleton?.update()
 }
 function onPointerDown(event) {
   const rect = renderer.domElement.getBoundingClientRect()
@@ -408,6 +397,8 @@ function applyIKUpdate() {
   const mesh = currentMeshRef.value
   const solver = helper?.objects.get(mesh)?.ikSolver
   solver?.update()
+  mesh?.skeleton?.update()
+  mesh?.updateMatrixWorld(true)
   updateIKMarkers()
 }
 
@@ -754,7 +745,6 @@ async function handleFiles(files) {
         return
       }
       scene.add(skinnedMesh)
-      helper.add(skinnedMesh, { physics: true })
       initIKSolver(skinnedMesh)
       const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
       skeletonHelper.visible = false
@@ -844,13 +834,6 @@ function animate() {
   requestAnimationFrame(animate)
   const delta = clock.getDelta()
   helper?.update(delta)
-  models.value.forEach(({ mesh, visible }) => {
-    if (!visible || !mesh.visible) return
-    const solver = helper?.objects.get(mesh)?.ikSolver
-    solver?.update()
-    mesh.skeleton?.update()
-    mesh.updateMatrixWorld(true)
-  })
   updateIKMarkers()
   effect.render(scene, camera)
   directionalLightHelper.update()
