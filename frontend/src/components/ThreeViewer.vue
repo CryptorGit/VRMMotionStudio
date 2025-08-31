@@ -76,6 +76,11 @@ const selectedPose = ref(null)
 const models = ref([])
 let nextModelId = 1
 const clock = new THREE.Clock()
+const TARGET_FPS = 30
+let lastFrameTime = 0
+const updateTimes = []
+const renderTimes = []
+let lastPerfLogTime = 0
 const ambientLight = ref(new THREE.AmbientLight(0x666666))
 const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
 directionalLight.value.position.set(0, 0, 0)
@@ -921,13 +926,36 @@ function onWindowResize() {
   renderer.setSize(container.clientWidth, container.clientHeight)
 }
 
-function animate() {
+function animate(time) {
   requestAnimationFrame(animate)
   const delta = clock.getDelta()
+  if (time - lastFrameTime < 1000 / TARGET_FPS) return
+  lastFrameTime = time
+
+  const updateStart = performance.now()
   helper?.update(delta)
+  updateTimes.push(performance.now() - updateStart)
+
   updateIKMarkers()
+
+  const renderStart = performance.now()
   effect.render(scene, camera)
+  renderTimes.push(performance.now() - renderStart)
+
   directionalLightHelper.update()
+
+  if (time - lastPerfLogTime >= 1000) {
+    const avgUpdate =
+      updateTimes.reduce((a, b) => a + b, 0) / (updateTimes.length || 1)
+    const avgRender =
+      renderTimes.reduce((a, b) => a + b, 0) / (renderTimes.length || 1)
+    console.log(
+      `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
+    )
+    updateTimes.length = 0
+    renderTimes.length = 0
+    lastPerfLogTime = time
+  }
 }
 
 function handleError(e) {
@@ -1006,7 +1034,7 @@ onMounted(async () => {
 
   await restoreCachedModel()
 
-  animate()
+  animate(0)
 })
 
 onUnmounted(() => {
