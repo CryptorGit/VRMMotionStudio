@@ -57,14 +57,6 @@
               <label>
                 <input type="checkbox" v-model="showIkMarkers" /> IKボーン表示
               </label>
-              <label>
-                操作平面:
-                <select v-model="planeMode">
-                  <option value="ground">地面平面</option>
-                  <option value="bone">ボーン軸平面</option>
-                  <option value="view">視点平面</option>
-                </select>
-              </label>
               <ModelList
                 :models="models"
                 @toggle="toggleModel"
@@ -94,8 +86,7 @@ const props = defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  showIkMarkers: { type: Boolean, required: true },
-  planeMode: { type: String, required: true }
+  showIkMarkers: { type: Boolean, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
@@ -103,7 +94,6 @@ const emit = defineEmits([
   'update:markerColor',
   'update:directionalIntensity',
   'update:showIkMarkers',
-  'update:planeMode',
   'toggle-model',
   'toggle-bone',
   'remove-model'
@@ -123,10 +113,6 @@ const directionalIntensity = computed({
 const showIkMarkers = computed({
   get: () => props.showIkMarkers,
   set: v => emit('update:showIkMarkers', v)
-})
-const planeMode = computed({
-  get: () => props.planeMode,
-  set: v => emit('update:planeMode', v)
 })
 
 const collapsed = ref(false)
@@ -168,7 +154,6 @@ function saveState() {
       expandedSections: { ...expandedSections },
       showLightMarker: showLightMarker.value,
       showIkMarkers: showIkMarkers.value,
-      planeMode: planeMode.value,
       markerColor: markerColor.value,
       directionalIntensity: directionalIntensity.value,
       directional: {
@@ -208,7 +193,6 @@ onMounted(() => {
         expandedSections: savedExpanded,
         showLightMarker: savedShowMarker,
         showIkMarkers: savedShowIk,
-        planeMode: savedPlaneMode,
         markerColor: savedMarkerColor,
         directionalIntensity: savedDirectionalIntensity,
         directional: savedDirectional
@@ -229,8 +213,6 @@ onMounted(() => {
         emit('update:showLightMarker', savedShowMarker)
       if (savedShowIk !== undefined)
         emit('update:showIkMarkers', savedShowIk)
-      if (savedPlaneMode !== undefined)
-        emit('update:planeMode', savedPlaneMode)
       if (savedMarkerColor !== undefined)
         emit('update:markerColor', savedMarkerColor)
       if (savedDirectionalIntensity !== undefined)
@@ -269,7 +251,6 @@ watchEffect(() => {
   expandedSections.models
   showLightMarker.value
   showIkMarkers.value
-  planeMode.value
   markerColor.value
   directionalIntensity.value
   directional.value.position.x
