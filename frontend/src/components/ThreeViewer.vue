@@ -46,6 +46,7 @@
     v-model:enable-physics="enablePhysics"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
+  @toggle-bone-names="toggleBoneNameVisibility"
   @remove-model="removeModel"
 />
 </template>
@@ -816,6 +817,9 @@ function toggleModelVisibility(index, visible) {
     if (model.skeletonHelper) {
       model.skeletonHelper.visible = visible && model.bonesVisible
     }
+    if (model.boneNameHelpers) {
+      model.boneNameHelpers.forEach(h => (h.visible = visible && model.boneNameVisible))
+    }
   }
 }
 
@@ -827,11 +831,19 @@ function toggleBoneVisibility(index, visible) {
   }
 }
 
+function toggleBoneNameVisibility(index, visible) {
+  const model = models.value[index]
+  if (model && model.boneNameHelpers) {
+    model.boneNameVisible = visible
+    model.boneNameHelpers.forEach(h => (h.visible = visible && model.visible))
+  }
+}
+
 async function removeModel(index) {
   const model = models.value[index]
   if (!model) return
 
-  const { mesh, skeletonHelper } = model
+  const { mesh, skeletonHelper, boneNameHelpers } = model
   // helper から確実に解除
   helper?.remove?.(mesh)
 
@@ -861,6 +873,13 @@ async function removeModel(index) {
       skeletonHelper.removeFromParent?.()
       skeletonHelper.geometry?.dispose?.()
       skeletonHelper.material?.dispose?.()
+    }
+    if (boneNameHelpers) {
+      boneNameHelpers.forEach(h => {
+        h.parent?.remove(h)
+        h.material.map?.dispose?.()
+        h.material?.dispose?.()
+      })
     }
 
     models.value.splice(index, 1)
@@ -896,7 +915,7 @@ async function clearCache() {
   poses.value = []
   selectedPose.value = null
   models.value.forEach(m => {
-    const { mesh, skeletonHelper } = m
+    const { mesh, skeletonHelper, boneNameHelpers } = m
     if (helper?.objects?.has(mesh)) helper.remove(mesh)
     try {
       scene.remove(mesh)
@@ -904,6 +923,13 @@ async function clearCache() {
         scene.remove(skeletonHelper)
         skeletonHelper.geometry?.dispose?.()
         skeletonHelper.material?.dispose?.()
+      }
+      if (boneNameHelpers) {
+        boneNameHelpers.forEach(h => {
+          h.parent?.remove(h)
+          h.material.map?.dispose?.()
+          h.material?.dispose?.()
+        })
       }
     } catch (e) {
       console.error('Failed to remove mesh from scene:', e)
@@ -925,6 +951,42 @@ function onDragLeave() {
 function onDrop(e) {
   viewer.value.classList.remove('dragover')
   handleFiles(e.dataTransfer.files)
+}
+
+function createBoneNameHelpers(skinnedMesh) {
+  const helpers = []
+  skinnedMesh.skeleton.bones.forEach(bone => {
+    const name = bone.name
+    if (!name) return
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    ctx.font = '24px sans-serif'
+    const width = ctx.measureText(name).width + 20
+    canvas.width = width
+    canvas.height = 40
+    ctx.font = '24px sans-serif'
+    ctx.fillStyle = '#fff'
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 4
+    ctx.strokeText(name, 10, 30)
+    ctx.fillText(name, 10, 30)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true
+    })
+    const sprite = new THREE.Sprite(material)
+    const scaleFactor = 0.01
+    sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1)
+    sprite.position.set(0, 0.1, 0)
+    sprite.visible = false
+    bone.add(sprite)
+    helpers.push(sprite)
+  })
+  return helpers
 }
 
 async function handleFiles(files) {
@@ -1005,6 +1067,7 @@ async function handleFiles(files) {
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
           skeletonHelper.visible = debugSkinning
           scene.add(skeletonHelper)
+          const boneNameHelpers = createBoneNameHelpers(skinnedMesh)
           models.value.push({
             id: nextModelId++,
             mesh: skinnedMesh,
@@ -1012,6 +1075,8 @@ async function handleFiles(files) {
             visible: true,
             skeletonHelper,
             bonesVisible: debugSkinning,
+            boneNameHelpers,
+            boneNameVisible: false,
             files: modelSpecificFiles
           })
           if (debugSkinning) {
