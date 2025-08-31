@@ -601,14 +601,7 @@ function getDB() {
 }
 async function cacheFiles(modelFiles) {
   try {
-    const db = await getDB()
-    const tx = db.transaction(DB_STORE, 'readwrite')
-    const store = tx.objectStore(DB_STORE)
-    await new Promise((res, rej) => {
-      const clearReq = store.clear()
-      clearReq.onsuccess = res
-      clearReq.onerror = () => rej(clearReq.error)
-    })
+    const dataLists = []
     for (let i = 0; i < modelFiles.length; i++) {
       const list = []
       for (const f of modelFiles[i]) {
@@ -618,7 +611,23 @@ async function cacheFiles(modelFiles) {
           data: await f.arrayBuffer()
         })
       }
-      store.put(list, i)
+      dataLists.push(list)
+    }
+
+    const db = await getDB()
+    const tx = db.transaction(DB_STORE, 'readwrite')
+    const store = tx.objectStore(DB_STORE)
+    await new Promise((res, rej) => {
+      const clearReq = store.clear()
+      clearReq.onsuccess = res
+      clearReq.onerror = () => rej(clearReq.error)
+    })
+    for (let i = 0; i < dataLists.length; i++) {
+      await new Promise((res, rej) => {
+        const req = store.put(dataLists[i], i)
+        req.onsuccess = res
+        req.onerror = () => rej(req.error)
+      })
     }
     await new Promise((res, rej) => {
       tx.oncomplete = res
