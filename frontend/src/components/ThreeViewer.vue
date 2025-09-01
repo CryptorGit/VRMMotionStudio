@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, markRaw, onMounted, onUnmounted } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -86,12 +86,12 @@ const settingsSidebar = ref(null)
 const currentMeshRef = ref(null)
 const enablePhysics = ref(true)
 
-const scene = ref(null)
-const camera = ref(null)
-const renderer = ref(null)
-const effect = ref(null)
-const controls = ref(null)
-const helper = ref(null)
+const scene = shallowRef(null)
+const camera = shallowRef(null)
+const renderer = shallowRef(null)
+const effect = shallowRef(null)
+const controls = shallowRef(null)
+const helper = shallowRef(null)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
@@ -205,14 +205,14 @@ onMounted(async () => {
 
   const container = viewer.value
 
-  renderer.value = new THREE.WebGLRenderer({ antialias: true })
+  renderer.value = markRaw(new THREE.WebGLRenderer({ antialias: true }))
   renderer.value.setPixelRatio(window.devicePixelRatio)
   renderer.value.setSize(container.clientWidth, container.clientHeight)
   container.appendChild(renderer.value.domElement)
 
-  effect.value = new OutlineEffect(renderer.value)
+  effect.value = markRaw(new OutlineEffect(renderer.value))
 
-  scene.value = new THREE.Scene()
+  scene.value = markRaw(new THREE.Scene())
   scene.value.background = new THREE.Color(0xeeeeee)
 
   const grid = new THREE.GridHelper(40, 40)
@@ -226,15 +226,15 @@ onMounted(async () => {
   floorMesh.visible = false
   scene.value.add(floorMesh)
 
-  camera.value = new THREE.PerspectiveCamera(
+  camera.value = markRaw(new THREE.PerspectiveCamera(
     45,
     container.clientWidth / container.clientHeight,
     1,
     2000
-  )
+  ))
   camera.value.position.set(0, 10, 30)
 
-  controls.value = new OrbitControls(camera.value, renderer.value.domElement)
+  controls.value = markRaw(new OrbitControls(camera.value, renderer.value.domElement))
   controls.value.mouseButtons = {
     LEFT: THREE.MOUSE.PAN,
     RIGHT: THREE.MOUSE.ROTATE,
@@ -258,7 +258,7 @@ onMounted(async () => {
   } else {
     globalThis.Ammo = AmmoLib
   }
-  helper.value = new MMDAnimationHelper()
+  helper.value = markRaw(new MMDAnimationHelper())
   helper.value.enable('physics', enablePhysics.value)
   helper.value.enabled.ik = false
   ensureFloorRigidBody()
