@@ -33,8 +33,16 @@ class CORSRequestHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
 
-def run():
-    server_address = ('', 8000)
+def run(port: int = 8000):
+    """HTTP サーバを起動する
+
+    Parameters
+    ----------
+    port : int, optional
+        起動するポート番号 (default 8000)
+    """
+
+    server_address = ('', port)
     with ThreadingHTTPServer(server_address, CORSRequestHandler) as httpd:
         def handle_signal(signum, frame):
             logger.info('Shutting down server')
@@ -43,10 +51,20 @@ def run():
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
-        logger.info('Python backend running on http://localhost:8000')
-        httpd.serve_forever()
+        logger.info('Python backend running on http://localhost:%d', port)
+        try:
+            httpd.serve_forever()
+        except Exception:
+            logger.exception('Server stopped unexpectedly')
+            httpd.shutdown()
 
 
 if __name__ == '__main__':
-    run()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', type=int, default=8000, help='ポート番号')
+    args = parser.parse_args()
+
+    run(port=args.port)
 

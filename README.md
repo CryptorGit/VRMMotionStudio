@@ -31,8 +31,9 @@ npm run dev
 ### バックエンド (Python)
 ```bash
 cd backend/python
-python app.py
+python app.py [--port 8000]
 ```
+`--port` オプションでリスニングポートを指定できます (省略時は 8000)。
 
 ### バックエンド (Java / Maven)
 ```bash
