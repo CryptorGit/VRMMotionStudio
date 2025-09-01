@@ -69,27 +69,49 @@ export function getIKDefinitions(geometry, modelName = '') {
     if (!iks || iks.length === 0) {
       const fallback = extraIKChains[modelName] || extraIKChains.default
       if (Array.isArray(fallback) && fallback.length > 0) {
-        const bones = geometry?.userData?.MMD?.bones || []
-        const resolve = v =>
-          typeof v === 'number' ? v : bones.findIndex(b => b.name === v)
-        iks = fallback.map(ik => ({
-          target: resolve(ik.target),
-          effector: resolve(ik.effector),
-          links: (ik.links || []).map(l => {
-            if (typeof l === 'number' || typeof l === 'string')
-              return { index: resolve(l) }
-            return { ...l, index: resolve(l.index) }
-          })
-        }))
+        // Copy fallback chains; actual resolution occurs below
+        iks = fallback.map(ik => ({ ...ik }))
       }
     }
   }
-  if (Array.isArray(iks) && iks.length > 0) {
+
+  const bones = geometry?.userData?.MMD?.bones || []
+  const resolve = v => (typeof v === 'number' ? v : bones.findIndex(b => b.name === v))
+  const originalCount = Array.isArray(iks) ? iks.length : 0
+  iks = (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
+    const target = resolve(ik.target)
+    const effector = resolve(ik.effector)
+    if (target === -1 || effector === -1) {
+      console.warn('IK chain skipped due to unresolved bone:', ik)
+      return acc
+    }
+    const links = (ik.links || []).reduce((arr, l) => {
+      const idx = typeof l === 'object' && l !== null && 'index' in l ? resolve(l.index) : resolve(l)
+      if (idx === -1) {
+        console.warn('IK link skipped due to unresolved bone:', l)
+        return arr
+      }
+      if (typeof l === 'object' && l !== null && 'index' in l) {
+        arr.push({ ...l, index: idx })
+      } else {
+        arr.push({ index: idx })
+      }
+      return arr
+    }, [])
+    if (links.length === 0) {
+      console.warn('IK chain skipped because it has no valid links:', ik)
+      return acc
+    }
+    acc.push({ target, effector, links })
+    return acc
+  }, [])
+
+  if (iks.length > 0) {
     ikWarning.value = ''
   } else {
-    ikWarning.value = 'IK定義が見つかりません'
+    ikWarning.value = originalCount > 0 ? 'IK定義が不完全' : 'IK定義が見つかりません'
   }
-  return Array.isArray(iks) ? iks : []
+  return iks
 }
 
 export function setupIKTargets(scene, mesh) {
