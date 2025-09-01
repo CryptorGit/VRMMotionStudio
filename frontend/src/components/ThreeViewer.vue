@@ -245,9 +245,6 @@ function applyIKUpdate() {
     applyBoneInheritance(mesh?.skeleton?.bones)
     for (let i = 0; i < 10; i++) {
       solver.update()
-      mesh.skeleton.calculateInverses()
-      mesh.skeleton.update()
-      mesh.updateMatrixWorld(true)
     }
     helper.objects.get(mesh)?.grantSolver?.update()
     mesh?.skeleton?.bones?.forEach(b => {
@@ -257,20 +254,12 @@ function applyIKUpdate() {
         applyLocalAxisRotation(b, _quat)
       }
     })
+    mesh.skeleton.update()
+    mesh.updateMatrixWorld(true)
   } else {
     helper?.update(1 / 60)
   }
   updateIKMarkersBound()
-  mesh?.skeleton?.update()
-  currentMeshRef.value?.skeleton?.bones?.forEach(b =>
-    b.updateMatrixWorld(true)
-  )
-  mesh?.updateMatrixWorld(true)
-  mesh?.skeleton?.update()
-  currentMeshRef.value?.skeleton?.bones?.forEach(b =>
-    b.updateMatrixWorld(true)
-  )
-  mesh?.updateMatrixWorld(true)
   console.debug(
     `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
   )
@@ -763,6 +752,7 @@ async function handleFiles(files) {
             return resolve()
           }
           applyMmdRotationOrder(skinnedMesh.skeleton.bones)
+          skinnedMesh.skeleton.calculateInverses()
           scene.add(skinnedMesh)
           initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
