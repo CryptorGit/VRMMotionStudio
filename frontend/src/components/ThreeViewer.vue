@@ -259,6 +259,14 @@ function applyIKUpdate() {
   } else {
     helper?.update(1 / 60)
   }
+  bones.forEach(b => {
+    const data = b.userData || (b.userData = {})
+    if (data._origQuat) {
+      data._origQuat.copy(b.quaternion)
+    } else {
+      data._origQuat = b.quaternion.clone()
+    }
+  })
   updateIKMarkersBound()
   skeleton?.update()
   bones.forEach(b => b.updateMatrixWorld(true))
