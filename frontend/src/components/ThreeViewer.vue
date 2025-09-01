@@ -88,7 +88,7 @@ import {
   initIKSolver
 } from '../utils/ik.js'
 import { createAnimator, handleWindowResize } from '../utils/rendering.js'
-import { adjustAxis } from '../utils/bones.js'
+import { adjustAxis, applyMmdRotationOrder } from '../utils/bones.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -744,6 +744,7 @@ async function handleFiles(files) {
             console.error('SkinnedMesh not found in model', modelFile.name)
             return resolve()
           }
+          applyMmdRotationOrder(skinnedMesh.skeleton.bones)
           scene.add(skinnedMesh)
           initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
