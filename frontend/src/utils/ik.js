@@ -106,6 +106,18 @@ export function getIKDefinitions(geometry, modelName = '') {
     return acc
   }, [])
 
+  const ikParentRegex = /(?:IK|ＩＫ)親$/
+  bones.forEach((b, idx) => {
+    if (ikParentRegex.test(b.name)) {
+      const ikName = b.name.slice(0, -1)
+      const targetIdx = bones.findIndex(bn => bn.name === ikName)
+      const chain = iks.find(ik => ik.target === targetIdx)
+      if (chain && !chain.links.some(l => l.index === idx)) {
+        chain.links.unshift({ index: idx })
+      }
+    }
+  })
+
   if (iks.length > 0) {
     ikWarning.value = ''
   } else {
@@ -176,12 +188,24 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
     console.error('initIKSolver: SkinnedMesh not found for', mesh.name)
     return
   }
-  const iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
+  let iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
   if (!Array.isArray(iks) || iks.length === 0) return
+  const bones = skinnedMesh.skeleton?.bones || []
+  const ikParentRegex = /(?:IK|ＩＫ)親$/
+  bones.forEach((b, idx) => {
+    if (ikParentRegex.test(b.name)) {
+      const ikName = b.name.slice(0, -1)
+      const targetIdx = bones.findIndex(bn => bn.name === ikName)
+      const chain = iks.find(ik => ik.target === targetIdx)
+      if (chain && !chain.links.some(l => l.index === idx)) {
+        chain.links.unshift({ index: idx })
+      }
+    }
+  })
+  skinnedMesh.geometry.userData.MMD =
+    skinnedMesh.geometry.userData.MMD || {}
+  skinnedMesh.geometry.userData.MMD.iks = iks
   if (!helper.objects.get(skinnedMesh)) {
-    skinnedMesh.geometry.userData.MMD =
-      skinnedMesh.geometry.userData.MMD || {}
-    skinnedMesh.geometry.userData.MMD.iks = iks
     helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
   }
   skinnedMesh.skeleton?.update()
