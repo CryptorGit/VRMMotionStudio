@@ -240,26 +240,29 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
+  const skeleton = mesh?.skeleton
+  const bones = skeleton?.bones || []
   const solver = helper?.objects.get(mesh)?.ikSolver
   if (solver) {
-    applyBoneInheritance(mesh?.skeleton?.bones)
+    applyBoneInheritance(bones)
     for (let i = 0; i < 10; i++) {
       solver.update()
     }
     helper.objects.get(mesh)?.grantSolver?.update()
-    mesh?.skeleton?.bones?.forEach(b => {
+    bones.forEach(b => {
       if (b.userData?.localAxes) {
         _quat.copy(b.quaternion)
         b.quaternion.identity()
         applyLocalAxisRotation(b, _quat)
       }
     })
-    mesh.skeleton.update()
-    mesh.updateMatrixWorld(true)
   } else {
     helper?.update(1 / 60)
   }
   updateIKMarkersBound()
+  skeleton?.update()
+  bones.forEach(b => b.updateMatrixWorld(true))
+  mesh?.updateMatrixWorld(true)
   console.debug(
     `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
   )
