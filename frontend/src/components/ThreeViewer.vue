@@ -255,12 +255,8 @@ function applyIKUpdate() {
     )
   }
   const mesh = currentMeshRef.value
-  if (import.meta.env.DEV) {
-    console.assert(
-      mesh instanceof THREE.SkinnedMesh,
-      'currentMeshRef should point to a SkinnedMesh',
-      mesh
-    )
+  if (import.meta.env.DEV && !(mesh instanceof THREE.SkinnedMesh)) {
+    console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
   }
   if (mesh && !helper?.objects.get(mesh)) {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
