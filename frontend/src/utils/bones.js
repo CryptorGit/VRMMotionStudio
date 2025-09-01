@@ -56,8 +56,8 @@ export function applyBoneInheritance(bones) {
     const parent = bone.parent
     if (!(parent instanceof THREE.Bone)) continue
     const ratio = inheritRatio ?? 1
-    _qParent.copy(parent.quaternion)
-    bone.quaternion.slerp(_qParent, ratio)
+    _qParent.identity().slerp(parent.quaternion, ratio)
+    bone.quaternion.multiply(_qParent)
     bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
   }
 }
