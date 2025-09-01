@@ -2,7 +2,6 @@ package com.mmd.controller;
 
 import com.mmd.security.SecurityConfig;
 import com.mmd.service.UserService;
-import com.mmd.model.entity.UserEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,10 +30,8 @@ public class UserController {
         if (!security.isAuthorized(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
-        UserEntity user = userService.getUser(userId);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        }
-        return ResponseEntity.ok("Hello, " + user.getName());
+        return userService.getUser(userId)
+                .map(user -> ResponseEntity.ok("Hello, " + user.getName()))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
     }
 }
