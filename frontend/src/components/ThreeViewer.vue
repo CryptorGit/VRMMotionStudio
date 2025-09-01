@@ -244,18 +244,10 @@ function applyIKUpdate() {
   const bones = skeleton?.bones || []
   const solver = helper?.objects.get(mesh)?.ikSolver
   if (solver) {
-    applyBoneInheritance(bones)
     for (let i = 0; i < 10; i++) {
       solver.update()
     }
     helper.objects.get(mesh)?.grantSolver?.update()
-    bones.forEach(b => {
-      if (b.userData?.localAxes) {
-        _quat.copy(b.quaternion)
-        b.quaternion.identity()
-        applyLocalAxisRotation(b, _quat)
-      }
-    })
   } else {
     helper?.update(1 / 60)
   }
@@ -265,6 +257,14 @@ function applyIKUpdate() {
       data._origQuat.copy(b.quaternion)
     } else {
       data._origQuat = b.quaternion.clone()
+    }
+  })
+  applyBoneInheritance(bones)
+  bones.forEach(b => {
+    if (b.userData?.localAxes) {
+      _quat.copy(b.quaternion)
+      b.quaternion.identity()
+      applyLocalAxisRotation(b, _quat)
     }
   })
   updateIKMarkersBound()
