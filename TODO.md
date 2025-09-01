@@ -31,6 +31,7 @@
 - [ ] VITE_DEBUG_SKINNING 無効化後、足IKマーカーをドラッグして姿勢が保持されることをブラウザで手動確認する
 - [x] `applyIKUpdate` のソルバー初期化と `helper.update()` 追加後の挙動をブラウザで手動確認する
 - [x] `applyIKUpdate` 修正後に IK マーカーをドラッグしてメッシュが追従することをブラウザで手動確認する
+- [x] `createAnimator` から `helper.enabled.ik = false` を削除後、IK 操作が呼び出し元制御で機能することをブラウザで手動確認する
 - [ ] `applyIKUpdate` 最適化後の処理時間をブラウザで計測し記録する（未実施）
 - [ ] requestAnimationFrame 経由の IK 更新が 1 フレームに 1 回のみ呼ばれることをブラウザで手動確認する
 - [x] 複数モデルをロードして切り替えた際にも IK 操作が可能であることをブラウザで手動確認する

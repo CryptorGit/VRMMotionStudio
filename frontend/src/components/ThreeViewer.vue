@@ -935,6 +935,7 @@ onMounted(async () => {
   }
   helper = new MMDAnimationHelper()
   helper.enable('physics', enablePhysics.value)
+  helper.enabled.ik = false
   ensureFloorRigidBody()
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
 

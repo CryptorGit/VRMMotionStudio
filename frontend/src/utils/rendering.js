@@ -22,7 +22,6 @@ export function createAnimator({
 
     const updateStart = performance.now()
     if (helper) {
-      helper.enabled.ik = false
       helper.update(delta)
     }
     const updateDuration = performance.now() - updateStart
