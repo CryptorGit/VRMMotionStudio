@@ -13,6 +13,10 @@ export function createAnimator({
   const renderTimes = []
   let lastPerfLogTime = 0
 
+  if (helper) {
+    helper.enabled.ik = false
+  }
+
   function animate(time) {
     requestAnimationFrame(animate)
     const delta = clock.getDelta()
@@ -20,7 +24,10 @@ export function createAnimator({
     lastFrameTime = time
 
     const updateStart = performance.now()
-    helper?.update(delta)
+    if (helper) {
+      helper.enabled.ik = false
+      helper.update(delta)
+    }
     updateTimes.push(performance.now() - updateStart)
 
     updateIKMarkers()
