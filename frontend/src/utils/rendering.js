@@ -13,10 +13,6 @@ export function createAnimator({
   const renderTimes = []
   let lastPerfLogTime = 0
 
-  if (helper) {
-    helper.enabled.ik = false
-  }
-
   function animate(time) {
     requestAnimationFrame(animate)
     const delta = clock.getDelta()
