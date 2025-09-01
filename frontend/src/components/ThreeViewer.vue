@@ -240,9 +240,8 @@ function applyIKUpdate() {
   }
   const start = performance.now()
   const solver = helper?.objects.get(mesh)?.ikSolver
-  const grantSolver = helper?.objects.get(mesh)?.grantSolver
   solver?.update()
-  grantSolver?.update()
+  // Grant updates are handled via helper.update in the render loop
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
