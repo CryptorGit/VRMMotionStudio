@@ -51,13 +51,15 @@ const _qTmp = new THREE.Quaternion()
 export function applyBoneInheritance(bones) {
   if (!Array.isArray(bones)) return
   for (const bone of bones) {
-    const { inheritRotation, inheritRatio } = bone.userData || {}
+    const data = bone.userData || (bone.userData = {})
+    const { inheritRotation, inheritRatio } = data
     if (!inheritRotation) continue
     const parent = bone.parent
     if (!(parent instanceof THREE.Bone)) continue
     const ratio = inheritRatio ?? 1
+    const _origQuat = data._origQuat || (data._origQuat = bone.quaternion.clone())
     _qParent.identity().slerp(parent.quaternion, ratio)
-    bone.quaternion.multiply(_qParent)
+    bone.quaternion.copy(_origQuat).multiply(_qParent)
     bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
   }
 }
