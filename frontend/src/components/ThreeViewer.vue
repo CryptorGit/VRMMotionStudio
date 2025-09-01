@@ -400,6 +400,17 @@ function getDB() {
   }
   return dbPromise
 }
+
+function promisifyRequest(req, handler) {
+  return new Promise((resolve, reject) => {
+    const successEvent = 'onsuccess' in req ? 'onsuccess' : 'oncomplete'
+    req[successEvent] = () => {
+      if (handler) handler(resolve)
+      else resolve(req.result)
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
 async function cacheFiles(modelFiles) {
   try {
     const dataLists = []
@@ -418,22 +429,11 @@ async function cacheFiles(modelFiles) {
     const db = await getDB()
     const tx = db.transaction(DB_STORE, 'readwrite')
     const store = tx.objectStore(DB_STORE)
-    await new Promise((res, rej) => {
-      const clearReq = store.clear()
-      clearReq.onsuccess = res
-      clearReq.onerror = () => rej(clearReq.error)
-    })
+    await promisifyRequest(store.clear())
     for (let i = 0; i < dataLists.length; i++) {
-      await new Promise((res, rej) => {
-        const req = store.put(dataLists[i], i)
-        req.onsuccess = res
-        req.onerror = () => rej(req.error)
-      })
+      await promisifyRequest(store.put(dataLists[i], i))
     }
-    await new Promise((res, rej) => {
-      tx.oncomplete = res
-      tx.onerror = () => rej(tx.error)
-    })
+    await promisifyRequest(tx)
     if (import.meta.env.DEV) console.log('Model cached')
   } catch (e) {
     console.error('Failed to cache model:', e)
@@ -445,16 +445,15 @@ async function loadCachedFiles() {
     const tx = db.transaction(DB_STORE)
     const store = tx.objectStore(DB_STORE)
     const result = []
-    await new Promise((res, rej) => {
-      const req = store.openCursor()
-      req.onsuccess = () => {
-        const cursor = req.result
-        if (cursor) {
-          result.push(cursor.value)
-          cursor.continue()
-        } else res()
+    const req = store.openCursor()
+    await promisifyRequest(req, resolve => {
+      const cursor = req.result
+      if (cursor) {
+        result.push(cursor.value)
+        cursor.continue()
+      } else {
+        resolve()
       }
-      req.onerror = () => rej(req.error)
     })
     return result
   } catch (e) {
@@ -472,10 +471,7 @@ async function deleteCachedFiles(index) {
     } else {
       store.delete(index)
     }
-    await new Promise((res, rej) => {
-      tx.oncomplete = res
-      tx.onerror = () => rej(tx.error)
-    })
+    await promisifyRequest(tx)
     if (import.meta.env.DEV) console.log('Model cache cleared')
   } catch (e) {
     console.error('Failed to clear model cache:', e)
