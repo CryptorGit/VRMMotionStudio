@@ -1,5 +1,12 @@
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import json
+import logging
+import signal
+import threading
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class CORSRequestHandler(SimpleHTTPRequestHandler):
@@ -28,9 +35,16 @@ class CORSRequestHandler(SimpleHTTPRequestHandler):
 
 def run():
     server_address = ('', 8000)
-    httpd = ThreadingHTTPServer(server_address, CORSRequestHandler)
-    print('Python backend running on http://localhost:8000')
-    httpd.serve_forever()
+    with ThreadingHTTPServer(server_address, CORSRequestHandler) as httpd:
+        def handle_signal(signum, frame):
+            logger.info('Shutting down server')
+            threading.Thread(target=httpd.shutdown).start()
+
+        signal.signal(signal.SIGINT, handle_signal)
+        signal.signal(signal.SIGTERM, handle_signal)
+
+        logger.info('Python backend running on http://localhost:8000')
+        httpd.serve_forever()
 
 
 if __name__ == '__main__':
