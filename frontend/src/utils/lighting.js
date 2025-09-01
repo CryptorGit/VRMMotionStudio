@@ -19,6 +19,16 @@ directionalLightHelper.visible = false
 export const directionalIntensity = ref(directionalLight.value.intensity)
 export const showLightMarker = ref(false)
 
+function safeWatch(handler, message) {
+  return (...args) => {
+    try {
+      handler(...args)
+    } catch (e) {
+      console.error(message, e)
+    }
+  }
+}
+
 export function loadLightingSettings(opts = {}) {
   const saved = localStorage.getItem(STORAGE_KEY)
   if (!saved) return
@@ -53,22 +63,26 @@ export function loadLightingSettings(opts = {}) {
   }
 }
 
-watch(showLightMarker, v => {
-  try {
-    directionalLightHelper.visible = v
-  } catch (e) {
-    console.error('Failed to toggle light marker:', e)
-  }
-})
+watch(
+  showLightMarker,
+  safeWatch(
+    v => {
+      directionalLightHelper.visible = v
+    },
+    'Failed to toggle light marker:'
+  )
+)
 
-watch(lightMarkerColor, c => {
-  try {
-    directionalLightHelper.color = new THREE.Color(c)
-    directionalLightHelper.update()
-  } catch (e) {
-    console.error('Failed to set light marker color:', e)
-  }
-})
+watch(
+  lightMarkerColor,
+  safeWatch(
+    c => {
+      directionalLightHelper.color = new THREE.Color(c)
+      directionalLightHelper.update()
+    },
+    'Failed to set light marker color:'
+  )
+)
 
 watch(
   () => [
@@ -79,21 +93,22 @@ watch(
     directionalLight.value.target.position.y,
     directionalLight.value.target.position.z
   ],
-  () => {
-    try {
+  safeWatch(
+    () => {
       directionalLightHelper.update()
-    } catch (e) {
-      console.error('Failed to update light marker position:', e)
-    }
-  }
+    },
+    'Failed to update light marker position:'
+  )
 )
 
-watch(directionalIntensity, i => {
-  try {
-    directionalLight.value.intensity = i
-    directionalLightHelper.scale.setScalar(LIGHT_MARKER_LENGTH * i)
-    directionalLightHelper.update()
-  } catch (e) {
-    console.error('Failed to update light marker intensity:', e)
-  }
-})
+watch(
+  directionalIntensity,
+  safeWatch(
+    i => {
+      directionalLight.value.intensity = i
+      directionalLightHelper.scale.setScalar(LIGHT_MARKER_LENGTH * i)
+      directionalLightHelper.update()
+    },
+    'Failed to update light marker intensity:'
+  )
+)
