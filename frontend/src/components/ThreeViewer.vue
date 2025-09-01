@@ -492,7 +492,8 @@ function initIKSolver(mesh) {
     skinnedMesh.geometry.userData.MMD =
       skinnedMesh.geometry.userData.MMD || {}
     skinnedMesh.geometry.userData.MMD.iks = iks
-    helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
+    // インタラクティブな IK 操作中は物理演算を無効化して追加する
+    helper.add(skinnedMesh, { physics: false, ik: true, grant: true })
     obj = helper.objects.get(skinnedMesh)
   } else {
     obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
@@ -633,6 +634,7 @@ function onPointerUp() {
   applyIKUpdate()
   if (physicsWasEnabled) {
     const mesh = currentMeshRef.value
+    // 操作終了後に物理演算を再有効化
     helper?.enable('physics', true)
     helper?.objects.get(mesh)?.physics?.reset()
     helper?.update(0)
