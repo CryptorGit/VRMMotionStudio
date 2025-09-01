@@ -91,7 +91,8 @@ import { createAnimator, handleWindowResize } from '../utils/rendering.js'
 import {
   adjustAxis,
   applyMmdRotationOrder,
-  applyBoneInheritance
+  applyBoneInheritance,
+  applyLocalAxisRotation
 } from '../utils/bones.js'
 
 const viewer = ref(null)
@@ -244,6 +245,13 @@ function applyIKUpdate() {
     applyBoneInheritance(mesh?.skeleton?.bones)
     for (let i = 0; i < 10; i++) solver.update()
     helper.objects.get(mesh)?.grantSolver?.update()
+    mesh?.skeleton?.bones?.forEach(b => {
+      if (b.userData?.localAxes) {
+        _quat.copy(b.quaternion)
+        b.quaternion.identity()
+        applyLocalAxisRotation(b, _quat)
+      }
+    })
   } else {
     helper?.update(1 / 60)
   }
@@ -284,7 +292,7 @@ function onPointerMove(event) {
       rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1])
       const angle = event.movementX * 0.01
       _quat.setFromAxisAngle(rotationAxis, angle)
-      bone.quaternion.multiply(_quat)
+      applyLocalAxisRotation(bone, _quat)
       bone.updateMatrixWorld(true)
       scheduleIKUpdate()
     }

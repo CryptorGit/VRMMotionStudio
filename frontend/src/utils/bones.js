@@ -37,6 +37,12 @@ export function applyMmdRotationOrder(bones, order = 'ZYX') {
 
 // 作業用クォータニオンを使い回してアロケーションを抑える
 const _qParent = new THREE.Quaternion()
+const _x = new THREE.Vector3()
+const _y = new THREE.Vector3()
+const _z = new THREE.Vector3()
+const _mat = new THREE.Matrix4()
+const _qAxes = new THREE.Quaternion()
+const _qTmp = new THREE.Quaternion()
 
 /**
  * inheritRotation と inheritRatio に基づいて親ボーンの回転を子ボーンへ補間適用する。
@@ -54,4 +60,29 @@ export function applyBoneInheritance(bones) {
     bone.quaternion.slerp(_qParent, ratio)
     bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
   }
+}
+
+/**
+ * ワールド座標系の回転をボーン固有のローカル軸に変換して適用する。
+ * @param {THREE.Bone} bone - 対象ボーン
+ * @param {THREE.Quaternion} quat - ワールド回転
+ */
+export function applyLocalAxisRotation(bone, quat) {
+  if (!bone || !quat) return
+  const axes = bone.userData?.localAxes
+  if (!axes || !axes.xAxis || !axes.zAxis) {
+    bone.quaternion.multiply(quat)
+    bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
+    return
+  }
+  _x.copy(adjustAxis(axes.xAxis, [0, 1, 2], [1, 1, -1])).normalize()
+  _z.copy(adjustAxis(axes.zAxis, [0, 1, 2], [1, 1, -1])).normalize()
+  _y.crossVectors(_z, _x).normalize()
+  _mat.makeBasis(_x, _y, _z)
+  _qAxes.setFromRotationMatrix(_mat)
+  _qTmp.copy(_qAxes).invert()
+  _qTmp.multiply(quat)
+  _qTmp.multiply(_qAxes)
+  bone.quaternion.multiply(_qTmp)
+  bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
 }
