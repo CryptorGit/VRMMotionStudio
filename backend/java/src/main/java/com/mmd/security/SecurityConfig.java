@@ -10,6 +10,19 @@ import java.util.Date;
 
 @Component
 public class SecurityConfig {
+
+    private volatile String jwtSecret;
+    private volatile String apiKey;
+
+    public SecurityConfig() {
+        reload();
+    }
+
+    public void reload() {
+        this.jwtSecret = System.getenv("JWT_SECRET");
+        this.apiKey = System.getenv("API_KEY");
+    }
+
     public boolean isAuthorized(String token) {
         if (token == null || token.isBlank()) {
             return false;
@@ -18,7 +31,7 @@ public class SecurityConfig {
         // JWTの場合: "Bearer "で始まるトークンを検証
         if (token.startsWith("Bearer ")) {
             String jwt = token.substring(7);
-            String secret = System.getenv("JWT_SECRET");
+            String secret = this.jwtSecret;
             if (secret == null || secret.isBlank()) {
                 return false;
             }
@@ -35,7 +48,7 @@ public class SecurityConfig {
         }
 
         // APIキーの場合: 固定のキーと一致するかを確認
-        String apiKey = System.getenv("API_KEY");
-        return apiKey != null && apiKey.equals(token);
+        String key = this.apiKey;
+        return key != null && key.equals(token);
     }
 }
