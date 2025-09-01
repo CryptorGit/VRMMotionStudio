@@ -243,6 +243,13 @@ function applyIKUpdate() {
   const grantSolver = helper?.objects.get(mesh)?.grantSolver
   solver?.update()
   grantSolver?.update()
+  if (mesh?.skeleton) {
+    for (const bone of mesh.skeleton.bones) {
+      bone.getWorldQuaternion(_quat)
+      bone.quaternion.identity()
+      applyLocalAxisRotation(bone, _quat)
+    }
+  }
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
