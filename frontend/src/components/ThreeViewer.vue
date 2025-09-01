@@ -118,6 +118,10 @@ let ikUpdateScheduled = false
 let floorMesh = null
 let floorRigidBody = null
 let floorBodyAdded = false
+let floorTransform = null
+let floorShape = null
+let floorMotionState = null
+let floorRbInfo = null
 let Ammo
 // 物理演算の有効/無効を切り替えるためのフラグ
 const enablePhysics = ref(true)
@@ -142,23 +146,44 @@ watch(enablePhysics, v => {
 })
 
 function ensureFloorRigidBody() {
-  if (floorBodyAdded || !helper?.physics?.world || !Ammo) return
+  if (!enablePhysics.value || !helper?.physics?.world || !Ammo) {
+    if (floorBodyAdded) {
+      helper.physics.world.removeRigidBody(floorRigidBody)
+      Ammo.destroy(floorRigidBody)
+      Ammo.destroy(floorRbInfo)
+      Ammo.destroy(floorMotionState)
+      Ammo.destroy(floorShape)
+      Ammo.destroy(floorTransform)
+      floorRigidBody = null
+      floorRbInfo = null
+      floorMotionState = null
+      floorShape = null
+      floorTransform = null
+      floorBodyAdded = false
+    }
+    return
+  }
+  if (floorBodyAdded) return
   const halfSize = 20
   const halfHeight = 0.5
-  const transform = new Ammo.btTransform()
-  transform.setIdentity()
-  transform.setOrigin(new Ammo.btVector3(0, -halfHeight, 0))
-  const shape = new Ammo.btBoxShape(
-    new Ammo.btVector3(halfSize, halfHeight, halfSize)
-  )
-  const motionState = new Ammo.btDefaultMotionState(transform)
-  const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+  floorTransform = new Ammo.btTransform()
+  floorTransform.setIdentity()
+  const origin = new Ammo.btVector3(0, -halfHeight, 0)
+  floorTransform.setOrigin(origin)
+  Ammo.destroy(origin)
+  const halfExtents = new Ammo.btVector3(halfSize, halfHeight, halfSize)
+  floorShape = new Ammo.btBoxShape(halfExtents)
+  Ammo.destroy(halfExtents)
+  floorMotionState = new Ammo.btDefaultMotionState(floorTransform)
+  const inertia = new Ammo.btVector3(0, 0, 0)
+  floorRbInfo = new Ammo.btRigidBodyConstructionInfo(
     0,
-    motionState,
-    shape,
-    new Ammo.btVector3(0, 0, 0)
+    floorMotionState,
+    floorShape,
+    inertia
   )
-  floorRigidBody = new Ammo.btRigidBody(rbInfo)
+  Ammo.destroy(inertia)
+  floorRigidBody = new Ammo.btRigidBody(floorRbInfo)
   helper.physics.world.addRigidBody(floorRigidBody)
   floorBodyAdded = true
 }
@@ -947,6 +972,8 @@ onUnmounted(() => {
   renderer?.domElement?.removeEventListener('pointerleave', onPointerUp)
   ikTargets.forEach(t => (t.marker.visible = false))
   selectedIK.value = null
+  enablePhysics.value = false
+  ensureFloorRigidBody()
 })
 </script>
 
