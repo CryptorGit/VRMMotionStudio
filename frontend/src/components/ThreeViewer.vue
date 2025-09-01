@@ -239,8 +239,8 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  const solver = helper?.objects.get(mesh)?.ikSolver
-  solver?.update()
+  const { ikSolver, grantSolver } = helper?.objects.get(mesh) || {}
+  ikSolver?.update()
   grantSolver?.update()
   if (mesh?.skeleton) {
     for (const bone of mesh.skeleton.bones) {
