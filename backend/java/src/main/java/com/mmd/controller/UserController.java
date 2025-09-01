@@ -4,6 +4,8 @@ import com.mmd.security.SecurityConfig;
 import com.mmd.service.UserService;
 import com.mmd.model.entity.UserEntity;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -23,12 +25,13 @@ public class UserController {
     }
 
     @GetMapping("/{id}/greeting")
-    public String getGreeting(@RequestHeader(value = "Authorization", required = false) String token,
-                              @PathVariable("id") int userId) {
+    public ResponseEntity<String> getGreeting(
+            @RequestHeader(value = "Authorization", required = false) String token,
+            @PathVariable("id") int userId) {
         if (!security.isAuthorized(token)) {
-            return "Unauthorized";
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         UserEntity user = userService.getUser(userId);
-        return "Hello, " + user.getName();
+        return ResponseEntity.ok("Hello, " + user.getName());
     }
 }
