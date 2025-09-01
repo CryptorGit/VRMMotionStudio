@@ -635,6 +635,10 @@ function createBoneNameHelpers(skinnedMesh) {
     if (!name) return
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      console.warn('2D context not available, skipping bone name helper for', name)
+      return
+    }
     ctx.font = '24px sans-serif'
     const width = ctx.measureText(name).width + 20
     canvas.width = width
