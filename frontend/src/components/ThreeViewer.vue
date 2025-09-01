@@ -128,6 +128,7 @@ const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
 const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 let updateIKMarkersBound = null
+const ikInitializedMeshes = new WeakSet()
 watch(showIkMarkers, () => {
   try {
     updateIKMarkersBound?.()
@@ -197,7 +198,13 @@ function isPhysicalBone(bone) {
 // モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
   setupIKTargets(scene, mesh)
-  initIKSolver(helper, mesh, ensureFloorRigidBody)
+  ikConfigPromise.then(() => {
+    if (currentMeshRef.value === mesh) setupIKTargets(scene, mesh)
+    if (mesh && !ikInitializedMeshes.has(mesh)) {
+      initIKSolver(helper, mesh, ensureFloorRigidBody)
+      ikInitializedMeshes.add(mesh)
+    }
+  })
 })
 function onPointerDown(event) {
   const rect = renderer.domElement.getBoundingClientRect()
@@ -245,30 +252,18 @@ function onPointerDown(event) {
 }
 
 function applyIKUpdate() {
-  if (
-    helper?.objects.get(currentMeshRef.value) === undefined &&
-    currentMeshRef.value?.type !== 'SkinnedMesh'
-  ) {
-    currentMeshRef.value = currentMeshRef.value?.getObjectByProperty(
-      'type',
-      'SkinnedMesh'
-    )
-  }
   const mesh = currentMeshRef.value
   if (import.meta.env.DEV && !(mesh instanceof THREE.SkinnedMesh)) {
     console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
   }
-  if (mesh && !helper?.objects.get(mesh)) {
-    initIKSolver(helper, mesh, ensureFloorRigidBody)
-  }
+  if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !helper) return
   const start = performance.now()
-  mesh?.skeleton?.update()
-  mesh?.updateMatrixWorld(true)
+  const prevIK = helper.enabled.ik
   helper.enabled.ik = true
   helper.update(0)
-  helper.enabled.ik = false
-  mesh?.skeleton?.update()
-  mesh?.updateMatrixWorld(true)
+  helper.enabled.ik = prevIK
+  mesh.skeleton.update()
+  mesh.updateMatrixWorld(true)
   updateIKMarkersBound?.()
   if (import.meta.env.DEV) {
     console.debug(
@@ -781,7 +776,6 @@ async function handleFiles(files) {
           applyMmdRotationOrder(skinnedMesh.skeleton.bones)
           skinnedMesh.skeleton.calculateInverses()
           scene.add(skinnedMesh)
-          initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
           skeletonHelper.visible = debugSkinning
           scene.add(skeletonHelper)
@@ -803,12 +797,6 @@ async function handleFiles(files) {
           }
           currentMeshRef.value = skinnedMesh
           setupIKTargets(scene, skinnedMesh)
-          ikConfigPromise.then(() => {
-            if (currentMeshRef.value === skinnedMesh) {
-              setupIKTargets(scene, skinnedMesh)
-              initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
-            }
-          })
           if (import.meta.env.DEV) console.log('Model loaded:', modelFile.name)
           logToServer({ event: 'loaded', model: modelFile.name })
           if (poseFile) {
