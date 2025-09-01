@@ -337,6 +337,22 @@ function onPointerUp() {
   }
   selectedIK.value = null
 }
+
+function onControlStart() {
+  physicsWasEnabled = enablePhysics.value
+  if (physicsWasEnabled) {
+    helper?.enable('physics', false)
+  }
+}
+
+function onControlEnd() {
+  if (physicsWasEnabled) {
+    const mesh = currentMeshRef.value
+    helper?.enable('physics', true)
+    helper?.objects.get(mesh)?.physics?.reset()
+    physicsWasEnabled = false
+  }
+}
 const settingsSidebar = ref(null)
 
 let scene, camera, renderer, effect, controls, helper, loader
@@ -911,6 +927,8 @@ onMounted(async () => {
   controls = new OrbitControls(camera, renderer.domElement)
   controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY }
   controls.enabled = true
+  controls.addEventListener('start', onControlStart)
+  controls.addEventListener('end', onControlEnd)
 
   scene.add(ambientLight.value)
   scene.add(directionalLight.value.target)
@@ -967,6 +985,8 @@ onUnmounted(() => {
   renderer?.domElement?.removeEventListener('pointerup', onPointerUp)
   renderer?.domElement?.removeEventListener('pointercancel', onPointerUp)
   renderer?.domElement?.removeEventListener('pointerleave', onPointerUp)
+  controls?.removeEventListener('start', onControlStart)
+  controls?.removeEventListener('end', onControlEnd)
   ikTargets.forEach(t => (t.marker.visible = false))
   selectedIK.value = null
   enablePhysics.value = false
