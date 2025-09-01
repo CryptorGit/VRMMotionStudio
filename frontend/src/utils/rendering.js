@@ -9,9 +9,10 @@ export function createAnimator({
   directionalLightHelper
 }) {
   let lastFrameTime = 0
-  const updateTimes = []
-  const renderTimes = []
+  let avgUpdate = 0
+  let avgRender = 0
   let lastPerfLogTime = 0
+  const smoothing = 0.1
 
   if (helper) {
     helper.enabled.ik = false
@@ -28,26 +29,30 @@ export function createAnimator({
       helper.enabled.ik = false
       helper.update(delta)
     }
-    updateTimes.push(performance.now() - updateStart)
+    const updateDuration = performance.now() - updateStart
+    avgUpdate =
+      avgUpdate === 0
+        ? updateDuration
+        : avgUpdate * (1 - smoothing) + updateDuration * smoothing
 
     updateIKMarkers()
 
     const renderStart = performance.now()
     effect.render(scene, camera)
-    renderTimes.push(performance.now() - renderStart)
+    const renderDuration = performance.now() - renderStart
+    avgRender =
+      avgRender === 0
+        ? renderDuration
+        : avgRender * (1 - smoothing) + renderDuration * smoothing
 
     directionalLightHelper.update()
 
     if (time - lastPerfLogTime >= 1000) {
-      const avgUpdate =
-        updateTimes.reduce((a, b) => a + b, 0) / (updateTimes.length || 1)
-      const avgRender =
-        renderTimes.reduce((a, b) => a + b, 0) / (renderTimes.length || 1)
-      console.log(
-        `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
-      )
-      updateTimes.length = 0
-      renderTimes.length = 0
+      if (import.meta.env.DEV) {
+        console.log(
+          `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
+        )
+      }
       lastPerfLogTime = time
     }
   }
