@@ -60,7 +60,6 @@ import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
-import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
 // Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
 import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // Ensure Vite serves the WASM binary correctly
@@ -487,17 +486,12 @@ function initIKSolver(mesh) {
     }
     return
   }
-  let obj = helper.objects.get(skinnedMesh)
-  if (!obj) {
+  if (!helper.objects.get(skinnedMesh)) {
     skinnedMesh.geometry.userData.MMD =
       skinnedMesh.geometry.userData.MMD || {}
     skinnedMesh.geometry.userData.MMD.iks = iks
     helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
-    obj = helper.objects.get(skinnedMesh)
-  } else {
-    obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
   }
-  obj?.ikSolver?.update()
   skinnedMesh.skeleton?.update()
   ensureFloorRigidBody()
 }
@@ -561,15 +555,11 @@ function applyIKUpdate() {
     'currentMeshRef should point to a SkinnedMesh',
     mesh
   )
-  let obj = helper?.objects.get(mesh)
-  if (mesh && (!obj || !obj.ikSolver)) {
+  if (mesh && !helper?.objects.get(mesh)) {
     initIKSolver(mesh)
-    obj = helper?.objects.get(mesh)
   }
-  const solver = obj?.ikSolver
   const start = performance.now()
   helper?.update(0)
-  solver?.update()
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
@@ -1133,9 +1123,8 @@ function applyPose() {
 function exportPose() {
   const mesh = currentMeshRef.value
   if (!mesh) return
-  const solver = helper?.objects.get(mesh)?.ikSolver
   selectedIK.value?.target.updateMatrixWorld(true)
-  solver?.update()
+  helper?.update(0)
   mesh.skeleton.update()
   mesh.updateMatrixWorld(true)
   const exporter = new MMDExporter()
