@@ -300,6 +300,8 @@ function onPointerMove(event) {
       _quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, _quat)
       bone.updateMatrixWorld(true)
+      currentMeshRef.value?.skeleton?.update()
+      currentMeshRef.value?.updateMatrixWorld(true)
       scheduleIKUpdate()
     }
     return
@@ -315,6 +317,8 @@ function onPointerMove(event) {
       target.parent.worldToLocal(_dragPoint)
       target.position.copy(_dragPoint)
       target.updateMatrixWorld(true)
+      currentMeshRef.value?.skeleton?.update()
+      currentMeshRef.value?.updateMatrixWorld(true)
       scheduleIKUpdate()
     }
   }
