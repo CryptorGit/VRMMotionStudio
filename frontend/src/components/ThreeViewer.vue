@@ -66,7 +66,28 @@ import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
 // three's ammo wrapper expects the .wasm file next to the js file.
 // We import it as an asset URL and pass it via locateFile.
 import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
-import { API_BASE_URL, STORAGE_KEY } from '../config.js'
+import { API_BASE_URL } from '../config.js'
+import {
+  ambientLight,
+  directionalLight,
+  directionalLightHelper,
+  lightMarkerColor,
+  LIGHT_MARKER_LENGTH,
+  directionalIntensity,
+  showLightMarker,
+  loadLightingSettings
+} from '../utils/lighting.js'
+import {
+  showIkMarkers,
+  ikWarning,
+  selectedIK,
+  ikTargets,
+  ikConfigPromise,
+  setupIKTargets,
+  updateIKMarkers,
+  initIKSolver
+} from '../utils/ik.js'
+import { createAnimator, handleWindowResize } from '../utils/rendering.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -78,45 +99,17 @@ const models = ref([])
 let nextModelId = 1
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
-let lastFrameTime = 0
-const updateTimes = []
-const renderTimes = []
-let lastPerfLogTime = 0
-const ambientLight = ref(new THREE.AmbientLight(0x666666))
-const directionalLight = ref(new THREE.DirectionalLight(0xffffff))
-directionalLight.value.position.set(0, 0, 0)
-directionalLight.value.target.position.set(1, 0, 0)
-const lightMarkerColor = ref('#ff0000')
-const LIGHT_MARKER_LENGTH = 0.2
-const directionalLightHelper = new THREE.DirectionalLightHelper(
-  directionalLight.value,
-  LIGHT_MARKER_LENGTH,
-  lightMarkerColor.value
-)
-directionalLightHelper.visible = false
-const directionalIntensity = ref(directionalLight.value.intensity)
-const showLightMarker = ref(false)
-const showIkMarkers = ref(true)
-const ikWarning = ref('')
 const planeMode = ref('view')
 const currentMeshRef = ref(null)
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
-const IK_MARKER_PIXEL_SIZE = 16
-let ikTargets = []
-// 選択中のIKターゲット（effectorとターゲットボーンを保持）
-const selectedIK = ref(null)
+// IKターゲットは外部モジュールで管理
 let dragPlane = null
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
 const rotationAxis = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
 let physicsWasEnabled = false
-const extraIKBoneNames = []
-// モデルごとの追加IKチェーン設定
-const extraIKChains = {}
-let ikConfigLoaded = false
-const ikConfigPromise = loadIKConfig()
 let ikUpdateScheduled = false
 let floorMesh = null
 let floorRigidBody = null
@@ -126,118 +119,10 @@ let Ammo
 const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
 const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
-async function loadIKConfig() {
+let updateIKMarkersBound = () => {}
+watch(showIkMarkers, () => {
   try {
-    const res = await fetch('/ik-config.json')
-    if (!res.ok) throw new Error('Config not found')
-    const data = await res.json()
-    extraIKBoneNames.push(...(data.extraIKBoneNames || []))
-    if (data.extraIKChains)
-      Object.assign(extraIKChains, data.extraIKChains)
-  } catch (e) {
-    console.warn('Failed to load IK config, applying defaults:', e)
-    if (extraIKBoneNames.length === 0)
-      extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
-    if (Object.keys(extraIKChains).length === 0)
-      extraIKChains.default = [
-        {
-          target: '左足ＩＫ',
-          effector: '左足首',
-          links: ['左ひざ', '左足']
-        },
-        {
-          target: '右足ＩＫ',
-          effector: '右足首',
-          links: ['右ひざ', '右足']
-        }
-      ]
-  } finally {
-    ikConfigLoaded = true
-  }
-}
-function loadLightingSettings() {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (!saved) return
-  try {
-    const data = JSON.parse(saved)
-    if (data.markerColor !== undefined)
-      lightMarkerColor.value = data.markerColor
-    if (data.showLightMarker !== undefined)
-      showLightMarker.value = data.showLightMarker
-    if (data.showIkMarkers !== undefined)
-      showIkMarkers.value = data.showIkMarkers
-    if (data.enablePhysics !== undefined)
-      enablePhysics.value = data.enablePhysics
-    if (data.directionalIntensity !== undefined)
-      directionalIntensity.value = data.directionalIntensity
-    if (data.directional?.position) {
-      const p = data.directional.position
-      directionalLight.value.position.set(
-        p.x ?? directionalLight.value.position.x,
-        p.y ?? directionalLight.value.position.y,
-        p.z ?? directionalLight.value.position.z
-      )
-    }
-    if (data.directional?.target) {
-      const t = data.directional.target
-      directionalLight.value.target.position.set(
-        t.x ?? directionalLight.value.target.position.x,
-        t.y ?? directionalLight.value.target.position.y,
-        t.z ?? directionalLight.value.target.position.z
-      )
-    }
-  } catch (e) {
-    console.error('Failed to load lighting settings:', e)
-  }
-}
-watch(showLightMarker, v => {
-  try {
-    directionalLightHelper.visible = v
-  } catch (e) {
-    console.error('Failed to toggle light marker:', e)
-  }
-})
-watch(lightMarkerColor, c => {
-  try {
-    if (directionalLightHelper) {
-      directionalLightHelper.color = new THREE.Color(c)
-      directionalLightHelper.update()
-    }
-  } catch (e) {
-    console.error('Failed to set light marker color:', e)
-  }
-})
-watch(
-  () => [
-    directionalLight.value.position.x,
-    directionalLight.value.position.y,
-    directionalLight.value.position.z,
-    directionalLight.value.target.position.x,
-    directionalLight.value.target.position.y,
-    directionalLight.value.target.position.z
-  ],
-  () => {
-    try {
-      directionalLightHelper.update()
-    } catch (e) {
-      console.error('Failed to update light marker position:', e)
-    }
-  }
-)
-watch(directionalIntensity, i => {
-  try {
-    directionalLight.value.intensity = i
-    directionalLightHelper.scale.setScalar(LIGHT_MARKER_LENGTH * i)
-    directionalLightHelper.update()
-  } catch (e) {
-    console.error('Failed to update light marker intensity:', e)
-  }
-})
-
-watch(showIkMarkers, v => {
-  try {
-    ikTargets.forEach(t => (t.marker.visible = v))
-    updateIKMarkers()
+    updateIKMarkersBound()
   } catch (e) {
     console.error('Failed to toggle IK markers:', e)
   }
@@ -282,219 +167,9 @@ function isPhysicalBone(bone) {
 }
 // モデル切り替え時にIKマーカーを再生成
 watch(currentMeshRef, mesh => {
-  setupIKTargets(mesh)
-  initIKSolver(mesh)
+  setupIKTargets(scene, mesh)
+  initIKSolver(helper, mesh, ensureFloorRigidBody)
 })
-function getIKDefinitions(geometry, modelName = '') {
-  if (import.meta.env.DEV) {
-    console.debug('getIKDefinitions geometry:', geometry)
-  }
-  let iks =
-    geometry?.userData?.MMD?.ik ||
-    geometry?.userData?.MMD?.iks ||
-    geometry?.userData?.mmd?.ik ||
-    geometry?.userData?.mmd?.iks ||
-    geometry?.ik ||
-    geometry?.iks ||
-    []
-  if (!Array.isArray(iks) || iks.length === 0) {
-    const ud = geometry?.userData
-    if (ud) {
-      const loaderGeom =
-        ud.MMDLoader?.geometry ||
-        ud.mmdLoader?.geometry ||
-        ud.MMDLoader ||
-        ud.mmdLoader
-      if (loaderGeom?.userData) {
-        iks =
-          loaderGeom.userData?.MMD?.ik ||
-          loaderGeom.userData?.MMD?.iks ||
-          loaderGeom.userData?.mmd?.ik ||
-          loaderGeom.userData?.mmd?.iks ||
-          loaderGeom.userData?.ik ||
-          loaderGeom.userData?.iks ||
-          iks
-      }
-      if ((Array.isArray(ud.ik) || Array.isArray(ud.iks)) && iks.length === 0) {
-        iks = ud.ik || ud.iks
-      }
-      if (iks.length === 0 && ud.metadata) {
-        iks = ud.metadata.ik || ud.metadata.iks || iks
-      }
-    }
-    if (!iks || iks.length === 0) {
-      const fallback =
-        extraIKChains[modelName] || extraIKChains.default
-      if (Array.isArray(fallback) && fallback.length > 0) {
-        const bones = geometry?.userData?.MMD?.bones || []
-        const resolve = v =>
-          typeof v === 'number'
-            ? v
-            : bones.findIndex(b => b.name === v)
-        iks = fallback.map(ik => ({
-          target: resolve(ik.target),
-          effector: resolve(ik.effector),
-          links: (ik.links || []).map(l => {
-            if (typeof l === 'number' || typeof l === 'string')
-              return { index: resolve(l) }
-            return {
-              ...l,
-              index: resolve(l.index)
-            }
-          })
-        }))
-        if (import.meta.env.DEV) {
-          console.debug(
-            `IK definitions loaded from config for model ${modelName}`,
-            iks
-          )
-        }
-      } else if (import.meta.env.DEV) {
-        console.warn(
-          `IK definitions not found for model ${modelName}`,
-          geometry?.userData || geometry
-        )
-      }
-    } else if (import.meta.env.DEV) {
-      console.debug(
-        `IK definitions recovered for model ${modelName}`,
-        iks
-      )
-    }
-  }
-  if (Array.isArray(iks) && iks.length > 0) {
-    ikWarning.value = ''
-    const bones = geometry?.userData?.MMD?.bones || []
-    const hasFootChain = iks.some(ik => {
-      const targetName = bones[ik.target]?.name || ''
-      if (!/足ＩＫ/.test(targetName)) return false
-      const effectorName = bones[ik.effector]?.name || ''
-      if (/足/.test(effectorName)) return true
-      const links = Array.isArray(ik.links) ? ik.links : []
-      return links.some(l => {
-        const idx = l.index ?? l
-        return /足/.test(bones[idx]?.name || '')
-      })
-    })
-    if (!hasFootChain && import.meta.env.DEV) {
-      console.warn(`Foot IK chain missing for model ${modelName}`)
-    }
-  } else {
-    ikWarning.value = 'IK定義が見つかりません'
-  }
-  return Array.isArray(iks) ? iks : []
-}
-function setupIKTargets(mesh) {
-  ikTargets.forEach(t => {
-    scene.remove(t.marker)
-    t.marker.material?.dispose()
-  })
-  ikTargets = []
-  selectedIK.value = null
-  if (!mesh) return
-  const bones = mesh.skeleton?.bones || []
-
-  const iks = getIKDefinitions(mesh.geometry, mesh.name)
-  if (!Array.isArray(iks) || iks.length === 0) {
-    ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
-    return
-  } else {
-    ikWarning.value = ''
-  }
-  const targetMap = new Map()
-  iks.forEach(ik => {
-    if (typeof ik.target === 'number') {
-      const target = bones[ik.target]
-      if (target && !isPhysicalBone(target)) targetMap.set(ik.target, target)
-    }
-  })
-
-  // Add extra IK bones specified by name
-  bones.forEach((bone, idx) => {
-    if (extraIKBoneNames.includes(bone.name) && !isPhysicalBone(bone))
-      if (!targetMap.has(idx)) targetMap.set(idx, bone)
-  })
-
-  // Group IK targets by bone name so that duplicates can be separated visually
-  const nameGroups = new Map()
-  targetMap.forEach(target => {
-    if (!target || isPhysicalBone(target)) return
-    const list = nameGroups.get(target.name) || []
-    list.push({ target })
-    nameGroups.set(target.name, list)
-  })
-
-  // Calculate offsets independently for each bone name group
-  nameGroups.forEach(entries => {
-    const count = entries.length
-    entries.forEach((entry, i) => {
-      const marker = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          color: 0xff0000,
-          opacity: 0.5,
-          transparent: true,
-          depthTest: false,
-          depthWrite: false
-        })
-      )
-      marker.renderOrder = 999
-      marker.visible = showIkMarkers.value
-      scene.add(marker)
-      const offset = (i - (count - 1) / 2) * 0.02
-      ikTargets.push({ target: entry.target, marker, offset })
-    })
-  })
-
-  updateIKMarkers()
-}
-function updateIKMarkers() {
-  const visible = showIkMarkers.value
-  const height = renderer.domElement.clientHeight
-  const fov = THREE.MathUtils.degToRad(camera.fov)
-  let maxScale = 0
-  ikTargets.forEach(t => {
-    t.target.updateMatrixWorld(true)
-    t.target.getWorldPosition(t.marker.position)
-    const dist = t.marker.position.distanceTo(camera.position)
-    t.marker.position.x += t.offset || 0
-    const scale =
-      (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
-    t.marker.scale.set(scale, scale, scale)
-    t.marker.visible = visible
-    if (scale > maxScale) maxScale = scale
-  })
-  if (maxScale > 0) {
-    const threshold = maxScale / 2
-    raycaster.params.Sprite.threshold = threshold
-    raycaster.params.Points.threshold = threshold
-  }
-}
-
-function initIKSolver(mesh) {
-  if (!mesh || !helper) return
-  const skinnedMesh = mesh.isSkinnedMesh
-    ? mesh
-    : mesh.getObjectByProperty('type', 'SkinnedMesh')
-  if (!skinnedMesh) {
-    console.error('initIKSolver: SkinnedMesh not found for', mesh.name)
-    return
-  }
-  const iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
-  if (!Array.isArray(iks) || iks.length === 0) {
-    if (import.meta.env.DEV) {
-      console.warn(`IK definitions not found for ${skinnedMesh.name}, skipping solver`)
-    }
-    return
-  }
-  if (!helper.objects.get(skinnedMesh)) {
-    skinnedMesh.geometry.userData.MMD =
-      skinnedMesh.geometry.userData.MMD || {}
-    skinnedMesh.geometry.userData.MMD.iks = iks
-    helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
-  }
-  skinnedMesh.skeleton?.update()
-  ensureFloorRigidBody()
-}
 function onPointerDown(event) {
   const rect = renderer.domElement.getBoundingClientRect()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -556,7 +231,7 @@ function applyIKUpdate() {
     mesh
   )
   if (mesh && !helper?.objects.get(mesh)) {
-    initIKSolver(mesh)
+    initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
   helper?.update(0)
@@ -565,7 +240,7 @@ function applyIKUpdate() {
     b.updateMatrixWorld(true)
   )
   mesh?.updateMatrixWorld(true)
-  updateIKMarkers()
+  updateIKMarkersBound()
   console.debug(
     `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
   )
@@ -878,9 +553,9 @@ async function removeModel(index) {
         scene.remove(t.marker)
         t.marker.material?.dispose()
       })
-      ikTargets = []
+      ikTargets.length = 0
       currentMeshRef.value = models.value[0]?.mesh || null
-      setupIKTargets(currentMeshRef.value)
+      setupIKTargets(scene, currentMeshRef.value)
     }
     if (models.value.length === 0) {
       await deleteCachedFiles()
@@ -928,7 +603,7 @@ async function clearCache() {
   models.value = []
   nextModelId = 1
   currentMeshRef.value = null
-  setupIKTargets(currentMeshRef.value)
+  setupIKTargets(scene, currentMeshRef.value)
   menuOpen.value = false
 }
 
@@ -1053,7 +728,7 @@ async function handleFiles(files) {
             return resolve()
           }
           scene.add(skinnedMesh)
-          initIKSolver(skinnedMesh)
+          initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
           const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
           skeletonHelper.visible = debugSkinning
           scene.add(skeletonHelper)
@@ -1074,15 +749,13 @@ async function handleFiles(files) {
             console.log('Skinning bones:', boneNames)
           }
           currentMeshRef.value = skinnedMesh
-          setupIKTargets(skinnedMesh)
-          if (!ikConfigLoaded) {
-            ikConfigPromise.then(() => {
-              if (currentMeshRef.value === skinnedMesh) {
-                setupIKTargets(skinnedMesh)
-                initIKSolver(skinnedMesh)
-              }
-            })
-          }
+          setupIKTargets(scene, skinnedMesh)
+          ikConfigPromise.then(() => {
+            if (currentMeshRef.value === skinnedMesh) {
+              setupIKTargets(scene, skinnedMesh)
+              initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
+            }
+          })
           console.log('Model loaded:', modelFile.name)
           logToServer({ event: 'loaded', model: modelFile.name })
           if (poseFile) {
@@ -1112,9 +785,9 @@ function applyPose() {
   loader.loadVPD(selectedPose.value.url, true, pose => {
     const mesh = currentMeshRef.value
     helper.pose(mesh, pose)
-    mesh.skeleton.update()
-    mesh.updateMatrixWorld(true)
-    updateIKMarkers()
+   mesh.skeleton.update()
+   mesh.updateMatrixWorld(true)
+    updateIKMarkersBound()
     console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })
@@ -1142,42 +815,7 @@ function exportPose() {
 }
 
 function onWindowResize() {
-  const container = viewer.value
-  camera.aspect = container.clientWidth / container.clientHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(container.clientWidth, container.clientHeight)
-}
-
-function animate(time) {
-  requestAnimationFrame(animate)
-  const delta = clock.getDelta()
-  if (time - lastFrameTime < 1000 / TARGET_FPS) return
-  lastFrameTime = time
-
-  const updateStart = performance.now()
-  helper?.update(delta)
-  updateTimes.push(performance.now() - updateStart)
-
-  updateIKMarkers()
-
-  const renderStart = performance.now()
-  effect.render(scene, camera)
-  renderTimes.push(performance.now() - renderStart)
-
-  directionalLightHelper.update()
-
-  if (time - lastPerfLogTime >= 1000) {
-    const avgUpdate =
-      updateTimes.reduce((a, b) => a + b, 0) / (updateTimes.length || 1)
-    const avgRender =
-      renderTimes.reduce((a, b) => a + b, 0) / (renderTimes.length || 1)
-    console.log(
-      `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
-    )
-    updateTimes.length = 0
-    renderTimes.length = 0
-    lastPerfLogTime = time
-  }
+  handleWindowResize(camera, renderer, viewer.value)
 }
 
 function handleError(e) {
@@ -1197,7 +835,7 @@ function handleUnhandledRejection(e) {
 }
 
 onMounted(async () => {
-  loadLightingSettings()
+  loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
   window.addEventListener('error', handleError)
   window.addEventListener('unhandledrejection', handleUnhandledRejection)
@@ -1232,9 +870,9 @@ onMounted(async () => {
   )
   camera.position.set(0, 10, 30)
 
-    controls = new OrbitControls(camera, renderer.domElement)
-    controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY }
-    controls.enabled = true
+  controls = new OrbitControls(camera, renderer.domElement)
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY }
+  controls.enabled = true
 
   scene.add(ambientLight.value)
   scene.add(directionalLight.value.target)
@@ -1256,6 +894,18 @@ onMounted(async () => {
   helper.enable('physics', enablePhysics.value)
   ensureFloorRigidBody()
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
+
+  updateIKMarkersBound = () => updateIKMarkers(camera, renderer, raycaster)
+  const animate = createAnimator({
+    clock,
+    targetFps: TARGET_FPS,
+    helper,
+    effect,
+    scene,
+    camera,
+    updateIKMarkers: updateIKMarkersBound,
+    directionalLightHelper
+  })
 
   window.addEventListener('resize', onWindowResize)
   document.addEventListener('click', handleDocumentClick)
