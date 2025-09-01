@@ -425,7 +425,6 @@ async function cacheFiles(modelFiles) {
       await promisifyRequest(store.put(dataLists[i], i))
     }
     await promisifyRequest(tx)
-    if (import.meta.env.DEV) console.log('Model cached')
   } catch (e) {
     console.error('Failed to cache model:', e)
   }
@@ -463,7 +462,6 @@ async function deleteCachedFiles(index) {
       store.delete(index)
     }
     await promisifyRequest(tx)
-    if (import.meta.env.DEV) console.log('Model cache cleared')
   } catch (e) {
     console.error('Failed to clear model cache:', e)
   }
@@ -490,13 +488,11 @@ function onFileChange(e) {
 }
 
 function toggleMenu() {
-  if (import.meta.env.DEV) console.log('Menu button clicked')
   logToServer({ event: 'menu' })
   menuOpen.value = !menuOpen.value
 }
 
 function openFile() {
-  if (import.meta.env.DEV) console.log('Import option clicked')
   logToServer({ event: 'import' })
   fileInput.value && fileInput.value.click()
   menuOpen.value = false
@@ -613,7 +609,6 @@ async function removeModel(index) {
 }
 
 async function clearCache() {
-  if (import.meta.env.DEV) console.log('Clear cache clicked')
   logToServer({ event: 'clear-cache' })
   effect?.clearCache?.()
   renderer?.renderLists?.dispose?.()
@@ -732,7 +727,6 @@ async function handleFiles(files) {
   const posePath = poseFile && poseFile.url
 
   const names = Array.from(files).map(f => f.name)
-  if (import.meta.env.DEV) console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
 
   const manager = new THREE.LoadingManager()
@@ -791,18 +785,12 @@ async function handleFiles(files) {
             boneNameVisible: false,
             files: modelSpecificFiles
           })
-          if (debugSkinning) {
-            const boneNames = skinnedMesh.skeleton.bones.map(b => b.name)
-            if (import.meta.env.DEV) console.log('Skinning bones:', boneNames)
-          }
           currentMeshRef.value = skinnedMesh
           setupIKTargets(scene, skinnedMesh)
-          if (import.meta.env.DEV) console.log('Model loaded:', modelFile.name)
           logToServer({ event: 'loaded', model: modelFile.name })
           if (poseFile) {
             loader.loadVPD(posePath, true, pose => {
               helper.pose(skinnedMesh, pose)
-              if (import.meta.env.DEV) console.log('Pose applied:', poseFile.name)
               logToServer({ event: 'pose', file: poseFile.name })
             })
           }
@@ -829,7 +817,6 @@ function applyPose() {
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
     updateIKMarkersBound?.()
-    if (import.meta.env.DEV) console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })
 }
@@ -850,7 +837,6 @@ function exportPose() {
   a.download = 'pose.vpd'
   a.click()
   URL.revokeObjectURL(url)
-  if (import.meta.env.DEV) console.log('Pose exported')
   logToServer({ event: 'export' })
   menuOpen.value = false
 }
@@ -954,7 +940,6 @@ onMounted(async () => {
   window.addEventListener('resize', onWindowResize)
   document.addEventListener('click', handleDocumentClick)
 
-  if (import.meta.env.DEV) console.log('API base URL:', API_BASE_URL)
   logToServer({ event: 'init' })
 
   await restoreCachedModel()

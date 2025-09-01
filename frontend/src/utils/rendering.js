@@ -44,7 +44,7 @@ export function createAnimator({
 
     if (time - lastPerfLogTime >= 1000) {
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
         )
       }
