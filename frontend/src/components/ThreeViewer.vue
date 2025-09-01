@@ -504,14 +504,7 @@ function openFile() {
 
 function openSidebarSection(section) {
   if (settingsSidebar.value) {
-    const isVisible = settingsSidebar.value.visibleSections[section]
-    if (isVisible) {
-      settingsSidebar.value.visibleSections[section] = false
-      settingsSidebar.value.expandedSections[section] = false
-    } else {
-      settingsSidebar.value.visibleSections[section] = true
-      settingsSidebar.value.openSection(section)
-    }
+    settingsSidebar.value.visibleSections[section] = !settingsSidebar.value.visibleSections[section]
   }
   menuOpen.value = false
 }
