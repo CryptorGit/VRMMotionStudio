@@ -264,10 +264,7 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  const solver = helper?.objects.get(mesh)?.ikSolver
-  const grantSolver = helper?.objects.get(mesh)?.grantSolver
-  solver?.update()
-  grantSolver?.update()
+  helper?.update(0)
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
