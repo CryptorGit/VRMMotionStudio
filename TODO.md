@@ -75,6 +75,7 @@
 - [ ] モデルやテクスチャ読み込み時の 404 エラーの原因調査
 - [ ] Gradle/Maven のビルドスクリプトを整備する
 - [ ] Gradle wrapper jar を含めずにスタンドアロンでビルド可能にする方法を検討
+- [ ] Maven build (`mvn -U clean spring-boot:run`) をネットワーク接続後に実行して NoClassDefFoundError 解消を確認する
 
 - [ ] PNG/BMP 等のテクスチャが再インポート後のリロードでも表示されることをブラウザで手動確認する（未実施）
 - [ ] キャッシュ機構で `webkitRelativePath` と MIME タイプが正しく保持されるか追加検証が必要
