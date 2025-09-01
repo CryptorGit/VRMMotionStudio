@@ -77,8 +77,20 @@ export function getIKDefinitions(geometry, modelName = '') {
 
   const bones = geometry?.userData?.MMD?.bones || []
   const resolve = v => (typeof v === 'number' ? v : bones.findIndex(b => b.name === v))
-  const originalCount = Array.isArray(iks) ? iks.length : 0
-  iks = (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
+
+  iks = Array.isArray(iks) ? iks : []
+  const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
+  extraIKBoneNames.forEach(name => {
+    const idx = bones.findIndex(b => b.name === name)
+    if (idx === -1) return
+    const exists = iks.some(ik => resolve(ik.target) === idx)
+    if (exists) return
+    const chain = fallbackChains.find(c => c.target === name)
+    if (chain) iks.push({ ...chain })
+  })
+
+  const originalCount = iks.length
+  iks = iks.reduce((acc, ik) => {
     const target = resolve(ik.target)
     const effector = resolve(ik.effector)
     if (target === -1 || effector === -1) {
@@ -136,13 +148,8 @@ export function setupIKTargets(scene, mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
-  if (!Array.isArray(iks) || iks.length === 0) {
-    ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
-    return
-  }
-  iks.forEach((ik, idx) => {
-    const target = bones[ik.target]
-    if (!target) return
+  const added = new Set()
+  const addMarker = (target, chainIndex) => {
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
         color: 0xff0000,
@@ -153,8 +160,25 @@ export function setupIKTargets(scene, mesh) {
     marker.position.set(0, 0, 0)
     marker.renderOrder = 999
     target.add(marker)
-    ikTargets.push({ target, marker, chainIndex: idx })
+    ikTargets.push({ target, marker, chainIndex })
     scene.add(marker)
+  }
+  if (Array.isArray(iks) && iks.length > 0) {
+    iks.forEach((ik, idx) => {
+      const target = bones[ik.target]
+      if (!target) return
+      addMarker(target, idx)
+      added.add(target)
+    })
+    ikWarning.value = ''
+  } else {
+    ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
+  }
+  extraIKBoneNames.forEach(name => {
+    const target = bones.find(b => b.name === name)
+    if (!target || added.has(target)) return
+    addMarker(target, -1)
+    added.add(target)
   })
 }
 
