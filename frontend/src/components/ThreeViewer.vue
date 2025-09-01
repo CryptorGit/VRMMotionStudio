@@ -244,7 +244,7 @@ function onPointerDown(event) {
   renderer.domElement.addEventListener('pointerleave', onPointerUp)
 }
 
-function applyIKUpdate(chainIndex) {
+function applyIKUpdate() {
   if (
     helper?.objects.get(currentMeshRef.value) === undefined &&
     currentMeshRef.value?.type !== 'SkinnedMesh'
@@ -264,14 +264,9 @@ function applyIKUpdate(chainIndex) {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  const obj = mesh ? helper?.objects.get(mesh) : undefined
-  if (obj && chainIndex !== undefined && chainIndex !== null) {
-    mesh.updateMatrixWorld(true)
-    obj.ikSolver?.updateOne(obj.ikSolver.iks[chainIndex])
-    obj.grantSolver?.update()
-  } else {
-    helper?.update(0)
-  }
+  helper.enabled.ik = true
+  helper.update(0)
+  helper.enabled.ik = false
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
@@ -280,12 +275,12 @@ function applyIKUpdate(chainIndex) {
   )
 }
 
-function scheduleIKUpdate(chainIndex) {
+function scheduleIKUpdate() {
   if (ikUpdateScheduled) return
   ikUpdateScheduled = true
   requestAnimationFrame(() => {
     ikUpdateScheduled = false
-    applyIKUpdate(chainIndex)
+    applyIKUpdate()
   })
 }
 
@@ -303,7 +298,7 @@ function onPointerMove(event) {
       _quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, _quat)
       bone.updateMatrixWorld(true)
-      scheduleIKUpdate(selectedIK.value?.chainIndex)
+      scheduleIKUpdate()
     }
     return
   }
@@ -318,7 +313,7 @@ function onPointerMove(event) {
       target.parent.worldToLocal(_dragPoint)
       target.position.copy(_dragPoint)
       target.updateMatrixWorld(true)
-      scheduleIKUpdate(selectedIK.value?.chainIndex)
+      scheduleIKUpdate()
     }
   }
 }
@@ -334,7 +329,6 @@ function onPointerUp() {
     isRotating = false
   }
   dragPlane = null
-  applyIKUpdate(selectedIK.value?.chainIndex)
   if (physicsWasEnabled) {
     const mesh = currentMeshRef.value
     helper?.enable('physics', true)
@@ -343,6 +337,7 @@ function onPointerUp() {
     physicsWasEnabled = false
   }
   selectedIK.value = null
+  applyIKUpdate()
 }
 
 function onControlStart() {
