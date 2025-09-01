@@ -255,11 +255,13 @@ function applyIKUpdate() {
     )
   }
   const mesh = currentMeshRef.value
-  console.assert(
-    mesh instanceof THREE.SkinnedMesh,
-    'currentMeshRef should point to a SkinnedMesh',
-    mesh
-  )
+  if (import.meta.env.DEV) {
+    console.assert(
+      mesh instanceof THREE.SkinnedMesh,
+      'currentMeshRef should point to a SkinnedMesh',
+      mesh
+    )
+  }
   if (mesh && !helper?.objects.get(mesh)) {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
@@ -272,9 +274,11 @@ function applyIKUpdate() {
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
-  console.debug(
-    `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
-  )
+  if (import.meta.env.DEV) {
+    console.debug(
+      `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
+    )
+  }
 }
 
 function scheduleIKUpdate() {
@@ -377,11 +381,7 @@ function logToServer(data) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  })
-    .then(response => {
-      if (!response.ok) console.debug('log failed:', response.status)
-    })
-    .catch(err => console.debug('log error:', err))
+  }).catch(() => {})
 }
 
 const DB_NAME = 'mmd-viewer'
@@ -435,7 +435,7 @@ async function cacheFiles(modelFiles) {
       tx.oncomplete = res
       tx.onerror = () => rej(tx.error)
     })
-    console.log('Model cached')
+    if (import.meta.env.DEV) console.log('Model cached')
   } catch (e) {
     console.error('Failed to cache model:', e)
   }
@@ -477,7 +477,7 @@ async function deleteCachedFiles(index) {
       tx.oncomplete = res
       tx.onerror = () => rej(tx.error)
     })
-    console.log('Model cache cleared')
+    if (import.meta.env.DEV) console.log('Model cache cleared')
   } catch (e) {
     console.error('Failed to clear model cache:', e)
   }
@@ -504,13 +504,13 @@ function onFileChange(e) {
 }
 
 function toggleMenu() {
-  console.log('Menu button clicked')
+  if (import.meta.env.DEV) console.log('Menu button clicked')
   logToServer({ event: 'menu' })
   menuOpen.value = !menuOpen.value
 }
 
 function openFile() {
-  console.log('Import option clicked')
+  if (import.meta.env.DEV) console.log('Import option clicked')
   logToServer({ event: 'import' })
   fileInput.value && fileInput.value.click()
   menuOpen.value = false
@@ -627,7 +627,7 @@ async function removeModel(index) {
 }
 
 async function clearCache() {
-  console.log('Clear cache clicked')
+  if (import.meta.env.DEV) console.log('Clear cache clicked')
   logToServer({ event: 'clear-cache' })
   effect?.clearCache?.()
   renderer?.renderLists?.dispose?.()
@@ -746,7 +746,7 @@ async function handleFiles(files) {
   const posePath = poseFile && poseFile.url
 
   const names = Array.from(files).map(f => f.name)
-  console.log('Selected files:', names)
+  if (import.meta.env.DEV) console.log('Selected files:', names)
   logToServer({ event: 'select', files: names })
 
   const manager = new THREE.LoadingManager()
@@ -808,7 +808,7 @@ async function handleFiles(files) {
           })
           if (debugSkinning) {
             const boneNames = skinnedMesh.skeleton.bones.map(b => b.name)
-            console.log('Skinning bones:', boneNames)
+            if (import.meta.env.DEV) console.log('Skinning bones:', boneNames)
           }
           currentMeshRef.value = skinnedMesh
           setupIKTargets(scene, skinnedMesh)
@@ -818,12 +818,12 @@ async function handleFiles(files) {
               initIKSolver(helper, skinnedMesh, ensureFloorRigidBody)
             }
           })
-          console.log('Model loaded:', modelFile.name)
+          if (import.meta.env.DEV) console.log('Model loaded:', modelFile.name)
           logToServer({ event: 'loaded', model: modelFile.name })
           if (poseFile) {
             loader.loadVPD(posePath, true, pose => {
               helper.pose(skinnedMesh, pose)
-              console.log('Pose applied:', poseFile.name)
+              if (import.meta.env.DEV) console.log('Pose applied:', poseFile.name)
               logToServer({ event: 'pose', file: poseFile.name })
             })
           }
@@ -850,7 +850,7 @@ function applyPose() {
    mesh.skeleton.update()
    mesh.updateMatrixWorld(true)
     updateIKMarkersBound()
-    console.log('Pose applied:', selectedPose.value.name)
+    if (import.meta.env.DEV) console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })
 }
@@ -871,7 +871,7 @@ function exportPose() {
   a.download = 'pose.vpd'
   a.click()
   URL.revokeObjectURL(url)
-  console.log('Pose exported')
+  if (import.meta.env.DEV) console.log('Pose exported')
   logToServer({ event: 'export' })
   menuOpen.value = false
 }
@@ -974,7 +974,7 @@ onMounted(async () => {
   window.addEventListener('resize', onWindowResize)
   document.addEventListener('click', handleDocumentClick)
 
-  console.log('API base URL:', API_BASE_URL)
+  if (import.meta.env.DEV) console.log('API base URL:', API_BASE_URL)
   logToServer({ event: 'init' })
 
   await restoreCachedModel()
