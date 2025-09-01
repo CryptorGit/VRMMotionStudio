@@ -244,7 +244,7 @@ function onPointerDown(event) {
   renderer.domElement.addEventListener('pointerleave', onPointerUp)
 }
 
-function applyIKUpdate() {
+function applyIKUpdate(chainIndex) {
   if (
     helper?.objects.get(currentMeshRef.value) === undefined &&
     currentMeshRef.value?.type !== 'SkinnedMesh'
@@ -264,7 +264,14 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  helper?.update(0)
+  const obj = mesh ? helper?.objects.get(mesh) : undefined
+  if (obj && chainIndex !== undefined && chainIndex !== null) {
+    mesh.updateMatrixWorld(true)
+    obj.ikSolver?.updateOne(obj.ikSolver.iks[chainIndex])
+    obj.grantSolver?.update()
+  } else {
+    helper?.update(0)
+  }
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
@@ -273,12 +280,12 @@ function applyIKUpdate() {
   )
 }
 
-function scheduleIKUpdate() {
+function scheduleIKUpdate(chainIndex) {
   if (ikUpdateScheduled) return
   ikUpdateScheduled = true
   requestAnimationFrame(() => {
     ikUpdateScheduled = false
-    applyIKUpdate()
+    applyIKUpdate(chainIndex)
   })
 }
 
@@ -296,7 +303,7 @@ function onPointerMove(event) {
       _quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, _quat)
       bone.updateMatrixWorld(true)
-      scheduleIKUpdate()
+      scheduleIKUpdate(selectedIK.value?.chainIndex)
     }
     return
   }
@@ -311,7 +318,7 @@ function onPointerMove(event) {
       target.parent.worldToLocal(_dragPoint)
       target.position.copy(_dragPoint)
       target.updateMatrixWorld(true)
-      scheduleIKUpdate()
+      scheduleIKUpdate(selectedIK.value?.chainIndex)
     }
   }
 }
@@ -327,7 +334,7 @@ function onPointerUp() {
     isRotating = false
   }
   dragPlane = null
-  applyIKUpdate()
+  applyIKUpdate(selectedIK.value?.chainIndex)
   if (physicsWasEnabled) {
     const mesh = currentMeshRef.value
     helper?.enable('physics', true)

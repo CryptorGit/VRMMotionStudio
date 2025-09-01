@@ -140,7 +140,7 @@ export function setupIKTargets(scene, mesh) {
     ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
     return
   }
-  iks.forEach(ik => {
+  iks.forEach((ik, idx) => {
     const target = bones[ik.target]
     if (!target) return
     const marker = new THREE.Sprite(
@@ -153,7 +153,7 @@ export function setupIKTargets(scene, mesh) {
     marker.position.set(0, 0, 0)
     marker.renderOrder = 999
     target.add(marker)
-    ikTargets.push({ target, marker })
+    ikTargets.push({ target, marker, chainIndex: idx })
     scene.add(marker)
   })
 }
