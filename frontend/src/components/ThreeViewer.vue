@@ -88,6 +88,7 @@ import {
   initIKSolver
 } from '../utils/ik.js'
 import { createAnimator, handleWindowResize } from '../utils/rendering.js'
+import { adjustAxis } from '../utils/bones.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -273,10 +274,11 @@ function onPointerMove(event) {
   }
   if (isRotating) {
     const bone = selectedIK.value.target
-    const axis = bone.userData?.localAxes
-    if (axis) {
+    let rotationAxis = bone.userData?.localAxes
+    if (rotationAxis) {
+      rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1])
       const angle = event.movementX * 0.01
-      _quat.setFromAxisAngle(axis, angle)
+      _quat.setFromAxisAngle(rotationAxis, angle)
       bone.quaternion.multiply(_quat)
       bone.updateMatrixWorld(true)
       scheduleIKUpdate()
