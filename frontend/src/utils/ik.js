@@ -47,93 +47,89 @@ export function attachIKParents(bones, iks) {
   return iks
 }
 
-export function getIKDefinitions(geometry, modelName = '') {
-  let iks =
-    geometry?.userData?.MMD?.ik ||
-    geometry?.userData?.MMD?.iks ||
-    geometry?.userData?.mmd?.ik ||
-    geometry?.userData?.mmd?.iks ||
-    geometry?.ik ||
-    geometry?.iks ||
-    []
-  if (!Array.isArray(iks) || iks.length === 0) {
-    const ud = geometry?.userData
-    if (ud) {
-      const loaderGeom =
-        ud.MMDLoader?.geometry ||
-        ud.mmdLoader?.geometry ||
-        ud.MMDLoader ||
-        ud.mmdLoader
-      if (loaderGeom?.userData) {
-        iks =
-          loaderGeom.userData?.MMD?.ik ||
-          loaderGeom.userData?.MMD?.iks ||
-          loaderGeom.userData?.mmd?.ik ||
-          loaderGeom.userData?.mmd?.iks ||
-          loaderGeom.userData?.ik ||
-          loaderGeom.userData?.iks ||
-          iks
-      }
-      if ((Array.isArray(ud.ik) || Array.isArray(ud.iks)) && iks.length === 0) {
-        iks = ud.ik || ud.iks
-      }
-      if (iks.length === 0 && ud.metadata) {
-        iks = ud.metadata.ik || ud.metadata.iks || iks
-      }
-    }
-    if (!iks || iks.length === 0) {
-      const fallback = extraIKChains[modelName] || extraIKChains.default
-      if (Array.isArray(fallback) && fallback.length > 0) {
-        // Copy fallback chains; actual resolution occurs below
-        iks = fallback.map(ik => ({ ...ik }))
-      }
+function findUserDataIKs(geometry) {
+  const extract = src =>
+    src?.MMD?.ik ||
+    src?.MMD?.iks ||
+    src?.mmd?.ik ||
+    src?.mmd?.iks ||
+    src?.ik ||
+    src?.iks
+  const ud = geometry?.userData
+  const sources = [
+    geometry,
+    ud,
+    ud?.MMDLoader?.geometry,
+    ud?.mmdLoader?.geometry,
+    ud?.MMDLoader,
+    ud?.mmdLoader,
+    ud?.metadata
+  ]
+  for (const s of sources) {
+    const iks = extract(s?.userData || s)
+    if (Array.isArray(iks) && iks.length > 0) return iks
+  }
+  return []
+}
+
+function applyFallbackIKs(iks, bones, modelName) {
+  let result = Array.isArray(iks) ? [...iks] : []
+  if (result.length === 0) {
+    const fallback = extraIKChains[modelName] || extraIKChains.default
+    if (Array.isArray(fallback) && fallback.length > 0) {
+      result = fallback.map(ik => ({ ...ik }))
     }
   }
-
-  const bones = geometry?.userData?.MMD?.bones || []
-  const resolve = v => (typeof v === 'number' ? v : bones.findIndex(b => b.name === v))
-
-  iks = Array.isArray(iks) ? iks : []
   const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
   extraIKBoneNames.forEach(name => {
     const idx = bones.findIndex(b => b.name === name)
     if (idx === -1) return
-    const exists = iks.some(ik => resolve(ik.target) === idx)
+    const exists = result.some(ik => {
+      const target = typeof ik.target === 'number' ? ik.target : bones.findIndex(b => b.name === ik.target)
+      return target === idx
+    })
     if (exists) return
     const chain = fallbackChains.find(c => c.target === name)
-    if (chain) iks.push({ ...chain })
+    if (chain) result.push({ ...chain })
   })
+  return result
+}
 
-  const originalCount = iks.length
-  iks = iks.reduce((acc, ik) => {
+function resolveIKLinks(iks, bones) {
+  const resolve = v => (typeof v === 'number' ? v : bones.findIndex(b => b.name === v))
+  return (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
     const target = resolve(ik.target)
     const effector = resolve(ik.effector)
     if (target === -1 || effector === -1) {
-      console.warn('IK chain skipped due to unresolved bone:', ik)
+      console.warn('getIKDefinitions: unresolved bone in chain', ik)
       return acc
     }
-    const links = (ik.links || []).reduce((arr, l) => {
-      const idx = typeof l === 'object' && l !== null && 'index' in l ? resolve(l.index) : resolve(l)
-      if (idx === -1) {
-        console.warn('IK link skipped due to unresolved bone:', l)
-        return arr
-      }
-      if (typeof l === 'object' && l !== null && 'index' in l) {
-        arr.push({ ...l, index: idx })
-      } else {
-        arr.push({ index: idx })
-      }
-      return arr
-    }, [])
+    const links = (ik.links || [])
+      .map(l => {
+        const idx = typeof l === 'object' && l !== null && 'index' in l ? resolve(l.index) : resolve(l)
+        if (idx === -1) {
+          console.warn('getIKDefinitions: unresolved bone in link', l)
+          return null
+        }
+        return typeof l === 'object' && l !== null && 'index' in l ? { ...l, index: idx } : { index: idx }
+      })
+      .filter(Boolean)
     if (links.length === 0) {
-      console.warn('IK chain skipped because it has no valid links:', ik)
+      console.warn('getIKDefinitions: chain has no valid links', ik)
       return acc
     }
     acc.push({ target, effector, links })
     return acc
   }, [])
-  attachIKParents(bones, iks)
+}
 
+export function getIKDefinitions(geometry, modelName = '') {
+  const bones = geometry?.userData?.MMD?.bones || []
+  let iks = findUserDataIKs(geometry)
+  iks = applyFallbackIKs(iks, bones, modelName)
+  const originalCount = iks.length
+  iks = resolveIKLinks(iks, bones)
+  attachIKParents(bones, iks)
   if (iks.length > 0) {
     ikWarning.value = ''
   } else {
