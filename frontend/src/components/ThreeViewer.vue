@@ -91,7 +91,6 @@ import { createAnimator, handleWindowResize } from '../utils/rendering.js'
 import {
   adjustAxis,
   applyMmdRotationOrder,
-  applyBoneInheritance,
   applyLocalAxisRotation
 } from '../utils/bones.js'
 
@@ -114,8 +113,6 @@ let dragPlane = null
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
 const _quat = new THREE.Quaternion()
-const _qParent = new THREE.Quaternion()
-const _qInv = new THREE.Quaternion()
 let physicsWasEnabled = false
 let ikUpdateScheduled = false
 let floorMesh = null
@@ -242,50 +239,13 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  const skeleton = mesh?.skeleton
-  const bones = skeleton?.bones || []
   const solver = helper?.objects.get(mesh)?.ikSolver
-  if (solver) {
-    for (let i = 0; i < 10; i++) {
-      solver.update()
-    }
-    helper.objects.get(mesh)?.grantSolver?.update()
-  } else {
-    helper?.update(1 / 60)
-  }
-  bones.forEach(b => {
-    const data = b.userData || (b.userData = {})
-    const { inheritRotation, inheritRatio } = data
-    const parent = b.parent
-    if (inheritRotation && parent instanceof THREE.Bone) {
-      const ratio = inheritRatio ?? 1
-      _qParent.identity().slerp(parent.quaternion, ratio)
-      _qInv.copy(_qParent).invert()
-      if (data._origQuat) {
-        data._origQuat.copy(b.quaternion).multiply(_qInv)
-      } else {
-        data._origQuat = b.quaternion.clone().multiply(_qInv)
-      }
-    } else {
-      if (data._origQuat) {
-        data._origQuat.copy(b.quaternion)
-      } else {
-        data._origQuat = b.quaternion.clone()
-      }
-    }
-  })
-  applyBoneInheritance(bones)
-  bones.forEach(b => {
-    if (b.userData?.localAxes) {
-      _quat.copy(b.quaternion)
-      b.quaternion.identity()
-      applyLocalAxisRotation(b, _quat)
-    }
-  })
-  updateIKMarkersBound()
-  skeleton?.update()
-  bones.forEach(b => b.updateMatrixWorld(true))
+  const grantSolver = helper?.objects.get(mesh)?.grantSolver
+  solver?.update()
+  grantSolver?.update()
+  mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
+  updateIKMarkersBound()
   console.debug(
     `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
   )
