@@ -8,7 +8,6 @@ export const selectedIK = ref(null)
 export let ikTargets = []
 export const extraIKBoneNames = []
 export const extraIKChains = {}
-let ikConfigLoaded = false
 
 export async function loadIKConfig() {
   try {
@@ -26,8 +25,6 @@ export async function loadIKConfig() {
         { target: '左足ＩＫ', effector: '左足首', links: ['左ひざ', '左足'] },
         { target: '右足ＩＫ', effector: '右足首', links: ['右ひざ', '右足'] }
       ]
-  } finally {
-    ikConfigLoaded = true
   }
 }
 export const ikConfigPromise = loadIKConfig()
