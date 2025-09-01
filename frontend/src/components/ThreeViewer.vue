@@ -284,9 +284,9 @@ function onPointerMove(event) {
   }
   if (isRotating) {
     const bone = selectedIK.value.target
-    let rotationAxis = bone.userData?.localAxes
+    let rotationAxis = bone.userData?.localAxes?.xAxis
     if (rotationAxis) {
-      rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1])
+      rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
       const angle = event.movementX * 0.01
       _quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, _quat)
