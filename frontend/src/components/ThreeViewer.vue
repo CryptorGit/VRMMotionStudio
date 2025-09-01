@@ -107,7 +107,6 @@ const mouse = new THREE.Vector2()
 let dragPlane = null
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
-const rotationAxis = new THREE.Vector3()
 const _quat = new THREE.Quaternion()
 let physicsWasEnabled = false
 let ikUpdateScheduled = false
@@ -194,8 +193,6 @@ function onPointerDown(event) {
   if (event.button === 2) {
     event.preventDefault()
     isRotating = true
-    selectedIK.value.target.getWorldPosition(_dragPoint)
-    rotationAxis.copy(_dragPoint).sub(camera.position).normalize()
     controls.enabled = false
     renderer.domElement.addEventListener('pointermove', onPointerMove)
     renderer.domElement.addEventListener('pointerup', onPointerUp)
@@ -275,11 +272,15 @@ function onPointerMove(event) {
     return
   }
   if (isRotating) {
-    const angle = event.movementX * 0.01
-    _quat.setFromAxisAngle(rotationAxis, angle)
-    selectedIK.value.target.quaternion.premultiply(_quat)
-    selectedIK.value.target.updateMatrixWorld(true)
-    scheduleIKUpdate()
+    const bone = selectedIK.value.target
+    const axis = bone.userData?.localAxes
+    if (axis) {
+      const angle = event.movementX * 0.01
+      _quat.setFromAxisAngle(axis, angle)
+      bone.quaternion.multiply(_quat)
+      bone.updateMatrixWorld(true)
+      scheduleIKUpdate()
+    }
     return
   }
   if (!dragPlane) return
