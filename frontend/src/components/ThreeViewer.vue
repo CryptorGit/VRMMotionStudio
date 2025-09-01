@@ -264,8 +264,9 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
-  // IK 解決はレンダーループの helper.update() に任せる
-  mesh?.skeleton?.update()
+  // solver と grantSolver を 1 回だけ実行
+  const obj = helper?.objects.get(mesh)
+  if (obj) helper.update(0)
   mesh?.updateMatrixWorld(true)
   updateIKMarkersBound()
   console.debug(
