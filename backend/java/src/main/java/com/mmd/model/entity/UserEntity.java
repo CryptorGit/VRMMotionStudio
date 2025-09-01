@@ -1,20 +1,41 @@
 package com.mmd.model.entity;
 
-public class UserEntity {
-    private final int id;
-    private final String name;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
-    public UserEntity(int id, String name) {
+@Entity
+@Table(name = "users")
+public class UserEntity {
+    @Id
+    private Integer id;
+
+    @Column(nullable = false)
+    private String name;
+
+    public UserEntity() {
+    }
+
+    public UserEntity(Integer id, String name) {
         this.id = id;
         this.name = name;
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     public String getName() {
         return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 }
  
