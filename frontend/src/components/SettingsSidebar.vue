@@ -15,72 +15,51 @@
         <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
       </button>
     </div>
-  <div class="sections" v-if="!collapsed && hasSections">
-    <template v-for="section in sectionOrder" :key="section">
-      <div v-if="visibleSections[section]" class="section">
-        <h3 @click="toggleSection(section)">
-            <i
-              :class="
-                expandedSections[section]
-                  ? 'fa-solid fa-chevron-down'
-                  : 'fa-solid fa-chevron-right'
-              "
-              class="toggle-icon"
-            ></i>
-            {{ sectionTitles[section] }}
-            <span class="spacer"></span>
-            <i
-              v-if="section === 'morph'"
-              class="fa-solid fa-rotate-right reload-icon"
-              @click.stop="reloadMorphs"
-            ></i>
-            <i
-              class="fa-solid fa-times close-icon"
-              @click.stop="hideSection(section)"
-            ></i>
-          </h3>
-          <div v-show="expandedSections[section]" class="section-content">
-            <LightingPanel
-              v-if="section === 'lighting' && ambient && directional"
-              :ambient="ambient"
-              :directional="directional"
-              v-model:directional-intensity="directionalIntensity"
-              v-model:show-light-marker="showLightMarker"
-              v-model:marker-color="markerColor"
-            />
-            <MorphEditor
-              v-else-if="section === 'morph'"
-              :mesh="mesh"
-              ref="morphEditorRef"
-            />
-            <div v-else-if="section === 'models'">
-              <label>
-                <input type="checkbox" v-model="enablePhysics" /> 物理演算
-              </label>
-              <label>
-                <input type="checkbox" v-model="showIkMarkers" /> IKボーン表示
-              </label>
-              <ModelList
-                :models="models"
-                @toggle="toggleModel"
-                @toggle-bone="toggleBoneVisibility"
-                @toggle-bone-names="toggleBoneNameVisibility"
-                @remove="removeModel"
-              />
-            </div>
-          </div>
-        </div>
-      </template>
+    <div class="sections" v-if="!collapsed && hasSections">
+      <LightingSection
+        v-if="visibleSections.lighting"
+        :ambient="ambient"
+        :directional="directional"
+        v-model:directional-intensity="directionalIntensity"
+        v-model:show-light-marker="showLightMarker"
+        v-model:marker-color="markerColor"
+        @hide="hideSection('lighting')"
+      />
+      <MorphSection
+        v-if="visibleSections.morph"
+        :mesh="mesh"
+        @hide="hideSection('morph')"
+      />
+      <ModelSection
+        v-if="visibleSections.models"
+        :models="models"
+        v-model:show-ik-markers="showIkMarkers"
+        v-model:enable-physics="enablePhysics"
+        @toggle-model="toggleModel"
+        @toggle-bone="toggleBoneVisibility"
+        @toggle-bone-names="toggleBoneNameVisibility"
+        @remove-model="removeModel"
+        @hide="hideSection('models')"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watchEffect, computed, nextTick, toRefs } from 'vue'
-import LightingPanel from './LightingPanel.vue'
-import MorphEditor from './MorphEditor.vue'
-import ModelList from './ModelList.vue'
+import {
+  ref,
+  reactive,
+  onMounted,
+  watchEffect,
+  computed,
+  nextTick,
+  toRefs
+} from 'vue'
+import LightingSection from './LightingSection.vue'
+import MorphSection from './MorphSection.vue'
+import ModelSection from './ModelSection.vue'
 import { STORAGE_KEY } from '../config.js'
+import { useResizableSidebar } from '../composables/useResizableSidebar.js'
 
 const props = defineProps({
   ambient: Object,
@@ -127,34 +106,16 @@ const enablePhysics = computed({
 })
 
 const collapsed = ref(false)
-const expandedSections = reactive({
-  lighting: false,
-  morph: false,
-  models: false
-})
-const width = ref(300)
-const isResizing = ref(false)
+const { width, isResizing, startResize } = useResizableSidebar(300)
 const headerRef = ref(null)
 const headerHeight = ref(0)
-const morphEditorRef = ref(null)
 
-// セクションの表示状態
 const visibleSections = reactive({
   lighting: false,
   morph: false,
   models: false
 })
 
-// 固定された表示順
-const sectionOrder = ['lighting', 'morph', 'models']
-
-const sectionTitles = {
-  lighting: 'ライト設定',
-  morph: 'モーフ編集',
-  models: 'モデル管理'
-}
-
-// 状態を保存
 function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
@@ -162,7 +123,6 @@ function saveState() {
       collapsed: collapsed.value,
       width: width.value,
       visibleSections: { ...visibleSections },
-      expandedSections: { ...expandedSections },
       showLightMarker: showLightMarker.value,
       showIkMarkers: showIkMarkers.value,
       enablePhysics: enablePhysics.value,
@@ -190,7 +150,6 @@ function scheduleSaveState() {
   saveStateTimeout = setTimeout(saveState, 200)
 }
 
-// 初期化時に保存された状態を読み込む
 onMounted(() => {
   nextTick(() => {
     headerHeight.value = headerRef.value?.offsetHeight ?? 0
@@ -202,7 +161,6 @@ onMounted(() => {
         collapsed: savedCollapsed,
         width: savedWidth,
         visibleSections: savedVisible,
-        expandedSections: savedExpanded,
         showLightMarker: savedShowMarker,
         showIkMarkers: savedShowIk,
         enablePhysics: savedEnablePhysics,
@@ -216,11 +174,6 @@ onMounted(() => {
         visibleSections.lighting = savedVisible.lighting ?? false
         visibleSections.morph = savedVisible.morph ?? false
         visibleSections.models = savedVisible.models ?? false
-      }
-      if (savedExpanded) {
-        expandedSections.lighting = savedExpanded.lighting ?? false
-        expandedSections.morph = savedExpanded.morph ?? false
-        expandedSections.models = savedExpanded.models ?? false
       }
       if (savedShowMarker !== undefined)
         emit('update:showLightMarker', savedShowMarker)
@@ -254,7 +207,6 @@ onMounted(() => {
   }
 })
 
-// 変更をまとめて監視して状態を保存
 watchEffect(() => {
   collapsed.value
   width.value
@@ -264,7 +216,6 @@ watchEffect(() => {
   markerColor.value
   directionalIntensity.value
   JSON.stringify(visibleSections)
-  JSON.stringify(expandedSections)
   directional.value.position.x
   directional.value.position.y
   directional.value.position.z
@@ -274,66 +225,8 @@ watchEffect(() => {
   scheduleSaveState()
 })
 
-function toggleSection(section) {
-  expandedSections[section] = !expandedSections[section]
-}
-
-function openSection(section) {
-  collapsed.value = false
-  expandedSections[section] = true
-}
-
 function hideSection(section) {
   visibleSections[section] = false
-  expandedSections[section] = false
-}
-
-let moveListener = null
-let upListener = null
-
-function startResize(e) {
-  e.preventDefault()
-  const startX = e.clientX
-  const startWidth = width.value
-  isResizing.value = true
-  document.body.style.userSelect = 'none'
-
-  let frameId
-  moveListener = function (ev) {
-    if (frameId) cancelAnimationFrame(frameId)
-    frameId = requestAnimationFrame(() => {
-      const delta = startX - ev.clientX
-      width.value = Math.max(150, startWidth + delta)
-    })
-  }
-
-  upListener = function () {
-    document.removeEventListener('mousemove', moveListener)
-    document.removeEventListener('mouseup', upListener)
-    if (frameId) cancelAnimationFrame(frameId)
-    document.body.style.userSelect = ''
-    isResizing.value = false
-    moveListener = null
-    upListener = null
-  }
-
-  document.addEventListener('mousemove', moveListener)
-  document.addEventListener('mouseup', upListener)
-}
-
-onUnmounted(() => {
-  if (moveListener) {
-    document.removeEventListener('mousemove', moveListener)
-    moveListener = null
-  }
-  if (upListener) {
-    document.removeEventListener('mouseup', upListener)
-    upListener = null
-  }
-})
-
-function reloadMorphs() {
-  morphEditorRef.value?.reloadMorphs?.()
 }
 
 function toggleModel(index, visible) {
@@ -352,7 +245,7 @@ function removeModel(index) {
 }
 
 const hasSections = computed(() =>
-  sectionOrder.some(section => visibleSections[section])
+  Object.values(visibleSections).some(Boolean)
 )
 
 const sidebarStyle = computed(() => {
@@ -364,9 +257,7 @@ const sidebarStyle = computed(() => {
 })
 
 defineExpose({
-  openSection,
   visibleSections,
-  expandedSections,
   showLightMarker,
   showIkMarkers,
   enablePhysics,
@@ -401,53 +292,23 @@ defineExpose({
   display: none;
 }
 .header {
+  padding: 0.5rem;
+  background: #ccc;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem;
-  background: #eee;
-}
-.header button {
-  background: none;
-  border: none;
-  cursor: pointer;
 }
 .resize-handle {
   position: absolute;
   left: 0;
   top: 0;
+  bottom: 0;
   width: 5px;
-  height: 100%;
   cursor: ew-resize;
-  user-select: none;
+  background: transparent;
 }
 .sections {
   max-height: calc(100vh - var(--header-height));
   overflow-y: auto;
-}
-.section h3 {
-  margin: 0;
-  padding: 0.5rem;
-  background: #ddd;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-.section h3 .toggle-icon {
-  margin-right: 0.5rem;
-}
-.section h3 .spacer {
-  flex: 1;
-}
-.section h3 .reload-icon {
-  margin-left: 0.5rem;
-  cursor: pointer;
-}
-.section h3 .close-icon {
-  margin-left: 0.5rem;
-  cursor: pointer;
-}
-.section-content {
-  padding: 0.5rem;
 }
 </style>
