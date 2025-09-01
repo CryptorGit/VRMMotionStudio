@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
 import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
@@ -369,12 +369,12 @@ export function useModelLoader({
             const boneNameHelpers = createBoneNameHelpers(skinnedMesh)
             models.value.push({
               id: nextModelId++,
-              mesh: skinnedMesh,
+              mesh: markRaw(skinnedMesh),
               name: modelFile.name,
               visible: true,
-              skeletonHelper,
+              skeletonHelper: markRaw(skeletonHelper),
               bonesVisible: debugSkinning,
-              boneNameHelpers,
+              boneNameHelpers: boneNameHelpers.map(h => markRaw(h)),
               boneNameVisible: false,
               files: modelSpecificFiles
             })
