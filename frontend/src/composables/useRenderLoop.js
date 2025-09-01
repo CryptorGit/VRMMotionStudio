@@ -15,10 +15,10 @@ export function useRenderLoop({
   const animate = createAnimator({
     clock,
     targetFps,
-    helper: helper.value,
-    effect: effect.value,
-    scene: scene.value,
-    camera: camera.value,
+    helper,
+    effect,
+    scene,
+    camera,
     updateIKMarkers,
     directionalLightHelper
   })

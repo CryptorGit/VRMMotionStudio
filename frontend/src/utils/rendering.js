@@ -21,8 +21,8 @@ export function createAnimator({
     lastFrameTime = time
 
     const updateStart = performance.now()
-    if (helper) {
-      helper.update(delta)
+    if (helper.value) {
+      helper.value.update(delta)
     }
     const updateDuration = performance.now() - updateStart
     avgUpdate =
@@ -33,7 +33,9 @@ export function createAnimator({
     updateIKMarkers()
 
     const renderStart = performance.now()
-    effect.render(scene, camera)
+    if (effect.value && scene.value && camera.value) {
+      effect.value.render(scene.value, camera.value)
+    }
     const renderDuration = performance.now() - renderStart
     avgRender =
       avgRender === 0
