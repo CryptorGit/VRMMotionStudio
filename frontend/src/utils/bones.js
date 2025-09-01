@@ -46,18 +46,24 @@ const _qTmp = new THREE.Quaternion()
 
 /**
  * inheritRotation と inheritRatio に基づいて親ボーンの回転を子ボーンへ補間適用する。
+ * 事前に各ボーンの `userData._origQuat` に基準クォータニオンを設定しておく必要がある。
  * @param {THREE.Bone[]} bones - 対象ボーン配列
  */
 export function applyBoneInheritance(bones) {
   if (!Array.isArray(bones)) return
   for (const bone of bones) {
     const data = bone.userData || (bone.userData = {})
-    const { inheritRotation, inheritRatio } = data
+    const { inheritRotation, inheritRatio, _origQuat } = data
     if (!inheritRotation) continue
     const parent = bone.parent
     if (!(parent instanceof THREE.Bone)) continue
+    if (!_origQuat) {
+      console.warn(
+        `applyBoneInheritance: _origQuat not set for bone "${bone.name}"`
+      )
+      continue
+    }
     const ratio = inheritRatio ?? 1
-    const _origQuat = data._origQuat || (data._origQuat = bone.quaternion.clone())
     _qParent.identity().slerp(parent.quaternion, ratio)
     bone.quaternion.copy(_origQuat).multiply(_qParent)
     bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
