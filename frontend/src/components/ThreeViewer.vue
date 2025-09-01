@@ -127,10 +127,10 @@ let Ammo
 const enablePhysics = ref(true)
 // スキニング関連のデバッグ用フラグ
 const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
-let updateIKMarkersBound = () => {}
+let updateIKMarkersBound = null
 watch(showIkMarkers, () => {
   try {
-    updateIKMarkersBound()
+    updateIKMarkersBound?.()
   } catch (e) {
     console.error('Failed to toggle IK markers:', e)
   }
@@ -269,7 +269,7 @@ function applyIKUpdate() {
   helper.enabled.ik = false
   mesh?.skeleton?.update()
   mesh?.updateMatrixWorld(true)
-  updateIKMarkersBound()
+  updateIKMarkersBound?.()
   if (import.meta.env.DEV) {
     console.debug(
       `applyIKUpdate: ${(performance.now() - start).toFixed(2)}ms`
@@ -838,9 +838,9 @@ function applyPose() {
   loader.loadVPD(selectedPose.value.url, true, pose => {
     const mesh = currentMeshRef.value
     helper.pose(mesh, pose)
-   mesh.skeleton.update()
-   mesh.updateMatrixWorld(true)
-    updateIKMarkersBound()
+    mesh.skeleton.update()
+    mesh.updateMatrixWorld(true)
+    updateIKMarkersBound?.()
     if (import.meta.env.DEV) console.log('Pose applied:', selectedPose.value.name)
     logToServer({ event: 'pose', file: selectedPose.value.name })
   })
