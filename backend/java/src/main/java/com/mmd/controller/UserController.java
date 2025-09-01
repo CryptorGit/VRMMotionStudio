@@ -32,6 +32,9 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
         UserEntity user = userService.getUser(userId);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
         return ResponseEntity.ok("Hello, " + user.getName());
     }
 }
