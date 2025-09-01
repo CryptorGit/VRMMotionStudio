@@ -290,7 +290,8 @@ function onPointerMove(event) {
     onPointerUp()
     return
   }
-  if (isRotating) {
+  // IKターゲットには回転を適用しない
+  if (isRotating && !selectedIK.value.marker) {
     const bone = selectedIK.value.target
     let rotationAxis = bone.userData?.localAxes?.xAxis
     if (rotationAxis) {
