@@ -1,3 +1,4 @@
+- [x] SettingsSidebar.vue の watch を watchEffect に統合し、保存処理を単一化
 - [x] 3D ビューアの初期実装
 - [x] PMX モデルのインポート（ハンバーガーメニュー/ドラッグ&ドロップ）
 - [x] 物理演算とライティングの適用
