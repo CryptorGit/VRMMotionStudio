@@ -29,6 +29,21 @@ export async function loadIKConfig() {
 }
 export const ikConfigPromise = loadIKConfig()
 
+export function attachIKParents(bones, iks) {
+  const ikParentRegex = /(?:IK|ＩＫ)親$/
+  bones.forEach((b, idx) => {
+    if (ikParentRegex.test(b.name)) {
+      const ikName = b.name.slice(0, -1)
+      const targetIdx = bones.findIndex(bn => bn.name === ikName)
+      const chain = iks.find(ik => ik.target === targetIdx)
+      if (chain && !chain.links.some(l => l.index === idx)) {
+        chain.links.unshift({ index: idx })
+      }
+    }
+  })
+  return iks
+}
+
 export function getIKDefinitions(geometry, modelName = '') {
   let iks =
     geometry?.userData?.MMD?.ik ||
@@ -114,18 +129,7 @@ export function getIKDefinitions(geometry, modelName = '') {
     acc.push({ target, effector, links })
     return acc
   }, [])
-
-  const ikParentRegex = /(?:IK|ＩＫ)親$/
-  bones.forEach((b, idx) => {
-    if (ikParentRegex.test(b.name)) {
-      const ikName = b.name.slice(0, -1)
-      const targetIdx = bones.findIndex(bn => bn.name === ikName)
-      const chain = iks.find(ik => ik.target === targetIdx)
-      if (chain && !chain.links.some(l => l.index === idx)) {
-        chain.links.unshift({ index: idx })
-      }
-    }
-  })
+  attachIKParents(bones, iks)
 
   if (iks.length > 0) {
     ikWarning.value = ''
@@ -212,17 +216,7 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
   let iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
   if (!Array.isArray(iks) || iks.length === 0) return
   const bones = skinnedMesh.skeleton?.bones || []
-  const ikParentRegex = /(?:IK|ＩＫ)親$/
-  bones.forEach((b, idx) => {
-    if (ikParentRegex.test(b.name)) {
-      const ikName = b.name.slice(0, -1)
-      const targetIdx = bones.findIndex(bn => bn.name === ikName)
-      const chain = iks.find(ik => ik.target === targetIdx)
-      if (chain && !chain.links.some(l => l.index === idx)) {
-        chain.links.unshift({ index: idx })
-      }
-    }
-  })
+  attachIKParents(bones, iks)
   skinnedMesh.geometry.userData.MMD =
     skinnedMesh.geometry.userData.MMD || {}
   skinnedMesh.geometry.userData.MMD.iks = iks
