@@ -16,3 +16,21 @@ export function adjustAxis(axis, order = [0, 1, 2], sign = [1, 1, 1]) {
     src[order[2]] * sign[2]
   )
 }
+
+/**
+ * MMDと同じ回転順序をボーンに適用する。
+ * 既に回転が適用されている場合は `reorder` で保持したまま順序を変更する。
+ * @param {THREE.Bone[]} bones - 対象ボーン配列
+ * @param {string} order - 設定する回転順序 (デフォルト 'ZYX')
+ */
+export function applyMmdRotationOrder(bones, order = 'ZYX') {
+  if (!Array.isArray(bones)) return
+  for (const bone of bones) {
+    const euler = bone.rotation
+    if (euler.x !== 0 || euler.y !== 0 || euler.z !== 0) {
+      euler.reorder(order)
+    } else {
+      euler.order = order
+    }
+  }
+}
