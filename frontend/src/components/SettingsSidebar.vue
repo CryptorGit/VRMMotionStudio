@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watchEffect, computed, nextTick, toRefs } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watchEffect, computed, nextTick, toRefs } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 import ModelList from './ModelList.vue'
@@ -293,6 +293,9 @@ function hideSection(section) {
   expandedSections[section] = false
 }
 
+let moveListener = null
+let upListener = null
+
 function startResize(e) {
   e.preventDefault()
   const startX = e.clientX
@@ -301,7 +304,7 @@ function startResize(e) {
   document.body.style.userSelect = 'none'
 
   let frameId
-  function onMouseMove(ev) {
+  moveListener = function (ev) {
     if (frameId) cancelAnimationFrame(frameId)
     frameId = requestAnimationFrame(() => {
       const delta = startX - ev.clientX
@@ -309,18 +312,31 @@ function startResize(e) {
     })
   }
 
-  function onMouseUp() {
-    document.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseup', onMouseUp)
+  upListener = function () {
+    document.removeEventListener('mousemove', moveListener)
+    document.removeEventListener('mouseup', upListener)
     if (frameId) cancelAnimationFrame(frameId)
     document.body.style.userSelect = ''
     isResizing.value = false
     scheduleSaveState()
+    moveListener = null
+    upListener = null
   }
 
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
+  document.addEventListener('mousemove', moveListener)
+  document.addEventListener('mouseup', upListener)
 }
+
+onUnmounted(() => {
+  if (moveListener) {
+    document.removeEventListener('mousemove', moveListener)
+    moveListener = null
+  }
+  if (upListener) {
+    document.removeEventListener('mouseup', upListener)
+    upListener = null
+  }
+})
 
 function reloadMorphs() {
   morphEditorRef.value?.reloadMorphs?.()
