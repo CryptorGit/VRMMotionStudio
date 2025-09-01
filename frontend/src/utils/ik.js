@@ -110,9 +110,14 @@ export function setupIKTargets(scene, mesh) {
     const target = bones[ik.target]
     if (!target) return
     const marker = new THREE.Sprite(
-      new THREE.SpriteMaterial({ color: 0xff0000 })
+      new THREE.SpriteMaterial({
+        color: 0xff0000,
+        depthTest: false,
+        depthWrite: false
+      })
     )
     marker.position.set(0, 0, 0)
+    marker.renderOrder = 999
     target.add(marker)
     ikTargets.push({ target, marker })
     scene.add(marker)
