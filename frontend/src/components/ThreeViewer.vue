@@ -187,7 +187,10 @@ function onPointerDown(event) {
   if (!target) return
   selectedIK.value = target
   physicsWasEnabled = enablePhysics.value
-  if (physicsWasEnabled) helper?.enable('physics', false)
+  if (physicsWasEnabled) {
+    helper?.enable('physics', false)
+    helper?.update(0)
+  }
   if (event.button === 2) {
     event.preventDefault()
     isRotating = true
