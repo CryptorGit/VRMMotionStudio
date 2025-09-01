@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watchEffect, computed, nextTick, toRefs } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick, toRefs } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 import MorphEditor from './MorphEditor.vue'
 import ModelList from './ModelList.vue'
@@ -254,30 +254,30 @@ onMounted(() => {
   }
 })
 
-// 変更があれば状態を保存
-watchEffect(() => {
-  collapsed.value
-  width.value
-  visibleSections.lighting
-  visibleSections.morph
-  visibleSections.models
-  expandedSections.lighting
-  expandedSections.morph
-  expandedSections.models
-  showLightMarker.value
-  showIkMarkers.value
-  enablePhysics.value
-  markerColor.value
-  directionalIntensity.value
-  directional.value.position.x
-  directional.value.position.y
-  directional.value.position.z
-  directional.value.target.position.x
-  directional.value.target.position.y
-  directional.value.target.position.z
-
-  scheduleSaveState()
-})
+// 変更があれば対象プロパティごとに状態を保存
+watch(collapsed, scheduleSaveState, { immediate: true })
+watch(width, scheduleSaveState, { immediate: true })
+watch(visibleSections, scheduleSaveState, { deep: true, immediate: true })
+watch(expandedSections, scheduleSaveState, { deep: true, immediate: true })
+watch(showLightMarker, scheduleSaveState, { immediate: true })
+watch(showIkMarkers, scheduleSaveState, { immediate: true })
+watch(enablePhysics, scheduleSaveState, { immediate: true })
+watch(markerColor, scheduleSaveState, { immediate: true })
+watch(directionalIntensity, scheduleSaveState, { immediate: true })
+watch(
+  () => [directional.value.position.x, directional.value.position.y, directional.value.position.z],
+  scheduleSaveState,
+  { immediate: true }
+)
+watch(
+  () => [
+    directional.value.target.position.x,
+    directional.value.target.position.y,
+    directional.value.target.position.z
+  ],
+  scheduleSaveState,
+  { immediate: true }
+)
 
 function toggleSection(section) {
   expandedSections[section] = !expandedSections[section]
