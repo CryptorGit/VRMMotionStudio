@@ -9,6 +9,9 @@ export let ikTargets = []
 export const extraIKBoneNames = []
 export const extraIKChains = {}
 
+let cachedFov = null
+let cachedFovRad = 0
+
 export async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
@@ -186,7 +189,11 @@ export function setupIKTargets(scene, mesh) {
 export function updateIKMarkers(camera, renderer, raycaster) {
   const visible = showIkMarkers.value
   const height = renderer.domElement.clientHeight
-  const fov = THREE.MathUtils.degToRad(camera.fov)
+  if (camera.fov !== cachedFov) {
+    cachedFov = camera.fov
+    cachedFovRad = THREE.MathUtils.degToRad(cachedFov)
+  }
+  const fov = cachedFovRad
   let maxScale = 0
   ikTargets.forEach(t => {
     t.target.updateMatrixWorld(true)
