@@ -495,8 +495,10 @@ function initIKSolver(mesh) {
     // インタラクティブな IK 操作中は物理演算を無効化して追加する
     helper.add(skinnedMesh, { physics: false, ik: true, grant: true })
     obj = helper.objects.get(skinnedMesh)
+    if (obj) obj.customIkSolver = false
   } else {
     obj.ikSolver = new CCDIKSolver(skinnedMesh, iks)
+    obj.customIkSolver = true
   }
   obj?.ikSolver?.update()
   skinnedMesh.skeleton?.update()
@@ -569,8 +571,14 @@ function applyIKUpdate() {
   }
   const solver = obj?.ikSolver
   const start = performance.now()
-  helper?.update(0)
-  solver?.update()
+  if (obj?.customIkSolver) {
+    helper?.enable('ik', false)
+    helper?.update(0)
+    solver?.update()
+  } else {
+    helper?.enable('ik', true)
+    helper?.update(0)
+  }
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
