@@ -264,6 +264,8 @@ function applyIKUpdate() {
     initIKSolver(helper, mesh, ensureFloorRigidBody)
   }
   const start = performance.now()
+  mesh?.skeleton?.update()
+  mesh?.updateMatrixWorld(true)
   helper.enabled.ik = true
   helper.update(0)
   helper.enabled.ik = false
