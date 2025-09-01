@@ -161,9 +161,8 @@ export function setupIKTargets(scene, mesh) {
         depthWrite: false
       })
     )
-    marker.position.set(0, 0, 0)
     marker.renderOrder = 999
-    target.add(marker)
+    target.getWorldPosition(marker.position)
     ikTargets.push({ target, marker, chainIndex })
     scene.add(marker)
   }
