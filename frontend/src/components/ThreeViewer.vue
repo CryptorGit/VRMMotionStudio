@@ -88,7 +88,11 @@ import {
   initIKSolver
 } from '../utils/ik.js'
 import { createAnimator, handleWindowResize } from '../utils/rendering.js'
-import { adjustAxis, applyMmdRotationOrder } from '../utils/bones.js'
+import {
+  adjustAxis,
+  applyMmdRotationOrder,
+  applyBoneInheritance
+} from '../utils/bones.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -237,6 +241,7 @@ function applyIKUpdate() {
   const start = performance.now()
   const solver = helper?.objects.get(mesh)?.ikSolver
   if (solver) {
+    applyBoneInheritance(mesh?.skeleton?.bones)
     for (let i = 0; i < 10; i++) solver.update()
     helper.objects.get(mesh)?.grantSolver?.update()
   } else {

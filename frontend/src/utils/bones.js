@@ -34,3 +34,24 @@ export function applyMmdRotationOrder(bones, order = 'ZYX') {
     }
   }
 }
+
+// 作業用クォータニオンを使い回してアロケーションを抑える
+const _qParent = new THREE.Quaternion()
+
+/**
+ * inheritRotation と inheritRatio に基づいて親ボーンの回転を子ボーンへ補間適用する。
+ * @param {THREE.Bone[]} bones - 対象ボーン配列
+ */
+export function applyBoneInheritance(bones) {
+  if (!Array.isArray(bones)) return
+  for (const bone of bones) {
+    const { inheritRotation, inheritRatio } = bone.userData || {}
+    if (!inheritRotation) continue
+    const parent = bone.parent
+    if (!(parent instanceof THREE.Bone)) continue
+    const ratio = inheritRatio ?? 1
+    _qParent.copy(parent.quaternion)
+    bone.quaternion.slerp(_qParent, ratio)
+    bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
+  }
+}
