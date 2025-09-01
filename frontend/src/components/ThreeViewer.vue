@@ -403,16 +403,15 @@ function getDB() {
 async function cacheFiles(modelFiles) {
   try {
     const dataLists = []
-    for (let i = 0; i < modelFiles.length; i++) {
-      const list = []
-      for (const f of modelFiles[i]) {
-        list.push({
+    for (const files of modelFiles) {
+      const list = await Promise.all(
+        files.map(async f => ({
           name: f.name,
           path: f.webkitRelativePath || f.name,
           type: f.type,
           data: await f.arrayBuffer()
-        })
-      }
+        }))
+      )
       dataLists.push(list)
     }
 
