@@ -1,5 +1,6 @@
 package com.mmd.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -11,17 +12,11 @@ import java.util.Date;
 @Component
 public class SecurityConfig {
 
-    private volatile String jwtSecret;
-    private volatile String apiKey;
+    @Value("${jwt.secret:}")
+    private String jwtSecret;
 
-    public SecurityConfig() {
-        reload();
-    }
-
-    public void reload() {
-        this.jwtSecret = System.getenv("JWT_SECRET");
-        this.apiKey = System.getenv("API_KEY");
-    }
+    @Value("${api.key:}")
+    private String apiKey;
 
     public boolean isAuthorized(String token) {
         if (token == null || token.isBlank()) {
