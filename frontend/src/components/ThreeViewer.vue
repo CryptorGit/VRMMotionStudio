@@ -243,7 +243,12 @@ function applyIKUpdate() {
   const solver = helper?.objects.get(mesh)?.ikSolver
   if (solver) {
     applyBoneInheritance(mesh?.skeleton?.bones)
-    for (let i = 0; i < 10; i++) solver.update()
+    for (let i = 0; i < 10; i++) {
+      solver.update()
+      mesh.skeleton.calculateInverses()
+      mesh.skeleton.update()
+      mesh.updateMatrixWorld(true)
+    }
     helper.objects.get(mesh)?.grantSolver?.update()
     mesh?.skeleton?.bones?.forEach(b => {
       if (b.userData?.localAxes) {
