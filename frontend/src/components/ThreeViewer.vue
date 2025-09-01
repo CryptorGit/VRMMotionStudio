@@ -114,6 +114,8 @@ let dragPlane = null
 const _dragPoint = new THREE.Vector3()
 let isRotating = false
 const _quat = new THREE.Quaternion()
+const _qParent = new THREE.Quaternion()
+const _qInv = new THREE.Quaternion()
 let physicsWasEnabled = false
 let ikUpdateScheduled = false
 let floorMesh = null
@@ -253,10 +255,23 @@ function applyIKUpdate() {
   }
   bones.forEach(b => {
     const data = b.userData || (b.userData = {})
-    if (data._origQuat) {
-      data._origQuat.copy(b.quaternion)
+    const { inheritRotation, inheritRatio } = data
+    const parent = b.parent
+    if (inheritRotation && parent instanceof THREE.Bone) {
+      const ratio = inheritRatio ?? 1
+      _qParent.identity().slerp(parent.quaternion, ratio)
+      _qInv.copy(_qParent).invert()
+      if (data._origQuat) {
+        data._origQuat.copy(b.quaternion).multiply(_qInv)
+      } else {
+        data._origQuat = b.quaternion.clone().multiply(_qInv)
+      }
     } else {
-      data._origQuat = b.quaternion.clone()
+      if (data._origQuat) {
+        data._origQuat.copy(b.quaternion)
+      } else {
+        data._origQuat = b.quaternion.clone()
+      }
     }
   })
   applyBoneInheritance(bones)
