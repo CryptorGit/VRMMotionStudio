@@ -237,10 +237,16 @@ function applyIKUpdate() {
   const solver = helper?.objects.get(mesh)?.ikSolver
   if (solver) {
     for (let i = 0; i < 10; i++) solver.update()
+    helper.objects.get(mesh)?.grantSolver?.update()
   } else {
     helper?.update(1 / 60)
   }
   updateIKMarkersBound()
+  mesh?.skeleton?.update()
+  currentMeshRef.value?.skeleton?.bones?.forEach(b =>
+    b.updateMatrixWorld(true)
+  )
+  mesh?.updateMatrixWorld(true)
   mesh?.skeleton?.update()
   currentMeshRef.value?.skeleton?.bones?.forEach(b =>
     b.updateMatrixWorld(true)
