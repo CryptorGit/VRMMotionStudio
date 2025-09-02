@@ -8,6 +8,7 @@ export const selectedIK = ref(null)
 export let ikTargets = []
 export const extraIKBoneNames = []
 export const extraIKChains = {}
+export const ikAliases = new Map()
 
 let cachedFov = null
 let cachedFovRad = 0
@@ -18,13 +19,23 @@ export async function loadIKConfig() {
     if (!res.ok) throw new Error('config fetch failed')
     const {
       extraIKBoneNames: boneNames = [],
-      extraIKChains: chains = {}
+      extraIKChains: chains = {},
+      aliases = {}
     } = await res.json()
     extraIKBoneNames.push(...boneNames.map(normalizeBoneName))
     for (const [key, arr] of Object.entries(chains)) {
       extraIKChains[key] = Array.isArray(arr)
         ? arr.map(normalizeChain)
         : []
+    }
+    for (const [canonical, names] of Object.entries(aliases)) {
+      const canon = normalizeBoneName(canonical)
+      ikAliases.set(canon, canon)
+      if (Array.isArray(names)) {
+        names
+          .map(normalizeBoneName)
+          .forEach(a => ikAliases.set(a, canon))
+      }
     }
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
@@ -398,16 +409,32 @@ function normalizeChain(chain) {
   }
 }
 
-const createBoneIndexMap = bones =>
-  new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
+const createBoneIndexMap = bones => {
+  const map = new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
+  ikAliases.forEach((canon, alias) => {
+    const idx = map.get(canon)
+    if (typeof idx === 'number') {
+      map.set(alias, idx)
+    } else {
+      console.warn('createBoneIndexMap: 未定義のボーン名', canon)
+      ikWarning.value ||=
+        `ボーン「${canon}」が見つかりません。ik-config.json の aliases に追加してください`
+    }
+  })
+  return map
+}
 
 function resolveIKLinks(
   iks,
   bones,
   boneIndexMap = createBoneIndexMap(bones)
 ) {
-  const resolve = v =>
-    typeof v === 'number' ? v : boneIndexMap.get(normalizeBoneName(v))
+  const resolve = v => {
+    if (typeof v === 'number') return v
+    const norm = normalizeBoneName(v)
+    const canon = ikAliases.get(norm) || norm
+    return boneIndexMap.get(canon)
+  }
   const nameOf = v => {
     if (typeof v === 'object' && v !== null && 'index' in v) return nameOf(v.index)
     if (typeof v === 'number') return bones[v]?.name || v
@@ -421,6 +448,10 @@ function resolveIKLinks(
         target: nameOf(ik.target),
         effector: nameOf(ik.effector)
       })
+      const miss =
+        typeof target !== 'number' ? nameOf(ik.target) : nameOf(ik.effector)
+      ikWarning.value ||=
+        `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
       return acc
     }
     const links = (ik.links || [])
@@ -434,6 +465,10 @@ function resolveIKLinks(
             link: nameOf(l),
             chainTarget: bones[target]?.name || target
           })
+          const miss = nameOf(l)
+          if (miss)
+            ikWarning.value ||=
+              `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
           return null
         }
         return (
