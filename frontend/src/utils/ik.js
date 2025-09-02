@@ -559,6 +559,22 @@ export function setupIKTargets(scene, mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
+  const modelChains = extraIKChains[mesh.name] || extraIKChains.default || []
+  const targetNames = new Set(
+    Array.isArray(iks)
+      ? iks
+          .map(ik => normalizeBoneName(bones[ik.target]?.name))
+          .filter(Boolean)
+      : []
+  )
+  extraIKBoneNames.forEach(name =>
+    targetNames.add(normalizeBoneName(name))
+  )
+  modelChains.forEach(c => {
+    const t =
+      typeof c.target === 'number' ? bones[c.target]?.name : c.target
+    if (t) targetNames.add(normalizeBoneName(t))
+  })
   const addMarker = (target, chainIndex) => {
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -577,7 +593,11 @@ export function setupIKTargets(scene, mesh) {
     const chainIndex = Array.isArray(iks)
       ? iks.findIndex(ik => bones[ik.target] === bone)
       : -1
-    if (typeof normalizedName === 'string' && normalizedName.includes('ik')) {
+    if (
+      targetNames.has(normalizedName) &&
+      typeof normalizedName === 'string' &&
+      !normalizedName.endsWith('ik親')
+    ) {
       addMarker(bone, chainIndex)
     }
   })
