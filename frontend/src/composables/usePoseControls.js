@@ -13,7 +13,7 @@ export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logT
       helper.value.pose(mesh, pose)
       mesh.skeleton.update()
       mesh.updateMatrixWorld(true)
-      updateIKMarkersBound.value?.()
+      updateIKMarkersBound.value?.(true)
       logToServer({ event: 'pose', file: selectedPose.value.name })
     })
   }

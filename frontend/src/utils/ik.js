@@ -210,7 +210,7 @@ export function setupIKTargets(scene, mesh) {
   })
 }
 
-export function updateIKMarkers(camera, renderer, raycaster) {
+export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = false) {
   if (!camera || !renderer || ikTargets.length === 0) return
   const visible = showIkMarkers.value
   const height = renderer.domElement.clientHeight
@@ -221,7 +221,7 @@ export function updateIKMarkers(camera, renderer, raycaster) {
   const fov = cachedFovRad
   let maxScale = 0
   ikTargets.forEach(t => {
-    t.target.updateMatrixWorld(true)
+    if (!skipMatrixUpdate) t.target.updateMatrixWorld(true)
     t.target.getWorldPosition(t.marker.position)
     const dist = t.marker.position.distanceTo(camera.position)
     const scale = (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height

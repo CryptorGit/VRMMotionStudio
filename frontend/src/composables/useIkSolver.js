@@ -44,7 +44,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     helper.value.enabled.ik = prevIK
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
-    updateIKMarkersBound.value?.()
+    updateIKMarkersBound.value?.(true)
   }
 
   function scheduleIKUpdate() {
@@ -57,7 +57,8 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   }
 
   function initUpdateIKMarkers() {
-    updateIKMarkersBound.value = () => updateIKMarkers(camera.value, renderer.value, raycaster)
+    updateIKMarkersBound.value = skip =>
+      updateIKMarkers(camera.value, renderer.value, raycaster, skip)
   }
 
   return { applyIKUpdate, scheduleIKUpdate, updateIKMarkersBound, initUpdateIKMarkers }
