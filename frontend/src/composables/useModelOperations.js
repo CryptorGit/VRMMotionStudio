@@ -40,10 +40,9 @@ export function useModelOperations({
     }
   }
 
-  function createBoneNameHelpers(skinnedMesh, isPhysicsBone, showPhysicsBones) {
+  function createBoneNameHelpers(skinnedMesh, isPhysicsBone) {
     const helpers = []
     skinnedMesh.skeleton.bones.forEach(bone => {
-      if (!showPhysicsBones && isPhysicsBone(bone)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -80,6 +79,7 @@ export function useModelOperations({
       sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1)
       sprite.position.set(0, 0.1, 0)
       sprite.visible = false
+      sprite.userData.isPhysicsBone = isPhysicsBone(bone)
       bone.add(sprite)
       helpers.push(sprite)
     })
@@ -101,7 +101,11 @@ export function useModelOperations({
       }
       if (Array.isArray(model.boneNameHelpers)) {
         model.boneNameHelpers.forEach(h => {
-          if (h) h.visible = visible && model.boneNameVisible
+          if (h)
+            h.visible =
+              visible &&
+              model.boneNameVisible &&
+              (model.showPhysicsBones || !h.userData?.isPhysicsBone)
         })
       }
     }
@@ -120,7 +124,11 @@ export function useModelOperations({
     if (Array.isArray(model?.boneNameHelpers)) {
       model.boneNameVisible = visible
       model.boneNameHelpers.forEach(h => {
-        if (h) h.visible = visible && model.visible
+        if (h)
+          h.visible =
+            visible &&
+            model.visible &&
+            (model.showPhysicsBones || !h.userData?.isPhysicsBone)
       })
     }
   }
@@ -128,7 +136,7 @@ export function useModelOperations({
   function togglePhysicsBones(index, visible) {
     const model = models.value[index]
     if (!model) return
-    const { skeletonHelper, isPhysicsBone, mesh } = model
+    const { skeletonHelper, isPhysicsBone } = model
     if (skeletonHelper && !(skeletonHelper instanceof THREE.SkeletonHelper)) {
       console.warn('skeletonHelper is not a THREE.SkeletonHelper', skeletonHelper)
       return
@@ -145,16 +153,12 @@ export function useModelOperations({
     }
     if (Array.isArray(model.boneNameHelpers)) {
       model.boneNameHelpers.forEach(h => {
-        h.parent?.remove(h)
-        h.material.map?.dispose?.()
-        h.material?.dispose?.()
+        h.visible =
+          model.boneNameVisible &&
+          model.visible &&
+          (visible || !h.userData?.isPhysicsBone)
       })
     }
-    const helpers = createBoneNameHelpers(mesh, isPhysicsBone, visible)
-    model.boneNameHelpers = helpers.map(h => markRaw(h))
-    model.boneNameHelpers.forEach(h => {
-      h.visible = model.boneNameVisible && model.visible
-    })
   }
 
   function disposeModelResources(model) {
@@ -318,8 +322,7 @@ export function useModelOperations({
             scene.value.add(skeletonHelper)
             const boneNameHelpers = createBoneNameHelpers(
               skinnedMesh,
-              isPhysicsBone,
-              showPhysicsBones
+              isPhysicsBone
             )
             models.value.push({
               id: nextModelId++,
