@@ -600,6 +600,10 @@ export function setupIKTargets(scene, mesh) {
       typeof c.target === 'number' ? bones[c.target]?.name : c.target
     if (t) targetNames.add(normalizeBoneName(t))
   })
+  bones.forEach(b => {
+    const n = normalizeBoneName(b.name)
+    if (typeof n === 'string' && n.endsWith('ik親')) targetNames.add(n)
+  })
   const addMarker = (target, chainIndex) => {
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -615,15 +619,16 @@ export function setupIKTargets(scene, mesh) {
   }
   bones.forEach(bone => {
     const normalizedName = normalizeBoneName(bone.name)
+    const isIKParent =
+      typeof normalizedName === 'string' && normalizedName.endsWith('ik親')
     const chainIndex = Array.isArray(iks)
       ? iks.findIndex(ik => bones[ik.target] === bone)
       : -1
     if (
-      chainIndex >= 0 &&
       targetNames.has(normalizedName) &&
-      typeof normalizedName === 'string'
+      (chainIndex >= 0 || isIKParent)
     ) {
-      addMarker(bone, chainIndex)
+      addMarker(bone, chainIndex >= 0 ? chainIndex : null)
     }
   })
   if (!Array.isArray(iks) || iks.length === 0) {
