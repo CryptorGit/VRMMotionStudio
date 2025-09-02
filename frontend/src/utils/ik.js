@@ -148,11 +148,19 @@ function resolveIKLinks(
   boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
 ) {
   const resolve = v => (typeof v === 'number' ? v : boneIndexMap.get(v))
+  const nameOf = v => {
+    if (typeof v === 'object' && v !== null && 'index' in v) return nameOf(v.index)
+    if (typeof v === 'number') return bones[v]?.name || v
+    return v
+  }
   return (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
     const target = resolve(ik.target)
     const effector = resolve(ik.effector)
     if (typeof target !== 'number' || typeof effector !== 'number') {
-      console.warn('getIKDefinitions: unresolved bone in chain', ik)
+      console.warn('getIKDefinitions: unresolved bone in chain', {
+        target: nameOf(ik.target),
+        effector: nameOf(ik.effector)
+      })
       return acc
     }
     const links = (ik.links || [])
@@ -162,7 +170,10 @@ function resolveIKLinks(
             ? resolve(l.index)
             : resolve(l)
         if (typeof idx !== 'number') {
-          console.warn('getIKDefinitions: unresolved bone in link', l)
+          console.warn('getIKDefinitions: unresolved bone in link', {
+            link: nameOf(l),
+            chainTarget: bones[target]?.name || target
+          })
           return null
         }
         return
@@ -172,7 +183,9 @@ function resolveIKLinks(
       })
       .filter(Boolean)
     if (links.length === 0) {
-      console.warn('getIKDefinitions: chain has no valid links', ik)
+      console.warn('getIKDefinitions: chain has no valid links', {
+        target: bones[target]?.name || target
+      })
       return acc
     }
     acc.push({ target, effector, links })
@@ -188,8 +201,10 @@ export function getIKDefinitions(geometry, modelName = '') {
   const originalCount = iks.length
   iks = resolveIKLinks(iks, bones, boneIndexMap)
   attachIKParents(bones, iks, boneIndexMap)
+  iks = resolveIKLinks(iks, bones, boneIndexMap)
   if (iks.length > 0) {
-    ikWarning.value = ''
+    ikWarning.value =
+      originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
   } else {
     ikWarning.value = originalCount > 0 ? 'IK定義が不完全' : 'IK定義が見つかりません'
   }
