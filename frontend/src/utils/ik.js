@@ -151,7 +151,21 @@ const boneNameAliases = {
   'right knee': '右ひざ',
   '左ひざ': '左ひざ',
   '左膝': '左ひざ',
-  'left knee': '左ひざ'
+  'left knee': '左ひざ',
+  '右足': '右足',
+  'right foot': '右足',
+  '左足': '左足',
+  'left foot': '左足',
+  '右足首': '右足首',
+  'right ankle': '右足首',
+  '左足首': '左足首',
+  'left ankle': '左足首',
+  '右つま先': '右つま先',
+  'right toe': '右つま先',
+  '右足先ex': '右つま先',
+  '左つま先': '左つま先',
+  'left toe': '左つま先',
+  '左足先ex': '左つま先'
 }
 
 export function normalizeBoneName(name) {
