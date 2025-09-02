@@ -503,6 +503,16 @@ function resolveIKLinks(
   }, [])
 }
 
+function createDefaultIKChains(bones) {
+  return bones.reduce((acc, bone, idx) => {
+    const parent = bone.parent ? bones.indexOf(bone.parent) : -1
+    if (parent !== -1) {
+      acc.push({ target: idx, effector: idx, links: [{ index: parent }] })
+    }
+    return acc
+  }, [])
+}
+
 export function getIKDefinitions(geometry, modelName = '') {
   const bones = geometry?.userData?.MMD?.bones || []
   const boneIndexMap = createBoneIndexMap(bones)
@@ -526,11 +536,15 @@ export function getIKDefinitions(geometry, modelName = '') {
       })
     }
   })
-  if (iks.length > 0) {
+  if (iks.length === 0) {
+    ikWarning.value =
+      originalCount > 0
+        ? 'IK定義が不完全のためデフォルトIKを生成しました'
+        : 'IK定義が見つからずデフォルトIKを生成しました'
+    iks = createDefaultIKChains(bones)
+  } else {
     ikWarning.value =
       originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
-  } else {
-    ikWarning.value = originalCount > 0 ? 'IK定義が不完全' : 'IK定義が見つかりません'
   }
   return iks
 }
@@ -564,10 +578,8 @@ export function setupIKTargets(scene, mesh) {
       : -1
     addMarker(bone, chainIndex)
   })
-  if (Array.isArray(iks) && iks.length > 0) {
-    ikWarning.value = ''
-  } else {
-    ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
+  if (!Array.isArray(iks) || iks.length === 0) {
+    ikWarning.value ||= 'IK定義が見つかりません。追加IK設定を行ってください'
   }
 }
 
@@ -611,7 +623,7 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
     return
   }
   let iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
-  if (!Array.isArray(iks) || iks.length === 0) return
+  if (!Array.isArray(iks)) iks = []
   skinnedMesh.geometry.userData.MMD =
     skinnedMesh.geometry.userData.MMD || {}
   skinnedMesh.geometry.userData.MMD.iks = iks
