@@ -394,7 +394,6 @@ export function setupIKTargets(scene, mesh) {
   if (!mesh) return
   const bones = mesh.skeleton?.bones || []
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
-  const added = new Set()
   const addMarker = (target, chainIndex) => {
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -408,41 +407,16 @@ export function setupIKTargets(scene, mesh) {
     ikTargets.push({ target, marker, chainIndex })
     scene.add(marker)
   }
+  bones.forEach(bone => {
+    const chainIndex = Array.isArray(iks)
+      ? iks.findIndex(ik => bones[ik.target] === bone)
+      : -1
+    addMarker(bone, chainIndex)
+  })
   if (Array.isArray(iks) && iks.length > 0) {
-    iks.forEach((ik, idx) => {
-      const target = bones[ik.target]
-      if (!target) return
-      addMarker(target, idx)
-      added.add(target)
-    })
     ikWarning.value = ''
   } else {
     ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
-  }
-  const chainBoneNames = new Set()
-  iks.forEach(ik => {
-    const indices = [ik.target, ik.effector, ...(ik.links || []).map(l => l.index)]
-    indices.forEach(i => {
-      const b = bones[i]
-      if (b) chainBoneNames.add(normalizeBoneName(b.name))
-    })
-  })
-  const missing = []
-  extraIKBoneNames.forEach(name => {
-    const target = bones.find(
-      b => normalizeBoneName(b.name) === normalizeBoneName(name)
-    )
-    if (!target || added.has(target)) return
-    if (!chainBoneNames.has(normalizeBoneName(name))) {
-      missing.push(name)
-      return
-    }
-    addMarker(target, -1)
-    added.add(target)
-  })
-  if (missing.length > 0) {
-    const msg = `IKチェーンに存在しないボーン: ${missing.join(', ')}`
-    ikWarning.value = ikWarning.value ? `${ikWarning.value}\n${msg}` : msg
   }
 }
 
