@@ -1,9 +1,10 @@
 import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
-import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { applyMmdRotationOrder } from '../utils/bones.js'
 import { setupIKTargets, ikTargets, selectedIK } from '../utils/ik.js'
+import { createLoader } from '../utils/createLoader.js'
+import { openDB } from '../utils/openDB.js'
 
 export function useModelLoader({
   scene,
@@ -28,16 +29,13 @@ export function useModelLoader({
   const DB_STORE = 'model'
   let dbPromise
 
+  function getLoader() {
+    return loader
+  }
+
   function getDB() {
     if (!dbPromise) {
-      dbPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1)
-        req.onupgradeneeded = () => {
-          req.result.createObjectStore(DB_STORE)
-        }
-        req.onsuccess = () => resolve(req.result)
-        req.onerror = () => reject(req.error)
-      })
+      dbPromise = openDB(DB_NAME, DB_STORE)
     }
     return dbPromise
   }
@@ -330,7 +328,7 @@ export function useModelLoader({
       logToServer({ event: 'resource-error', url })
     }
 
-    loader = new MMDLoader(manager)
+      loader = createLoader(manager)
     for (const { file: modelFile, dir } of modelEntries) {
       const modelPath = (modelFile.webkitRelativePath || modelFile.name)
         .replace(/^[^/]*\//, '')
@@ -454,6 +452,8 @@ export function useModelLoader({
     onDragOver,
     onDragLeave,
     onDrop,
-    restoreCachedModel
+    restoreCachedModel,
+    getLoader,
+    getDB
   }
 }
