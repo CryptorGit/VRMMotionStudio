@@ -178,7 +178,6 @@ function applyFallbackIKs(
   hasPMXIKs = false
 ) {
   let result = Array.isArray(iks) ? [...iks] : []
-  if (hasPMXIKs) return result
   if (result.length === 0) {
     const fallback = extraIKChains[modelName] || extraIKChains.default
     if (Array.isArray(fallback) && fallback.length > 0) {
@@ -202,6 +201,7 @@ function applyFallbackIKs(
     )
     if (chain) result.push({ ...chain })
   })
+  result = resolveIKLinks(result, bones, boneIndexMap)
   const seenTargets = new Set()
   result = result.filter(ik => {
     const targetName =
@@ -557,20 +557,6 @@ function createDefaultIKChains(bones) {
       )
       ikWarning.value ||= '一部のIKチェーンが無効です。PMXファイルを修正してください'
     }
-    const expected = extraIKChains[modelName] || extraIKChains.default || []
-    expected.forEach(c => {
-      const targetName = normalizeBoneName(
-        typeof c.target === 'number' ? bones[c.target]?.name : c.target
-      )
-      const exists = iks.some(
-        ik => normalizeBoneName(bones[ik.target]?.name) === targetName
-      )
-      if (!exists && boneIndexMap.has(targetName)) {
-        console.warn('getIKDefinitions: missing IK chain from config', {
-          target: targetName
-        })
-      }
-    })
     if (iks.length === 0) {
       ikWarning.value =
         originalCount > 0
