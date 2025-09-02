@@ -13,6 +13,7 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
   let physicsWasEnabled = false
 
   function onPointerDown(event) {
+    renderer.value?.domElement?.setPointerCapture(event.pointerId)
     const rect = renderer.value.domElement.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -83,7 +84,8 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     }
   }
 
-  function onPointerUp() {
+  function onPointerUp(event) {
+    renderer.value?.domElement?.releasePointerCapture(event?.pointerId)
     controls.value.enabled = true
     if (isRotating.value) {
       isRotating.value = false

@@ -28,20 +28,24 @@ export default function useIkControls(options) {
       if (dom) {
         dom.removeEventListener('pointermove', handlePointerMove)
         dom.removeEventListener('pointerup', handlePointerUp)
+        window.removeEventListener('pointerup', handlePointerUp)
       }
       dom = newDom
       if (dom) {
         dom.addEventListener('pointermove', handlePointerMove)
         dom.addEventListener('pointerup', handlePointerUp)
+        window.addEventListener('pointerup', handlePointerUp)
       }
     },
     { immediate: true }
   )
 
   onUnmounted(() => {
-    if (!dom) return
-    dom.removeEventListener('pointermove', handlePointerMove)
-    dom.removeEventListener('pointerup', handlePointerUp)
+    if (dom) {
+      dom.removeEventListener('pointermove', handlePointerMove)
+      dom.removeEventListener('pointerup', handlePointerUp)
+    }
+    window.removeEventListener('pointerup', handlePointerUp)
     dom = null
   })
   return {
