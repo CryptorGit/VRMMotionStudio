@@ -1,5 +1,5 @@
 {
-  "extraIKBoneNames": ["左足ＩＫ", "右足ＩＫ", "左足IK", "右足IK"],
+  "extraIKBoneNames": ["左足ＩＫ", "右足ＩＫ", "左つま先ＩＫ", "右つま先ＩＫ", "左足IK", "右足IK"],
   "extraIKChains": {
     "default": [
       {
@@ -21,6 +21,16 @@
         "target": "右足IK",
         "effector": "右足首",
         "links": ["右膝", "右足"]
+      },
+      {
+        "target": "左つま先ＩＫ",
+        "effector": "左足首",
+        "links": ["左足", "左つま先"]
+      },
+      {
+        "target": "右つま先ＩＫ",
+        "effector": "右足首",
+        "links": ["右足", "右つま先"]
       }
     ],
     "ユニティちゃん": "default",
