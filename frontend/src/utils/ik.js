@@ -573,10 +573,13 @@ export function setupIKTargets(scene, mesh) {
     scene.add(marker)
   }
   bones.forEach(bone => {
+    const normalizedName = normalizeBoneName(bone.name)
     const chainIndex = Array.isArray(iks)
       ? iks.findIndex(ik => bones[ik.target] === bone)
       : -1
-    addMarker(bone, chainIndex)
+    if (typeof normalizedName === 'string' && normalizedName.includes('ik')) {
+      addMarker(bone, chainIndex)
+    }
   })
   if (!Array.isArray(iks) || iks.length === 0) {
     ikWarning.value ||= 'IK定義が見つかりません。追加IK設定を行ってください'
