@@ -30,6 +30,7 @@
       @toggle-model="toggleModel"
       @toggle-bone="toggleBone"
       @toggle-bone-names="toggleBoneNames"
+      @toggle-physics-bones="togglePhysicsBones"
       @remove-model="removeModel"
       @hide="hideSection"
     />
@@ -63,6 +64,7 @@ const emit = defineEmits([
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
+  'toggle-physics-bones',
   'remove-model'
 ])
 const showLightMarker = computed({
@@ -94,6 +96,9 @@ function toggleBone(i, v) {
 }
 function toggleBoneNames(i, v) {
   emit('toggle-bone-names', i, v)
+}
+function togglePhysicsBones(i, v) {
+  emit('toggle-physics-bones', i, v)
 }
 function removeModel(i) {
   emit('remove-model', i)
