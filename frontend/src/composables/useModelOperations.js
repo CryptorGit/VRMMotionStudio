@@ -43,6 +43,14 @@ export function useModelOperations({
     }
   }
 
+  function warnMissingLocalAxes(bones) {
+    bones.forEach(bone => {
+      if (!bone.userData?.localAxes) {
+        console.warn(`localAxes missing for bone "${bone.name}"`)
+      }
+    })
+  }
+
   function createBoneNameHelpers(skinnedMesh, isPhysicsBone) {
     const helpers = []
     skinnedMesh.skeleton.bones.forEach(bone => {
@@ -315,6 +323,7 @@ export function useModelOperations({
             const showPhysicsBones = false
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
             initBoneOriginalQuaternions(skinnedMesh.skeleton.bones)
+            warnMissingLocalAxes(skinnedMesh.skeleton.bones)
             skinnedMesh.skeleton.calculateInverses()
             const metaName =
               skinnedMesh.geometry?.userData?.MMD?.meta?.name
