@@ -42,6 +42,8 @@
 - [ ] IK 定義の拡張後の IK マーカー表示をブラウザで手動確認する
 - [x] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
 - [ ] IK情報を取得できなかったモデル名を一覧化する
+- [ ] 問題のモデルで `mesh.skeleton.bones.map(b => b.name)` を実行しボーン名を確認する
+- [ ] `ik-config.json` 調整後にモデルを再読込し警告が解消されることをブラウザで手動確認する
 - [ ] モデル削除や並び替え時に ModelList と 3D 表示が正しく更新されることをブラウザで手動確認する
   - [ ] removeModel による helper/scene 解除とリソース解放が行われることをブラウザで手動確認する
 - [x] IKチェーン定義を設定ファイルやUIから編集できるようにする
