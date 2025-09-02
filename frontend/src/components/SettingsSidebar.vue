@@ -15,51 +15,32 @@
         <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
       </button>
     </div>
-    <div class="sections" v-if="!collapsed && hasSections">
-      <LightingSection
-        v-if="visibleSections.lighting"
-        :ambient="ambient"
-        :directional="directional"
-        v-model:directional-intensity="directionalIntensity"
-        v-model:show-light-marker="showLightMarker"
-        v-model:marker-color="markerColor"
-        @hide="hideSection('lighting')"
-      />
-      <MorphSection
-        v-if="visibleSections.morph"
-        :mesh="mesh"
-        @hide="hideSection('morph')"
-      />
-      <ModelSection
-        v-if="visibleSections.models"
-        :models="models"
-        v-model:show-ik-markers="showIkMarkers"
-        v-model:enable-physics="enablePhysics"
-        @toggle-model="toggleModel"
-        @toggle-bone="toggleBoneVisibility"
-        @toggle-bone-names="toggleBoneNameVisibility"
-        @remove-model="removeModel"
-        @hide="hideSection('models')"
-      />
-    </div>
+    <SectionVisibility
+      v-if="!collapsed && hasSections"
+      :ambient="ambient"
+      :directional="directional"
+      :mesh="mesh"
+      :models="models"
+      :visible-sections="visibleSections"
+      v-model:show-light-marker="showLightMarker"
+      v-model:marker-color="markerColor"
+      v-model:directional-intensity="directionalIntensity"
+      v-model:show-ik-markers="showIkMarkers"
+      v-model:enable-physics="enablePhysics"
+      @toggle-model="(i, v) => emit('toggle-model', i, v)"
+      @toggle-bone="(i, v) => emit('toggle-bone', i, v)"
+      @toggle-bone-names="(i, v) => emit('toggle-bone-names', i, v)"
+      @remove-model="i => emit('remove-model', i)"
+      @hide="hideSection"
+    />
   </div>
 </template>
 
 <script setup>
-import {
-  ref,
-  reactive,
-  onMounted,
-  watchEffect,
-  computed,
-  nextTick,
-  toRefs
-} from 'vue'
-import LightingSection from './LightingSection.vue'
-import MorphSection from './MorphSection.vue'
-import ModelSection from './ModelSection.vue'
-import { STORAGE_KEY } from '../config.js'
+import { ref, onMounted, computed, nextTick, toRefs } from 'vue'
+import SectionVisibility from './SectionVisibility.vue'
 import { useResizableSidebar } from '../composables/useResizableSidebar.js'
+import { useSidebarState } from '../composables/useSidebarState.js'
 
 const props = defineProps({
   ambient: Object,
@@ -105,148 +86,30 @@ const enablePhysics = computed({
   set: v => emit('update:enablePhysics', v)
 })
 
-const collapsed = ref(false)
 const { width, isResizing, startResize } = useResizableSidebar(300)
-const headerRef = ref(null)
-const headerHeight = ref(0)
-
-const visibleSections = reactive({
-  lighting: false,
-  morph: false,
-  models: false
+const {
+  collapsed,
+  visibleSections,
+  hideSection,
+  hasSections
+} = useSidebarState({
+  width,
+  showLightMarker,
+  showIkMarkers,
+  enablePhysics,
+  markerColor,
+  directionalIntensity,
+  directional
 })
 
-function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      collapsed: collapsed.value,
-      width: width.value,
-      visibleSections: { ...visibleSections },
-      showLightMarker: showLightMarker.value,
-      showIkMarkers: showIkMarkers.value,
-      enablePhysics: enablePhysics.value,
-      markerColor: markerColor.value,
-      directionalIntensity: directionalIntensity.value,
-      directional: {
-        position: {
-          x: directional.value.position.x,
-          y: directional.value.position.y,
-          z: directional.value.position.z
-        },
-        target: {
-          x: directional.value.target.position.x,
-          y: directional.value.target.position.y,
-          z: directional.value.target.position.z
-        }
-      }
-    })
-  )
-}
-
-let saveStateTimeout
-function scheduleSaveState() {
-  clearTimeout(saveStateTimeout)
-  saveStateTimeout = setTimeout(saveState, 200)
-}
+const headerRef = ref(null)
+const headerHeight = ref(0)
 
 onMounted(() => {
   nextTick(() => {
     headerHeight.value = headerRef.value?.offsetHeight ?? 0
   })
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) {
-    try {
-      const {
-        collapsed: savedCollapsed,
-        width: savedWidth,
-        visibleSections: savedVisible,
-        showLightMarker: savedShowMarker,
-        showIkMarkers: savedShowIk,
-        enablePhysics: savedEnablePhysics,
-        markerColor: savedMarkerColor,
-        directionalIntensity: savedDirectionalIntensity,
-        directional: savedDirectional
-      } = JSON.parse(saved)
-      collapsed.value = savedCollapsed ?? false
-      width.value = savedWidth ?? 300
-      if (savedVisible) {
-        visibleSections.lighting = savedVisible.lighting ?? false
-        visibleSections.morph = savedVisible.morph ?? false
-        visibleSections.models = savedVisible.models ?? false
-      }
-      if (savedShowMarker !== undefined)
-        emit('update:showLightMarker', savedShowMarker)
-      if (savedShowIk !== undefined)
-        emit('update:showIkMarkers', savedShowIk)
-      if (savedEnablePhysics !== undefined)
-        emit('update:enablePhysics', savedEnablePhysics)
-      if (savedMarkerColor !== undefined)
-        emit('update:markerColor', savedMarkerColor)
-      if (savedDirectionalIntensity !== undefined)
-        emit('update:directionalIntensity', savedDirectionalIntensity)
-      if (savedDirectional?.position) {
-        const p = savedDirectional.position
-        directional.value.position.set(
-          p.x ?? directional.value.position.x,
-          p.y ?? directional.value.position.y,
-          p.z ?? directional.value.position.z
-        )
-      }
-      if (savedDirectional?.target) {
-        const t = savedDirectional.target
-        directional.value.target.position.set(
-          t.x ?? directional.value.target.position.x,
-          t.y ?? directional.value.target.position.y,
-          t.z ?? directional.value.target.position.z
-        )
-      }
-    } catch (_) {
-      // JSON パース失敗時は何もしない
-    }
-  }
 })
-
-watchEffect(() => {
-  collapsed.value
-  width.value
-  showLightMarker.value
-  showIkMarkers.value
-  enablePhysics.value
-  markerColor.value
-  directionalIntensity.value
-  JSON.stringify(visibleSections)
-  directional.value.position.x
-  directional.value.position.y
-  directional.value.position.z
-  directional.value.target.position.x
-  directional.value.target.position.y
-  directional.value.target.position.z
-  scheduleSaveState()
-})
-
-function hideSection(section) {
-  visibleSections[section] = false
-}
-
-function toggleModel(index, visible) {
-  emit('toggle-model', index, visible)
-}
-
-function toggleBoneVisibility(index, visible) {
-  emit('toggle-bone', index, visible)
-}
-function toggleBoneNameVisibility(index, visible) {
-  emit('toggle-bone-names', index, visible)
-}
-
-function removeModel(index) {
-  emit('remove-model', index)
-}
-
-const hasSections = computed(() =>
-  Object.values(visibleSections).some(Boolean)
-)
 
 const sidebarStyle = computed(() => {
   const style = { '--header-height': headerHeight.value + 'px' }
@@ -285,10 +148,7 @@ defineExpose({
 .settings-sidebar.collapsed {
   width: 40px;
 }
-.settings-sidebar.collapsed .sections {
-  display: none;
-}
-.settings-sidebar.collapsed .header span {
+ .settings-sidebar.collapsed .header span {
   display: none;
 }
 .header {
@@ -306,9 +166,5 @@ defineExpose({
   width: 5px;
   cursor: ew-resize;
   background: transparent;
-}
-.sections {
-  max-height: calc(100vh - var(--header-height));
-  overflow-y: auto;
 }
 </style>

@@ -1,6 +1,6 @@
 import { ref, onUnmounted } from 'vue'
 
-export function useResizableSidebar(initialWidth = 300) {
+export function useResizableSidebar(initialWidth = 300, minWidth = 150) {
   const width = ref(initialWidth)
   const isResizing = ref(false)
   let moveListener = null
@@ -17,7 +17,7 @@ export function useResizableSidebar(initialWidth = 300) {
       if (frameId) cancelAnimationFrame(frameId)
       frameId = requestAnimationFrame(() => {
         const delta = startX - ev.clientX
-        width.value = Math.max(150, startWidth + delta)
+        width.value = Math.max(minWidth, startWidth + delta)
       })
     }
     upListener = function () {
