@@ -73,22 +73,23 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
     if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
-      const target = selectedIK.value.target
-      if (target) {
-        const parent = target.parent
-        if (parent && typeof parent.worldToLocal === 'function') {
-          parent.worldToLocal(dragPoint)
-          target.position.copy(dragPoint)
-          target.updateMatrixWorld(true)
-          const mesh = currentMeshRef.value
-          mesh?.skeleton?.update()
-          mesh?.updateMatrixWorld?.(true)
-          scheduleIKUpdate()
-        } else {
-          console.warn('IK target parent missing worldToLocal method')
+        const target = selectedIK.value.target
+        if (target) {
+          const parent = target.parent
+          if (parent && typeof parent.worldToLocal === 'function') {
+            parent.updateMatrixWorld(true)
+            parent.worldToLocal(dragPoint)
+            target.position.copy(dragPoint)
+            target.updateMatrixWorld(true)
+            const mesh = currentMeshRef.value
+            mesh?.skeleton?.update()
+            mesh?.updateMatrixWorld?.(true)
+            scheduleIKUpdate()
+          } else {
+            console.warn('IK target parent missing worldToLocal method')
+          }
         }
       }
-    }
   }
 
   function onPointerUp(event) {
