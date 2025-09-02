@@ -17,14 +17,19 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   })
 
   watch(currentMeshRef, mesh => {
-    setupIKTargets(scene.value, mesh)
-    ikConfigPromise.then(() => {
-      if (currentMeshRef.value === mesh) setupIKTargets(scene.value, mesh)
-      if (mesh && !ikInitializedMeshes.has(mesh)) {
-        initIKSolver(helper.value, mesh, ensureFloorRigidBody)
-        ikInitializedMeshes.add(mesh)
-      }
-    })
+    ikConfigPromise
+      .then(() => {
+        if (currentMeshRef.value === mesh) {
+          setupIKTargets(scene.value, mesh)
+          if (mesh && !ikInitializedMeshes.has(mesh)) {
+            initIKSolver(helper.value, mesh, ensureFloorRigidBody)
+            ikInitializedMeshes.add(mesh)
+          }
+        }
+      })
+      .catch(e => {
+        console.error('Failed to setup IK targets:', e)
+      })
   })
 
   function applyIKUpdate() {
