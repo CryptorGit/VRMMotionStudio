@@ -1,5 +1,5 @@
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import json
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import logging
 import signal
 import threading
