@@ -45,6 +45,24 @@ mvn package
 java -cp java/target/classes com.mmd.App
 ```
 
+### 必須環境変数
+バックエンドの認証には以下の環境変数を設定する必要があります。未設定のまま起動すると警告が表示され、認証が行えません。
+
+- `JWT_SECRET`: JWT 署名に使用する秘密鍵
+- `API_KEY`: 固定 API キー
+
+Linux/macOS の例:
+```bash
+export JWT_SECRET=your-secret
+export API_KEY=your-api-key
+```
+
+Windows (PowerShell) の例:
+```powershell
+$env:JWT_SECRET="your-secret"
+$env:API_KEY="your-api-key"
+```
+
 ## 基本機能（予定）
 - PMX インポート
 - モーフ調整
