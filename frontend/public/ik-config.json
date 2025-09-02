@@ -41,9 +41,6 @@
         "effector": "右足首",
         "links": ["右足", "右足先EX"]
       }
-    ],
-    "ユニティちゃん": "default",
-    "VRoidモデル": "default",
-    "EACモデル": "default"
+    ]
   }
 }
