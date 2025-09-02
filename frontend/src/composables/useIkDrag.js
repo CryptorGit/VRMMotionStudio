@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
 import { selectedIK, ikTargets } from '../utils/ik.js'
 
@@ -7,7 +8,7 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
   const mouse = new THREE.Vector2()
   let dragPlane = null
   const dragPoint = new THREE.Vector3()
-  let isRotating = false
+  const isRotating = ref(false)
   const quat = new THREE.Quaternion()
   let physicsWasEnabled = false
 
@@ -31,12 +32,8 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     }
     if (event.button === 2) {
       event.preventDefault()
-      isRotating = true
+      isRotating.value = true
       controls.value.enabled = false
-      renderer.value.domElement.addEventListener('pointermove', onPointerMove)
-      renderer.value.domElement.addEventListener('pointerup', onPointerUp)
-      renderer.value.domElement.addEventListener('pointercancel', onPointerUp)
-      renderer.value.domElement.addEventListener('pointerleave', onPointerUp)
       return
     }
     if (event.button !== 0) return
@@ -47,10 +44,6 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     camera.value.getWorldDirection(normal)
     dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
     controls.value.enabled = false
-    renderer.value.domElement.addEventListener('pointermove', onPointerMove)
-    renderer.value.domElement.addEventListener('pointerup', onPointerUp)
-    renderer.value.domElement.addEventListener('pointercancel', onPointerUp)
-    renderer.value.domElement.addEventListener('pointerleave', onPointerUp)
   }
 
   function onPointerMove(event) {
@@ -58,7 +51,7 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
       onPointerUp()
       return
     }
-    if (isRotating) {
+    if (isRotating.value) {
       const bone = selectedIK.value.target
       let rotationAxis = bone.userData?.localAxes?.xAxis
       if (rotationAxis) {
@@ -92,14 +85,9 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
   }
 
   function onPointerUp() {
-    const dom = renderer.value.domElement
-    dom.removeEventListener('pointermove', onPointerMove)
-    dom.removeEventListener('pointerup', onPointerUp)
-    dom.removeEventListener('pointercancel', onPointerUp)
-    dom.removeEventListener('pointerleave', onPointerUp)
     controls.value.enabled = true
-    if (isRotating) {
-      isRotating = false
+    if (isRotating.value) {
+      isRotating.value = false
     }
     dragPlane = null
     if (physicsWasEnabled) {
@@ -129,5 +117,5 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     }
   }
 
-  return { onPointerDown, onPointerMove, onPointerUp, onControlStart, onControlEnd }
+  return { onPointerDown, onPointerMove, onPointerUp, onControlStart, onControlEnd, isRotating }
 }

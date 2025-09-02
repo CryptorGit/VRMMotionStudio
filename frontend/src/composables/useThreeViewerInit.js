@@ -16,8 +16,6 @@ export function useThreeViewerInit({
   onControlStart,
   onControlEnd,
   onPointerDown,
-  onPointerMove,
-  onPointerUp,
   onWindowResize
 }) {
   function init() {
@@ -65,10 +63,6 @@ export function useThreeViewerInit({
     scene.value.add(directionalLightHelper)
 
     renderer.value.domElement.addEventListener('pointerdown', onPointerDown)
-    renderer.value.domElement.addEventListener('pointermove', onPointerMove)
-    renderer.value.domElement.addEventListener('pointerup', onPointerUp)
-    renderer.value.domElement.addEventListener('pointercancel', onPointerUp)
-    renderer.value.domElement.addEventListener('pointerleave', onPointerUp)
 
     window.addEventListener('resize', onWindowResize)
   }
@@ -76,10 +70,6 @@ export function useThreeViewerInit({
   function cleanup() {
     window.removeEventListener('resize', onWindowResize)
     renderer.value?.domElement?.removeEventListener('pointerdown', onPointerDown)
-    renderer.value?.domElement?.removeEventListener('pointermove', onPointerMove)
-    renderer.value?.domElement?.removeEventListener('pointerup', onPointerUp)
-    renderer.value?.domElement?.removeEventListener('pointercancel', onPointerUp)
-    renderer.value?.domElement?.removeEventListener('pointerleave', onPointerUp)
     controls.value?.removeEventListener('start', onControlStart)
     controls.value?.removeEventListener('end', onControlEnd)
   }
