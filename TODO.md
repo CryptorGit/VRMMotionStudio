@@ -45,6 +45,7 @@
 - [x] 複数モデルをロードして切り替えた際にも IK 操作が可能であることをブラウザで手動確認する
 - [ ] IK 定義の拡張後の IK マーカー表示をブラウザで手動確認する
 - [x] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
+- [ ] 未対応モデル用の追加IKチェーンを `frontend/public/ik-config.json` に追記する
 - [ ] IK情報を取得できなかったモデル名を一覧化する
 - [ ] 問題のモデルで `mesh.skeleton.bones.map(b => b.name)` を実行しボーン名を確認する
 - [ ] `ik-config.json` 調整後にモデルを再読込し警告が解消されることをブラウザで手動確認する

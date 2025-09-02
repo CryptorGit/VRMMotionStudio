@@ -15,51 +15,24 @@ let cachedFovRad = 0
 export async function loadIKConfig() {
   try {
     const res = await fetch('/ik-config.json')
-    if (!res.ok) throw new Error('Config not found')
-    const data = await res.json()
-    extraIKBoneNames.push(...(data.extraIKBoneNames || []))
-    if (data.extraIKChains) {
-      const resolved = {}
-      const resolving = new Set()
-      const resolve = key => {
-        if (resolved[key]) return resolved[key]
-        if (resolving.has(key)) return []
-        resolving.add(key)
-        const val = data.extraIKChains[key]
-        let chains = []
-        if (Array.isArray(val)) {
-          chains = val.map(c => ({ ...c }))
-        } else if (typeof val === 'string') {
-          chains = resolve(val)
-        } else if (val && typeof val === 'object') {
-          const baseKey = val.ref || val.extends || val.use
-          chains = baseKey ? resolve(baseKey).map(c => ({ ...c })) : []
-          if (Array.isArray(val.chains)) {
-            val.chains.forEach(o => {
-              const idx = chains.findIndex(c => c.target === o.target)
-              chains[idx !== -1 ? idx : chains.length] = {
-                ...(chains[idx] || {}),
-                ...o
-              }
-            })
-          }
-        }
-        resolving.delete(key)
-        resolved[key] = chains
-        return chains
-      }
-      Object.keys(data.extraIKChains).forEach(k => resolve(k))
-      Object.assign(extraIKChains, resolved)
-    }
+    if (!res.ok) throw new Error('config fetch failed')
+    const {
+      extraIKBoneNames: boneNames = [],
+      extraIKChains: chains = {}
+    } = await res.json()
+    extraIKBoneNames.push(...boneNames)
+    Object.assign(extraIKChains, chains)
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
-    if (extraIKBoneNames.length === 0)
+    if (extraIKBoneNames.length === 0) {
       extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
-    if (Object.keys(extraIKChains).length === 0)
+    }
+    if (Object.keys(extraIKChains).length === 0) {
       extraIKChains.default = [
         { target: '左足ＩＫ', effector: '左足首', links: ['左ひざ', '左足'] },
         { target: '右足ＩＫ', effector: '右足首', links: ['右ひざ', '右足'] }
       ]
+    }
   }
 }
 export const ikConfigPromise = loadIKConfig()
