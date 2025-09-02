@@ -118,8 +118,6 @@ const ikControls = useIkControls({
 })
 const {
   onPointerDown,
-  onPointerMove,
-  onPointerUp,
   onControlStart,
   onControlEnd,
   ensureFloorRigidBody,
@@ -206,8 +204,6 @@ const { init: initViewer, cleanup: cleanupViewer } = useThreeViewerInit({
   onControlStart,
   onControlEnd,
   onPointerDown,
-  onPointerMove,
-  onPointerUp,
   onWindowResize
 })
 
