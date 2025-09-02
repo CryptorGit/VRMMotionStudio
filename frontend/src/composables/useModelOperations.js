@@ -55,11 +55,16 @@ export function useModelOperations({
       ctx.fillStyle = '#000'
       ctx.fillText(name, canvas.width / 2, canvas.height / 2)
       const texture = new THREE.CanvasTexture(canvas)
+      texture.needsUpdate = true
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+      texture.generateMipmaps = false
       const material = new THREE.SpriteMaterial({
         map: texture,
         depthTest: false,
         depthWrite: false,
-        transparent: true
+        transparent: true,
+        toneMapped: false
       })
       const sprite = new THREE.Sprite(material)
       const scaleFactor = 0.01

@@ -27,10 +27,10 @@
       v-model:directional-intensity="directionalIntensity"
       v-model:show-ik-markers="showIkMarkers"
       v-model:enable-physics="enablePhysics"
-      @toggle-model="(i, v) => emit('toggle-model', i, v)"
-      @toggle-bone="(i, v) => emit('toggle-bone', i, v)"
-      @toggle-bone-names="(i, v) => emit('toggle-bone-names', i, v)"
-      @remove-model="i => emit('remove-model', i)"
+      @toggle-model="toggleModel"
+      @toggle-bone="toggleBone"
+      @toggle-bone-names="toggleBoneNames"
+      @remove-model="removeModel"
       @hide="hideSection"
     />
   </div>
@@ -85,6 +85,19 @@ const enablePhysics = computed({
   get: () => props.enablePhysics,
   set: v => emit('update:enablePhysics', v)
 })
+
+function toggleModel(i, v) {
+  emit('toggle-model', i, v)
+}
+function toggleBone(i, v) {
+  emit('toggle-bone', i, v)
+}
+function toggleBoneNames(i, v) {
+  emit('toggle-bone-names', i, v)
+}
+function removeModel(i) {
+  emit('remove-model', i)
+}
 
 const { width, isResizing, startResize } = useResizableSidebar(300)
 const {
