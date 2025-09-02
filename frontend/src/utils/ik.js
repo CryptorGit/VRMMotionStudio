@@ -18,7 +18,39 @@ export async function loadIKConfig() {
     if (!res.ok) throw new Error('Config not found')
     const data = await res.json()
     extraIKBoneNames.push(...(data.extraIKBoneNames || []))
-    if (data.extraIKChains) Object.assign(extraIKChains, data.extraIKChains)
+    if (data.extraIKChains) {
+      const resolved = {}
+      const resolving = new Set()
+      const resolve = key => {
+        if (resolved[key]) return resolved[key]
+        if (resolving.has(key)) return []
+        resolving.add(key)
+        const val = data.extraIKChains[key]
+        let chains = []
+        if (Array.isArray(val)) {
+          chains = val.map(c => ({ ...c }))
+        } else if (typeof val === 'string') {
+          chains = resolve(val)
+        } else if (val && typeof val === 'object') {
+          const baseKey = val.ref || val.extends || val.use
+          chains = baseKey ? resolve(baseKey).map(c => ({ ...c })) : []
+          if (Array.isArray(val.chains)) {
+            val.chains.forEach(o => {
+              const idx = chains.findIndex(c => c.target === o.target)
+              chains[idx !== -1 ? idx : chains.length] = {
+                ...(chains[idx] || {}),
+                ...o
+              }
+            })
+          }
+        }
+        resolving.delete(key)
+        resolved[key] = chains
+        return chains
+      }
+      Object.keys(data.extraIKChains).forEach(k => resolve(k))
+      Object.assign(extraIKChains, resolved)
+    }
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0)
