@@ -59,9 +59,6 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
         const angle = event.movementX * 0.01
         quat.setFromAxisAngle(rotationAxis, angle)
         applyLocalAxisRotation(bone, quat)
-        bone.updateMatrixWorld(true)
-        currentMeshRef.value?.skeleton?.update()
-        currentMeshRef.value?.updateMatrixWorld(true)
         scheduleIKUpdate()
       }
       return
@@ -76,9 +73,6 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
       if (target) {
         target.parent.worldToLocal(dragPoint)
         target.position.copy(dragPoint)
-        target.updateMatrixWorld(true)
-        currentMeshRef.value?.skeleton?.update()
-        currentMeshRef.value?.updateMatrixWorld(true)
         scheduleIKUpdate()
       }
     }
