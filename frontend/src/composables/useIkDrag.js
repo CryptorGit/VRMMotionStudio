@@ -63,6 +63,7 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
         bone.updateMatrixWorld(true)
         const mesh = currentMeshRef.value
         mesh?.skeleton?.update()
+        mesh?.updateMatrixWorld?.(true)
         scheduleIKUpdate()
       }
       return
@@ -82,6 +83,7 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
           target.updateMatrixWorld(true)
           const mesh = currentMeshRef.value
           mesh?.skeleton?.update()
+          mesh?.updateMatrixWorld?.(true)
           scheduleIKUpdate()
         } else {
           console.warn('IK target parent missing worldToLocal method')

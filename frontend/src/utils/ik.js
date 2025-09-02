@@ -404,8 +404,6 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
   }
   let iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
   if (!Array.isArray(iks) || iks.length === 0) return
-  const bones = skinnedMesh.skeleton?.bones || []
-  attachIKParents(bones, iks)
   skinnedMesh.geometry.userData.MMD =
     skinnedMesh.geometry.userData.MMD || {}
   skinnedMesh.geometry.userData.MMD.iks = iks
