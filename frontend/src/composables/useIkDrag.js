@@ -56,15 +56,18 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
       let rotationAxis = bone.userData?.localAxes?.xAxis
       if (rotationAxis) {
         rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
-        const angle = event.movementX * 0.01
-        quat.setFromAxisAngle(rotationAxis, angle)
-        applyLocalAxisRotation(bone, quat)
-        bone.updateMatrixWorld(true)
-        const mesh = currentMeshRef.value
-        mesh?.skeleton?.update()
-        mesh?.updateMatrixWorld?.(true)
-        scheduleIKUpdate()
+      } else {
+        console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
+        rotationAxis = new THREE.Vector3(0, 1, 0)
       }
+      const angle = event.movementX * 0.01
+      quat.setFromAxisAngle(rotationAxis, angle)
+      applyLocalAxisRotation(bone, quat)
+      bone.updateMatrixWorld(true)
+      const mesh = currentMeshRef.value
+      mesh?.skeleton?.update()
+      mesh?.updateMatrixWorld?.(true)
+      scheduleIKUpdate()
       return
     }
     if (!dragPlane) return
