@@ -6,17 +6,15 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   ></div>
-  <div id="menu" ref="menu">
-    <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
-    <ul id="menu-list" :class="{ hidden: !menuOpen }">
-      <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
-      <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
-      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
-      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
-      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル一覧</li>
-      <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
-    </ul>
-  </div>
+  <MenuControls
+    ref="menu"
+    :menu-open="menuOpen"
+    :toggle-menu="toggleMenu"
+    :open-file="openFile"
+    :export-pose="exportPose"
+    :open-sidebar-section="openSidebarSection"
+    :clear-cache="clearCache"
+  />
   <div v-if="poses.length" id="pose-selector">
     <select v-model="selectedPose" @change="applyPose">
       <option disabled value="">ポーズを選択</option>
@@ -54,6 +52,7 @@
 <script setup>
 import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
+import MenuControls from './MenuControls.vue'
 import * as THREE from 'three'
 import { API_BASE_URL } from '../config.js'
 import {
@@ -68,15 +67,13 @@ import {
 } from '../utils/lighting.js'
 import { showIkMarkers, ikWarning, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
 import useIkControls from '../composables/useIkControls.js'
-import useModelLoader from '../composables/useModelLoader.js'
 import { useMenu } from '../composables/useMenu.js'
-import { useRenderLoop } from '../composables/useRenderLoop.js'
-import { useThreeViewerInit } from '../composables/useThreeViewerInit.js'
+import { useFileLoader } from '../composables/useFileLoader.js'
+import { useRenderer } from '../composables/useRenderer.js'
 import { useAmmoInit } from '../composables/useAmmoInit.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 
 const viewer = ref(null)
-const fileInput = ref(null)
 const menu = ref(null)
 const settingsSidebar = ref(null)
 const currentMeshRef = ref(null)
@@ -101,8 +98,7 @@ function logToServer(data) {
   }).catch(() => {})
 }
 
-const { menuOpen, toggleMenu, openFile, openSidebarSection } = useMenu({
-  fileInput,
+const { menuOpen, toggleMenu, openSidebarSection } = useMenu({
   settingsSidebar,
   logToServer
 })
@@ -126,7 +122,7 @@ const {
   initUpdateIKMarkers
 } = ikControls
 
-const modelLoader = useModelLoader({
+const fileLoader = useFileLoader({
   scene,
   camera,
   renderer,
@@ -139,6 +135,7 @@ const modelLoader = useModelLoader({
   viewer
 })
 const {
+  fileInput,
   poses,
   selectedPose,
   models,
@@ -150,13 +147,14 @@ const {
   clearCache,
   applyPose,
   exportPose,
+  openFile,
   onDragOver,
   onDragLeave,
   onDrop,
   restoreCachedModel
-} = modelLoader
+} = fileLoader
 
-const { animate, onWindowResize } = useRenderLoop({
+const { animate, initRenderer, cleanupRenderer } = useRenderer({
   clock,
   targetFps: TARGET_FPS,
   helper,
@@ -166,11 +164,17 @@ const { animate, onWindowResize } = useRenderLoop({
   updateIKMarkers: () => updateIKMarkersBound.value?.(),
   directionalLightHelper,
   renderer,
-  viewer
+  viewer,
+  controls,
+  ambientLight,
+  directionalLight,
+  onControlStart,
+  onControlEnd,
+  onPointerDown
 })
 
 function handleDocumentClick(e) {
-  if (menuOpen.value && menu.value && !menu.value.contains(e.target)) {
+  if (menuOpen.value && menu.value?.menu && !menu.value.menu.contains(e.target)) {
     menuOpen.value = false
   }
 }
@@ -191,22 +195,6 @@ function handleUnhandledRejection(e) {
   }
 }
 
-const { init: initViewer, cleanup: cleanupViewer } = useThreeViewerInit({
-  viewer,
-  scene,
-  camera,
-  renderer,
-  effect,
-  controls,
-  ambientLight,
-  directionalLight,
-  directionalLightHelper,
-  onControlStart,
-  onControlEnd,
-  onPointerDown,
-  onWindowResize
-})
-
 const { init: initAmmo, cleanup: cleanupAmmo } = useAmmoInit({
   helper,
   enablePhysics,
@@ -223,7 +211,7 @@ onMounted(async () => {
   loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
   setupErrorHandlers()
-  initViewer()
+  initRenderer()
   await initAmmo()
   initUpdateIKMarkers()
   document.addEventListener('click', handleDocumentClick)
@@ -237,7 +225,7 @@ onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   cleanupErrorHandlers()
   cleanupAmmo()
-  cleanupViewer()
+  cleanupRenderer()
   ikTargets.forEach(t => (t.marker.visible = false))
   selectedIK.value = null
   enablePhysics.value = false
