@@ -35,6 +35,19 @@ export function applyMmdRotationOrder(bones, order = 'ZYX') {
   }
 }
 
+/**
+ * 各ボーンの現在のクォータニオンを `userData._origQuat` に保存する。
+ * `applyBoneInheritance` を使用する前に呼び出し、基準姿勢を設定する。
+ * @param {THREE.Bone[]} bones - 対象ボーン配列
+ */
+export function initBoneOriginalQuaternions(bones) {
+  if (!Array.isArray(bones)) return
+  for (const bone of bones) {
+    const data = bone.userData || (bone.userData = {})
+    data._origQuat = bone.quaternion.clone()
+  }
+}
+
 // 作業用クォータニオンを使い回してアロケーションを抑える
 const _qParent = new THREE.Quaternion()
 const _x = new THREE.Vector3()
