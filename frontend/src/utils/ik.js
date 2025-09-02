@@ -20,28 +20,34 @@ export async function loadIKConfig() {
       extraIKBoneNames: boneNames = [],
       extraIKChains: chains = {}
     } = await res.json()
-    extraIKBoneNames.push(...boneNames)
-    Object.assign(extraIKChains, chains)
+    extraIKBoneNames.push(...boneNames.map(normalizeBoneName))
+    for (const [key, arr] of Object.entries(chains)) {
+      extraIKChains[key] = Array.isArray(arr)
+        ? arr.map(normalizeChain)
+        : []
+    }
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0) {
       extraIKBoneNames.push(
-        '左足ＩＫ',
-        '右足ＩＫ',
-        '左つま先ＩＫ',
-        '右つま先ＩＫ',
-        '左手ＩＫ',
-        '右手ＩＫ',
-        '左親指ＩＫ',
-        '右親指ＩＫ',
-        '左人指ＩＫ',
-        '右人指ＩＫ',
-        '左中指ＩＫ',
-        '右中指ＩＫ',
-        '左薬指ＩＫ',
-        '右薬指ＩＫ',
-        '左小指ＩＫ',
-        '右小指ＩＫ'
+        ...[
+          '左足ＩＫ',
+          '右足ＩＫ',
+          '左つま先ＩＫ',
+          '右つま先ＩＫ',
+          '左手ＩＫ',
+          '右手ＩＫ',
+          '左親指ＩＫ',
+          '右親指ＩＫ',
+          '左人指ＩＫ',
+          '右人指ＩＫ',
+          '左中指ＩＫ',
+          '右中指ＩＫ',
+          '左薬指ＩＫ',
+          '右薬指ＩＫ',
+          '左小指ＩＫ',
+          '右小指ＩＫ'
+        ].map(normalizeBoneName)
       )
     }
     if (Object.keys(extraIKChains).length === 0) {
@@ -110,7 +116,7 @@ export async function loadIKConfig() {
           effector: '右小指３',
           links: ['右小指２', '右小指１', '右小指０']
         }
-      ]
+      ].map(normalizeChain)
     }
   }
 }
@@ -380,6 +386,17 @@ export function normalizeBoneName(name) {
   return n
 }
 
+function normalizeChain(chain) {
+  return {
+    ...chain,
+    target: normalizeBoneName(chain.target),
+    effector: normalizeBoneName(chain.effector),
+    links: (chain.links || []).map(l =>
+      typeof l === 'string' ? normalizeBoneName(l) : l
+    )
+  }
+}
+
 const createBoneIndexMap = bones =>
   new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
 
@@ -517,6 +534,7 @@ function createDefaultIKChains(bones) {
     const pmxIKs = geometry?.userData?.MMD?.iks
     const hasPMXIKs = Array.isArray(pmxIKs) && pmxIKs.length > 0
     let iks = hasPMXIKs ? pmxIKs : findUserDataIKs(geometry)
+    iks = resolveIKLinks(iks, bones, boneIndexMap)
     iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap, hasPMXIKs)
     const originalCount = iks.length
     iks = resolveIKLinks(iks, bones, boneIndexMap)
@@ -536,7 +554,7 @@ function createDefaultIKChains(bones) {
       const exists = iks.some(
         ik => normalizeBoneName(bones[ik.target]?.name) === targetName
       )
-      if (!exists) {
+      if (!exists && boneIndexMap.has(targetName)) {
         console.warn('getIKDefinitions: missing IK chain from config', {
           target: targetName
         })
