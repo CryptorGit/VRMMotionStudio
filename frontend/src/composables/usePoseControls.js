@@ -1,6 +1,6 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
-import { selectedIK } from '../utils/ik.js'
+import { selectedIK, normalizeBoneName } from '../utils/ik.js'
 
 export function usePoseControls({
   loader,
@@ -55,7 +55,7 @@ export function usePoseControls({
 
   function handleTransformEvent() {
     const name = transformControls?.value?.object?.name
-    if (name && /IK$/i.test(name)) {
+    if (name && /ik$/i.test(normalizeBoneName(name))) {
       applyIKUpdate()
     }
   }

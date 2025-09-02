@@ -39,6 +39,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !helper.value) return
     mesh.updateMatrixWorld(true)
     mesh.skeleton.update()
+    helper.value.objects.get(mesh)?.ik?.solve()
     helper.value.update(0)
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
