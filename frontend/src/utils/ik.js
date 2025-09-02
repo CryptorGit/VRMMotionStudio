@@ -177,7 +177,20 @@ const boneNameAliases = {
   '右足先ex': '右つま先',
   '左つま先': '左つま先',
   'left toe': '左つま先',
-  '左足先ex': '左つま先'
+  '左足先ex': '左つま先',
+  // IK ボーンの英語・半角表記への対応
+  'right leg ik': '右足ik',
+  'right foot ik': '右足ik',
+  'right ankle ik': '右足ik',
+  'left leg ik': '左足ik',
+  'left foot ik': '左足ik',
+  'left ankle ik': '左足ik',
+  'right toe ik': '右つま先ik',
+  'left toe ik': '左つま先ik',
+  '右足ik': '右足ik',
+  '左足ik': '左足ik',
+  '右つま先ik': '右つま先ik',
+  '左つま先ik': '左つま先ik'
 }
 
 export function normalizeBoneName(name) {
@@ -276,6 +289,10 @@ function resolveIKLinks(
         if (filtered.length > 0) links.splice(0, links.length, ...filtered)
       }
     }
+    console.debug('resolveIKLinks:', {
+      target: bones[target]?.name || target,
+      links: links.map(l => bones[l.index]?.name || l.index)
+    })
     if (links.length === 0) {
       console.warn('getIKDefinitions: chain has no valid links', {
         target: bones[target]?.name || target
