@@ -222,9 +222,9 @@ onMounted(async () => {
   loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
   setupErrorHandlers()
-  const restoredMesh = await restoreCachedModel()
-  if (restoredMesh) {
-    currentMeshRef.value = restoredMesh
+  const restored = await restoreCachedModel()
+  if (restored) {
+    currentMeshRef.value = models.value[0]?.mesh || null
     setupIKTargets(scene.value, currentMeshRef.value)
   }
   initRenderer()
