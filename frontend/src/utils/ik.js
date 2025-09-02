@@ -424,6 +424,26 @@ const createBoneIndexMap = bones => {
   return map
 }
 
+function inferIKChainsFromStructure(bones) {
+  const chains = []
+  bones.forEach((knee, kneeIdx) => {
+    const ankleIdx = bones.findIndex(b => b.parent === knee)
+    if (ankleIdx === -1) return
+    const toeIdx = bones.findIndex(b => b.parent === bones[ankleIdx])
+    if (toeIdx === -1) return
+    const kneePos = bones[kneeIdx]?.position || new THREE.Vector3()
+    const anklePos = bones[ankleIdx]?.position || new THREE.Vector3()
+    const toePos = bones[toeIdx]?.position || new THREE.Vector3()
+    if (kneePos.y <= anklePos.y || anklePos.y <= toePos.y) return
+    chains.push({
+      target: toeIdx,
+      effector: toeIdx,
+      links: [{ index: ankleIdx }, { index: kneeIdx }]
+    })
+  })
+  return chains
+}
+
 function resolveIKLinks(
   iks,
   bones,
@@ -440,18 +460,24 @@ function resolveIKLinks(
     if (typeof v === 'number') return bones[v]?.name || v
     return v
   }
+  const guessed = []
   return (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
     const target = resolve(ik.target)
     const effector = resolve(ik.effector)
     if (typeof target !== 'number' || typeof effector !== 'number') {
-      console.warn('getIKDefinitions: unresolved bone in chain', {
-        target: nameOf(ik.target),
-        effector: nameOf(ik.effector)
-      })
-      const miss =
-        typeof target !== 'number' ? nameOf(ik.target) : nameOf(ik.effector)
-      ikWarning.value ||=
-        `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
+      if (guessed.length === 0) guessed.push(...inferIKChainsFromStructure(bones))
+      if (guessed.length > 0) {
+        guessed.forEach(g => acc.push(g))
+      } else {
+        console.warn('getIKDefinitions: unresolved bone in chain', {
+          target: nameOf(ik.target),
+          effector: nameOf(ik.effector)
+        })
+        const miss =
+          typeof target !== 'number' ? nameOf(ik.target) : nameOf(ik.effector)
+        ikWarning.value ||=
+          `IKを自動推測できません。${miss} を ik-config.json の extraIKChains に追加してください`
+      }
       return acc
     }
     const links = (ik.links || [])
@@ -602,6 +628,9 @@ function createDefaultIKChains(bones) {
       ikWarning.value =
         originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
     }
+    geometry.userData = geometry.userData || {}
+    geometry.userData.MMD = geometry.userData.MMD || {}
+    geometry.userData.MMD.iks = iks
     return iks
   }
 
