@@ -128,8 +128,12 @@ export function useModelOperations({
   function togglePhysicsBones(index, visible) {
     const model = models.value[index]
     if (!model) return
-    model.showPhysicsBones = visible
     const { skeletonHelper, isPhysicsBone, mesh } = model
+    if (skeletonHelper && !(skeletonHelper instanceof THREE.SkeletonHelper)) {
+      console.warn('skeletonHelper is not a THREE.SkeletonHelper', skeletonHelper)
+      return
+    }
+    model.showPhysicsBones = visible
     if (skeletonHelper) {
       const bones = skeletonHelper.allBones || skeletonHelper.bones
       skeletonHelper.allBones = bones

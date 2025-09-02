@@ -98,7 +98,12 @@ function toggleBoneNames(i, v) {
   emit('toggle-bone-names', i, v)
 }
 function togglePhysicsBones(i, v) {
-  emit('toggle-physics-bones', i, v)
+  try {
+    emit('toggle-physics-bones', i, v)
+  } catch (e) {
+    console.warn('物理ボーンの切り替えに失敗しました', e)
+    alert('物理ボーンの切り替えに失敗しました')
+  }
 }
 function removeModel(i) {
   emit('remove-model', i)
