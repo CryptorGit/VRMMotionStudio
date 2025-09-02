@@ -1,6 +1,9 @@
 import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
-import { applyMmdRotationOrder } from '../utils/bones.js'
+import {
+  applyMmdRotationOrder,
+  initBoneOriginalQuaternions
+} from '../utils/bones.js'
 import { setupIKTargets, ikTargets } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
 
@@ -307,6 +310,7 @@ export function useModelOperations({
             const isPhysicsBone = createIsPhysicsBone(skinnedMesh)
             const showPhysicsBones = false
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
+            initBoneOriginalQuaternions(skinnedMesh.skeleton.bones)
             skinnedMesh.skeleton.calculateInverses()
             scene.value.add(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
