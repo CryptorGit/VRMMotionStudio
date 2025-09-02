@@ -350,9 +350,11 @@ export function useModelOperations({
   }
 
   async function restoreCachedModel() {
+    console.debug('restoreCachedModel: start')
     let saved
     try {
       saved = await cache.loadCachedFiles()
+      console.debug('restoreCachedModel: load result', saved)
     } catch (e) {
       console.warn('Failed to load cached files')
       console.debug(e)
@@ -360,20 +362,31 @@ export function useModelOperations({
       return null
     }
     if (!saved.length) {
-      console.warn('No cached model to restore')
-      console.debug('restoreCachedModel: load result', saved)
+      console.info('No cached model to restore')
       alert('復元するモデルがありません')
       return null
     }
     const files = []
     for (const model of saved) {
       for (const f of model) {
-        const file = new File([f.data], f.name, { type: f.type })
-        if (f.path) Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
-        files.push(file)
+        try {
+          const file = new File([f.data], f.name, { type: f.type })
+          if (f.path) Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
+          files.push(file)
+        } catch (err) {
+          console.error('Failed to reconstruct file from cache', err)
+        }
       }
     }
-    await handleFiles(files)
+    try {
+      await handleFiles(files)
+      console.info(`restoreCachedModel: restored ${saved.length} model(s)`) 
+    } catch (e) {
+      console.error('Failed to restore cached model files', e)
+      alert('モデルの復元中にエラーが発生しました')
+      return null
+    }
+    console.debug('restoreCachedModel: models in scene', models.value.length)
     return currentMeshRef.value
   }
 
