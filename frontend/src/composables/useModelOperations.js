@@ -23,9 +23,18 @@ export function useModelOperations({
   let nextModelId = 1
   const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 
-  function createBoneNameHelpers(skinnedMesh) {
+  function createIsPhysicsBone(skinnedMesh) {
+    const indices = new Set(
+      skinnedMesh.geometry?.userData?.MMD?.rigidBodies?.map(rb => rb.boneIndex) || []
+    )
+    const bones = skinnedMesh.skeleton?.bones || []
+    return bone => indices.has(bones.indexOf(bone))
+  }
+
+  function createBoneNameHelpers(skinnedMesh, isPhysicsBone) {
     const helpers = []
     skinnedMesh.skeleton.bones.forEach(bone => {
+      if (isPhysicsBone(bone)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -76,15 +85,17 @@ export function useModelOperations({
       if (model.skeletonHelper) {
         model.skeletonHelper.visible = visible && model.bonesVisible
       }
-      if (model.boneNameHelpers) {
-        model.boneNameHelpers.forEach(h => (h.visible = visible && model.boneNameVisible))
+      if (Array.isArray(model.boneNameHelpers)) {
+        model.boneNameHelpers.forEach(h => {
+          if (h) h.visible = visible && model.boneNameVisible
+        })
       }
     }
   }
 
   function toggleBoneVisibility(index, visible) {
     const model = models.value[index]
-    if (model && model.skeletonHelper) {
+    if (model?.skeletonHelper) {
       model.bonesVisible = visible
       model.skeletonHelper.visible = visible && model.visible
     }
@@ -92,9 +103,11 @@ export function useModelOperations({
 
   function toggleBoneNameVisibility(index, visible) {
     const model = models.value[index]
-    if (model && model.boneNameHelpers) {
+    if (Array.isArray(model?.boneNameHelpers)) {
       model.boneNameVisible = visible
-      model.boneNameHelpers.forEach(h => (h.visible = visible && model.visible))
+      model.boneNameHelpers.forEach(h => {
+        if (h) h.visible = visible && model.visible
+      })
     }
   }
 
@@ -245,13 +258,15 @@ export function useModelOperations({
               console.error('SkinnedMesh not found in model', modelFile.name)
               return resolve()
             }
+            const isPhysicsBone = createIsPhysicsBone(skinnedMesh)
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
             skinnedMesh.skeleton.calculateInverses()
             scene.value.add(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
+            skeletonHelper.bones = skeletonHelper.bones.filter(b => !isPhysicsBone(b))
             skeletonHelper.visible = debugSkinning
             scene.value.add(skeletonHelper)
-            const boneNameHelpers = createBoneNameHelpers(skinnedMesh)
+            const boneNameHelpers = createBoneNameHelpers(skinnedMesh, isPhysicsBone)
             models.value.push({
               id: nextModelId++,
               mesh: markRaw(skinnedMesh),
