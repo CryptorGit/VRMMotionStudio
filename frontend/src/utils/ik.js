@@ -64,12 +64,16 @@ export async function loadIKConfig() {
 }
 export const ikConfigPromise = loadIKConfig()
 
-export function attachIKParents(bones, iks) {
+export function attachIKParents(
+  bones,
+  iks,
+  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+) {
   const ikParentRegex = /(?:IK|ＩＫ)親$/
   bones.forEach((b, idx) => {
     if (ikParentRegex.test(b.name)) {
       const ikName = b.name.replace(/(?:IK|ＩＫ)親$/, '')
-      const targetIdx = bones.findIndex(bn => bn.name === ikName)
+      const targetIdx = boneIndexMap.get(ikName)
       const chain = iks.find(ik => ik.target === targetIdx)
       if (chain && !chain.links.some(l => l.index === idx)) {
         chain.links.unshift({ index: idx })
@@ -101,7 +105,12 @@ function findUserDataIKs(geometry) {
   return []
 }
 
-function applyFallbackIKs(iks, bones, modelName) {
+function applyFallbackIKs(
+  iks,
+  bones,
+  modelName,
+  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+) {
   let result = Array.isArray(iks) ? [...iks] : []
   if (result.length === 0) {
     const fallback = extraIKChains[modelName] || extraIKChains.default
@@ -111,10 +120,13 @@ function applyFallbackIKs(iks, bones, modelName) {
   }
   const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
   extraIKBoneNames.forEach(name => {
-    const idx = bones.findIndex(b => b.name === name)
-    if (idx === -1) return
+    const idx = boneIndexMap.get(name)
+    if (typeof idx !== 'number') return
     const exists = result.some(ik => {
-      const target = typeof ik.target === 'number' ? ik.target : bones.findIndex(b => b.name === ik.target)
+      const target =
+        typeof ik.target === 'number'
+          ? ik.target
+          : boneIndexMap.get(ik.target)
       return target === idx
     })
     if (exists) return
@@ -124,23 +136,33 @@ function applyFallbackIKs(iks, bones, modelName) {
   return result
 }
 
-function resolveIKLinks(iks, bones) {
-  const resolve = v => (typeof v === 'number' ? v : bones.findIndex(b => b.name === v))
+function resolveIKLinks(
+  iks,
+  bones,
+  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+) {
+  const resolve = v => (typeof v === 'number' ? v : boneIndexMap.get(v))
   return (Array.isArray(iks) ? iks : []).reduce((acc, ik) => {
     const target = resolve(ik.target)
     const effector = resolve(ik.effector)
-    if (target === -1 || effector === -1) {
+    if (typeof target !== 'number' || typeof effector !== 'number') {
       console.warn('getIKDefinitions: unresolved bone in chain', ik)
       return acc
     }
     const links = (ik.links || [])
       .map(l => {
-        const idx = typeof l === 'object' && l !== null && 'index' in l ? resolve(l.index) : resolve(l)
-        if (idx === -1) {
+        const idx =
+          typeof l === 'object' && l !== null && 'index' in l
+            ? resolve(l.index)
+            : resolve(l)
+        if (typeof idx !== 'number') {
           console.warn('getIKDefinitions: unresolved bone in link', l)
           return null
         }
-        return typeof l === 'object' && l !== null && 'index' in l ? { ...l, index: idx } : { index: idx }
+        return
+          typeof l === 'object' && l !== null && 'index' in l
+            ? { ...l, index: idx }
+            : { index: idx }
       })
       .filter(Boolean)
     if (links.length === 0) {
@@ -154,11 +176,12 @@ function resolveIKLinks(iks, bones) {
 
 export function getIKDefinitions(geometry, modelName = '') {
   const bones = geometry?.userData?.MMD?.bones || []
+  const boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
   let iks = findUserDataIKs(geometry)
-  iks = applyFallbackIKs(iks, bones, modelName)
+  iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap)
   const originalCount = iks.length
-  iks = resolveIKLinks(iks, bones)
-  attachIKParents(bones, iks)
+  iks = resolveIKLinks(iks, bones, boneIndexMap)
+  attachIKParents(bones, iks, boneIndexMap)
   if (iks.length > 0) {
     ikWarning.value = ''
   } else {
