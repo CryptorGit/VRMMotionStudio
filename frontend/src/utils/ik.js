@@ -594,6 +594,7 @@ export function setupIKTargets(scene, mesh) {
       ? iks.findIndex(ik => bones[ik.target] === bone)
       : -1
     if (
+      chainIndex >= 0 &&
       targetNames.has(normalizedName) &&
       typeof normalizedName === 'string' &&
       !normalizedName.endsWith('ik親')
