@@ -101,7 +101,10 @@ export function useModelOperations({
   function disposeModelResources(model) {
     if (!model) return
     const { mesh, skeletonHelper, boneNameHelpers } = model
-    helper.value?.remove?.(mesh)
+    const objects = helper.value?.objects
+    if (objects?.has?.(mesh) || objects?.get?.(mesh)) {
+      helper.value?.remove?.(mesh)
+    }
     try {
       mesh.traverse(child => {
         if (!child.isMesh) return
