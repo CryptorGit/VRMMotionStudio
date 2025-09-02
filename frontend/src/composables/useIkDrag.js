@@ -3,7 +3,17 @@ import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
 import { selectedIK, ikTargets } from '../utils/ik.js'
 
-export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, enablePhysics, scheduleIKUpdate, applyIKUpdate }) {
+export function useIkDrag({
+  camera,
+  renderer,
+  controls,
+  helper,
+  currentMeshRef,
+  enablePhysics,
+  scheduleIKUpdate,
+  applyIKUpdate,
+  updateIKMarkersBound
+}) {
   const raycaster = new THREE.Raycaster()
   const mouse = new THREE.Vector2()
   let dragPlane = null
@@ -86,10 +96,10 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
             target.position.copy(dragPoint)
             target.updateMatrixWorld(true)
             const mesh = currentMeshRef.value
+            helper.value?.objects.get(mesh)?.ik?.solve()
             mesh?.skeleton?.update()
             mesh?.updateMatrixWorld?.(true)
-            scheduleIKUpdate()
-            applyIKUpdate()
+            updateIKMarkersBound.value?.(true)
           } else {
             console.warn('IK target parent missing worldToLocal method')
           }
@@ -111,8 +121,14 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
       helper.value?.update(0)
       physicsWasEnabled = false
     }
+    if (selectedIK.value) {
+      const mesh = currentMeshRef.value
+      helper.value?.objects.get(mesh)?.ik?.solve()
+      mesh?.skeleton?.update()
+      mesh?.updateMatrixWorld?.(true)
+      updateIKMarkersBound.value?.(true)
+    }
     selectedIK.value = null
-    applyIKUpdate()
   }
 
   function onControlStart() {

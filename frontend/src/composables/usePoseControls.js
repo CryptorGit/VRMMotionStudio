@@ -1,8 +1,17 @@
-import { ref } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { MMDExporter } from 'three/examples/jsm/exporters/MMDExporter.js'
 import { selectedIK } from '../utils/ik.js'
 
-export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logToServer, updateIKMarkersBound }) {
+export function usePoseControls({
+  loader,
+  helper,
+  currentMeshRef,
+  menuOpen,
+  logToServer,
+  updateIKMarkersBound,
+  transformControls,
+  applyIKUpdate
+}) {
   const poses = ref([])
   const selectedPose = ref(null)
 
@@ -43,6 +52,29 @@ export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logT
     logToServer({ event: 'export' })
     menuOpen.value = false
   }
+
+  function handleTransformEvent() {
+    const name = transformControls?.value?.object?.name
+    if (name && /IK$/i.test(name)) {
+      applyIKUpdate()
+    }
+  }
+
+  watch(
+    () => transformControls?.value,
+    tc => {
+      if (!tc) return
+      tc.addEventListener('dragging-changed', handleTransformEvent)
+      tc.addEventListener('objectChange', handleTransformEvent)
+    },
+    { immediate: true }
+  )
+
+  onUnmounted(() => {
+    const tc = transformControls?.value
+    tc?.removeEventListener('dragging-changed', handleTransformEvent)
+    tc?.removeEventListener('objectChange', handleTransformEvent)
+  })
 
   return { poses, selectedPose, applyPose, exportPose }
 }

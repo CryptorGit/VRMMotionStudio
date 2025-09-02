@@ -12,7 +12,9 @@ export default function useModelLoader(ctx) {
     currentMeshRef: ctx.currentMeshRef,
     menuOpen: ctx.menuOpen,
     logToServer: ctx.logToServer,
-    updateIKMarkersBound: ctx.updateIKMarkersBound
+    updateIKMarkersBound: ctx.updateIKMarkersBound,
+    transformControls: ctx.transformControls,
+    applyIKUpdate: ctx.applyIKUpdate
   })
   const ops = useModelOperations({
     ...ctx,
