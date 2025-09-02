@@ -67,13 +67,13 @@ export const ikConfigPromise = loadIKConfig()
 export function attachIKParents(
   bones,
   iks,
-  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+  boneIndexMap = createBoneIndexMap(bones)
 ) {
   const ikParentRegex = /(?:IK|ＩＫ)親$/
   bones.forEach((b, idx) => {
     if (ikParentRegex.test(b.name)) {
       const ikName = b.name.replace(/(?:IK|ＩＫ)親$/, '')
-      const targetIdx = boneIndexMap.get(ikName)
+      const targetIdx = boneIndexMap.get(normalizeBoneName(ikName))
       const chain = iks.find(ik => ik.target === targetIdx)
       if (
         chain &&
@@ -115,7 +115,7 @@ function applyFallbackIKs(
   iks,
   bones,
   modelName,
-  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+  boneIndexMap = createBoneIndexMap(bones)
 ) {
   let result = Array.isArray(iks) ? [...iks] : []
   if (result.length === 0) {
@@ -126,28 +126,50 @@ function applyFallbackIKs(
   }
   const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
   extraIKBoneNames.forEach(name => {
-    const idx = boneIndexMap.get(name)
+    const idx = boneIndexMap.get(normalizeBoneName(name))
     if (typeof idx !== 'number') return
     const exists = result.some(ik => {
       const target =
         typeof ik.target === 'number'
           ? ik.target
-          : boneIndexMap.get(ik.target)
+          : boneIndexMap.get(normalizeBoneName(ik.target))
       return target === idx
     })
     if (exists) return
-    const chain = fallbackChains.find(c => c.target === name)
+    const chain = fallbackChains.find(
+      c => normalizeBoneName(c.target) === normalizeBoneName(name)
+    )
     if (chain) result.push({ ...chain })
   })
   return result
 }
 
+// 既知のボーン名エイリアスを正規化するためのマッピング
+const boneNameAliases = {
+  '右ひざ': '右ひざ',
+  '右膝': '右ひざ',
+  'right knee': '右ひざ',
+  '左ひざ': '左ひざ',
+  '左膝': '左ひざ',
+  'left knee': '左ひざ'
+}
+
+export function normalizeBoneName(name) {
+  if (typeof name !== 'string') return name
+  const n = name.normalize('NFKC').toLowerCase()
+  return boneNameAliases[n] || n
+}
+
+const createBoneIndexMap = bones =>
+  new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
+
 function resolveIKLinks(
   iks,
   bones,
-  boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+  boneIndexMap = createBoneIndexMap(bones)
 ) {
-  const resolve = v => (typeof v === 'number' ? v : boneIndexMap.get(v))
+  const resolve = v =>
+    typeof v === 'number' ? v : boneIndexMap.get(normalizeBoneName(v))
   const nameOf = v => {
     if (typeof v === 'object' && v !== null && 'index' in v) return nameOf(v.index)
     if (typeof v === 'number') return bones[v]?.name || v
@@ -195,7 +217,7 @@ function resolveIKLinks(
 
 export function getIKDefinitions(geometry, modelName = '') {
   const bones = geometry?.userData?.MMD?.bones || []
-  const boneIndexMap = new Map(bones.map((b, i) => [b.name, i]))
+  const boneIndexMap = createBoneIndexMap(bones)
   let iks = findUserDataIKs(geometry)
   iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap)
   const originalCount = iks.length
@@ -247,7 +269,9 @@ export function setupIKTargets(scene, mesh) {
     ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
   }
   extraIKBoneNames.forEach(name => {
-    const target = bones.find(b => b.name === name)
+    const target = bones.find(
+      b => normalizeBoneName(b.name) === normalizeBoneName(name)
+    )
     if (!target || added.has(target)) return
     addMarker(target, -1)
     added.add(target)
