@@ -25,12 +25,95 @@ export async function loadIKConfig() {
   } catch (e) {
     console.warn('Failed to load IK config, applying defaults:', e)
     if (extraIKBoneNames.length === 0) {
-      extraIKBoneNames.push('左足ＩＫ', '右足ＩＫ')
+      extraIKBoneNames.push(
+        '左足ＩＫ',
+        '右足ＩＫ',
+        '左つま先ＩＫ',
+        '右つま先ＩＫ',
+        '左足先EX',
+        '右足先EX',
+        '左手ＩＫ',
+        '右手ＩＫ',
+        '左親指ＩＫ',
+        '右親指ＩＫ',
+        '左人指ＩＫ',
+        '右人指ＩＫ',
+        '左中指ＩＫ',
+        '右中指ＩＫ',
+        '左薬指ＩＫ',
+        '右薬指ＩＫ',
+        '左小指ＩＫ',
+        '右小指ＩＫ'
+      )
     }
     if (Object.keys(extraIKChains).length === 0) {
       extraIKChains.default = [
         { target: '左足ＩＫ', effector: '左足首', links: ['左ひざ', '左足'] },
-        { target: '右足ＩＫ', effector: '右足首', links: ['右ひざ', '右足'] }
+        { target: '右足ＩＫ', effector: '右足首', links: ['右ひざ', '右足'] },
+        {
+          target: '左つま先ＩＫ',
+          effector: '左つま先',
+          links: ['左足首', '左ひざ', '左足']
+        },
+        {
+          target: '右つま先ＩＫ',
+          effector: '右つま先',
+          links: ['右足首', '右ひざ', '右足']
+        },
+        { target: '左足先EX', effector: '左足首', links: ['左ひざ', '左足'] },
+        { target: '右足先EX', effector: '右足首', links: ['右ひざ', '右足'] },
+        { target: '左手ＩＫ', effector: '左手首', links: ['左ひじ', '左腕'] },
+        { target: '右手ＩＫ', effector: '右手首', links: ['右ひじ', '右腕'] },
+        {
+          target: '左親指ＩＫ',
+          effector: '左親指２',
+          links: ['左親指１', '左親指０']
+        },
+        {
+          target: '右親指ＩＫ',
+          effector: '右親指２',
+          links: ['右親指１', '右親指０']
+        },
+        {
+          target: '左人指ＩＫ',
+          effector: '左人指３',
+          links: ['左人指２', '左人指１', '左人指０']
+        },
+        {
+          target: '右人指ＩＫ',
+          effector: '右人指３',
+          links: ['右人指２', '右人指１', '右人指０']
+        },
+        {
+          target: '左中指ＩＫ',
+          effector: '左中指３',
+          links: ['左中指２', '左中指１', '左中指０']
+        },
+        {
+          target: '右中指ＩＫ',
+          effector: '右中指３',
+          links: ['右中指２', '右中指１', '右中指０']
+        },
+        {
+          target: '左薬指ＩＫ',
+          effector: '左薬指３',
+          links: ['左薬指２', '左薬指１', '左薬指０']
+        },
+        {
+          target: '右薬指ＩＫ',
+          effector: '右薬指３',
+          links: ['右薬指２', '右薬指１', '右薬指０']
+        },
+        {
+          target: '左小指ＩＫ',
+          effector: '左小指３',
+          links: ['左小指２', '左小指１', '左小指０']
+        },
+        {
+          target: '右小指ＩＫ',
+          effector: '右小指３',
+          links: ['右小指２', '右小指１', '右小指０']
+        }
       ]
     }
   }
@@ -152,6 +235,74 @@ const boneNameAliases = {
   '左足首': '左足首',
   'left ankle': '左足首',
   'l ankle': '左足首',
+  '右ひじ': '右ひじ',
+  '右肘': '右ひじ',
+  'right elbow': '右ひじ',
+  'r elbow': '右ひじ',
+  '左ひじ': '左ひじ',
+  '左肘': '左ひじ',
+  'left elbow': '左ひじ',
+  'l elbow': '左ひじ',
+  '右腕': '右腕',
+  'right arm': '右腕',
+  'r arm': '右腕',
+  '左腕': '左腕',
+  'left arm': '左腕',
+  'l arm': '左腕',
+  '右手首': '右手首',
+  'right wrist': '右手首',
+  'r wrist': '右手首',
+  '左手首': '左手首',
+  'left wrist': '左手首',
+  'l wrist': '左手首',
+  '右手': '右手',
+  'right hand': '右手',
+  'r hand': '右手',
+  '左手': '左手',
+  'left hand': '左手',
+  'l hand': '左手',
+  '右手ik': '右手ik',
+  'right hand ik': '右手ik',
+  'r hand ik': '右手ik',
+  '左手ik': '左手ik',
+  'left hand ik': '左手ik',
+  'l hand ik': '左手ik',
+  'right thumb ik': '右親指ik',
+  'r thumb ik': '右親指ik',
+  'left thumb ik': '左親指ik',
+  'l thumb ik': '左親指ik',
+  'right index ik': '右人指ik',
+  'right index finger ik': '右人指ik',
+  'r index ik': '右人指ik',
+  'r index finger ik': '右人指ik',
+  'left index ik': '左人指ik',
+  'left index finger ik': '左人指ik',
+  'l index ik': '左人指ik',
+  'l index finger ik': '左人指ik',
+  'right middle ik': '右中指ik',
+  'right middle finger ik': '右中指ik',
+  'r middle ik': '右中指ik',
+  'r middle finger ik': '右中指ik',
+  'left middle ik': '左中指ik',
+  'left middle finger ik': '左中指ik',
+  'l middle ik': '左中指ik',
+  'l middle finger ik': '左中指ik',
+  'right ring ik': '右薬指ik',
+  'right ring finger ik': '右薬指ik',
+  'r ring ik': '右薬指ik',
+  'r ring finger ik': '右薬指ik',
+  'left ring ik': '左薬指ik',
+  'left ring finger ik': '左薬指ik',
+  'l ring ik': '左薬指ik',
+  'l ring finger ik': '左薬指ik',
+  'right little ik': '右小指ik',
+  'right little finger ik': '右小指ik',
+  'r little ik': '右小指ik',
+  'r little finger ik': '右小指ik',
+  'left little ik': '左小指ik',
+  'left little finger ik': '左小指ik',
+  'l little ik': '左小指ik',
+  'l little finger ik': '左小指ik',
   '右つま先': '右つま先',
   'right toe': '右つま先',
   'r toe': '右つま先',
