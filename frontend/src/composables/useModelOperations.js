@@ -5,7 +5,7 @@ import {
   initBoneOriginalQuaternions,
   ensureLocalAxes
 } from '../utils/bones.js'
-import { setupIKTargets, ikTargets } from '../utils/ik.js'
+import { setupIKTargets, ikTargets, ikConfigPromise } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
 
 export function useModelOperations({
@@ -194,6 +194,7 @@ export function useModelOperations({
         })
         ikTargets.length = 0
         currentMeshRef.value = models.value[0]?.mesh || null
+        await ikConfigPromise
         setupIKTargets(scene.value, currentMeshRef.value)
       }
       if (models.value.length === 0) {
@@ -223,6 +224,7 @@ export function useModelOperations({
     models.value = []
     nextModelId = 1
     currentMeshRef.value = null
+    await ikConfigPromise
     setupIKTargets(scene.value, currentMeshRef.value)
     menuOpen.value = false
   }
@@ -254,6 +256,7 @@ export function useModelOperations({
     const names = Array.from(files).map(f => f.name)
     logToServer({ event: 'select', files: names })
 
+    await ikConfigPromise
     const manager = new THREE.LoadingManager()
     manager.setURLModifier(url => {
       const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '')
