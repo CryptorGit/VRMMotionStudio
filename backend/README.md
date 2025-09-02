@@ -15,6 +15,25 @@
 - `db/` : 今後実装予定のデータベース関連
 
 ## 実行方法
+### 必須環境変数
+以下の環境変数が設定されていない場合、起動時に警告が表示され認証が機能しません。
+
+- `JWT_SECRET`: JWT 署名用の秘密鍵
+- `API_KEY`: 固定 API キー
+
+Linux/macOS の例:
+```bash
+export JWT_SECRET=your-secret
+export API_KEY=your-api-key
+```
+
+Windows (PowerShell) の例:
+```powershell
+$env:JWT_SECRET="your-secret"
+$env:API_KEY="your-api-key"
+```
+
+### 実行方法
 - Python サーバ: `cd python` して `python app.py`
 - Java サーバ (Spring Boot):
   - 開発起動: `cd java && mvn spring-boot:run`
