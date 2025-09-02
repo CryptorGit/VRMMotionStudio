@@ -31,10 +31,10 @@ export function useModelOperations({
     return bone => indices.has(bones.indexOf(bone))
   }
 
-  function createBoneNameHelpers(skinnedMesh, isPhysicsBone) {
+  function createBoneNameHelpers(skinnedMesh, isPhysicsBone, showPhysicsBones) {
     const helpers = []
     skinnedMesh.skeleton.bones.forEach(bone => {
-      if (isPhysicsBone(bone)) return
+      if (!showPhysicsBones && isPhysicsBone(bone)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -114,6 +114,34 @@ export function useModelOperations({
         if (h) h.visible = visible && model.visible
       })
     }
+  }
+
+  function togglePhysicsBones(index, visible) {
+    const model = models.value[index]
+    if (!model) return
+    model.showPhysicsBones = visible
+    const { skeletonHelper, isPhysicsBone, mesh } = model
+    if (skeletonHelper) {
+      const bones = skeletonHelper.allBones || skeletonHelper.bones
+      skeletonHelper.allBones = bones
+      skeletonHelper.bones = visible
+        ? bones
+        : bones.filter(b => !isPhysicsBone(b))
+      skeletonHelper.update()
+      skeletonHelper.visible = model.bonesVisible && model.visible
+    }
+    if (Array.isArray(model.boneNameHelpers)) {
+      model.boneNameHelpers.forEach(h => {
+        h.parent?.remove(h)
+        h.material.map?.dispose?.()
+        h.material?.dispose?.()
+      })
+    }
+    const helpers = createBoneNameHelpers(mesh, isPhysicsBone, visible)
+    model.boneNameHelpers = helpers.map(h => markRaw(h))
+    model.boneNameHelpers.forEach(h => {
+      h.visible = model.boneNameVisible && model.visible
+    })
   }
 
   function disposeModelResources(model) {
@@ -264,14 +292,22 @@ export function useModelOperations({
               return resolve()
             }
             const isPhysicsBone = createIsPhysicsBone(skinnedMesh)
+            const showPhysicsBones = false
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
             skinnedMesh.skeleton.calculateInverses()
             scene.value.add(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
-            skeletonHelper.bones = skeletonHelper.bones.filter(b => !isPhysicsBone(b))
+            skeletonHelper.allBones = [...skeletonHelper.bones]
+            skeletonHelper.bones = showPhysicsBones
+              ? skeletonHelper.bones
+              : skeletonHelper.bones.filter(b => !isPhysicsBone(b))
             skeletonHelper.visible = debugSkinning
             scene.value.add(skeletonHelper)
-            const boneNameHelpers = createBoneNameHelpers(skinnedMesh, isPhysicsBone)
+            const boneNameHelpers = createBoneNameHelpers(
+              skinnedMesh,
+              isPhysicsBone,
+              showPhysicsBones
+            )
             models.value.push({
               id: nextModelId++,
               mesh: markRaw(skinnedMesh),
@@ -281,6 +317,8 @@ export function useModelOperations({
               bonesVisible: debugSkinning,
               boneNameHelpers: boneNameHelpers.map(h => markRaw(h)),
               boneNameVisible: false,
+              showPhysicsBones,
+              isPhysicsBone,
               files: modelSpecificFiles
             })
             currentMeshRef.value = skinnedMesh
@@ -339,6 +377,7 @@ export function useModelOperations({
     handleFiles,
     toggleModelVisibility,
     toggleBoneVisibility,
+    togglePhysicsBones,
     toggleBoneNameVisibility,
     removeModel,
     clearCache,
