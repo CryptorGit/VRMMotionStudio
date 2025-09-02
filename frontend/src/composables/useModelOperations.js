@@ -127,7 +127,7 @@ export function useModelOperations({
       skeletonHelper.bones = visible
         ? bones
         : bones.filter(b => !isPhysicsBone(b))
-      skeletonHelper.update()
+      skeletonHelper.updateMatrixWorld(true)
       skeletonHelper.visible = model.bonesVisible && model.visible
     }
     if (Array.isArray(model.boneNameHelpers)) {
