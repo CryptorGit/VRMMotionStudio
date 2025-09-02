@@ -6,7 +6,7 @@
         :key="name"
         class="morph-row"
       >
-        <label :for="name">{{ name }}</label>
+        <label :for="name">{{ getMorphDisplayName(name) }}</label>
         <input
           type="range"
           :id="name"
@@ -24,6 +24,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { isVowelMorphName, getMorphDisplayName } from '../utils/morphNameMapping.js'
 
 const props = defineProps({
   mesh: Object
@@ -35,7 +36,9 @@ function computeMorphs() {
   if (!props.mesh || !props.mesh.morphTargetDictionary) {
     morphs.value = []
   } else {
-    morphs.value = Object.entries(props.mesh.morphTargetDictionary)
+    morphs.value = Object.entries(props.mesh.morphTargetDictionary).filter(([name]) =>
+      isVowelMorphName(name)
+    )
   }
 }
 
