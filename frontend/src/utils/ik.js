@@ -282,6 +282,22 @@ function resolveIKLinks(
           }
         }
       }
+      // Ensure each link's immediate parent appears next in the chain.
+      for (let i = 0; i < links.length - 1; i++) {
+        const parent = bones[links[i].index]?.parent
+        const expectedIdx = parent ? bones.indexOf(parent) : -1
+        if (expectedIdx === -1) continue
+        if (links[i + 1].index === expectedIdx) continue
+        const existingIdx = links.findIndex(
+          (l, idx) => idx > i && l.index === expectedIdx
+        )
+        if (existingIdx !== -1) {
+          const [existing] = links.splice(existingIdx, 1)
+          links.splice(i + 1, 0, existing)
+        } else {
+          links.splice(i + 1, 0, { index: expectedIdx })
+        }
+      }
       // Finally, drop any link not on the ancestor path to keep adjacency.
       if (links.length > 0 && ancestors.length > 0) {
         const ancestorSet = new Set(ancestors)
@@ -313,6 +329,20 @@ export function getIKDefinitions(geometry, modelName = '') {
   iks = resolveIKLinks(iks, bones, boneIndexMap)
   attachIKParents(bones, iks, boneIndexMap)
   iks = resolveIKLinks(iks, bones, boneIndexMap)
+  const expected = extraIKChains[modelName] || extraIKChains.default || []
+  expected.forEach(c => {
+    const targetName = normalizeBoneName(
+      typeof c.target === 'number' ? bones[c.target]?.name : c.target
+    )
+    const exists = iks.some(
+      ik => normalizeBoneName(bones[ik.target]?.name) === targetName
+    )
+    if (!exists) {
+      console.warn('getIKDefinitions: missing IK chain from config', {
+        target: targetName
+      })
+    }
+  })
   if (iks.length > 0) {
     ikWarning.value =
       originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
