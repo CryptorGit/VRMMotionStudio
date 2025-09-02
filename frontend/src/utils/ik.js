@@ -178,6 +178,12 @@ const boneNameAliases = {
   '左つま先': '左つま先',
   'left toe': '左つま先',
   '左足先ex': '左つま先',
+  '右膝ik': '右ひざik',
+  '左膝ik': '左ひざik',
+  'right knee ik': '右ひざik',
+  'left knee ik': '左ひざik',
+  '右足先ik': '右つま先ik',
+  '左足先ik': '左つま先ik',
   // IK ボーンの英語・半角表記への対応
   'right leg ik': '右足ik',
   'right foot ik': '右足ik',
@@ -193,10 +199,39 @@ const boneNameAliases = {
   '左つま先ik': '左つま先ik'
 }
 
+const sep = '[\\s._-]*'
+const sidePatterns = [
+  { pattern: '(?:r|right)', prefix: '右' },
+  { pattern: '(?:l|left)', prefix: '左' }
+]
+const partPatterns = [
+  { pattern: 'knee', suffix: 'ひざik' },
+  { pattern: '(?:leg|foot|ankle)', suffix: '足ik' },
+  { pattern: '(?:toe(?:' + sep + 'tip)?|foottip)', suffix: 'つま先ik' }
+]
+const boneNameRegexes = []
+sidePatterns.forEach(s => {
+  partPatterns.forEach(p => {
+    boneNameRegexes.push({
+      regex: new RegExp(`^${s.pattern}${sep}${p.pattern}${sep}ik$`),
+      value: s.prefix + p.suffix
+    })
+    boneNameRegexes.push({
+      regex: new RegExp(`^${p.pattern}${sep}ik${sep}${s.pattern}$`),
+      value: s.prefix + p.suffix
+    })
+  })
+})
+
 export function normalizeBoneName(name) {
   if (typeof name !== 'string') return name
   const n = name.normalize('NFKC').toLowerCase()
-  return boneNameAliases[n] || n
+  const alias = boneNameAliases[n]
+  if (alias) return alias
+  for (const { regex, value } of boneNameRegexes) {
+    if (regex.test(n)) return value
+  }
+  return n
 }
 
 const createBoneIndexMap = bones =>
