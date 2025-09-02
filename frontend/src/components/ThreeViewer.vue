@@ -52,16 +52,9 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, markRaw, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js'
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
-// Use Three.js-provided Ammo WASM wrapper which exposes global Ammo when awaited
-import * as AmmoModule from 'three/examples/jsm/libs/ammo.wasm.js'
-// Ensure Vite serves the WASM binary correctly
-import ammoWasmUrl from 'three/examples/jsm/libs/ammo.wasm.wasm?url'
 import { API_BASE_URL } from '../config.js'
 import {
   ambientLight,
@@ -78,6 +71,9 @@ import { useIkControls } from '../composables/useIkControls.js'
 import { useModelLoader } from '../composables/useModelLoader.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useRenderLoop } from '../composables/useRenderLoop.js'
+import { useThreeViewerInit } from '../composables/useThreeViewerInit.js'
+import { useAmmoInit } from '../composables/useAmmoInit.js'
+import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 
 const viewer = ref(null)
 const fileInput = ref(null)
@@ -197,98 +193,55 @@ function handleUnhandledRejection(e) {
   }
 }
 
+const { init: initViewer, cleanup: cleanupViewer } = useThreeViewerInit({
+  viewer,
+  scene,
+  camera,
+  renderer,
+  effect,
+  controls,
+  ambientLight,
+  directionalLight,
+  directionalLightHelper,
+  onControlStart,
+  onControlEnd,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onWindowResize
+})
+
+const { init: initAmmo, cleanup: cleanupAmmo } = useAmmoInit({
+  helper,
+  enablePhysics,
+  setAmmo,
+  ensureFloorRigidBody
+})
+
+const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHandlers({
+  handleError,
+  handleUnhandledRejection
+})
+
 onMounted(async () => {
   loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
-  window.addEventListener('error', handleError)
-  window.addEventListener('unhandledrejection', handleUnhandledRejection)
-
-  const container = viewer.value
-
-  renderer.value = markRaw(new THREE.WebGLRenderer({ antialias: true }))
-  renderer.value.setPixelRatio(window.devicePixelRatio)
-  renderer.value.setSize(container.clientWidth, container.clientHeight)
-  container.appendChild(renderer.value.domElement)
-
-  effect.value = markRaw(new OutlineEffect(renderer.value))
-
-  scene.value = markRaw(new THREE.Scene())
-  scene.value.background = new THREE.Color(0xeeeeee)
-
-  const grid = new THREE.GridHelper(40, 40)
-  scene.value.add(grid)
-
-  const floorMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(40, 1, 40),
-    new THREE.MeshBasicMaterial({ color: 0xcccccc })
-  )
-  floorMesh.position.set(0, -0.5, 0)
-  floorMesh.visible = false
-  scene.value.add(floorMesh)
-
-  camera.value = markRaw(new THREE.PerspectiveCamera(
-    45,
-    container.clientWidth / container.clientHeight,
-    1,
-    2000
-  ))
-  camera.value.position.set(0, 10, 30)
-
-  controls.value = markRaw(new OrbitControls(camera.value, renderer.value.domElement))
-  controls.value.mouseButtons = {
-    LEFT: THREE.MOUSE.PAN,
-    RIGHT: THREE.MOUSE.ROTATE,
-    MIDDLE: THREE.MOUSE.DOLLY
-  }
-  controls.value.enabled = true
-  controls.value.addEventListener('start', onControlStart)
-  controls.value.addEventListener('end', onControlEnd)
-
-  scene.value.add(ambientLight.value)
-  scene.value.add(directionalLight.value.target)
-  scene.value.add(directionalLight.value)
-  scene.value.add(directionalLightHelper)
-
-  const AmmoLib = await AmmoModule.default({
-    locateFile: file => (file.endsWith('.wasm') ? ammoWasmUrl : file)
-  })
-  setAmmo(AmmoLib)
-  if (typeof window !== 'undefined') {
-    window.Ammo = AmmoLib
-  } else {
-    globalThis.Ammo = AmmoLib
-  }
-  helper.value = markRaw(new MMDAnimationHelper())
-  helper.value.enable('physics', enablePhysics.value)
-  helper.value.enabled.ik = false
-  ensureFloorRigidBody()
-  renderer.value.domElement.addEventListener('pointerdown', onPointerDown)
-
+  setupErrorHandlers()
+  initViewer()
+  await initAmmo()
   initUpdateIKMarkers()
-
-  window.addEventListener('resize', onWindowResize)
   document.addEventListener('click', handleDocumentClick)
-
   logToServer({ event: 'init' })
-
   await restoreCachedModel()
   ensureFloorRigidBody()
-
   animate(0)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
-  window.removeEventListener('error', handleError)
-  window.removeEventListener('unhandledrejection', handleUnhandledRejection)
-  window.removeEventListener('resize', onWindowResize)
-  renderer.value?.domElement?.removeEventListener('pointerdown', onPointerDown)
-  renderer.value?.domElement?.removeEventListener('pointermove', onPointerMove)
-  renderer.value?.domElement?.removeEventListener('pointerup', onPointerUp)
-  renderer.value?.domElement?.removeEventListener('pointercancel', onPointerUp)
-  renderer.value?.domElement?.removeEventListener('pointerleave', onPointerUp)
-  controls.value?.removeEventListener('start', onControlStart)
-  controls.value?.removeEventListener('end', onControlEnd)
+  cleanupErrorHandlers()
+  cleanupAmmo()
+  cleanupViewer()
   ikTargets.forEach(t => (t.marker.visible = false))
   selectedIK.value = null
   enablePhysics.value = false
