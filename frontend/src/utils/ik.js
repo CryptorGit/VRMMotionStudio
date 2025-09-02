@@ -532,9 +532,19 @@ function createDefaultIKChains(bones) {
   export function getIKDefinitions(geometry, modelName = '') {
     const bones = geometry?.userData?.MMD?.bones || []
     const boneIndexMap = createBoneIndexMap(bones)
-    const pmxIKs = geometry?.userData?.MMD?.iks
-    const hasPMXIKs = Array.isArray(pmxIKs) && pmxIKs.length > 0
-    let iks = hasPMXIKs ? pmxIKs : findUserDataIKs(geometry)
+    let iks = geometry?.userData?.MMD?.iks
+    let hasPMXIKs = Array.isArray(iks) && iks.length > 0
+    if (!hasPMXIKs) {
+      iks = findUserDataIKs(geometry)
+      if (Array.isArray(iks) && iks.length > 0) {
+        geometry.userData = geometry.userData || {}
+        geometry.userData.MMD = geometry.userData.MMD || {}
+        geometry.userData.MMD.iks = iks
+        hasPMXIKs = true
+      } else {
+        iks = []
+      }
+    }
     iks = resolveIKLinks(iks, bones, boneIndexMap)
     iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap, hasPMXIKs)
     const originalCount = iks.length
@@ -682,6 +692,7 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
   skinnedMesh.geometry.userData.MMD.iks = iks
   if (!helper.objects.get(skinnedMesh)) {
     helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
+    helper.update(0)
   }
   skinnedMesh.skeleton?.update()
   ensureFloorRigidBody()
