@@ -36,7 +36,7 @@ export function attachIKParents(bones, iks) {
   const ikParentRegex = /(?:IK|ＩＫ)親$/
   bones.forEach((b, idx) => {
     if (ikParentRegex.test(b.name)) {
-      const ikName = b.name.slice(0, -1)
+      const ikName = b.name.replace(/(?:IK|ＩＫ)親$/, '')
       const targetIdx = bones.findIndex(bn => bn.name === ikName)
       const chain = iks.find(ik => ik.target === targetIdx)
       if (chain && !chain.links.some(l => l.index === idx)) {
