@@ -113,10 +113,7 @@ export function useModelOperations({
       if (Array.isArray(model.boneNameHelpers)) {
         model.boneNameHelpers.forEach(h => {
           if (h)
-            h.visible =
-              visible &&
-              model.boneNameVisible &&
-              (model.showPhysicsBones || !h.userData?.isPhysicsBone)
+            h.visible = visible && model.boneNameVisible
         })
       }
     }
@@ -136,38 +133,7 @@ export function useModelOperations({
       model.boneNameVisible = visible
       model.boneNameHelpers.forEach(h => {
         if (h)
-          h.visible =
-            visible &&
-            model.visible &&
-            (model.showPhysicsBones || !h.userData?.isPhysicsBone)
-      })
-    }
-  }
-
-  function togglePhysicsBones(index, visible) {
-    const model = models.value[index]
-    if (!model) return
-    const { skeletonHelper, isPhysicsBone } = model
-    if (skeletonHelper && !(skeletonHelper instanceof THREE.SkeletonHelper)) {
-      console.warn('skeletonHelper is not a THREE.SkeletonHelper', skeletonHelper)
-      return
-    }
-    model.showPhysicsBones = visible
-    if (skeletonHelper) {
-      const bones = skeletonHelper.allBones || skeletonHelper.bones
-      skeletonHelper.allBones = bones
-      skeletonHelper.bones = visible
-        ? bones
-        : bones.filter(b => !isPhysicsBone(b))
-      skeletonHelper.updateMatrixWorld(true)
-      skeletonHelper.visible = model.bonesVisible && model.visible
-    }
-    if (Array.isArray(model.boneNameHelpers)) {
-      model.boneNameHelpers.forEach(h => {
-        h.visible =
-          model.boneNameVisible &&
-          model.visible &&
-          (visible || !h.userData?.isPhysicsBone)
+          h.visible = visible && model.visible
       })
     }
   }
@@ -320,7 +286,6 @@ export function useModelOperations({
               return resolve()
             }
             const isPhysicsBone = createIsPhysicsBone(skinnedMesh)
-            const showPhysicsBones = false
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
             initBoneOriginalQuaternions(skinnedMesh.skeleton.bones)
             warnMissingLocalAxes(skinnedMesh.skeleton.bones)
@@ -332,10 +297,6 @@ export function useModelOperations({
               modelFile.name.replace(/\.(pmx|pmd)$/i, '')
             scene.value.add(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
-            skeletonHelper.allBones = [...skeletonHelper.bones]
-            skeletonHelper.bones = showPhysicsBones
-              ? skeletonHelper.bones
-              : skeletonHelper.bones.filter(b => !isPhysicsBone(b))
             skeletonHelper.visible = debugSkinning
             scene.value.add(skeletonHelper)
             const boneNameHelpers = createBoneNameHelpers(
@@ -351,7 +312,6 @@ export function useModelOperations({
               bonesVisible: debugSkinning,
               boneNameHelpers: boneNameHelpers.map(h => markRaw(h)),
               boneNameVisible: false,
-              showPhysicsBones,
               isPhysicsBone,
               files: modelSpecificFiles
             })
@@ -411,7 +371,6 @@ export function useModelOperations({
     handleFiles,
     toggleModelVisibility,
     toggleBoneVisibility,
-    togglePhysicsBones,
     toggleBoneNameVisibility,
     removeModel,
     clearCache,

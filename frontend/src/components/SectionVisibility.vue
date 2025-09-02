@@ -27,7 +27,6 @@
       @toggle-model="(...args) => emit('toggle-model', ...args)"
       @toggle-bone="(...args) => emit('toggle-bone', ...args)"
       @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
-      @toggle-physics-bones="(...args) => emit('toggle-physics-bones', ...args)"
       @remove-model="(...args) => emit('remove-model', ...args)"
       @hide="emit('hide', 'models')"
     />
@@ -61,7 +60,6 @@ const emit = defineEmits([
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
-  'toggle-physics-bones',
   'remove-model',
   'hide'
 ])

@@ -45,7 +45,6 @@
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @toggle-bone-names="toggleBoneNameVisibility"
-  @toggle-physics-bones="togglePhysicsBones"
   @remove-model="removeModel"
 />
 </template>
@@ -143,7 +142,6 @@ const {
   onFileChange,
   toggleModelVisibility,
   toggleBoneVisibility,
-  togglePhysicsBones,
   toggleBoneNameVisibility,
   removeModel,
   clearCache,
