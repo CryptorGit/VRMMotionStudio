@@ -13,7 +13,7 @@ export function useAmmoInit({ helper, enablePhysics, setAmmo, ensureFloorRigidBo
     setAmmo(AmmoLib)
     helper.value = markRaw(new MMDAnimationHelper())
     helper.value.enable('physics', enablePhysics.value)
-    helper.value.enabled.ik = false
+    helper.value.enabled.ik = true
     ensureFloorRigidBody()
   }
 

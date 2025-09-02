@@ -38,12 +38,9 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
       console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
     }
     if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !helper.value) return
-    const prevIK = helper.value.enabled.ik
-    helper.value.enabled.ik = true
     mesh.updateMatrixWorld(true)
     mesh.skeleton.update()
     helper.value.update(0)
-    helper.value.enabled.ik = prevIK
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
     updateIKMarkersBound.value?.(true)
