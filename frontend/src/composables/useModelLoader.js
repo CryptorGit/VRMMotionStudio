@@ -168,14 +168,10 @@ export function useModelLoader({
     }
   }
 
-  async function removeModel(index) {
-    const model = models.value[index]
+  function disposeModelResources(model) {
     if (!model) return
     const { mesh, skeletonHelper, boneNameHelpers } = model
     helper.value?.remove?.(mesh)
-    effect.value?.clearCache?.()
-    renderer.value?.renderLists?.dispose?.()
-    renderer.value?.info?.reset?.()
     try {
       mesh.traverse(child => {
         if (!child.isMesh) return
@@ -202,6 +198,20 @@ export function useModelLoader({
           h.material?.dispose?.()
         })
       }
+    } catch (e) {
+      console.error('Failed to dispose model resources:', e)
+    }
+  }
+
+  async function removeModel(index) {
+    const model = models.value[index]
+    if (!model) return
+    const { mesh } = model
+    effect.value?.clearCache?.()
+    renderer.value?.renderLists?.dispose?.()
+    renderer.value?.info?.reset?.()
+    try {
+      disposeModelResources(model)
       models.value.splice(index, 1)
       if (currentMeshRef.value === mesh) {
         ikTargets.forEach(t => {
@@ -234,25 +244,7 @@ export function useModelLoader({
     poses.value = []
     selectedPose.value = null
     models.value.forEach(m => {
-      const { mesh, skeletonHelper, boneNameHelpers } = m
-      if (helper.value?.objects?.has(mesh)) helper.value.remove(mesh)
-      try {
-        scene.value.remove(mesh)
-        if (skeletonHelper) {
-          scene.value.remove(skeletonHelper)
-          skeletonHelper.geometry?.dispose?.()
-          skeletonHelper.material?.dispose?.()
-        }
-        if (boneNameHelpers) {
-          boneNameHelpers.forEach(h => {
-            h.parent?.remove(h)
-            h.material.map?.dispose?.()
-            h.material?.dispose?.()
-          })
-        }
-      } catch (e) {
-        console.error('Failed to remove mesh from scene:', e)
-      }
+      disposeModelResources(m)
     })
     models.value = []
     nextModelId = 1
