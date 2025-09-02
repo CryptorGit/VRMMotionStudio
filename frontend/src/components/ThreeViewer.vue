@@ -222,16 +222,16 @@ onMounted(async () => {
   loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
   setupErrorHandlers()
-  initRenderer()
-  await initAmmo()
-  initUpdateIKMarkers()
-  document.addEventListener('click', handleDocumentClick)
-  logToServer({ event: 'init' })
   const restoredMesh = await restoreCachedModel()
   if (restoredMesh) {
     currentMeshRef.value = restoredMesh
     setupIKTargets(scene.value, currentMeshRef.value)
   }
+  initRenderer()
+  await initAmmo()
+  initUpdateIKMarkers()
+  document.addEventListener('click', handleDocumentClick)
+  logToServer({ event: 'init' })
   ensureFloorRigidBody()
   animate(0)
 })

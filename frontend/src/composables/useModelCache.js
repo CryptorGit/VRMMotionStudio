@@ -72,7 +72,9 @@ export function useModelCache() {
       }
       if (useLocal) {
         localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
-      } else {
+        return true
+      }
+      try {
         const db = await getDB()
         const tx = db.transaction(DB_STORE, 'readwrite')
         const store = tx.objectStore(DB_STORE)
@@ -81,8 +83,18 @@ export function useModelCache() {
           await promisifyRequest(store.put(dataLists[i], i))
         }
         await promisifyRequest(tx)
+        return true
+      } catch (dbErr) {
+        console.warn('IndexedDB write failed, falling back to localStorage', dbErr)
+        useLocal = true
+        try {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
+          return true
+        } catch (lsErr) {
+          console.error('Failed to cache model to localStorage:', lsErr)
+          return false
+        }
       }
-      return true
     } catch (e) {
       console.error('Failed to cache model:', e)
       return false
