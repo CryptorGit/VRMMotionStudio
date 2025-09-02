@@ -71,9 +71,14 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
     if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
       const target = selectedIK.value.target
       if (target) {
-        target.parent.worldToLocal(dragPoint)
-        target.position.copy(dragPoint)
-        scheduleIKUpdate()
+        const parent = target.parent
+        if (parent && typeof parent.worldToLocal === 'function') {
+          parent.worldToLocal(dragPoint)
+          target.position.copy(dragPoint)
+          scheduleIKUpdate()
+        } else {
+          console.warn('IK target parent missing worldToLocal method')
+        }
       }
     }
   }
