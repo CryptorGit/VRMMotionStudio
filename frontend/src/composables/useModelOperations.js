@@ -24,11 +24,20 @@ export function useModelOperations({
   const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 
   function createIsPhysicsBone(skinnedMesh) {
-    const indices = new Set(
-      skinnedMesh.geometry?.userData?.MMD?.rigidBodies?.map(rb => rb.boneIndex) || []
-    )
     const bones = skinnedMesh.skeleton?.bones || []
-    return bone => indices.has(bones.indexOf(bone))
+    const boneToIndex = new Map(bones.map((bone, index) => [bone, index]))
+    const physicsIndices = new Set()
+    const rigidBodies = skinnedMesh.geometry?.userData?.MMD?.rigidBodies || []
+    rigidBodies.forEach(rb => {
+      const index = rb.boneIndex
+      if (typeof index === 'number' && index >= 0 && index < bones.length) {
+        physicsIndices.add(index)
+      }
+    })
+    return bone => {
+      const index = boneToIndex.get(bone)
+      return index !== undefined && physicsIndices.has(index)
+    }
   }
 
   function createBoneNameHelpers(skinnedMesh, isPhysicsBone, showPhysicsBones) {
