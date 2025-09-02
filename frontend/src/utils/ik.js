@@ -127,9 +127,10 @@ export function attachIKParents(
   iks,
   boneIndexMap = createBoneIndexMap(bones)
 ) {
+  const ikParentSuffix = normalizeBoneName('ik親')
   bones.forEach((b, idx) => {
-    const norm = b.name?.normalize('NFKC')?.toLowerCase()
-    if (typeof norm !== 'string' || !norm.endsWith('ik親')) return
+    const norm = normalizeBoneName(b.name)
+    if (typeof norm !== 'string' || !norm.endsWith(ikParentSuffix)) return
     const ikName = b.name.normalize('NFKC').replace(/ik親$/i, '')
     const targetIdx = boneIndexMap.get(normalizeBoneName(ikName))
     const chain = iks.find(ik => ik.target === targetIdx)
@@ -138,10 +139,10 @@ export function attachIKParents(
       typeof idx === 'number' &&
       !chain.links.some(l => l.index === idx)
     ) {
-      // Disabled to preserve CCDIK adjacency: do not insert IK parent into link chain.
-      // chain.links.unshift({ index: idx })
+      chain.links.unshift({ index: idx })
     }
   })
+  // Re-run to ensure CCD IK adjacency after inserting parents
   const resolved = resolveIKLinks(iks, bones, boneIndexMap)
   iks.splice(0, iks.length, ...resolved)
   return iks
