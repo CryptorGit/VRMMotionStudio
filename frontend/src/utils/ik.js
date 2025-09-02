@@ -42,20 +42,19 @@ export function attachIKParents(
   iks,
   boneIndexMap = createBoneIndexMap(bones)
 ) {
-  const ikParentRegex = /(?:IK|ＩＫ)親$/
   bones.forEach((b, idx) => {
-    if (ikParentRegex.test(b.name)) {
-      const ikName = b.name.replace(/(?:IK|ＩＫ)親$/, '')
-      const targetIdx = boneIndexMap.get(normalizeBoneName(ikName))
-      const chain = iks.find(ik => ik.target === targetIdx)
-      if (
-        chain &&
-        typeof idx === 'number' &&
-        !chain.links.some(l => l.index === idx)
-      ) {
-        // Disabled to preserve CCDIK adjacency: do not insert IK parent into link chain.
-        // chain.links.unshift({ index: idx })
-      }
+    const norm = b.name?.normalize('NFKC')?.toLowerCase()
+    if (typeof norm !== 'string' || !norm.endsWith('ik親')) return
+    const ikName = b.name.normalize('NFKC').replace(/ik親$/i, '')
+    const targetIdx = boneIndexMap.get(normalizeBoneName(ikName))
+    const chain = iks.find(ik => ik.target === targetIdx)
+    if (
+      chain &&
+      typeof idx === 'number' &&
+      !chain.links.some(l => l.index === idx)
+    ) {
+      // Disabled to preserve CCDIK adjacency: do not insert IK parent into link chain.
+      // chain.links.unshift({ index: idx })
     }
   })
   const resolved = resolveIKLinks(iks, bones, boneIndexMap)
@@ -134,38 +133,58 @@ const boneNameAliases = {
   '右ひざ': '右ひざ',
   '右膝': '右ひざ',
   'right knee': '右ひざ',
+  'r knee': '右ひざ',
   '左ひざ': '左ひざ',
   '左膝': '左ひざ',
   'left knee': '左ひざ',
+  'l knee': '左ひざ',
   '右足': '右足',
   'right foot': '右足',
+  'r foot': '右足',
+  'r leg': '右足',
   '左足': '左足',
   'left foot': '左足',
+  'l foot': '左足',
+  'l leg': '左足',
   '右足首': '右足首',
   'right ankle': '右足首',
+  'r ankle': '右足首',
   '左足首': '左足首',
   'left ankle': '左足首',
+  'l ankle': '左足首',
   '右つま先': '右つま先',
   'right toe': '右つま先',
+  'r toe': '右つま先',
   '右足先ex': '右つま先',
   '左つま先': '左つま先',
   'left toe': '左つま先',
+  'l toe': '左つま先',
   '左足先ex': '左つま先',
   '右膝ik': '右ひざik',
   '左膝ik': '左ひざik',
   'right knee ik': '右ひざik',
+  'r knee ik': '右ひざik',
   'left knee ik': '左ひざik',
+  'l knee ik': '左ひざik',
   '右足先ik': '右つま先ik',
   '左足先ik': '左つま先ik',
   // IK ボーンの英語・半角表記への対応
   'right leg ik': '右足ik',
   'right foot ik': '右足ik',
   'right ankle ik': '右足ik',
+  'r leg ik': '右足ik',
+  'r foot ik': '右足ik',
+  'r ankle ik': '右足ik',
   'left leg ik': '左足ik',
   'left foot ik': '左足ik',
   'left ankle ik': '左足ik',
+  'l leg ik': '左足ik',
+  'l foot ik': '左足ik',
+  'l ankle ik': '左足ik',
   'right toe ik': '右つま先ik',
   'left toe ik': '左つま先ik',
+  'r toe ik': '右つま先ik',
+  'l toe ik': '左つま先ik',
   '右足ik': '右足ik',
   '左足ik': '左足ik',
   '右つま先ik': '右つま先ik',
@@ -178,21 +197,26 @@ const sidePatterns = [
   { pattern: '(?:l|left)', prefix: '左' }
 ]
 const partPatterns = [
-  { pattern: 'knee', suffix: 'ひざik' },
-  { pattern: '(?:leg|foot|ankle)', suffix: '足ik' },
-  { pattern: '(?:toe(?:' + sep + 'tip)?|foottip)', suffix: 'つま先ik' }
+  { pattern: 'knee', suffix: 'ひざ', ikSuffix: 'ひざik' },
+  { pattern: '(?:leg|foot)', suffix: '足', ikSuffix: '足ik' },
+  { pattern: 'ankle', suffix: '足首', ikSuffix: '足ik' },
+  { pattern: '(?:toe(?:' + sep + 'tip)?|foottip)', suffix: 'つま先', ikSuffix: 'つま先ik' }
 ]
 const boneNameRegexes = []
 sidePatterns.forEach(s => {
   partPatterns.forEach(p => {
-    boneNameRegexes.push({
-      regex: new RegExp(`^${s.pattern}${sep}${p.pattern}${sep}ik$`),
-      value: s.prefix + p.suffix
-    })
-    boneNameRegexes.push({
-      regex: new RegExp(`^${p.pattern}${sep}ik${sep}${s.pattern}$`),
-      value: s.prefix + p.suffix
-    })
+    boneNameRegexes.push(
+      { regex: new RegExp(`^${s.pattern}${sep}${p.pattern}$`), value: s.prefix + p.suffix },
+      { regex: new RegExp(`^${p.pattern}${sep}${s.pattern}$`), value: s.prefix + p.suffix },
+      {
+        regex: new RegExp(`^${s.pattern}${sep}${p.pattern}${sep}ik$`),
+        value: s.prefix + p.ikSuffix
+      },
+      {
+        regex: new RegExp(`^${p.pattern}${sep}ik${sep}${s.pattern}$`),
+        value: s.prefix + p.ikSuffix
+      }
+    )
   })
 })
 

@@ -44,6 +44,7 @@
 - [ ] requestAnimationFrame 経由の IK 更新が 1 フレームに 1 回のみ呼ばれることをブラウザで手動確認する
 - [x] 複数モデルをロードして切り替えた際にも IK 操作が可能であることをブラウザで手動確認する
 - [ ] IK 定義の拡張後の IK マーカー表示をブラウザで手動確認する
+- [ ] ボーン名エイリアス候補: 'rt'/'lt' など左右略記への対応を検討する
 - [x] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
 - [ ] 未対応モデル用の追加IKチェーンを `frontend/public/ik-config.json` に追記する
 - [ ] IK情報を取得できなかったモデル名を一覧化する
