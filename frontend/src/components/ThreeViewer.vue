@@ -75,7 +75,9 @@ import {
 } from '../utils/lighting.js'
 import { showIkMarkers, ikWarning, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
 import { useIkControls } from '../composables/useIkControls.js'
-import { useModelLoader } from '../composables/useModelLoader.js'
+import { useModelCache } from '../composables/useModelCache.js'
+import { useModelOperations } from '../composables/useModelOperations.js'
+import { usePoseControls } from '../composables/usePoseControls.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useRenderLoop } from '../composables/useRenderLoop.js'
 
@@ -132,7 +134,17 @@ const {
   initUpdateIKMarkers
 } = ikControls
 
-const modelLoader = useModelLoader({
+const poseControls = usePoseControls({
+  helper,
+  currentMeshRef,
+  menuOpen,
+  logToServer,
+  updateIKMarkersBound
+})
+const { poses, selectedPose, applyPose, exportPose, setLoader } = poseControls
+
+const modelCache = useModelCache()
+const modelOperations = useModelOperations({
   scene,
   camera,
   renderer,
@@ -141,12 +153,13 @@ const modelLoader = useModelLoader({
   currentMeshRef,
   menuOpen,
   logToServer,
-  updateIKMarkersBound,
-  viewer
-})
-const {
+  viewer,
   poses,
   selectedPose,
+  modelCache
+})
+setLoader(modelOperations.loader)
+const {
   models,
   onFileChange,
   toggleModelVisibility,
@@ -154,13 +167,11 @@ const {
   toggleBoneNameVisibility,
   removeModel,
   clearCache,
-  applyPose,
-  exportPose,
   onDragOver,
   onDragLeave,
   onDrop,
   restoreCachedModel
-} = modelLoader
+} = modelOperations
 
 const { animate, onWindowResize } = useRenderLoop({
   clock,
