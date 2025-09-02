@@ -179,6 +179,7 @@ export function setupIKTargets(scene, mesh) {
 }
 
 export function updateIKMarkers(camera, renderer, raycaster) {
+  if (!camera || !renderer || ikTargets.length === 0) return
   const visible = showIkMarkers.value
   const height = renderer.domElement.clientHeight
   if (camera.fov !== cachedFov) {
