@@ -49,6 +49,7 @@ export function useIkPhysics({ helper, enablePhysics }) {
 
   function setAmmo(lib) {
     Ammo = lib
+    return Ammo
   }
 
   watch(enablePhysics, v => {

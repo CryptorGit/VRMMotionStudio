@@ -11,11 +11,6 @@ export function useAmmoInit({ helper, enablePhysics, setAmmo, ensureFloorRigidBo
       locateFile: file => (file.endsWith('.wasm') ? ammoWasmUrl : file)
     })
     setAmmo(AmmoLib)
-    if (typeof window !== 'undefined') {
-      window.Ammo = AmmoLib
-    } else {
-      globalThis.Ammo = AmmoLib
-    }
     helper.value = markRaw(new MMDAnimationHelper())
     helper.value.enable('physics', enablePhysics.value)
     helper.value.enabled.ik = false
