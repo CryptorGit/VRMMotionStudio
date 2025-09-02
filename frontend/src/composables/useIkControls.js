@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, nextTick } from 'vue'
+import { onUnmounted, watch } from 'vue'
 import { selectedIK } from '../utils/ik.js'
 import { useIkDrag } from './useIkDrag.js'
 import { useIkPhysics } from './useIkPhysics.js'
@@ -19,20 +19,30 @@ export default function useIkControls(options) {
     drag.onPointerUp(event)
   }
 
-  onMounted(() => {
-    nextTick(() => {
-      const dom = options.renderer.value?.domElement
-      if (!dom) return
-      dom.addEventListener('pointermove', handlePointerMove)
-      dom.addEventListener('pointerup', handlePointerUp)
-    })
-  })
+  let dom
+
+  watch(
+    () => options.renderer.value,
+    renderer => {
+      const newDom = renderer?.domElement
+      if (dom) {
+        dom.removeEventListener('pointermove', handlePointerMove)
+        dom.removeEventListener('pointerup', handlePointerUp)
+      }
+      dom = newDom
+      if (dom) {
+        dom.addEventListener('pointermove', handlePointerMove)
+        dom.addEventListener('pointerup', handlePointerUp)
+      }
+    },
+    { immediate: true }
+  )
 
   onUnmounted(() => {
-    const dom = options.renderer.value?.domElement
     if (!dom) return
     dom.removeEventListener('pointermove', handlePointerMove)
     dom.removeEventListener('pointerup', handlePointerUp)
+    dom = null
   })
   return {
     ...drag,
