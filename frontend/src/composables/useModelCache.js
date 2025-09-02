@@ -71,8 +71,13 @@ export function useModelCache() {
         dataLists.push(list)
       }
       if (useLocal) {
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
-        return true
+        try {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
+          return true
+        } catch (lsErr) {
+          console.error('Failed to cache model to localStorage:', lsErr)
+          return false
+        }
       }
       try {
         const db = await getDB()
@@ -112,21 +117,37 @@ export function useModelCache() {
           list.map(f => ({ ...f, data: base64ToArrayBuffer(f.data) }))
         )
       }
-      const db = await getDB()
-      const tx = db.transaction(DB_STORE)
-      const store = tx.objectStore(DB_STORE)
-      const result = []
-      const req = store.openCursor()
-      await promisifyRequest(req, resolve => {
-        const cursor = req.result
-        if (cursor) {
-          result.push(cursor.value)
-          cursor.continue()
-        } else {
-          resolve()
+      try {
+        const db = await getDB()
+        const tx = db.transaction(DB_STORE)
+        const store = tx.objectStore(DB_STORE)
+        const result = []
+        const req = store.openCursor()
+        await promisifyRequest(req, resolve => {
+          const cursor = req.result
+          if (cursor) {
+            result.push(cursor.value)
+            cursor.continue()
+          } else {
+            resolve()
+          }
+        })
+        return result
+      } catch (dbErr) {
+        console.warn('IndexedDB read failed, falling back to localStorage', dbErr)
+        useLocal = true
+        try {
+          const raw = localStorage.getItem(LOCAL_KEY)
+          if (!raw) return []
+          const parsed = JSON.parse(raw)
+          return parsed.map(list =>
+            list.map(f => ({ ...f, data: base64ToArrayBuffer(f.data) }))
+          )
+        } catch (lsErr) {
+          console.error('Failed to load cached model from localStorage:', lsErr)
+          return []
         }
-      })
-      return result
+      }
     } catch (e) {
       console.error('Failed to load cached model:', e)
       return []
@@ -137,26 +158,48 @@ export function useModelCache() {
     try {
       await getDB()
       if (useLocal) {
-        if (index === undefined) {
-          localStorage.removeItem(LOCAL_KEY)
-        } else {
-          const raw = localStorage.getItem(LOCAL_KEY)
-          if (!raw) return
-          const parsed = JSON.parse(raw)
-          parsed.splice(index, 1)
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed))
+        try {
+          if (index === undefined) {
+            localStorage.removeItem(LOCAL_KEY)
+          } else {
+            const raw = localStorage.getItem(LOCAL_KEY)
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            parsed.splice(index, 1)
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed))
+          }
+        } catch (lsErr) {
+          console.error('Failed to clear model cache in localStorage:', lsErr)
         }
         return
       }
-      const db = await getDB()
-      const tx = db.transaction(DB_STORE, 'readwrite')
-      const store = tx.objectStore(DB_STORE)
-      if (index === undefined) {
-        store.clear()
-      } else {
-        store.delete(index)
+      try {
+        const db = await getDB()
+        const tx = db.transaction(DB_STORE, 'readwrite')
+        const store = tx.objectStore(DB_STORE)
+        if (index === undefined) {
+          store.clear()
+        } else {
+          store.delete(index)
+        }
+        await promisifyRequest(tx)
+      } catch (dbErr) {
+        console.warn('IndexedDB delete failed, falling back to localStorage', dbErr)
+        useLocal = true
+        try {
+          if (index === undefined) {
+            localStorage.removeItem(LOCAL_KEY)
+          } else {
+            const raw = localStorage.getItem(LOCAL_KEY)
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            parsed.splice(index, 1)
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed))
+          }
+        } catch (lsErr) {
+          console.error('Failed to clear model cache in localStorage:', lsErr)
+        }
       }
-      await promisifyRequest(tx)
     } catch (e) {
       console.error('Failed to clear model cache:', e)
     }

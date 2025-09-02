@@ -341,7 +341,12 @@ export function useModelOperations({
         )
       })
     }
-    const cached = await cache.cacheFiles(models.value.map(m => m.files))
+    let cached = false
+    try {
+      cached = await cache.cacheFiles(models.value.map(m => m.files))
+    } catch (e) {
+      console.error('Failed to cache model files', e)
+    }
     if (!cached) {
       console.error('Failed to cache model files')
       alert('モデルのキャッシュに失敗しました')
@@ -359,12 +364,12 @@ export function useModelOperations({
       console.warn('Failed to load cached files')
       console.debug(e)
       alert('モデルの復元に失敗しました')
-      return null
+      return false
     }
     if (!saved.length) {
       console.info('No cached model to restore')
       alert('復元するモデルがありません')
-      return null
+      return false
     }
     const files = []
     for (const model of saved) {
@@ -380,14 +385,15 @@ export function useModelOperations({
     }
     try {
       await handleFiles(files)
-      console.info(`restoreCachedModel: restored ${saved.length} model(s)`) 
+      currentMeshRef.value = models.value[0]?.mesh || null
+      setupIKTargets(scene.value, currentMeshRef.value)
+      console.info(`restoreCachedModel: restored ${models.value.length} model(s)`)
+      return true
     } catch (e) {
       console.error('Failed to restore cached model files', e)
       alert('モデルの復元中にエラーが発生しました')
-      return null
+      return false
     }
-    console.debug('restoreCachedModel: models in scene', models.value.length)
-    return currentMeshRef.value
   }
 
   function onDragOver() {
