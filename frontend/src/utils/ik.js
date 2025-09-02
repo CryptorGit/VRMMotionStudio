@@ -142,6 +142,17 @@ function applyFallbackIKs(
     )
     if (chain) result.push({ ...chain })
   })
+  const seenTargets = new Set()
+  result = result.filter(ik => {
+    const targetName =
+      typeof ik.target === 'number'
+        ? normalizeBoneName(bones[ik.target]?.name)
+        : normalizeBoneName(ik.target)
+    if (!targetName) return true
+    if (seenTargets.has(targetName)) return false
+    seenTargets.add(targetName)
+    return true
+  })
   return result
 }
 
