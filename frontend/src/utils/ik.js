@@ -75,11 +75,17 @@ export function attachIKParents(
       const ikName = b.name.replace(/(?:IK|ＩＫ)親$/, '')
       const targetIdx = boneIndexMap.get(ikName)
       const chain = iks.find(ik => ik.target === targetIdx)
-      if (chain && !chain.links.some(l => l.index === idx)) {
+      if (
+        chain &&
+        typeof idx === 'number' &&
+        !chain.links.some(l => l.index === idx)
+      ) {
         chain.links.unshift({ index: idx })
       }
     }
   })
+  const resolved = resolveIKLinks(iks, bones, boneIndexMap)
+  iks.splice(0, iks.length, ...resolved)
   return iks
 }
 
