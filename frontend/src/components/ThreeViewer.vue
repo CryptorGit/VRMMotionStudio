@@ -74,7 +74,7 @@ import {
   loadLightingSettings
 } from '../utils/lighting.js'
 import { showIkMarkers, ikWarning, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
-import { useIkControls } from '../composables/useIkControls.js'
+import useIkControls from '../composables/useIkControls.js'
 import { useModelLoader } from '../composables/useModelLoader.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useRenderLoop } from '../composables/useRenderLoop.js'
