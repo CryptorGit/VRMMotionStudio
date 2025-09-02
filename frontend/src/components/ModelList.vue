@@ -21,14 +21,6 @@
         />
         ボーン名表示
       </label>
-      <label>
-        <input
-          type="checkbox"
-          :checked="m.showPhysicsBones"
-          @change="onTogglePhysicsBones(i, $event.target.checked)"
-        />
-        物理ボーン表示
-      </label>
       <button @click="$emit('remove', i)">削除</button>
     </li>
   </ul>
@@ -42,7 +34,6 @@ const emit = defineEmits([
   'toggle',
   'toggle-bone',
   'toggle-bone-names',
-  'toggle-physics-bones',
   'remove'
 ])
 function onToggle(index, visible) {
@@ -53,9 +44,6 @@ function onToggleBone(index, visible) {
 }
 function onToggleBoneName(index, visible) {
   emit('toggle-bone-names', index, visible)
-}
-function onTogglePhysicsBones(index, visible) {
-  emit('toggle-physics-bones', index, visible)
 }
 </script>
 

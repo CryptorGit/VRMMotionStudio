@@ -21,7 +21,6 @@
         @toggle="(i, v) => emit('toggle-model', i, v)"
         @toggle-bone="(i, v) => emit('toggle-bone', i, v)"
         @toggle-bone-names="(i, v) => emit('toggle-bone-names', i, v)"
-        @toggle-physics-bones="(i, v) => emit('toggle-physics-bones', i, v)"
         @remove="i => emit('remove-model', i)"
       />
     </div>
@@ -45,7 +44,6 @@ const emit = defineEmits([
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
-  'toggle-physics-bones',
   'remove-model'
 ])
 
