@@ -65,7 +65,14 @@ import {
   showLightMarker,
   loadLightingSettings
 } from '../utils/lighting.js'
-import { showIkMarkers, ikWarning, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
+import {
+  showIkMarkers,
+  ikWarning,
+  ikConfigPromise,
+  ikTargets,
+  selectedIK,
+  setupIKTargets
+} from '../utils/ik.js'
 import useIkControls from '../composables/useIkControls.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useFileLoader } from '../composables/useFileLoader.js'
@@ -216,7 +223,11 @@ onMounted(async () => {
   initUpdateIKMarkers()
   document.addEventListener('click', handleDocumentClick)
   logToServer({ event: 'init' })
-  await restoreCachedModel()
+  const restoredMesh = await restoreCachedModel()
+  if (restoredMesh) {
+    currentMeshRef.value = restoredMesh
+    setupIKTargets(scene.value, currentMeshRef.value)
+  }
   ensureFloorRigidBody()
   animate(0)
 })

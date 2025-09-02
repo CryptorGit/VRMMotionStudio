@@ -341,13 +341,30 @@ export function useModelOperations({
         )
       })
     }
-    await cache.cacheFiles(models.value.map(m => m.files))
+    const cached = await cache.cacheFiles(models.value.map(m => m.files))
+    if (!cached) {
+      console.error('Failed to cache model files')
+      alert('モデルのキャッシュに失敗しました')
+    }
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
   }
 
   async function restoreCachedModel() {
-    const saved = await cache.loadCachedFiles()
-    if (!saved.length) return
+    let saved
+    try {
+      saved = await cache.loadCachedFiles()
+    } catch (e) {
+      console.warn('Failed to load cached files')
+      console.debug(e)
+      alert('モデルの復元に失敗しました')
+      return null
+    }
+    if (!saved.length) {
+      console.warn('No cached model to restore')
+      console.debug('restoreCachedModel: load result', saved)
+      alert('復元するモデルがありません')
+      return null
+    }
     const files = []
     for (const model of saved) {
       for (const f of model) {
@@ -357,6 +374,7 @@ export function useModelOperations({
       }
     }
     await handleFiles(files)
+    return currentMeshRef.value
   }
 
   function onDragOver() {
