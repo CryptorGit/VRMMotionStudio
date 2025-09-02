@@ -11,6 +11,9 @@ export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logT
     loader.value.loadVPD(selectedPose.value.url, true, pose => {
       const mesh = currentMeshRef.value
       helper.value.pose(mesh, pose)
+      mesh.updateMatrixWorld(true)
+      mesh.skeleton.update()
+      helper.value?.update(0)
       mesh.skeleton.update()
       mesh.updateMatrixWorld(true)
       updateIKMarkersBound.value?.(true)
@@ -27,6 +30,7 @@ export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logT
     helper.value?.update(0)
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
+    updateIKMarkersBound.value?.(true)
     const exporter = new MMDExporter()
     const result = exporter.parseVpd(mesh, 'pose', {})
     const blob = new Blob([result], { type: 'text/plain' })
