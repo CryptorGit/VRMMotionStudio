@@ -48,13 +48,7 @@ export function attachIKParents(bones, iks) {
 }
 
 function findUserDataIKs(geometry) {
-  const extract = src =>
-    src?.MMD?.ik ||
-    src?.MMD?.iks ||
-    src?.mmd?.ik ||
-    src?.mmd?.iks ||
-    src?.ik ||
-    src?.iks
+  const candidates = ['MMD.ik', 'MMD.iks', 'mmd.ik', 'mmd.iks', 'ik', 'iks']
   const ud = geometry?.userData
   const sources = [
     geometry,
@@ -66,8 +60,11 @@ function findUserDataIKs(geometry) {
     ud?.metadata
   ]
   for (const s of sources) {
-    const iks = extract(s?.userData || s)
-    if (Array.isArray(iks) && iks.length > 0) return iks
+    const src = s?.userData || s
+    for (const path of candidates) {
+      const iks = path.split('.').reduce((acc, k) => acc?.[k], src)
+      if (Array.isArray(iks) && iks.length > 0) return iks
+    }
   }
   return []
 }
