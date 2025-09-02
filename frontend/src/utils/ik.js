@@ -30,8 +30,6 @@ export async function loadIKConfig() {
         '右足ＩＫ',
         '左つま先ＩＫ',
         '右つま先ＩＫ',
-        '左足先EX',
-        '右足先EX',
         '左手ＩＫ',
         '右手ＩＫ',
         '左親指ＩＫ',
@@ -60,8 +58,6 @@ export async function loadIKConfig() {
           effector: '右つま先',
           links: ['右足首', '右ひざ', '右足']
         },
-        { target: '左足先EX', effector: '左足首', links: ['左ひざ', '左足'] },
-        { target: '右足先EX', effector: '右足首', links: ['右ひざ', '右足'] },
         { target: '左手ＩＫ', effector: '左手首', links: ['左ひじ', '左腕'] },
         { target: '右手ＩＫ', effector: '右手首', links: ['右ひじ', '右腕'] },
         {
@@ -171,9 +167,11 @@ function applyFallbackIKs(
   iks,
   bones,
   modelName,
-  boneIndexMap = createBoneIndexMap(bones)
+  boneIndexMap = createBoneIndexMap(bones),
+  hasPMXIKs = false
 ) {
   let result = Array.isArray(iks) ? [...iks] : []
+  if (hasPMXIKs) return result
   if (result.length === 0) {
     const fallback = extraIKChains[modelName] || extraIKChains.default
     if (Array.isArray(fallback) && fallback.length > 0) {
@@ -513,41 +511,49 @@ function createDefaultIKChains(bones) {
   }, [])
 }
 
-export function getIKDefinitions(geometry, modelName = '') {
-  const bones = geometry?.userData?.MMD?.bones || []
-  const boneIndexMap = createBoneIndexMap(bones)
-  let iks = findUserDataIKs(geometry)
-  iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap)
-  const originalCount = iks.length
-  iks = resolveIKLinks(iks, bones, boneIndexMap)
-  attachIKParents(bones, iks, boneIndexMap)
-  iks = resolveIKLinks(iks, bones, boneIndexMap)
-  const expected = extraIKChains[modelName] || extraIKChains.default || []
-  expected.forEach(c => {
-    const targetName = normalizeBoneName(
-      typeof c.target === 'number' ? bones[c.target]?.name : c.target
-    )
-    const exists = iks.some(
-      ik => normalizeBoneName(bones[ik.target]?.name) === targetName
-    )
-    if (!exists) {
-      console.warn('getIKDefinitions: missing IK chain from config', {
-        target: targetName
-      })
+  export function getIKDefinitions(geometry, modelName = '') {
+    const bones = geometry?.userData?.MMD?.bones || []
+    const boneIndexMap = createBoneIndexMap(bones)
+    const pmxIKs = geometry?.userData?.MMD?.iks
+    const hasPMXIKs = Array.isArray(pmxIKs) && pmxIKs.length > 0
+    let iks = hasPMXIKs ? pmxIKs : findUserDataIKs(geometry)
+    iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap, hasPMXIKs)
+    const originalCount = iks.length
+    iks = resolveIKLinks(iks, bones, boneIndexMap)
+    attachIKParents(bones, iks, boneIndexMap)
+    iks = resolveIKLinks(iks, bones, boneIndexMap)
+    if (hasPMXIKs && originalCount > iks.length) {
+      console.warn(
+        'getIKDefinitions: invalid IK chain detected in PMX; please fix the file'
+      )
+      ikWarning.value ||= '一部のIKチェーンが無効です。PMXファイルを修正してください'
     }
-  })
-  if (iks.length === 0) {
-    ikWarning.value =
-      originalCount > 0
-        ? 'IK定義が不完全のためデフォルトIKを生成しました'
-        : 'IK定義が見つからずデフォルトIKを生成しました'
-    iks = createDefaultIKChains(bones)
-  } else {
-    ikWarning.value =
-      originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
+    const expected = extraIKChains[modelName] || extraIKChains.default || []
+    expected.forEach(c => {
+      const targetName = normalizeBoneName(
+        typeof c.target === 'number' ? bones[c.target]?.name : c.target
+      )
+      const exists = iks.some(
+        ik => normalizeBoneName(bones[ik.target]?.name) === targetName
+      )
+      if (!exists) {
+        console.warn('getIKDefinitions: missing IK chain from config', {
+          target: targetName
+        })
+      }
+    })
+    if (iks.length === 0) {
+      ikWarning.value =
+        originalCount > 0
+          ? 'IK定義が不完全のためデフォルトIKを生成しました'
+          : 'IK定義が見つからずデフォルトIKを生成しました'
+      iks = createDefaultIKChains(bones)
+    } else if (!hasPMXIKs) {
+      ikWarning.value =
+        originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
+    }
+    return iks
   }
-  return iks
-}
 
 export function setupIKTargets(scene, mesh) {
   ikTargets.forEach(t => {
@@ -596,8 +602,7 @@ export function setupIKTargets(scene, mesh) {
     if (
       chainIndex >= 0 &&
       targetNames.has(normalizedName) &&
-      typeof normalizedName === 'string' &&
-      !normalizedName.endsWith('ik親')
+      typeof normalizedName === 'string'
     ) {
       addMarker(bone, chainIndex)
     }
