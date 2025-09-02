@@ -1,12 +1,27 @@
 import { ref, watch } from 'vue'
 import * as THREE from 'three'
-import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver } from '../utils/ik.js'
+import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers } from '../utils/ik.js'
 
-export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody }) {
+export function useIkSolver({ scene, camera, renderer, currentMeshRef }) {
   let ikUpdateScheduled = false
-  const ikInitializedMeshes = new WeakSet()
   const updateIKMarkersBound = ref(null)
   const raycaster = new THREE.Raycaster()
+  const worker = new Worker(new URL('../workers/ikWorker.js', import.meta.url), { type: 'module' })
+  let bones = null
+
+  worker.onmessage = e => {
+    const { type, bones: updated } = e.data
+    if (type !== 'updated' || !bones || !currentMeshRef.value) return
+    updated.forEach((b, i) => {
+      bones[i].position.fromArray(b.pos)
+      bones[i].quaternion.fromArray(b.quat)
+      bones[i].scale.fromArray(b.scl)
+    })
+    const mesh = currentMeshRef.value
+    mesh.skeleton.update()
+    mesh.updateMatrixWorld(true)
+    updateIKMarkersBound.value?.()
+  }
 
   watch(showIkMarkers, () => {
     try {
@@ -20,10 +35,16 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     ikConfigPromise
       .then(() => {
         if (currentMeshRef.value === mesh) {
-          setupIKTargets(scene.value, mesh)
-          if (mesh && !ikInitializedMeshes.has(mesh)) {
-            initIKSolver(helper.value, mesh, ensureFloorRigidBody)
-            ikInitializedMeshes.add(mesh)
+          const iks = setupIKTargets(scene.value, mesh)
+          if (mesh) {
+            bones = mesh.skeleton?.bones || []
+            const boneDefs = bones.map(b => ({
+              name: b.name,
+              parent: bones.indexOf(b.parent)
+            }))
+            worker.postMessage({ type: 'init', bones: boneDefs, iks })
+          } else {
+            bones = null
           }
         }
       })
@@ -37,14 +58,12 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     if (import.meta.env.DEV && !(mesh instanceof THREE.SkinnedMesh)) {
       console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
     }
-    if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !helper.value) return
-    const prevIK = helper.value.enabled.ik
-    helper.value.enabled.ik = true
-    helper.value.update(0)
-    helper.value.enabled.ik = prevIK
-    mesh.skeleton.update()
-    mesh.updateMatrixWorld(true)
-    updateIKMarkersBound.value?.()
+    if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !bones) return
+    const matrices = bones.map(b => {
+      b.updateMatrixWorld(true)
+      return b.matrix.toArray()
+    })
+    worker.postMessage({ type: 'update', matrices })
   }
 
   function scheduleIKUpdate() {

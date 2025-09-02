@@ -174,7 +174,7 @@ export function setupIKTargets(scene, mesh) {
   })
   ikTargets = []
   selectedIK.value = null
-  if (!mesh) return
+  if (!mesh) return []
   const bones = mesh.skeleton?.bones || []
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const added = new Set()
@@ -208,6 +208,7 @@ export function setupIKTargets(scene, mesh) {
     addMarker(target, -1)
     added.add(target)
   })
+  return iks
 }
 
 export function updateIKMarkers(camera, renderer, raycaster) {
