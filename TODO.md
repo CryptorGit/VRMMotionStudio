@@ -56,6 +56,7 @@
   - [ ] IK親ボーンのマーカー表示が両足で機能することをブラウザで手動確認する
 - [x] モデルごとの不足 IK チェーンを `frontend/public/ik-config.json` の `extraIKChains` に追記する
 - [ ] 未対応モデル用の追加IKチェーンを `frontend/public/ik-config.json` に追記する
+- [ ] IK自動推測アルゴリズムの精度向上（親子関係と位置ベクトル解析の強化）
 - [ ] IK情報を取得できなかったモデル名を一覧化する
 - [ ] 問題のモデルで `mesh.skeleton.bones.map(b => b.name)` を実行しボーン名を確認する
 - [ ] `ik-config.json` 調整後にモデルを再読込し警告が解消されることをブラウザで手動確認する
