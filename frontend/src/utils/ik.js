@@ -282,14 +282,31 @@ export function setupIKTargets(scene, mesh) {
   } else {
     ikWarning.value = 'IK定義が見つかりません。追加IK設定を行ってください'
   }
+  const chainBoneNames = new Set()
+  iks.forEach(ik => {
+    const indices = [ik.target, ik.effector, ...(ik.links || []).map(l => l.index)]
+    indices.forEach(i => {
+      const b = bones[i]
+      if (b) chainBoneNames.add(normalizeBoneName(b.name))
+    })
+  })
+  const missing = []
   extraIKBoneNames.forEach(name => {
     const target = bones.find(
       b => normalizeBoneName(b.name) === normalizeBoneName(name)
     )
     if (!target || added.has(target)) return
+    if (!chainBoneNames.has(normalizeBoneName(name))) {
+      missing.push(name)
+      return
+    }
     addMarker(target, -1)
     added.add(target)
   })
+  if (missing.length > 0) {
+    const msg = `IKチェーンに存在しないボーン: ${missing.join(', ')}`
+    ikWarning.value = ikWarning.value ? `${ikWarning.value}\n${msg}` : msg
+  }
 }
 
 export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = false) {
