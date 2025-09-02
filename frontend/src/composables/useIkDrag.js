@@ -73,10 +73,6 @@ export function useIkDrag({
       const angle = event.movementX * 0.01
       quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, quat)
-      bone.updateMatrixWorld(true)
-      const mesh = currentMeshRef.value
-      mesh?.skeleton?.update()
-      mesh?.updateMatrixWorld?.(true)
       scheduleIKUpdate()
       applyIKUpdate()
       return
@@ -94,12 +90,7 @@ export function useIkDrag({
             parent.updateMatrixWorld(true)
             parent.worldToLocal(dragPoint)
             target.position.copy(dragPoint)
-            target.updateMatrixWorld(true)
-            const mesh = currentMeshRef.value
-            helper.value?.objects.get(mesh)?.ik?.solve()
-            mesh?.skeleton?.update()
-            mesh?.updateMatrixWorld?.(true)
-            updateIKMarkersBound.value?.(true)
+            applyIKUpdate()
           } else {
             console.warn('IK target parent missing worldToLocal method')
           }
@@ -122,11 +113,7 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
-      const mesh = currentMeshRef.value
-      helper.value?.objects.get(mesh)?.ik?.solve()
-      mesh?.skeleton?.update()
-      mesh?.updateMatrixWorld?.(true)
-      updateIKMarkersBound.value?.(true)
+      applyIKUpdate()
     }
     selectedIK.value = null
   }
