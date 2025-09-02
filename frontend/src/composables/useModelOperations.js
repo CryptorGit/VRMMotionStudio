@@ -316,6 +316,11 @@ export function useModelOperations({
             applyMmdRotationOrder(skinnedMesh.skeleton.bones)
             initBoneOriginalQuaternions(skinnedMesh.skeleton.bones)
             skinnedMesh.skeleton.calculateInverses()
+            const metaName =
+              skinnedMesh.geometry?.userData?.MMD?.meta?.name
+            skinnedMesh.name =
+              (typeof metaName === 'string' && metaName.trim()) ||
+              modelFile.name.replace(/\.(pmx|pmd)$/i, '')
             scene.value.add(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
             skeletonHelper.allBones = [...skeletonHelper.bones]
