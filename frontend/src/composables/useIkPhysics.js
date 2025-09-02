@@ -49,6 +49,7 @@ export function useIkPhysics({ helper, enablePhysics }) {
 
   function setAmmo(lib) {
     Ammo = lib
+    globalThis.Ammo = lib
     return Ammo
   }
 

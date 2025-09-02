@@ -15,6 +15,7 @@
   - [ ] `frontend/src/components/MorphEditor.vue` を作成し、モデルの `mesh.morphTargetDictionary` からモーフ名を列挙してスライダー表示
   - [ ] スライダー操作で `mesh.morphTargetInfluences` を更新する処理を `ThreeViewer.vue` と連携
   - [ ] `ThreeViewer.vue` のメニュー項目から `MorphEditor.vue` を開けるようにする
+- [ ] Ammo を globalThis に設定した状態でモデル読み込み時のエラー解消をブラウザで手動確認する
 - [ ] サイドバー全体の overflow 動作をブラウザで手動確認する
 - [x] IKボーン表示機能の実装
 - [x] 足のIKマーカーのドラッグ操作機能
