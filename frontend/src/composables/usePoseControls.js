@@ -23,6 +23,7 @@ export function usePoseControls({ loader, helper, currentMeshRef, menuOpen, logT
     if (!mesh) return
     selectedIK.value?.target.updateMatrixWorld(true)
     helper.value?.update(0)
+    helper.value?.objects.get(mesh)?.ikSolver?.update()
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
     const exporter = new MMDExporter()
