@@ -7,7 +7,12 @@ import { useIkSolver } from './useIkSolver.js'
 export default function useIkControls(options) {
   const physics = useIkPhysics(options)
   const solver = useIkSolver({ ...options, ensureFloorRigidBody: physics.ensureFloorRigidBody })
-  const drag = useIkDrag({ ...options, scheduleIKUpdate: solver.scheduleIKUpdate, applyIKUpdate: solver.applyIKUpdate })
+  const drag = useIkDrag({
+    ...options,
+    scheduleIKUpdate: solver.scheduleIKUpdate,
+    applyIKUpdate: solver.applyIKUpdate,
+    updateIKMarkersBound: solver.updateIKMarkersBound
+  })
 
   function handlePointerMove(event) {
     if (!selectedIK.value && !drag.isRotating.value) return
@@ -51,6 +56,7 @@ export default function useIkControls(options) {
   return {
     ...drag,
     ...physics,
+    applyIKUpdate: solver.applyIKUpdate,
     updateIKMarkersBound: solver.updateIKMarkersBound,
     initUpdateIKMarkers: solver.initUpdateIKMarkers
   }

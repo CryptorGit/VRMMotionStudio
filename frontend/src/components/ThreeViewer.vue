@@ -85,6 +85,7 @@ const renderer = shallowRef(null)
 const effect = shallowRef(null)
 const controls = shallowRef(null)
 const helper = shallowRef(null)
+const transformControls = shallowRef(null)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
@@ -119,7 +120,8 @@ const {
   ensureFloorRigidBody,
   updateIKMarkersBound,
   setAmmo,
-  initUpdateIKMarkers
+  initUpdateIKMarkers,
+  applyIKUpdate
 } = ikControls
 
 const fileLoader = useFileLoader({
@@ -132,7 +134,9 @@ const fileLoader = useFileLoader({
   menuOpen,
   logToServer,
   updateIKMarkersBound,
-  viewer
+  viewer,
+  transformControls,
+  applyIKUpdate
 })
 const {
   fileInput,
