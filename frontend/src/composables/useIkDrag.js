@@ -49,7 +49,6 @@ export function useIkDrag({ camera, renderer, controls, helper, currentMeshRef, 
 
   function onPointerMove(event) {
     if (!selectedIK.value) {
-      onPointerUp()
       return
     }
     if (isRotating.value) {
