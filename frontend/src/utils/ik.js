@@ -80,7 +80,8 @@ export function attachIKParents(
         typeof idx === 'number' &&
         !chain.links.some(l => l.index === idx)
       ) {
-        chain.links.unshift({ index: idx })
+        // Disabled to preserve CCDIK adjacency: do not insert IK parent into link chain.
+        // chain.links.unshift({ index: idx })
       }
     }
   })
@@ -212,12 +213,58 @@ function resolveIKLinks(
           })
           return null
         }
-        return
+        return (
           typeof l === 'object' && l !== null && 'index' in l
             ? { ...l, index: idx }
             : { index: idx }
+        )
       })
       .filter(Boolean)
+    // Reorder links to follow actual parent chain from effector upwards.
+    // CCDIKSolver expects effector to be a child of links[0], links[i] a child of links[i+1], etc.
+    if (links.length > 0) {
+      const candidateSet = new Set(links.map(x => x.index))
+      const ordered = []
+      const ancestors = []
+      let cur = bones[effector]?.parent || null
+      while (cur) {
+        const idx = bones.indexOf(cur)
+        if (idx === -1) break
+        ancestors.push(idx)
+        if (candidateSet.has(idx)) {
+          const found = links.find(x => x.index === idx)
+          if (found) ordered.push(found)
+        }
+        cur = cur.parent || null
+      }
+      if (ordered.length > 0) {
+        // replace with ordered chain; drop non-parental entries (e.g., toe EX)
+        links.splice(0, links.length, ...ordered)
+      }
+      // Ensure the first link is the immediate parent of effector.
+      const parentIdx = ancestors[0]
+      if (typeof parentIdx === 'number') {
+        if (links.length === 0) {
+          links.push({ index: parentIdx })
+        } else if (links[0].index !== parentIdx) {
+          const existing = links.find(l => l.index === parentIdx)
+          if (existing) {
+            // Move to front
+            const rest = links.filter(l => l !== existing)
+            links.splice(0, links.length, existing, ...rest)
+          } else {
+            // Insert missing immediate parent
+            links.unshift({ index: parentIdx })
+          }
+        }
+      }
+      // Finally, drop any link not on the ancestor path to keep adjacency.
+      if (links.length > 0 && ancestors.length > 0) {
+        const ancestorSet = new Set(ancestors)
+        const filtered = links.filter(l => ancestorSet.has(l.index))
+        if (filtered.length > 0) links.splice(0, links.length, ...filtered)
+      }
+    }
     if (links.length === 0) {
       console.warn('getIKDefinitions: chain has no valid links', {
         target: bones[target]?.name || target
