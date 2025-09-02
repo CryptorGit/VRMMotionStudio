@@ -59,6 +59,8 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   function initUpdateIKMarkers() {
     updateIKMarkersBound.value = skip =>
       updateIKMarkers(camera.value, renderer.value, raycaster, skip)
+    updateIKMarkersBound.value()
+    return updateIKMarkersBound.value
   }
 
   return { applyIKUpdate, scheduleIKUpdate, updateIKMarkersBound, initUpdateIKMarkers }

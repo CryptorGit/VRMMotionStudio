@@ -425,6 +425,10 @@ export function setupIKTargets(scene, mesh) {
 export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = false) {
   if (!camera || !renderer || ikTargets.length === 0) return
   const visible = showIkMarkers.value
+  if (!visible) {
+    ikTargets.forEach(t => (t.marker.visible = false))
+    return
+  }
   const height = renderer.domElement.clientHeight
   if (camera.fov !== cachedFov) {
     cachedFov = camera.fov
@@ -438,7 +442,7 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
     const dist = t.marker.position.distanceTo(camera.position)
     const scale = (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
     t.marker.scale.set(scale, scale, scale)
-    t.marker.visible = visible
+    t.marker.visible = true
     if (scale > maxScale) maxScale = scale
   })
   if (maxScale > 0) {
@@ -470,9 +474,5 @@ export function initIKSolver(helper, mesh, ensureFloorRigidBody) {
 }
 
 watch(showIkMarkers, v => {
-  try {
-    ikTargets.forEach(t => (t.marker.visible = v))
-  } catch (e) {
-    console.error('Failed to toggle IK markers:', e)
-  }
+  ikTargets.forEach(t => (t.marker.visible = v))
 })
