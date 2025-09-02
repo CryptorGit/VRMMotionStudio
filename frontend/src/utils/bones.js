@@ -84,6 +84,73 @@ export function applyBoneInheritance(bones) {
 }
 
 /**
+ * PMX から取得した軸情報を `bone.userData.localAxes` に設定し、
+ * 情報が無い場合は親子ボーンの位置から推定して補完する。
+ * @param {THREE.SkinnedMesh} skinnedMesh - 対象スキンドメッシュ
+ */
+export function ensureLocalAxes(skinnedMesh) {
+  const bones = skinnedMesh?.skeleton?.bones
+  const boneDatas = skinnedMesh?.geometry?.userData?.MMD?.bones
+  if (!Array.isArray(bones) || !Array.isArray(boneDatas)) return
+
+  skinnedMesh.updateMatrixWorld(true)
+
+  const toVector3 = v => {
+    if (!v) return null
+    if (v.isVector3) return v.clone()
+    if (Array.isArray(v)) return new THREE.Vector3().fromArray(v)
+    if ('x' in v && 'y' in v && 'z' in v)
+      return new THREE.Vector3(v.x, v.y, v.z)
+    return null
+  }
+
+  const _world = new THREE.Vector3()
+  const _child = new THREE.Vector3()
+  const _parent = new THREE.Vector3()
+  const fallbackX = new THREE.Vector3(1, 0, 0)
+  const fallbackZ = new THREE.Vector3(0, 0, 1)
+
+  bones.forEach((bone, idx) => {
+    const data = boneDatas[idx]
+    const ud = bone.userData || (bone.userData = {})
+    const lx = data?.localAxes
+    const xAxis = toVector3(lx?.xAxis || lx?.x)
+    const zAxis = toVector3(lx?.zAxis || lx?.z)
+    if (xAxis && zAxis) {
+      ud.localAxes = { xAxis, zAxis }
+      return
+    }
+
+    let y = new THREE.Vector3()
+    const child = bone.children.find(c => c.isBone)
+    if (child) {
+      y
+        .subVectors(
+          child.getWorldPosition(_child),
+          bone.getWorldPosition(_world)
+        )
+        .normalize()
+    } else if (bone.parent && bone.parent.isBone) {
+      y
+        .subVectors(
+          bone.getWorldPosition(_world),
+          bone.parent.getWorldPosition(_parent)
+        )
+        .normalize()
+    } else {
+      y.set(0, 1, 0)
+    }
+
+    let x = fallbackX.clone()
+    if (Math.abs(y.dot(x)) > 0.9) x.copy(fallbackZ)
+    let z = new THREE.Vector3().crossVectors(x, y).normalize()
+    x.crossVectors(y, z).normalize()
+
+    ud.localAxes = { xAxis: x, zAxis: z }
+  })
+}
+
+/**
  * ワールド座標系の回転をボーン固有のローカル軸に変換して適用する。
  * @param {THREE.Bone} bone - 対象ボーン
  * @param {THREE.Quaternion} quat - ワールド回転
