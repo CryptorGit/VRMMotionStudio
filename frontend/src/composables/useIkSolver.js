@@ -2,7 +2,7 @@ import { ref, watch } from 'vue'
 import * as THREE from 'three'
 import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver } from '../utils/ik.js'
 
-export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody }) {
+export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody, getAmmo }) {
   let ikUpdateScheduled = false
   const ikInitializedMeshes = new WeakSet()
   const updateIKMarkersBound = ref(null)
@@ -22,7 +22,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
       if (currentMeshRef.value === mesh) {
         setupIKTargets(scene.value, mesh)
         if (mesh && !ikInitializedMeshes.has(mesh)) {
-          await initIKSolver(helper.value, mesh, ensureFloorRigidBody)
+          await initIKSolver(helper.value, mesh, ensureFloorRigidBody, getAmmo?.())
           ikInitializedMeshes.add(mesh)
         }
       }
