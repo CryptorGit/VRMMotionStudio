@@ -22,8 +22,17 @@ export function useIkDrag({
   let physicsWasEnabled = false
 
   function onPointerDown(event) {
-    renderer.value?.domElement?.setPointerCapture(event.pointerId)
-    const rect = renderer.value.domElement.getBoundingClientRect()
+    if (!renderer.value) {
+      console.error('renderer is not initialized')
+      return
+    }
+    const element = renderer.value.domElement
+    if (!element) {
+      console.error('renderer domElement is not initialized')
+      return
+    }
+    element.setPointerCapture(event.pointerId)
+    const rect = element.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
@@ -60,6 +69,15 @@ export function useIkDrag({
     if (!selectedIK.value) {
       return
     }
+    if (!renderer.value) {
+      console.error('renderer is not initialized')
+      return
+    }
+    const element = renderer.value.domElement
+    if (!element) {
+      console.error('renderer domElement is not initialized')
+      return
+    }
     if (isRotating.value) {
       const bone = selectedIK.value.target
       let rotationAxis = bone.userData?.localAxes?.xAxis
@@ -76,7 +94,7 @@ export function useIkDrag({
       return
     }
     if (!dragPlane) return
-    const rect = renderer.value.domElement.getBoundingClientRect()
+    const rect = element.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
