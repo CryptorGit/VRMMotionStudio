@@ -22,7 +22,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
       if (currentMeshRef.value === mesh) {
         setupIKTargets(scene.value, mesh)
         if (mesh && !ikInitializedMeshes.has(mesh)) {
-          initIKSolver(helper.value, mesh, ensureFloorRigidBody)
+          await initIKSolver(helper.value, mesh, ensureFloorRigidBody)
           ikInitializedMeshes.add(mesh)
         }
       }
