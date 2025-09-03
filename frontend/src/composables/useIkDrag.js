@@ -11,7 +11,6 @@ export function useIkDrag({
   currentMeshRef,
   enablePhysics,
   scheduleIKUpdate,
-  applyIKUpdate,
   updateIKMarkersBound
 }) {
   const raycaster = new THREE.Raycaster()
@@ -74,7 +73,6 @@ export function useIkDrag({
       quat.setFromAxisAngle(rotationAxis, angle)
       applyLocalAxisRotation(bone, quat)
       scheduleIKUpdate()
-      applyIKUpdate()
       return
     }
     if (!dragPlane) return
@@ -90,7 +88,7 @@ export function useIkDrag({
             parent.updateMatrixWorld(true)
             parent.worldToLocal(dragPoint)
             target.position.copy(dragPoint)
-            applyIKUpdate()
+            scheduleIKUpdate()
           } else {
             console.warn('IK target parent missing worldToLocal method')
           }
@@ -113,7 +111,7 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
-      applyIKUpdate()
+      scheduleIKUpdate()
     }
     selectedIK.value = null
   }

@@ -10,7 +10,6 @@ export default function useIkControls(options) {
   const drag = useIkDrag({
     ...options,
     scheduleIKUpdate: solver.scheduleIKUpdate,
-    applyIKUpdate: solver.applyIKUpdate,
     updateIKMarkersBound: solver.updateIKMarkersBound
   })
 
