@@ -41,6 +41,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     mesh.skeleton.update()
     helper.value.objects.get(mesh)?.ik?.solve()
     helper.value.update(0)
+    mesh.skeleton.needsUpdate = true
     mesh.skeleton.update()
     mesh.updateMatrixWorld(true)
     updateIKMarkersBound.value?.(true)
