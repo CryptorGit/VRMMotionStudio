@@ -27,6 +27,36 @@ export function useModelOperations({
   let nextModelId = 1
   const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 
+  const LOCAL_MODELS_KEY = 'importedModels'
+
+  function saveModelState() {
+    try {
+      const data = models.value.map(m => ({
+        name: m.name,
+        visible: m.visible,
+        bonesVisible: m.bonesVisible,
+        boneNameVisible: m.boneNameVisible
+      }))
+      if (data.length) {
+        localStorage.setItem(LOCAL_MODELS_KEY, JSON.stringify(data))
+      } else {
+        localStorage.removeItem(LOCAL_MODELS_KEY)
+      }
+    } catch (e) {
+      console.warn('Failed to save model state', e)
+    }
+  }
+
+  function loadModelState() {
+    try {
+      const raw = localStorage.getItem(LOCAL_MODELS_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch (e) {
+      console.warn('Failed to load model state', e)
+      return []
+    }
+  }
+
   function createIsPhysicsBone(skinnedMesh) {
     const bones = skinnedMesh.skeleton?.bones || []
     const boneToIndex = new Map(bones.map((bone, index) => [bone, index]))
@@ -118,6 +148,7 @@ export function useModelOperations({
         })
       }
     }
+    saveModelState()
   }
 
   function toggleBoneVisibility(index, visible) {
@@ -126,6 +157,7 @@ export function useModelOperations({
       model.bonesVisible = visible
       model.skeletonHelper.visible = visible && model.visible
     }
+    saveModelState()
   }
 
   function toggleBoneNameVisibility(index, visible) {
@@ -137,6 +169,7 @@ export function useModelOperations({
           h.visible = visible && model.visible
       })
     }
+    saveModelState()
   }
 
   function disposeModelResources(model) {
@@ -206,6 +239,7 @@ export function useModelOperations({
     } catch (e) {
       console.error('Failed to remove model:', e)
     } finally {
+      saveModelState()
       requestAnimationFrame(() => effect.value.render(scene.value, camera.value))
     }
   }
@@ -227,6 +261,7 @@ export function useModelOperations({
     await ikConfigPromise
     setupIKTargets(scene.value, currentMeshRef.value)
     menuOpen.value = false
+    saveModelState()
   }
 
   async function handleFiles(files) {
@@ -352,9 +387,10 @@ export function useModelOperations({
       alert('モデルのキャッシュに失敗しました')
     }
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
+    saveModelState()
   }
 
-  async function restoreCachedModel() {
+  async function restoreCachedModel(savedState = loadModelState()) {
     console.debug('restoreCachedModel: start')
     let saved
     try {
@@ -387,6 +423,15 @@ export function useModelOperations({
       await handleFiles(files)
       currentMeshRef.value = models.value[0]?.mesh || null
       setupIKTargets(scene.value, currentMeshRef.value)
+      savedState.forEach(s => {
+        const index = models.value.findIndex(m => m.name === s.name)
+        if (index !== -1) {
+          toggleModelVisibility(index, s.visible)
+          toggleBoneVisibility(index, s.bonesVisible)
+          toggleBoneNameVisibility(index, s.boneNameVisible)
+        }
+      })
+      saveModelState()
       console.info(`restoreCachedModel: restored ${models.value.length} model(s)`)
       return true
     } catch (e) {

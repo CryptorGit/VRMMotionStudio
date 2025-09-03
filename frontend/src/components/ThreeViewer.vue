@@ -70,8 +70,7 @@ import {
   ikWarning,
   ikConfigPromise,
   ikTargets,
-  selectedIK,
-  setupIKTargets
+  selectedIK
 } from '../utils/ik.js'
 import useIkControls from '../composables/useIkControls.js'
 import { useMenu } from '../composables/useMenu.js'
@@ -222,10 +221,9 @@ onMounted(async () => {
   loadLightingSettings({ showIkMarkers, enablePhysics })
   await ikConfigPromise
   setupErrorHandlers()
-  const restored = await restoreCachedModel()
-  if (restored) {
-    currentMeshRef.value = models.value[0]?.mesh || null
-    setupIKTargets(scene.value, currentMeshRef.value)
+  const raw = localStorage.getItem('importedModels')
+  if (raw) {
+    await restoreCachedModel(JSON.parse(raw))
   }
   initRenderer()
   await initAmmo()
