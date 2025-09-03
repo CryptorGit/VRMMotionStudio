@@ -171,6 +171,16 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
 }
+.header button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .resize-handle {
   position: absolute;
   left: 0;
