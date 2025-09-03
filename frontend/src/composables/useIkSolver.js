@@ -7,6 +7,17 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   const ikInitializedMeshes = new WeakSet()
   const updateIKMarkersBound = ref(null)
   const raycaster = new THREE.Raycaster()
+  const devLog = data => {
+    try {
+      if (typeof fetch === 'function' && typeof window !== 'undefined') {
+        fetch('/__dev__/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'ik-solver', ...data })
+        }).catch(() => {})
+      }
+    } catch {}
+  }
 
   watch(showIkMarkers, () => {
     try {
@@ -20,6 +31,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     try {
       await ikConfigPromise
       if (currentMeshRef.value === mesh) {
+        devLog({ event: 'mesh:change', name: mesh?.name, hasHelper: !!helper.value, ammo: !!getAmmo?.() })
         setupIKTargets(scene.value, mesh)
         if (mesh && !ikInitializedMeshes.has(mesh)) {
           await initIKSolver(helper.value, mesh, ensureFloorRigidBody, getAmmo?.())
@@ -28,6 +40,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
       }
     } catch (e) {
       console.error('Failed to setup IK targets:', e)
+      devLog({ event: 'mesh:ik-setup:error', message: String(e && e.message) })
     }
   })
 

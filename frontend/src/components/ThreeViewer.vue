@@ -98,8 +98,8 @@ const clock = new THREE.Clock()
 const TARGET_FPS = 30
 
 function logToServer(data) {
-  if (import.meta.env.DEV) return
-  fetch(`${API_BASE_URL}/log`, {
+  const url = import.meta.env.DEV ? '/__dev__/log' : `${API_BASE_URL}/log`
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -225,9 +225,8 @@ onMounted(async () => {
   const raw = localStorage.getItem('importedModels')
   initRenderer()
   ammo.value = await initAmmo()
-  if (raw) {
-    await restoreCachedModel(JSON.parse(raw))
-  }
+  // Always try restoring from cache; if saved UI state exists, pass it
+  await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
   initUpdateIKMarkers()
   document.addEventListener('click', handleDocumentClick)
   logToServer({ event: 'init' })

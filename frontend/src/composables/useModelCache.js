@@ -6,6 +6,18 @@ export function useModelCache() {
   const LOCAL_KEY = 'mmd-viewer-model'
   let dbPromise
   let useLocal = false
+  const devLog = (data) => {
+    try {
+      if (typeof fetch === 'function' && typeof window !== 'undefined') {
+        // vite dev server endpoint installed by dev plugin
+        fetch('/__dev__/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'cache', ...data })
+        }).catch(() => {})
+      }
+    } catch {}
+  }
 
   function getDB() {
     if (useLocal) return Promise.resolve(null)
@@ -66,17 +78,7 @@ export function useModelCache() {
   async function cacheFiles(modelFiles) {
     try {
       await getDB()
-      let totalSize = 0
-      for (const files of modelFiles) {
-        for (const f of files) {
-          totalSize += f.size || 0
-        }
-      }
-      const MAX_CACHE_SIZE = 100 * 1024 * 1024
-      if (totalSize > MAX_CACHE_SIZE) {
-        console.warn('Model files exceed cache size limit, skipping cache')
-        return false
-      }
+      // Removed hard 100MB limit: allow caching large models
 
       const dataLists = []
       for (const files of modelFiles) {
@@ -85,20 +87,29 @@ export function useModelCache() {
             const buffer = await f.arrayBuffer()
             return {
               name: f.name,
-              path: f.webkitRelativePath || f.name,
+              // Preserve original relative path if present
+              path: f.restoredPath || f.webkitRelativePath || f.name,
               type: f.type,
-              data: useLocal ? await arrayBufferToBase64(buffer) : buffer
+              data: useLocal ? await arrayBufferToBase64(buffer) : new Blob([buffer], { type: f.type })
             }
           })
         )
         dataLists.push(list)
       }
+      devLog({
+        event: 'cache:prepare',
+        groups: dataLists.length,
+        counts: dataLists.map(l => l.length),
+        samples: dataLists.map(l => l.slice(0, 5).map(x => x.name))
+      })
       if (useLocal) {
         try {
           localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
+          devLog({ event: 'cache:local:ok' })
           return true
         } catch (lsErr) {
           console.error('Failed to cache model to localStorage:', lsErr)
+          devLog({ event: 'cache:local:error', message: String(lsErr && lsErr.message) })
           return false
         }
       }
@@ -111,20 +122,24 @@ export function useModelCache() {
           await promisifyRequest(store.put(dataLists[i], i))
         }
         await promisifyRequest(tx)
+        devLog({ event: 'cache:idb:ok' })
         return true
       } catch (dbErr) {
         console.warn('IndexedDB write failed, falling back to localStorage', dbErr)
         useLocal = true
         try {
           localStorage.setItem(LOCAL_KEY, JSON.stringify(dataLists))
+          devLog({ event: 'cache:idb:fallback-local:ok' })
           return true
         } catch (lsErr) {
           console.error('Failed to cache model to localStorage:', lsErr)
+          devLog({ event: 'cache:idb:fallback-local:error', message: String(lsErr && lsErr.message) })
           return false
         }
       }
     } catch (e) {
       console.error('Failed to cache model:', e)
+      devLog({ event: 'cache:error', message: String(e && e.message) })
       return false
     }
   }
@@ -136,13 +151,15 @@ export function useModelCache() {
         const raw = localStorage.getItem(LOCAL_KEY)
         if (!raw) return []
         const parsed = JSON.parse(raw)
-        return Promise.all(
+        const restored = await Promise.all(
           parsed.map(list =>
             Promise.all(
               list.map(async f => ({ ...f, data: await base64ToArrayBuffer(f.data) }))
             )
           )
         )
+        devLog({ event: 'load:local', groups: restored.length, counts: restored.map(l => l.length), samples: restored.map(l => l.slice(0,5).map(x => x.name)) })
+        return restored
       }
       try {
         const db = await getDB()
@@ -159,6 +176,12 @@ export function useModelCache() {
             resolve()
           }
         })
+        devLog({
+          event: 'load:idb',
+          groups: result.length,
+          counts: result.map(l => (Array.isArray(l) ? l.length : -1)),
+          samples: result.map(l => (Array.isArray(l) ? l.slice(0, 5).map(x => x && x.name) : []))
+        })
         return result
       } catch (dbErr) {
         console.warn('IndexedDB read failed, falling back to localStorage', dbErr)
@@ -167,20 +190,24 @@ export function useModelCache() {
           const raw = localStorage.getItem(LOCAL_KEY)
           if (!raw) return []
           const parsed = JSON.parse(raw)
-          return Promise.all(
+          const restored = await Promise.all(
             parsed.map(list =>
               Promise.all(
                 list.map(async f => ({ ...f, data: await base64ToArrayBuffer(f.data) }))
               )
             )
           )
+          devLog({ event: 'load:idb-fallback-local', groups: restored.length, counts: restored.map(l => l.length), samples: restored.map(l => l.slice(0,5).map(x => x.name)) })
+          return restored
         } catch (lsErr) {
           console.error('Failed to load cached model from localStorage:', lsErr)
+          devLog({ event: 'load:idb-fallback-local:error', message: String(lsErr && lsErr.message) })
           return []
         }
       }
     } catch (e) {
       console.error('Failed to load cached model:', e)
+      devLog({ event: 'load:error', message: String(e && e.message) })
       return []
     }
   }

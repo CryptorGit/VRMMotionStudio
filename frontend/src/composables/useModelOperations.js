@@ -129,8 +129,10 @@ export function useModelOperations({
   }
 
   function onFileChange(e) {
-    handleFiles(e.target.files)
+    // Snapshot FileList before clearing input to avoid live collection becoming empty
+    const list = Array.from(e.target.files || [])
     e.target.value = ''
+    handleFiles(list)
   }
 
   function toggleModelVisibility(index, visible) {
@@ -265,6 +267,7 @@ export function useModelOperations({
   }
 
   async function handleFiles(files) {
+    try { logToServer?.({ event: 'handleFiles:start', count: files?.length || 0 }) } catch {}
     poses.value.forEach(p => URL.revokeObjectURL(p.url))
     poses.value = []
     selectedPose.value = null
@@ -273,8 +276,10 @@ export function useModelOperations({
     const modelEntries = []
     const poseFiles = []
     for (const file of files) {
-      const path = file.webkitRelativePath || file.name
-      const shortPath = path.replace(/^[^/]*\//, '').replace(/\\/g, '/')
+      const path = file.restoredPath || file.webkitRelativePath || file.name
+      const shortPath = (
+        file.restoredPath ? path : path.replace(/^[^/]*\//, '')
+      ).replace(/\\/g, '/')
       const dir = shortPath.includes('/') ? shortPath.substring(0, shortPath.lastIndexOf('/')) : ''
       const url = URL.createObjectURL(file)
       fileMap[shortPath] = url
@@ -282,9 +287,11 @@ export function useModelOperations({
       if (/\.vpd$/i.test(file.name)) poseFiles.push({ name: file.name, url })
     }
     if (modelEntries.length === 0) {
+      try { logToServer?.({ event: 'handleFiles:no-model-entries' }) } catch {}
       for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
       return
     }
+    try { logToServer?.({ event: 'handleFiles:entries', count: modelEntries.length, names: modelEntries.map(e => e.file.name) }) } catch {}
     poses.value = poseFiles
     const poseFile = poseFiles[0]
     const posePath = poseFile && poseFile.url
@@ -295,7 +302,11 @@ export function useModelOperations({
     const manager = new THREE.LoadingManager()
     manager.setURLModifier(url => {
       const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '')
-      return fileMap[normalized] || url
+      // Fallback: try basename in case cached entries lack directory prefixes
+      const basename = normalized.includes('/')
+        ? normalized.substring(normalized.lastIndexOf('/') + 1)
+        : normalized
+      return fileMap[normalized] || fileMap[basename] || url
     })
     manager.onError = url => {
       console.error('Resource load failed:', url)
@@ -304,18 +315,32 @@ export function useModelOperations({
 
     loader.value = createLoader(manager)
     for (const { file: modelFile, dir } of modelEntries) {
-      const modelPath = (modelFile.webkitRelativePath || modelFile.name)
-        .replace(/^[^/]*\//, '')
+      const rawModelPath = (modelFile.restoredPath || modelFile.webkitRelativePath || modelFile.name)
         .replace(/\\/g, '/')
+      const modelPath = modelFile.restoredPath
+        ? rawModelPath
+        : rawModelPath.replace(/^[^/]*\//, '')
+      const modelRoot = rawModelPath.includes('/') ? rawModelPath.split('/')[0] : ''
       const dirPrefix = dir ? dir + '/' : ''
       const modelSpecificFiles = Array.from(files).filter(f => {
-        const p = (f.webkitRelativePath || f.name)
-          .replace(/^[^/]*\//, '')
-          .replace(/\\/g, '/')
+        const raw = (f.restoredPath || f.webkitRelativePath || f.name).replace(/\\/g, '/')
+        const root = raw.includes('/') ? raw.split('/')[0] : ''
+        const p = f.restoredPath ? raw : raw.replace(/^[^/]*\//, '')
         const isTexture = /\.(png|jpe?g|bmp|tga|gif|tiff|dds|svg|sph|spa)$/i.test(f.name)
-        return dir ? p.startsWith(dirPrefix) || isTexture : !p.includes('/') || isTexture
+        // Prefer same top-level root as the model; always include textures
+        if (root === modelRoot) return true
+        if (isTexture) return true
+        // Fallback to previous heuristic
+        return dir ? p.startsWith(dirPrefix) : !p.includes('/')
       })
+      try {
+        const allPaths = Array.from(files).map(f => (f.restoredPath || f.webkitRelativePath || f.name))
+        logToServer?.({ event: 'model:specific-files', model: modelFile.name, dir, dirPrefix, modelPath, modelRoot, selected: modelSpecificFiles.length, total: allPaths.length, sample: allPaths.slice(0, 10) })
+      } catch {}
       await new Promise(resolve => {
+        // Ensure relative resources resolve under the model's directory
+        try { loader.value.setResourcePath(dirPrefix) } catch {}
+        try { logToServer?.({ event: 'load-model', modelPath, dir }) } catch {}
         loader.value.load(
           modelPath,
           mesh => {
@@ -377,6 +402,7 @@ export function useModelOperations({
       })
     }
     let cached = false
+    try { logToServer?.({ event: 'handleFiles:cache-input', counts: models.value.map(m => (m.files ? m.files.length : 0)) }) } catch {}
     try {
       cached = await cache.cacheFiles(models.value.map(m => m.files))
     } catch (e) {
@@ -386,16 +412,19 @@ export function useModelOperations({
       console.error('Failed to cache model files')
       alert('モデルのキャッシュに失敗しました')
     }
+    try { logToServer?.({ event: 'handleFiles:cached', ok: !!cached, models: models.value.length }) } catch {}
     for (const key in fileMap) URL.revokeObjectURL(fileMap[key])
     saveModelState()
   }
 
   async function restoreCachedModel(savedState = loadModelState()) {
     console.debug('restoreCachedModel: start')
+    try { logToServer?.({ event: 'restore:start' }) } catch {}
     let saved
     try {
       saved = await cache.loadCachedFiles()
       console.debug('restoreCachedModel: load result', saved)
+      try { logToServer?.({ event: 'restore:loaded', groups: saved.length }) } catch {}
     } catch (e) {
       console.warn('Failed to load cached files')
       console.debug(e)
@@ -404,6 +433,7 @@ export function useModelOperations({
     }
     if (!saved.length) {
       console.info('No cached model to restore')
+      try { logToServer?.({ event: 'restore:empty' }) } catch {}
       alert('復元するモデルがありません')
       return false
     }
@@ -411,15 +441,25 @@ export function useModelOperations({
     for (const model of saved) {
       for (const f of model) {
         try {
-          const file = new File([f.data], f.name, { type: f.type })
-          if (f.path) Object.defineProperty(file, 'webkitRelativePath', { value: f.path })
+          const part = f?.data && f.data.byteLength !== undefined ? new Uint8Array(f.data) : f?.data
+          const file = new File([part], f.name, { type: f.type })
+          // Preserve original relative path for restored files without relying on webkitRelativePath
+          if (f.path) {
+            try {
+              file.restoredPath = f.path
+            } catch (_) {
+              // If assignment fails for any reason, proceed without it
+            }
+          }
           files.push(file)
         } catch (err) {
           console.error('Failed to reconstruct file from cache', err)
+          try { logToServer?.({ event: 'restore:reconstruct-error', name: f?.name, haveData: !!f?.data, dataType: Object.prototype.toString.call(f?.data), message: err?.message }) } catch {}
         }
       }
     }
     try {
+      try { logToServer?.({ event: 'restore:reconstructed', count: files.length }) } catch {}
       await handleFiles(files)
       currentMeshRef.value = models.value[0]?.mesh || null
       setupIKTargets(scene.value, currentMeshRef.value)
@@ -433,6 +473,7 @@ export function useModelOperations({
       })
       saveModelState()
       console.info(`restoreCachedModel: restored ${models.value.length} model(s)`)
+      try { logToServer?.({ event: 'restore:done', models: models.value.length }) } catch {}
       return true
     } catch (e) {
       console.error('Failed to restore cached model files', e)
@@ -449,7 +490,8 @@ export function useModelOperations({
   }
   function onDrop(e) {
     viewer.value.classList.remove('dragover')
-    handleFiles(e.dataTransfer.files)
+    const list = Array.from(e.dataTransfer?.files || [])
+    handleFiles(list)
   }
 
   return {

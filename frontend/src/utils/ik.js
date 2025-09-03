@@ -1,20 +1,51 @@
 import { ref, watch } from 'vue'
 import * as THREE from 'three'
 
+// Dev logging helper (dev server captures at /__dev__/log)
+const devLog = data => {
+  try {
+    if (typeof fetch === 'function' && typeof window !== 'undefined') {
+      fetch('/__dev__/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'ik', ...data })
+      }).catch(() => {})
+    }
+  } catch {}
+}
+
 export const IK_MARKER_PIXEL_SIZE = 16
 export const showIkMarkers = ref(true)
 export const ikWarning = ref('')
 export const selectedIK = ref(null)
 export let ikTargets = []
+
+// Config loaded from /ik-config.json (optional)
 export const extraIKBoneNames = []
 export const extraIKChains = {}
 export const ikAliases = new Map()
 
-const missingIKParentWarnings = new Set()
-
 let cachedCamera = null
 let cachedFov = null
 let cachedFovRad = 0
+
+// Minimal alias table (extend via ik-config.json)
+const boneNameAliases = {
+  'right knee': '右ひざ',
+  'r knee': '右ひざ',
+  'left knee': '左ひざ',
+  'l knee': '左ひざ',
+  'right foot': '右足',
+  'r foot': '右足',
+  'left foot': '左足',
+  'l foot': '左足',
+  'right ankle': '右足首',
+  'left ankle': '左足首',
+  'right toe': '右つま先',
+  'left toe': '左つま先'
+}
+const boneNameRegexes = []
+const linkIgnoreRegex = /(d)$/
 
 export async function loadIKConfig() {
   try {
@@ -41,158 +72,51 @@ export async function loadIKConfig() {
       }
     }
   } catch (e) {
-    console.warn('Failed to load IK config, applying defaults:', e)
-    if (extraIKBoneNames.length === 0) {
-      extraIKBoneNames.push(
-        ...[
-          '左足ＩＫ',
-          '右足ＩＫ',
-          '左つま先ＩＫ',
-          '右つま先ＩＫ',
-          '左手ＩＫ',
-          '右手ＩＫ',
-          '左親指ＩＫ',
-          '右親指ＩＫ',
-          '左人指ＩＫ',
-          '右人指ＩＫ',
-          '左中指ＩＫ',
-          '右中指ＩＫ',
-          '左薬指ＩＫ',
-          '右薬指ＩＫ',
-          '左小指ＩＫ',
-          '右小指ＩＫ'
-        ].map(normalizeBoneName)
-      )
-    }
-    if (Object.keys(extraIKChains).length === 0) {
-      extraIKChains.default = [
-        { target: '左足ＩＫ', effector: '左足首', links: ['左ひざ', '左足'] },
-        { target: '右足ＩＫ', effector: '右足首', links: ['右ひざ', '右足'] },
-        {
-          target: '左つま先ＩＫ',
-          effector: '左つま先',
-          links: ['左足首', '左ひざ', '左足']
-        },
-        {
-          target: '右つま先ＩＫ',
-          effector: '右つま先',
-          links: ['右足首', '右ひざ', '右足']
-        },
-        { target: '左手ＩＫ', effector: '左手首', links: ['左ひじ', '左腕'] },
-        { target: '右手ＩＫ', effector: '右手首', links: ['右ひじ', '右腕'] },
-        {
-          target: '左親指ＩＫ',
-          effector: '左親指２',
-          links: ['左親指１', '左親指０']
-        },
-        {
-          target: '右親指ＩＫ',
-          effector: '右親指２',
-          links: ['右親指１', '右親指０']
-        },
-        {
-          target: '左人指ＩＫ',
-          effector: '左人指３',
-          links: ['左人指２', '左人指１', '左人指０']
-        },
-        {
-          target: '右人指ＩＫ',
-          effector: '右人指３',
-          links: ['右人指２', '右人指１', '右人指０']
-        },
-        {
-          target: '左中指ＩＫ',
-          effector: '左中指３',
-          links: ['左中指２', '左中指１', '左中指０']
-        },
-        {
-          target: '右中指ＩＫ',
-          effector: '右中指３',
-          links: ['右中指２', '右中指１', '右中指０']
-        },
-        {
-          target: '左薬指ＩＫ',
-          effector: '左薬指３',
-          links: ['左薬指２', '左薬指１', '左薬指０']
-        },
-        {
-          target: '右薬指ＩＫ',
-          effector: '右薬指３',
-          links: ['右薬指２', '右薬指１', '右薬指０']
-        },
-        {
-          target: '左小指ＩＫ',
-          effector: '左小指３',
-          links: ['左小指２', '左小指１', '左小指０']
-        },
-        {
-          target: '右小指ＩＫ',
-          effector: '右小指３',
-          links: ['右小指２', '右小指１', '右小指０']
-        }
-      ].map(normalizeChain)
-    }
+    console.warn('Failed to load IK config; using minimal defaults', e)
+    if (Object.keys(extraIKChains).length === 0) extraIKChains.default = []
   }
 }
 export const ikConfigPromise = loadIKConfig()
 
-export function attachIKParents(
-  bones,
-  iks,
-  boneIndexMap = createBoneIndexMap(bones)
-) {
-  const ikParentSuffix = normalizeBoneName('ik親')
-  bones.forEach((b, idx) => {
-    const norm = normalizeBoneName(b.name)
-    if (typeof norm !== 'string' || !norm.endsWith(ikParentSuffix)) return
-    const ikName = norm.replace(/ik親$/, 'ik')
-    const targetIdx = boneIndexMap.get(ikName)
-    const chain = iks.find(ik => ik.target === targetIdx)
-    if (chain && typeof idx === 'number') {
-      // 既に IK 親がリンクに含まれている場合は一旦取り除く
-      const existingPos = chain.links.findIndex(l => l.index === idx)
-      let existingLink = null
-      if (existingPos !== -1) {
-        existingLink = chain.links.splice(existingPos, 1)[0]
-      }
+export function normalizeBoneName(name) {
+  if (typeof name !== 'string') return name
+  // NFKC to collapse full-width to half-width, then lower-case
+  // Also remove common separators (space, _, -, ・) to normalize variants like "IK 親"/"IK・親"
+  const n = name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s_\-・]/g, '')
+  const alias = boneNameAliases[n]
+  if (alias) return alias
+  for (const { regex, value } of boneNameRegexes) {
+    if (regex.test(n)) return value
+  }
+  return n
+}
 
-      const targetParent = bones[targetIdx]?.parent
-      if (bones[idx] === targetParent) {
-        chain.links.unshift({ index: idx })
-      } else {
-        // IK 親がターゲットの親でない場合は、子となるリンクを探して先頭に移動する
-        const childPos = chain.links.findIndex(
-          l => bones[l.index]?.parent === bones[idx]
-        )
-        if (childPos === -1) {
-          if (!missingIKParentWarnings.has(b.name)) {
-            // 親が見つからない場合は一度だけ警告する
-            console.warn(
-              `attachIKParents: ${b.name} is not parent of chain target or first link`
-            )
-            missingIKParentWarnings.add(b.name)
-          }
-          // 取り除いたリンクを元に戻す
-          if (existingLink) chain.links.splice(existingPos, 0, existingLink)
-          return
-        }
-        if (childPos > 0) {
-          const [child] = chain.links.splice(childPos, 1)
-          chain.links.unshift(child)
-        }
-        chain.links.unshift({ index: idx })
-      }
+function normalizeChain(chain) {
+  return {
+    ...chain,
+    target: normalizeBoneName(chain.target),
+    effector: normalizeBoneName(chain.effector),
+    links: (chain.links || [])
+      .map(l => (typeof l === 'string' ? normalizeBoneName(l) : l))
+      .filter(l => typeof l !== 'string' || !linkIgnoreRegex.test(l))
+  }
+}
 
-      const [resolved] = resolveIKLinks([chain], bones, boneIndexMap)
-      if (resolved) {
-        chain.links.splice(0, chain.links.length, ...resolved.links)
-      }
+const createBoneIndexMap = bones => {
+  const map = new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
+  ikAliases.forEach((canon, alias) => {
+    const idx = map.get(canon)
+    if (typeof idx === 'number') {
+      map.set(alias, idx)
+    } else {
+      console.warn('createBoneIndexMap: canonical bone not found for alias', canon)
+      ikWarning.value ||= `ボーン「${canon}」が見つかりません。ik-config.json の aliases に追加してください`
     }
   })
-  // Re-run to ensure CCD IK adjacency after inserting parents
-  const resolved = resolveIKLinks(iks, bones, boneIndexMap)
-  iks.splice(0, iks.length, ...resolved)
-  return iks
+  return map
 }
 
 function findUserDataIKs(geometry) {
@@ -217,253 +141,6 @@ function findUserDataIKs(geometry) {
   return []
 }
 
-function applyFallbackIKs(
-  iks,
-  bones,
-  modelName,
-  boneIndexMap = createBoneIndexMap(bones),
-  hasPMXIKs = false
-) {
-  let result = Array.isArray(iks) ? [...iks] : []
-  if (result.length === 0) {
-    const fallback = extraIKChains[modelName] || extraIKChains.default
-    if (Array.isArray(fallback) && fallback.length > 0) {
-      result = fallback.map(ik => ({ ...ik }))
-    }
-  }
-  const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
-  extraIKBoneNames.forEach(name => {
-    const idx = boneIndexMap.get(normalizeBoneName(name))
-    if (typeof idx !== 'number') return
-    const exists = result.some(ik => {
-      const target =
-        typeof ik.target === 'number'
-          ? ik.target
-          : boneIndexMap.get(normalizeBoneName(ik.target))
-      return target === idx
-    })
-    if (exists) return
-    const chain = fallbackChains.find(
-      c => normalizeBoneName(c.target) === normalizeBoneName(name)
-    )
-    if (chain) result.push({ ...chain })
-  })
-  result = resolveIKLinks(result, bones, boneIndexMap)
-  const seenTargets = new Set()
-  result = result.filter(ik => {
-    const targetName =
-      typeof ik.target === 'number'
-        ? normalizeBoneName(bones[ik.target]?.name)
-        : normalizeBoneName(ik.target)
-    if (!targetName) return true
-    if (seenTargets.has(targetName)) return false
-    seenTargets.add(targetName)
-    return true
-  })
-  return result
-}
-
-// 既知のボーン名エイリアスを正規化するためのマッピング
-const boneNameAliases = {
-  '右ひざ': '右ひざ',
-  '右膝': '右ひざ',
-  'right knee': '右ひざ',
-  'r knee': '右ひざ',
-  '左ひざ': '左ひざ',
-  '左膝': '左ひざ',
-  'left knee': '左ひざ',
-  'l knee': '左ひざ',
-  '右足': '右足',
-  'right foot': '右足',
-  'r foot': '右足',
-  'r leg': '右足',
-  '左足': '左足',
-  'left foot': '左足',
-  'l foot': '左足',
-  'l leg': '左足',
-  '右足首': '右足首',
-  'right ankle': '右足首',
-  'r ankle': '右足首',
-  '左足首': '左足首',
-  'left ankle': '左足首',
-  'l ankle': '左足首',
-  '右ひじ': '右ひじ',
-  '右肘': '右ひじ',
-  'right elbow': '右ひじ',
-  'r elbow': '右ひじ',
-  '左ひじ': '左ひじ',
-  '左肘': '左ひじ',
-  'left elbow': '左ひじ',
-  'l elbow': '左ひじ',
-  '右腕': '右腕',
-  'right arm': '右腕',
-  'r arm': '右腕',
-  '左腕': '左腕',
-  'left arm': '左腕',
-  'l arm': '左腕',
-  '右手首': '右手首',
-  'right wrist': '右手首',
-  'r wrist': '右手首',
-  '左手首': '左手首',
-  'left wrist': '左手首',
-  'l wrist': '左手首',
-  '右手': '右手',
-  'right hand': '右手',
-  'r hand': '右手',
-  '左手': '左手',
-  'left hand': '左手',
-  'l hand': '左手',
-  '右手ik': '右手ik',
-  'right hand ik': '右手ik',
-  'r hand ik': '右手ik',
-  '左手ik': '左手ik',
-  'left hand ik': '左手ik',
-  'l hand ik': '左手ik',
-  'right thumb ik': '右親指ik',
-  'r thumb ik': '右親指ik',
-  'left thumb ik': '左親指ik',
-  'l thumb ik': '左親指ik',
-  'right index ik': '右人指ik',
-  'right index finger ik': '右人指ik',
-  'r index ik': '右人指ik',
-  'r index finger ik': '右人指ik',
-  'left index ik': '左人指ik',
-  'left index finger ik': '左人指ik',
-  'l index ik': '左人指ik',
-  'l index finger ik': '左人指ik',
-  'right middle ik': '右中指ik',
-  'right middle finger ik': '右中指ik',
-  'r middle ik': '右中指ik',
-  'r middle finger ik': '右中指ik',
-  'left middle ik': '左中指ik',
-  'left middle finger ik': '左中指ik',
-  'l middle ik': '左中指ik',
-  'l middle finger ik': '左中指ik',
-  'right ring ik': '右薬指ik',
-  'right ring finger ik': '右薬指ik',
-  'r ring ik': '右薬指ik',
-  'r ring finger ik': '右薬指ik',
-  'left ring ik': '左薬指ik',
-  'left ring finger ik': '左薬指ik',
-  'l ring ik': '左薬指ik',
-  'l ring finger ik': '左薬指ik',
-  'right little ik': '右小指ik',
-  'right little finger ik': '右小指ik',
-  'r little ik': '右小指ik',
-  'r little finger ik': '右小指ik',
-  'left little ik': '左小指ik',
-  'left little finger ik': '左小指ik',
-  'l little ik': '左小指ik',
-  'l little finger ik': '左小指ik',
-  '右つま先': '右つま先',
-  'right toe': '右つま先',
-  'r toe': '右つま先',
-  '右足先ex': '右つま先',
-  '左つま先': '左つま先',
-  'left toe': '左つま先',
-  'l toe': '左つま先',
-  '左足先ex': '左つま先',
-  '右膝ik': '右ひざik',
-  '左膝ik': '左ひざik',
-  'right knee ik': '右ひざik',
-  'r knee ik': '右ひざik',
-  'left knee ik': '左ひざik',
-  'l knee ik': '左ひざik',
-  '右足先ik': '右つま先ik',
-  '左足先ik': '左つま先ik',
-  // IK ボーンの英語・半角表記への対応
-  'right leg ik': '右足ik',
-  'right foot ik': '右足ik',
-  'right ankle ik': '右足ik',
-  'r leg ik': '右足ik',
-  'r foot ik': '右足ik',
-  'r ankle ik': '右足ik',
-  'left leg ik': '左足ik',
-  'left foot ik': '左足ik',
-  'left ankle ik': '左足ik',
-  'l leg ik': '左足ik',
-  'l foot ik': '左足ik',
-  'l ankle ik': '左足ik',
-  'right toe ik': '右つま先ik',
-  'left toe ik': '左つま先ik',
-  'r toe ik': '右つま先ik',
-  'l toe ik': '左つま先ik',
-  '右足ik': '右足ik',
-  '左足ik': '左足ik',
-  '右つま先ik': '右つま先ik',
-  '左つま先ik': '左つま先ik'
-}
-
-const sep = '[\\s._-]*'
-const sidePatterns = [
-  { pattern: '(?:r|right)', prefix: '右' },
-  { pattern: '(?:l|left)', prefix: '左' }
-]
-const partPatterns = [
-  { pattern: 'knee', suffix: 'ひざ', ikSuffix: 'ひざik' },
-  { pattern: '(?:leg|foot)', suffix: '足', ikSuffix: '足ik' },
-  { pattern: 'ankle', suffix: '足首', ikSuffix: '足ik' },
-  { pattern: '(?:toe(?:' + sep + 'tip)?|foottip)', suffix: 'つま先', ikSuffix: 'つま先ik' }
-]
-const boneNameRegexes = []
-sidePatterns.forEach(s => {
-  partPatterns.forEach(p => {
-    boneNameRegexes.push(
-      { regex: new RegExp(`^${s.pattern}${sep}${p.pattern}$`), value: s.prefix + p.suffix },
-      { regex: new RegExp(`^${p.pattern}${sep}${s.pattern}$`), value: s.prefix + p.suffix },
-      {
-        regex: new RegExp(`^${s.pattern}${sep}${p.pattern}${sep}ik$`),
-        value: s.prefix + p.ikSuffix
-      },
-      {
-        regex: new RegExp(`^${p.pattern}${sep}ik${sep}${s.pattern}$`),
-        value: s.prefix + p.ikSuffix
-      }
-    )
-  })
-})
-
-const linkIgnoreRegex = /(d|補助|表示)$/
-
-export function normalizeBoneName(name) {
-  if (typeof name !== 'string') return name
-  const n = name.normalize('NFKC').toLowerCase()
-  const alias = boneNameAliases[n]
-  if (alias) return alias
-  for (const { regex, value } of boneNameRegexes) {
-    if (regex.test(n)) return value
-  }
-  return n
-}
-
-function normalizeChain(chain) {
-  return {
-    ...chain,
-    target: normalizeBoneName(chain.target),
-    effector: normalizeBoneName(chain.effector),
-    links: (chain.links || [])
-      .map(l => (typeof l === 'string' ? normalizeBoneName(l) : l))
-      .filter(l =>
-        typeof l !== 'string' || !linkIgnoreRegex.test(l)
-      )
-  }
-}
-
-const createBoneIndexMap = bones => {
-  const map = new Map(bones.map((b, i) => [normalizeBoneName(b.name), i]))
-  ikAliases.forEach((canon, alias) => {
-    const idx = map.get(canon)
-    if (typeof idx === 'number') {
-      map.set(alias, idx)
-    } else {
-      console.warn('createBoneIndexMap: 未定義のボーン名', canon)
-      ikWarning.value ||=
-        `ボーン「${canon}」が見つかりません。ik-config.json の aliases に追加してください`
-    }
-  })
-  return map
-}
-
 function inferIKChainsFromStructure(bones) {
   const chains = []
   bones.forEach((knee, kneeIdx) => {
@@ -475,20 +152,53 @@ function inferIKChainsFromStructure(bones) {
     const anklePos = bones[ankleIdx]?.position || new THREE.Vector3()
     const toePos = bones[toeIdx]?.position || new THREE.Vector3()
     if (kneePos.y <= anklePos.y || anklePos.y <= toePos.y) return
-    chains.push({
-      target: toeIdx,
-      effector: toeIdx,
-      links: [{ index: ankleIdx }, { index: kneeIdx }]
-    })
+    chains.push({ target: toeIdx, effector: toeIdx, links: [{ index: ankleIdx }, { index: kneeIdx }] })
   })
   return chains
 }
 
-function resolveIKLinks(
+function applyFallbackIKs(
   iks,
   bones,
-  boneIndexMap = createBoneIndexMap(bones)
+  modelName,
+  boneIndexMap = createBoneIndexMap(bones),
+  hasPMXIKs = false
 ) {
+  let result = Array.isArray(iks) ? [...iks] : []
+  // If no IKs from PMX/userData, try model-specific/default fallbacks
+  if (result.length === 0) {
+    const fallback = extraIKChains[modelName] || extraIKChains.default
+    if (Array.isArray(fallback) && fallback.length > 0) {
+      result = fallback.map(ik => ({ ...ik }))
+    }
+  }
+  const fallbackChains = extraIKChains[modelName] || extraIKChains.default || []
+  // Ensure every requested extra IK target appears at least once
+  extraIKBoneNames.forEach(name => {
+    const idx = boneIndexMap.get(normalizeBoneName(name))
+    if (typeof idx !== 'number') return
+    const exists = result.some(ik => {
+      const target = typeof ik.target === 'number' ? ik.target : boneIndexMap.get(normalizeBoneName(ik.target))
+      return target === idx
+    })
+    if (exists) return
+    const chain = fallbackChains.find(c => normalizeBoneName(c.target) === normalizeBoneName(name))
+    if (chain) result.push({ ...chain })
+  })
+  // Resolve names to indices and dedupe by target
+  result = resolveIKLinks(result, bones, boneIndexMap)
+  const seenTargets = new Set()
+  result = result.filter(ik => {
+    const targetName = typeof ik.target === 'number' ? normalizeBoneName(bones[ik.target]?.name) : normalizeBoneName(ik.target)
+    if (!targetName) return true
+    if (seenTargets.has(targetName)) return false
+    seenTargets.add(targetName)
+    return true
+  })
+  return result
+}
+
+function resolveIKLinks(iks, bones, boneIndexMap = createBoneIndexMap(bones)) {
   const resolve = v => {
     if (typeof v === 'number') return v
     const norm = normalizeBoneName(v)
@@ -510,46 +220,29 @@ function resolveIKLinks(
         guessed.forEach(g => acc.push(g))
       } else {
         console.warn('getIKDefinitions: unresolved bone in chain', {
-          target: nameOf(ik.target),
-          effector: nameOf(ik.effector)
+          target: nameOf(ik.target), effector: nameOf(ik.effector)
         })
-        const miss =
-          typeof target !== 'number' ? nameOf(ik.target) : nameOf(ik.effector)
-        ikWarning.value ||=
-          `IKを自動推測できません。${miss} を ik-config.json の extraIKChains に追加してください`
+        const miss = typeof target !== 'number' ? nameOf(ik.target) : nameOf(ik.effector)
+        ikWarning.value ||= `IKを解決できません。${miss} を ik-config.json に追加してください`
       }
       return acc
     }
     const links = (ik.links || [])
       .map(l => {
-        const idx =
-          typeof l === 'object' && l !== null && 'index' in l
-            ? resolve(l.index)
-            : resolve(l)
+        const idx = (typeof l === 'object' && l !== null && 'index' in l) ? resolve(l.index) : resolve(l)
         if (typeof idx !== 'number') {
-          console.warn('getIKDefinitions: unresolved bone in link', {
-            link: nameOf(l),
-            chainTarget: bones[target]?.name || target
-          })
+          console.warn('getIKDefinitions: unresolved bone in link', { link: nameOf(l), chainTarget: bones[target]?.name || target })
           const miss = nameOf(l)
-          if (miss)
-            ikWarning.value ||=
-              `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
+          if (miss) ikWarning.value ||= `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
           return null
         }
         const linkName = normalizeBoneName(bones[idx]?.name)
-        if (typeof linkName === 'string' && linkIgnoreRegex.test(linkName)) {
-          return null
-        }
-        return (
-          typeof l === 'object' && l !== null && 'index' in l
-            ? { ...l, index: idx }
-            : { index: idx }
-        )
+        if (typeof linkName === 'string' && linkIgnoreRegex.test(linkName)) return null
+        return (typeof l === 'object' && l !== null && 'index' in l) ? { ...l, index: idx } : { index: idx }
       })
       .filter(Boolean)
+
     // Reorder links to follow actual parent chain from effector upwards.
-    // CCDIKSolver expects effector to be a child of links[0], links[i] a child of links[i+1], etc.
     if (links.length > 0) {
       const candidateSet = new Set(links.map(x => x.index))
       const ordered = []
@@ -565,11 +258,7 @@ function resolveIKLinks(
         }
         cur = cur.parent || null
       }
-      if (ordered.length > 0) {
-        // replace with ordered chain; drop non-parental entries (e.g., toe EX)
-        links.splice(0, links.length, ...ordered)
-      }
-      // Ensure the first link is the immediate parent of effector.
+      if (ordered.length > 0) links.splice(0, links.length, ...ordered)
       const parentIdx = ancestors[0]
       if (typeof parentIdx === 'number') {
         if (links.length === 0) {
@@ -577,24 +266,19 @@ function resolveIKLinks(
         } else if (links[0].index !== parentIdx) {
           const existing = links.find(l => l.index === parentIdx)
           if (existing) {
-            // Move to front
             const rest = links.filter(l => l !== existing)
             links.splice(0, links.length, existing, ...rest)
           } else {
-            // Insert missing immediate parent
             links.unshift({ index: parentIdx })
           }
         }
       }
-      // Ensure each link's immediate parent appears next in the chain.
       for (let i = 0; i < links.length - 1; i++) {
         const parent = bones[links[i].index]?.parent
         const expectedIdx = parent ? bones.indexOf(parent) : -1
         if (expectedIdx === -1) continue
         if (links[i + 1].index === expectedIdx) continue
-        const existingIdx = links.findIndex(
-          (l, idx) => idx > i && l.index === expectedIdx
-        )
+        const existingIdx = links.findIndex((l, idx) => idx > i && l.index === expectedIdx)
         if (existingIdx !== -1) {
           const [existing] = links.splice(existingIdx, 1)
           links.splice(i + 1, 0, existing)
@@ -602,21 +286,18 @@ function resolveIKLinks(
           links.splice(i + 1, 0, { index: expectedIdx })
         }
       }
-      // Finally, drop any link not on the ancestor path to keep adjacency.
       if (links.length > 0 && ancestors.length > 0) {
         const ancestorSet = new Set(ancestors)
         const filtered = links.filter(l => ancestorSet.has(l.index))
         if (filtered.length > 0) links.splice(0, links.length, ...filtered)
       }
     }
-    console.debug('resolveIKLinks:', {
-      target: bones[target]?.name || target,
-      links: links.map(l => bones[l.index]?.name || l.index)
-    })
+
+    const dbg = { target: bones[target]?.name || target, links: links.map(l => bones[l.index]?.name || l.index) }
+    console.debug('resolveIKLinks:', dbg)
+    try { devLog({ event: 'ik:resolve', ...dbg }) } catch {}
     if (links.length === 0) {
-      console.warn('getIKDefinitions: chain has no valid links', {
-        target: bones[target]?.name || target
-      })
+      console.warn('getIKDefinitions: chain has no valid links', { target: bones[target]?.name || target })
       return acc
     }
     acc.push({ target, effector, links })
@@ -624,59 +305,106 @@ function resolveIKLinks(
   }, [])
 }
 
+// Accept IK parent bones that are ancestors (not only immediate parents)
+export function attachIKParentsSafe(bones, iks, boneIndexMap = createBoneIndexMap(bones)) {
+  const suffix = normalizeBoneName('ik親')
+  const endsWithIkParent = n => typeof n === 'string' && n.endsWith(suffix)
+  const isAncestor = (ancIdx, descIdx) => {
+    let cur = bones[descIdx]?.parent || null
+    while (cur) {
+      if (bones[ancIdx] === cur) return true
+      cur = cur.parent || null
+    }
+    return false
+  }
+  bones.forEach((b, idx) => {
+    const norm = normalizeBoneName(b.name)
+    if (!endsWithIkParent(norm)) return
+    const base = norm.slice(0, -suffix.length) + 'ik'
+    const targetIdx = boneIndexMap.get(base)
+    const chain = iks.find(ik => ik.target === targetIdx)
+    if (!chain) return
+    const existingPos = chain.links.findIndex(l => l.index === idx)
+    let existingLink = null
+    if (existingPos !== -1) existingLink = chain.links.splice(existingPos, 1)[0]
+    const targetParent = bones[targetIdx]?.parent
+    if (bones[idx] === targetParent) {
+      chain.links.unshift({ index: idx })
+    } else {
+      const childPos = chain.links.findIndex(l => bones[l.index]?.parent === bones[idx])
+      if (childPos === -1) {
+        const anyDescendant = isAncestor(idx, targetIdx) || chain.links.some(l => isAncestor(idx, l.index))
+        if (anyDescendant) {
+          chain.links.unshift({ index: idx })
+        } else {
+          if (existingLink) chain.links.splice(existingPos, 0, existingLink)
+          return
+        }
+      }
+      if (childPos > 0) {
+        const [child] = chain.links.splice(childPos, 1)
+        chain.links.unshift(child)
+      }
+      chain.links.unshift({ index: idx })
+    }
+    const [resolved] = resolveIKLinks([chain], bones, boneIndexMap)
+    if (resolved) chain.links.splice(0, chain.links.length, ...resolved.links)
+  })
+  const resolved = resolveIKLinks(iks, bones, boneIndexMap)
+  iks.splice(0, iks.length, ...resolved)
+  return iks
+}
+
 function createDefaultIKChains(bones) {
   return bones.reduce((acc, bone, idx) => {
     const parent = bone.parent ? bones.indexOf(bone.parent) : -1
-    if (parent !== -1) {
-      acc.push({ target: idx, effector: idx, links: [{ index: parent }] })
-    }
+    if (parent !== -1) acc.push({ target: idx, effector: idx, links: [{ index: parent }] })
     return acc
   }, [])
 }
 
-  export function getIKDefinitions(geometry, modelName = '') {
-    const bones = geometry?.userData?.MMD?.bones || []
-    const boneIndexMap = createBoneIndexMap(bones)
-    let iks = geometry?.userData?.MMD?.iks
-    let hasPMXIKs = Array.isArray(iks) && iks.length > 0
-    if (!hasPMXIKs) {
-      iks = findUserDataIKs(geometry)
-      if (Array.isArray(iks) && iks.length > 0) {
-        geometry.userData = geometry.userData || {}
-        geometry.userData.MMD = geometry.userData.MMD || {}
-        geometry.userData.MMD.iks = iks
-        hasPMXIKs = true
-      } else {
-        iks = []
-      }
+export function getIKDefinitions(geometry, modelName = '') {
+  const bones = geometry?.userData?.MMD?.bones || []
+  const boneIndexMap = createBoneIndexMap(bones)
+  let iks = geometry?.userData?.MMD?.iks
+  let hasPMXIKs = Array.isArray(iks) && iks.length > 0
+  try { devLog({ event: 'ik:get:start', model: modelName, bones: bones.length, hasPMXIKs }) } catch {}
+  if (!hasPMXIKs) {
+    iks = findUserDataIKs(geometry)
+    if (Array.isArray(iks) && iks.length > 0) {
+      geometry.userData = geometry.userData || {}
+      geometry.userData.MMD = geometry.userData.MMD || {}
+      geometry.userData.MMD.iks = iks
+      hasPMXIKs = true
+    } else {
+      iks = []
     }
-    iks = resolveIKLinks(iks, bones, boneIndexMap)
-    iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap, hasPMXIKs)
-    const originalCount = iks.length
-    iks = resolveIKLinks(iks, bones, boneIndexMap)
-    attachIKParents(bones, iks, boneIndexMap)
-    iks = resolveIKLinks(iks, bones, boneIndexMap)
-    if (hasPMXIKs && originalCount > iks.length) {
-      console.warn(
-        'getIKDefinitions: invalid IK chain detected in PMX; please fix the file'
-      )
-      ikWarning.value ||= '一部のIKチェーンが無効です。PMXファイルを修正してください'
-    }
-    if (iks.length === 0) {
-      ikWarning.value =
-        originalCount > 0
-          ? 'IK定義が不完全のためデフォルトIKを生成しました'
-          : 'IK定義が見つからずデフォルトIKを生成しました'
-      iks = createDefaultIKChains(bones)
-    } else if (!hasPMXIKs) {
-      ikWarning.value =
-        originalCount > iks.length ? '一部のIKチェーンが無効です' : ''
-    }
-    geometry.userData = geometry.userData || {}
-    geometry.userData.MMD = geometry.userData.MMD || {}
-    geometry.userData.MMD.iks = iks
-    return iks
   }
+  iks = resolveIKLinks(iks, bones, boneIndexMap)
+  iks = applyFallbackIKs(iks, bones, modelName, boneIndexMap, hasPMXIKs)
+  const originalCount = iks.length
+  try { devLog({ event: 'ik:get:post-fallback', count: originalCount }) } catch {}
+  iks = resolveIKLinks(iks, bones, boneIndexMap)
+  attachIKParentsSafe(bones, iks, boneIndexMap)
+  iks = resolveIKLinks(iks, bones, boneIndexMap)
+  if (hasPMXIKs && originalCount > iks.length) {
+    console.warn('getIKDefinitions: invalid IK chain detected in PMX; please fix the file')
+    try { devLog({ event: 'ik:get:invalid-pmx', before: originalCount, after: iks.length }) } catch {}
+    ikWarning.value ||= 'PMX内のIKチェーンに不整合があります。ファイルの修正を検討してください'
+  }
+  if (iks.length === 0) {
+    ikWarning.value = originalCount > 0
+      ? '一部のIKチェーンを構築できませんでした'
+      : 'IKチェーンが見つかりませんでした'
+    iks = createDefaultIKChains(bones)
+    try { devLog({ event: 'ik:get:created-default', count: iks.length }) } catch {}
+  }
+  geometry.userData = geometry.userData || {}
+  geometry.userData.MMD = geometry.userData.MMD || {}
+  geometry.userData.MMD.iks = iks
+  try { devLog({ event: 'ik:get:done', count: iks.length }) } catch {}
+  return iks
+}
 
 export function setupIKTargets(scene, mesh) {
   ikTargets.forEach(t => {
@@ -690,53 +418,30 @@ export function setupIKTargets(scene, mesh) {
   const iks = getIKDefinitions(mesh.geometry, mesh.name)
   const modelChains = extraIKChains[mesh.name] || extraIKChains.default || []
   const targetNames = new Set(
-    Array.isArray(iks)
-      ? iks
-          .map(ik => normalizeBoneName(bones[ik.target]?.name))
-          .filter(Boolean)
-      : []
+    Array.isArray(iks) ? iks.map(ik => normalizeBoneName(bones[ik.target]?.name)).filter(Boolean) : []
   )
-  extraIKBoneNames.forEach(name =>
-    targetNames.add(normalizeBoneName(name))
-  )
+  extraIKBoneNames.forEach(name => targetNames.add(normalizeBoneName(name)))
   modelChains.forEach(c => {
-    const t =
-      typeof c.target === 'number' ? bones[c.target]?.name : c.target
+    const t = typeof c.target === 'number' ? bones[c.target]?.name : c.target
     if (t) targetNames.add(normalizeBoneName(t))
   })
-  bones.forEach(b => {
-    const n = normalizeBoneName(b.name)
-    if (typeof n === 'string' && n.endsWith('ik親')) targetNames.add(n)
-  })
   const addMarker = (target, chainIndex) => {
-    const marker = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        color: 0xff0000,
-        depthTest: false,
-        depthWrite: false
-      })
-    )
+    const marker = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff0000, depthTest: false, depthWrite: false }))
     marker.renderOrder = 999
     target.getWorldPosition(marker.position)
     ikTargets.push({ target, marker, chainIndex })
     scene.add(marker)
   }
+  const isIkParentName = n => typeof n === 'string' && /ik親$/.test(n)
   bones.forEach(bone => {
     const normalizedName = normalizeBoneName(bone.name)
-    const isIKParent =
-      typeof normalizedName === 'string' && normalizedName.endsWith('ik親')
-    const chainIndex = Array.isArray(iks)
-      ? iks.findIndex(ik => bones[ik.target] === bone)
-      : -1
-    if (
-      targetNames.has(normalizedName) &&
-      (chainIndex >= 0 || isIKParent)
-    ) {
+    const chainIndex = Array.isArray(iks) ? iks.findIndex(ik => bones[ik.target] === bone) : -1
+    if (targetNames.has(normalizedName) || chainIndex >= 0 || isIkParentName(normalizedName)) {
       addMarker(bone, chainIndex >= 0 ? chainIndex : null)
     }
   })
   if (!Array.isArray(iks) || iks.length === 0) {
-    ikWarning.value ||= 'IK定義が見つかりません。追加IK設定を行ってください'
+    ikWarning.value ||= 'IKチェーンが検出されませんでした（マーカーは表示されません）'
   }
 }
 
@@ -774,20 +479,20 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
 
 export async function initIKSolver(helper, mesh, ensureFloorRigidBody, Ammo) {
   if (!mesh || !helper) return
-  const skinnedMesh = mesh.isSkinnedMesh
-    ? mesh
-    : mesh.getObjectByProperty('type', 'SkinnedMesh')
+  const skinnedMesh = mesh.isSkinnedMesh ? mesh : mesh.getObjectByProperty('type', 'SkinnedMesh')
   if (!skinnedMesh) {
     console.error('initIKSolver: SkinnedMesh not found for', mesh.name)
     return
   }
+  try {
+    devLog({ event: 'ik:init', mesh: skinnedMesh.name, ammoArg: !!Ammo, globalAmmo: !!(typeof window !== 'undefined' && window.Ammo) })
+  } catch {}
   let iks = getIKDefinitions(skinnedMesh.geometry, skinnedMesh.name)
   if (!Array.isArray(iks)) iks = []
-  skinnedMesh.geometry.userData.MMD =
-    skinnedMesh.geometry.userData.MMD || {}
+  skinnedMesh.geometry.userData.MMD = skinnedMesh.geometry.userData.MMD || {}
   skinnedMesh.geometry.userData.MMD.iks = iks
   if (!helper.objects.get(skinnedMesh)) {
-    if (Ammo) {
+    if (Ammo || (typeof window !== 'undefined' && window.Ammo)) {
       helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
     } else {
       helper.add(skinnedMesh, { physics: false, ik: true, grant: true })
