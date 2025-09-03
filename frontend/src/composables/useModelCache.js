@@ -35,26 +35,49 @@ export function useModelCache() {
   }
 
   function arrayBufferToBase64(buffer) {
-    let binary = ''
-    const bytes = new Uint8Array(buffer)
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([buffer])
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result.split(',')[1])
+        } else {
+          reject(new Error('Failed to convert arrayBuffer to base64'))
+        }
+      }
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(blob)
+    })
   }
 
   function base64ToArrayBuffer(base64) {
-    const binary = atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i)
-    }
-    return bytes.buffer
+    return new Promise((resolve, reject) => {
+      const byteString = atob(base64)
+      const uint8Array = Uint8Array.from(byteString, c => c.charCodeAt(0))
+      const blob = new Blob([uint8Array])
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsArrayBuffer(blob)
+    })
   }
 
   async function cacheFiles(modelFiles) {
     try {
       await getDB()
+      let totalSize = 0
+      for (const files of modelFiles) {
+        for (const f of files) {
+          totalSize += f.size || 0
+        }
+      }
+      const MAX_CACHE_SIZE = 100 * 1024 * 1024
+      if (totalSize > MAX_CACHE_SIZE) {
+        console.warn('Model files exceed cache size limit, skipping cache')
+        return false
+      }
+
       const dataLists = []
       for (const files of modelFiles) {
         const list = await Promise.all(
@@ -64,7 +87,7 @@ export function useModelCache() {
               name: f.name,
               path: f.webkitRelativePath || f.name,
               type: f.type,
-              data: useLocal ? arrayBufferToBase64(buffer) : buffer
+              data: useLocal ? await arrayBufferToBase64(buffer) : buffer
             }
           })
         )
@@ -113,8 +136,12 @@ export function useModelCache() {
         const raw = localStorage.getItem(LOCAL_KEY)
         if (!raw) return []
         const parsed = JSON.parse(raw)
-        return parsed.map(list =>
-          list.map(f => ({ ...f, data: base64ToArrayBuffer(f.data) }))
+        return Promise.all(
+          parsed.map(list =>
+            Promise.all(
+              list.map(async f => ({ ...f, data: await base64ToArrayBuffer(f.data) }))
+            )
+          )
         )
       }
       try {
@@ -140,8 +167,12 @@ export function useModelCache() {
           const raw = localStorage.getItem(LOCAL_KEY)
           if (!raw) return []
           const parsed = JSON.parse(raw)
-          return parsed.map(list =>
-            list.map(f => ({ ...f, data: base64ToArrayBuffer(f.data) }))
+          return Promise.all(
+            parsed.map(list =>
+              Promise.all(
+                list.map(async f => ({ ...f, data: await base64ToArrayBuffer(f.data) }))
+              )
+            )
           )
         } catch (lsErr) {
           console.error('Failed to load cached model from localStorage:', lsErr)
