@@ -10,6 +10,7 @@ export const extraIKBoneNames = []
 export const extraIKChains = {}
 export const ikAliases = new Map()
 
+let cachedCamera = null
 let cachedFov = null
 let cachedFovRad = 0
 
@@ -712,7 +713,8 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
     return
   }
   const height = renderer.domElement.clientHeight
-  if (camera.fov !== cachedFov) {
+  if (camera !== cachedCamera || camera.fov !== cachedFov) {
+    cachedCamera = camera
     cachedFov = camera.fov
     cachedFovRad = THREE.MathUtils.degToRad(cachedFov)
   }
