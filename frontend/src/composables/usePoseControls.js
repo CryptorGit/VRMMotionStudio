@@ -54,8 +54,10 @@ export function usePoseControls({
   }
 
   function handleTransformEvent() {
-    const name = transformControls?.value?.object?.name
-    if (name && /ik$/i.test(normalizeBoneName(name))) {
+    const name = normalizeBoneName(
+      transformControls?.value?.object?.name
+    )
+    if (typeof name === 'string' && /ik$/i.test(name)) {
       applyIKUpdate()
     }
   }
