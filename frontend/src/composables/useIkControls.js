@@ -6,7 +6,11 @@ import { useIkSolver } from './useIkSolver.js'
 
 export default function useIkControls(options) {
   const physics = useIkPhysics(options)
-  const solver = useIkSolver({ ...options, ensureFloorRigidBody: physics.ensureFloorRigidBody })
+  const solver = useIkSolver({
+    ...options,
+    ensureFloorRigidBody: physics.ensureFloorRigidBody,
+    getAmmo: physics.getAmmo
+  })
   const drag = useIkDrag({
     ...options,
     scheduleIKUpdate: solver.scheduleIKUpdate,
