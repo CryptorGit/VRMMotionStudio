@@ -222,11 +222,11 @@ onMounted(async () => {
   await ikConfigPromise
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
+  initRenderer()
+  await initAmmo()
   if (raw) {
     await restoreCachedModel(JSON.parse(raw))
   }
-  initRenderer()
-  await initAmmo()
   initUpdateIKMarkers()
   document.addEventListener('click', handleDocumentClick)
   logToServer({ event: 'init' })
