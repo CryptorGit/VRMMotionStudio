@@ -713,6 +713,7 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
     return
   }
   const height = renderer.domElement.clientHeight
+  if (height <= 0) return
   if (camera !== cachedCamera || camera.fov !== cachedFov) {
     cachedCamera = camera
     cachedFov = camera.fov
