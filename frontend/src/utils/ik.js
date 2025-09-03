@@ -712,6 +712,7 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
     return
   }
   const height = renderer.domElement.clientHeight
+  if (height <= 0) return
   if (camera.fov !== cachedFov) {
     cachedFov = camera.fov
     cachedFovRad = THREE.MathUtils.degToRad(cachedFov)
