@@ -142,8 +142,8 @@ export function attachIKParents(
   bones.forEach((b, idx) => {
     const norm = normalizeBoneName(b.name)
     if (typeof norm !== 'string' || !norm.endsWith(ikParentSuffix)) return
-    const ikName = b.name.normalize('NFKC').replace(/ik親$/i, '')
-    const targetIdx = boneIndexMap.get(normalizeBoneName(ikName))
+    const ikName = norm.replace(/ik親$/, '')
+    const targetIdx = boneIndexMap.get(ikName)
     const chain = iks.find(ik => ik.target === targetIdx)
     if (
       chain &&
