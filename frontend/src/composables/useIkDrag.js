@@ -20,6 +20,12 @@ export function useIkDrag({
   const isRotating = ref(false)
   const quat = new THREE.Quaternion()
   let physicsWasEnabled = false
+  function hasAfterPhysicsGrants(mesh) {
+    try {
+      const grants = mesh?.geometry?.userData?.MMD?.grants || []
+      return grants.some(g => g?.isAfterPhysics)
+    } catch { return false }
+  }
 
   function devLog(data) {
     try {
@@ -86,7 +92,9 @@ export function useIkDrag({
     if (!target) return
     selectedIK.value = target
     physicsWasEnabled = enablePhysics.value
-    if (physicsWasEnabled) {
+    const mesh = currentMeshRef.value
+    // Keep physics enabled if model uses after-physics grants (so grant propagation runs during drag)
+    if (physicsWasEnabled && mesh && !hasAfterPhysicsGrants(mesh)) {
       helper.value?.enable('physics', false)
       helper.value?.update(0)
     }
@@ -181,7 +189,8 @@ export function useIkDrag({
 
   function onControlStart() {
     physicsWasEnabled = enablePhysics.value
-    if (physicsWasEnabled) {
+    const mesh = currentMeshRef.value
+    if (physicsWasEnabled && mesh && !hasAfterPhysicsGrants(mesh)) {
       helper.value?.enable('physics', false)
     }
   }
@@ -197,4 +206,5 @@ export function useIkDrag({
 
   return { onPointerDown, onPointerMove, onPointerUp, onControlStart, onControlEnd, isRotating }
 }
+
 

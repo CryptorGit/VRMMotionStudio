@@ -35,8 +35,10 @@ export function useAmmoInit({ helper, enablePhysics, setAmmo, ensureFloorRigidBo
     helper.value = markRaw(new MMDAnimationHelper())
     try {
       helper.value.enable('physics', enablePhysics.value)
+      helper.value.enable && helper.value.enable('grant', true)
       helper.value.enabled.ik = true
-      devLog({ event: 'ammo:helper:enabled', physics: enablePhysics.value })
+      helper.value.enabled.grant = true
+      devLog({ event: 'ammo:helper:enabled', physics: enablePhysics.value, grant: true, ik: true })
     } catch (e) {
       devLog({ event: 'ammo:helper:error', message: String(e && e.message) })
     }
