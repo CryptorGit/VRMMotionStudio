@@ -1,7 +1,7 @@
 {
   "aliases": {
-    "LeftLegIK": ["左足ＩＫ", "LeftLegIK"],
-    "RightLegIK": ["右足ＩＫ", "RightLegIK"]
+    "左足ＩＫ": ["LeftLegIK"],
+    "右足ＩＫ": ["RightLegIK"]
   },
   "extraIKBoneNames": [
     "左足ＩＫ",
