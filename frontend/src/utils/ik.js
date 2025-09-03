@@ -1,6 +1,15 @@
 import { ref, watch } from 'vue'
 import * as THREE from 'three'
-import Ammo from 'ammo.js'
+import * as Ammo from 'ammo.js'
+
+let ammoInitPromise
+async function initAmmo() {
+  if (!ammoInitPromise) {
+    ammoInitPromise =
+      typeof Ammo.default === 'function' ? Ammo.default() : Promise.resolve()
+  }
+  return ammoInitPromise
+}
 
 export const IK_MARKER_PIXEL_SIZE = 16
 export const showIkMarkers = ref(true)
@@ -769,7 +778,7 @@ export async function initIKSolver(helper, mesh, ensureFloorRigidBody) {
     skinnedMesh.geometry.userData.MMD || {}
   skinnedMesh.geometry.userData.MMD.iks = iks
   if (!helper.objects.get(skinnedMesh)) {
-    await Ammo()
+    await initAmmo()
     helper.add(skinnedMesh, { physics: true, ik: true, grant: true })
     helper.update(0)
   }
