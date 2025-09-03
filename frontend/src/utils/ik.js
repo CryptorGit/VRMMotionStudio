@@ -151,7 +151,23 @@ export function attachIKParents(
       typeof idx === 'number' &&
       !chain.links.some(l => l.index === idx)
     ) {
+      const targetParent = bones[targetIdx]?.parent
+      const firstLinkIdx = chain.links[0]?.index
+      const firstLinkParent =
+        typeof firstLinkIdx === 'number'
+          ? bones[firstLinkIdx]?.parent
+          : null
+      if (bones[idx] !== targetParent && bones[idx] !== firstLinkParent) {
+        console.warn(
+          `attachIKParents: ${b.name} is not parent of chain target or first link`
+        )
+        return
+      }
       chain.links.unshift({ index: idx })
+      const [resolved] = resolveIKLinks([chain], bones, boneIndexMap)
+      if (resolved) {
+        chain.links.splice(0, chain.links.length, ...resolved.links)
+      }
     }
   })
   // Re-run to ensure CCD IK adjacency after inserting parents
