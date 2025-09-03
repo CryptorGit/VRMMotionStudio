@@ -18,19 +18,29 @@
 ### 必須環境変数
 以下の環境変数が設定されていない場合、起動時に警告が表示され認証が機能しません。
 
+- `ALLOWED_ORIGINS`: CORS を許可するドメインのカンマ区切りリスト
 - `JWT_SECRET`: JWT 署名用の秘密鍵
 - `API_KEY`: 固定 API キー
 
 Linux/macOS の例:
 ```bash
+export ALLOWED_ORIGINS=http://localhost:5173
 export JWT_SECRET=your-secret
 export API_KEY=your-api-key
 ```
 
 Windows (PowerShell) の例:
 ```powershell
+$env:ALLOWED_ORIGINS="http://localhost:5173"
 $env:JWT_SECRET="your-secret"
 $env:API_KEY="your-api-key"
+```
+
+`.env` の例:
+```env
+ALLOWED_ORIGINS=http://localhost:5173
+JWT_SECRET=your-secret
+API_KEY=your-api-key
 ```
 
 ### 実行方法

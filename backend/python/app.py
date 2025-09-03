@@ -8,9 +8,16 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = os.getenv("ALLOWED_ORIGINS")
+if not allowed_origins:
+    logger.error("環境変数 ALLOWED_ORIGINS が設定されていません。")
+    raise RuntimeError("ALLOWED_ORIGINS is required")
+
 origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
-CORS(app, origins=origins)
+if origins:
+    CORS(app, origins=origins)
+else:
+    logger.warning("ALLOWED_ORIGINS が空です。CORS を無効化します。")
 
 
 @app.route("/api/hello", methods=["GET"])
