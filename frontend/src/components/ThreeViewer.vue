@@ -84,6 +84,7 @@ const menu = ref(null)
 const settingsSidebar = ref(null)
 const currentMeshRef = ref(null)
 const enablePhysics = ref(true)
+const ammo = shallowRef(null)
 
 const scene = shallowRef(null)
 const camera = shallowRef(null)
@@ -223,7 +224,7 @@ onMounted(async () => {
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
-  await initAmmo()
+  ammo.value = await initAmmo()
   if (raw) {
     await restoreCachedModel(JSON.parse(raw))
   }

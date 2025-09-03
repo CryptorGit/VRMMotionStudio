@@ -49,7 +49,10 @@ export function useIkPhysics({ helper, enablePhysics }) {
 
   function setAmmo(lib) {
     Ammo = lib
-    globalThis.Ammo = lib
+    return Ammo
+  }
+
+  function getAmmo() {
     return Ammo
   }
 
@@ -62,5 +65,5 @@ export function useIkPhysics({ helper, enablePhysics }) {
     }
   })
 
-  return { ensureFloorRigidBody, setAmmo }
+  return { ensureFloorRigidBody, setAmmo, getAmmo }
 }
