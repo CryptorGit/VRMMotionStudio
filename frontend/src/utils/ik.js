@@ -156,24 +156,37 @@ export function attachIKParents(
     const ikName = norm.replace(/ik親$/, 'ik')
     const targetIdx = boneIndexMap.get(ikName)
     const chain = iks.find(ik => ik.target === targetIdx)
-    if (
-      chain &&
-      typeof idx === 'number' &&
-      !chain.links.some(l => l.index === idx)
-    ) {
-      const targetParent = bones[targetIdx]?.parent
-      const firstLinkIdx = chain.links[0]?.index
-      const firstLinkParent =
-        typeof firstLinkIdx === 'number'
-          ? bones[firstLinkIdx]?.parent
-          : null
-      if (bones[idx] !== targetParent && bones[idx] !== firstLinkParent) {
-        console.warn(
-          `attachIKParents: ${b.name} is not parent of chain target or first link`
-        )
-        return
+    if (chain && typeof idx === 'number') {
+      // 既に IK 親がリンクに含まれている場合は一旦取り除く
+      const existingPos = chain.links.findIndex(l => l.index === idx)
+      let existingLink = null
+      if (existingPos !== -1) {
+        existingLink = chain.links.splice(existingPos, 1)[0]
       }
-      chain.links.unshift({ index: idx })
+
+      const targetParent = bones[targetIdx]?.parent
+      if (bones[idx] === targetParent) {
+        chain.links.unshift({ index: idx })
+      } else {
+        // IK 親がターゲットの親でない場合は、子となるリンクを探して先頭に移動する
+        const childPos = chain.links.findIndex(
+          l => bones[l.index]?.parent === bones[idx]
+        )
+        if (childPos === -1) {
+          console.warn(
+            `attachIKParents: ${b.name} is not parent of chain target or first link`
+          )
+          // 取り除いたリンクを元に戻す
+          if (existingLink) chain.links.splice(existingPos, 0, existingLink)
+          return
+        }
+        if (childPos > 0) {
+          const [child] = chain.links.splice(childPos, 1)
+          chain.links.unshift(child)
+        }
+        chain.links.unshift({ index: idx })
+      }
+
       const [resolved] = resolveIKLinks([chain], bones, boneIndexMap)
       if (resolved) {
         chain.links.splice(0, chain.links.length, ...resolved.links)
