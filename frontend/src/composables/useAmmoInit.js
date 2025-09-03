@@ -10,11 +10,12 @@ export function useAmmoInit({ helper, enablePhysics, setAmmo, ensureFloorRigidBo
     const AmmoLib = await AmmoModule.default({
       locateFile: file => (file.endsWith('.wasm') ? ammoWasmUrl : file)
     })
-    setAmmo(AmmoLib)
+    const ammo = setAmmo(AmmoLib)
     helper.value = markRaw(new MMDAnimationHelper())
     helper.value.enable('physics', enablePhysics.value)
     helper.value.enabled.ik = true
     ensureFloorRigidBody()
+    return ammo
   }
 
   function cleanup() {
