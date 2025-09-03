@@ -48,19 +48,29 @@ java -cp java/target/classes com.mmd.App
 ### 必須環境変数
 バックエンドの認証には以下の環境変数を設定する必要があります。未設定のまま起動すると警告が表示され、認証が行えません。
 
+- `ALLOWED_ORIGINS`: CORS を許可するドメインのカンマ区切りリスト
 - `JWT_SECRET`: JWT 署名に使用する秘密鍵
 - `API_KEY`: 固定 API キー
 
 Linux/macOS の例:
 ```bash
+export ALLOWED_ORIGINS=http://localhost:5173
 export JWT_SECRET=your-secret
 export API_KEY=your-api-key
 ```
 
 Windows (PowerShell) の例:
 ```powershell
+$env:ALLOWED_ORIGINS="http://localhost:5173"
 $env:JWT_SECRET="your-secret"
 $env:API_KEY="your-api-key"
+```
+
+`.env` の例:
+```env
+ALLOWED_ORIGINS=http://localhost:5173
+JWT_SECRET=your-secret
+API_KEY=your-api-key
 ```
 
 ## 基本機能（予定）
