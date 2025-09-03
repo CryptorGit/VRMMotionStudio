@@ -387,6 +387,8 @@ sidePatterns.forEach(s => {
   })
 })
 
+const linkIgnoreRegex = /(d|補助|表示)$/
+
 export function normalizeBoneName(name) {
   if (typeof name !== 'string') return name
   const n = name.normalize('NFKC').toLowerCase()
@@ -403,9 +405,11 @@ function normalizeChain(chain) {
     ...chain,
     target: normalizeBoneName(chain.target),
     effector: normalizeBoneName(chain.effector),
-    links: (chain.links || []).map(l =>
-      typeof l === 'string' ? normalizeBoneName(l) : l
-    )
+    links: (chain.links || [])
+      .map(l => (typeof l === 'string' ? normalizeBoneName(l) : l))
+      .filter(l =>
+        typeof l !== 'string' || !linkIgnoreRegex.test(l)
+      )
   }
 }
 
@@ -495,6 +499,10 @@ function resolveIKLinks(
           if (miss)
             ikWarning.value ||=
               `ボーン「${miss}」が見つかりません。ik-config.json の aliases に追加してください`
+          return null
+        }
+        const linkName = normalizeBoneName(bones[idx]?.name)
+        if (typeof linkName === 'string' && linkIgnoreRegex.test(linkName)) {
           return null
         }
         return (
