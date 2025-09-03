@@ -1,7 +1,7 @@
-import * as THREE from 'three'
+﻿import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -20,6 +20,47 @@ export function useIkDrag({
   const isRotating = ref(false)
   const quat = new THREE.Quaternion()
   let physicsWasEnabled = false
+
+  function devLog(data) {
+    try {
+      if (typeof fetch === 'function' && typeof window !== 'undefined') {
+        fetch('/__dev__/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'ik-drag', ...data })
+        }).catch(() => {})
+      }
+    } catch {}
+  }
+
+  function resolveDraggableBone(selectedBone) {
+    const mesh = currentMeshRef.value
+    const bones = mesh?.skeleton?.bones || []
+    const iks = mesh?.geometry?.userData?.MMD?.iks || []
+    // Prefer stored chainIndex
+    const stored = selectedIK.value?.chainIndex
+    if (typeof stored === 'number' && stored >= 0 && stored < iks.length) {
+      return { bone: bones[iks[stored].target], index: stored }
+    }
+    // Try by name heuristic: IK隕ｪ -> IK
+    const norm = normalizeBoneName(selectedBone?.name)
+    if (typeof norm === 'string' && /ik隕ｪ$/.test(norm)) {
+      const targetName = norm.replace(/ik隕ｪ$/, 'ik')
+      const targetIdx = bones.findIndex(b => normalizeBoneName(b.name) === targetName)
+      if (targetIdx !== -1) {
+        const chainIdx = iks.findIndex(ik => bones[ik.target] === bones[targetIdx])
+        // Drag IK隕ｪ縺昴・繧ゅ・繧貞虚縺九☆縲ＤhainIdx 縺ｯ蜿ら・縺ｫ菫晄戟
+        if (chainIdx !== -1) return { bone: selectedBone, index: chainIdx }
+      }
+      // IK隕ｪ縺ｮ蜷榊燕縺縺悟ｯｾ蠢廬K縺瑚ｦ九▽縺九ｉ縺ｪ縺・ｴ蜷医ｂ縲∬ｦｪ閾ｪ菴薙ｒ蜍輔°縺・      return { bone: selectedBone, index: -1 }
+    }
+    // Fallback: same bone or chain containing this bone as link
+    const byTarget = iks.findIndex(ik => bones[ik.target] === selectedBone)
+    if (byTarget !== -1) return { bone: bones[iks[byTarget].target], index: byTarget }
+    const byLink = iks.findIndex(ik => (ik.links || []).some(l => bones[l.index] === selectedBone))
+    if (byLink !== -1) return { bone: bones[iks[byLink].target], index: byLink }
+    return { bone: selectedBone, index: -1 }
+  }
 
   function onPointerDown(event) {
     if (!renderer.value) {
@@ -57,7 +98,8 @@ export function useIkDrag({
     }
     if (event.button !== 0) return
     const pos = new THREE.Vector3()
-    const targetBone = selectedIK.value.target
+    const { bone: targetBone, index: chainIndex } = resolveDraggableBone(selectedIK.value.target)
+    devLog({ event: 'select', clicked: selectedIK.value.target?.name || null, resolved: targetBone?.name || null, chainIndex })
     targetBone.getWorldPosition(pos)
     const normal = new THREE.Vector3()
     camera.value.getWorldDirection(normal)
@@ -99,13 +141,16 @@ export function useIkDrag({
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
     if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
-        const target = selectedIK.value.target
+        const mesh = currentMeshRef.value
+        const { bone: target, index: chainIndex } = resolveDraggableBone(selectedIK.value.target)
         if (target) {
           const parent = target.parent
           if (parent && typeof parent.worldToLocal === 'function') {
             parent.updateMatrixWorld(true)
             parent.worldToLocal(dragPoint)
             target.position.copy(dragPoint)
+            target.updateMatrixWorld(true)
+            devLog({ event: 'drag-move', target: target.name, chainIndex, pos: dragPoint.toArray() })
             scheduleIKUpdate()
           } else {
             console.warn('IK target parent missing worldToLocal method')
@@ -152,3 +197,4 @@ export function useIkDrag({
 
   return { onPointerDown, onPointerMove, onPointerUp, onControlStart, onControlEnd, isRotating }
 }
+
