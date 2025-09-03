@@ -20,6 +20,8 @@ export const extraIKBoneNames = []
 export const extraIKChains = {}
 export const ikAliases = new Map()
 
+const missingIKParentWarnings = new Set()
+
 let cachedCamera = null
 let cachedFov = null
 let cachedFovRad = 0
@@ -173,9 +175,13 @@ export function attachIKParents(
           l => bones[l.index]?.parent === bones[idx]
         )
         if (childPos === -1) {
-          console.warn(
-            `attachIKParents: ${b.name} is not parent of chain target or first link`
-          )
+          if (!missingIKParentWarnings.has(b.name)) {
+            // 親が見つからない場合は一度だけ警告する
+            console.warn(
+              `attachIKParents: ${b.name} is not parent of chain target or first link`
+            )
+            missingIKParentWarnings.add(b.name)
+          }
           // 取り除いたリンクを元に戻す
           if (existingLink) chain.links.splice(existingPos, 0, existingLink)
           return
