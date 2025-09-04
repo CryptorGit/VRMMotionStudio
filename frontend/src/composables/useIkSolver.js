@@ -51,6 +51,8 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     const solver = obj?.ikSolver || obj?.ik
     solver?.update?.()
 
+    mesh.skeleton.update() // Update skeleton after IK solver to prevent lag in grants
+
     // Reset grant bones before grant solver runs to prevent cumulative rotation
     const grants = mesh.geometry?.userData?.MMD?.grants || []
     const bones = mesh.skeleton.bones
