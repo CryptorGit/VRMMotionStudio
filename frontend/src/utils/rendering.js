@@ -1,3 +1,16 @@
+// Dev logging helper (dev server captures at /__dev__/log)
+const devLog = data => {
+  try {
+    if (typeof fetch === 'function' && typeof window !== 'undefined') {
+      fetch('/__dev__/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'render', ...data })
+      }).catch(() => {})
+    }
+  } catch {}
+}
+
 export function createAnimator({
   clock,
   targetFps,
@@ -46,9 +59,13 @@ export function createAnimator({
 
     if (time - lastPerfLogTime >= 1000) {
       if (import.meta.env.DEV) {
-        console.debug(
-          `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
-        )
+        try {
+          devLog({
+            event: 'render:perf',
+            avgUpdate: +avgUpdate.toFixed(2),
+            avgRender: +avgRender.toFixed(2)
+          })
+        } catch {}
       }
       lastPerfLogTime = time
     }

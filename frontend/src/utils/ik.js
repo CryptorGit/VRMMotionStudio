@@ -294,7 +294,6 @@ function resolveIKLinks(iks, bones, boneIndexMap = createBoneIndexMap(bones)) {
     }
 
     const dbg = { target: bones[target]?.name || target, links: links.map(l => bones[l.index]?.name || l.index) }
-    console.debug('resolveIKLinks:', dbg)
     try { devLog({ event: 'ik:resolve', ...dbg }) } catch {}
     if (links.length === 0) {
       console.warn('getIKDefinitions: chain has no valid links', { target: bones[target]?.name || target })
