@@ -102,6 +102,8 @@ export function useIkDrag({
       event.preventDefault()
       isRotating.value = true
       controls.value.enabled = false
+      selectedIK.value.startQuat = selectedIK.value.target.quaternion.clone()
+      selectedIK.value.accAngle = 0
       return
     }
     if (event.button !== 0) return
@@ -137,8 +139,9 @@ export function useIkDrag({
         console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
         rotationAxis = new THREE.Vector3(0, 1, 0)
       }
-      const angle = event.movementX * 0.01
-      quat.setFromAxisAngle(rotationAxis, angle)
+      selectedIK.value.accAngle += event.movementX * 0.01
+      quat.setFromAxisAngle(rotationAxis, selectedIK.value.accAngle)
+      bone.quaternion.copy(selectedIK.value.startQuat)
       applyLocalAxisRotation(bone, quat)
       scheduleIKUpdate()
       return
@@ -182,6 +185,8 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
+      selectedIK.value.startQuat = undefined
+      selectedIK.value.accAngle = undefined
       scheduleIKUpdate()
     }
     selectedIK.value = null
