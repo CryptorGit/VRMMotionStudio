@@ -21,7 +21,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   }
 
   watch(showIkMarkers, () => {
-    try { updateIKMarkersBound.value?.() } catch (e) { console.error('Failed to toggle IK markers:', e) }
+    try { updateIKMarkersBound.value?.() } catch (e) { devLog({ event: 'ik-markers:toggle:error', message: String(e?.message) }) }
   })
 
   watch(currentMeshRef, async mesh => {
@@ -46,7 +46,6 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
         } catch {}
       }
     } catch (e) {
-      console.error('Failed to setup IK targets:', e)
       devLog({ event: 'mesh:ik-setup:error', message: String(e && e.message) })
     }
   })
@@ -54,7 +53,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
   function applyIKUpdate() {
     const mesh = currentMeshRef.value
     if (import.meta.env.DEV && !(mesh instanceof THREE.SkinnedMesh)) {
-      console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
+      devLog({ event: 'currentMeshRef:not-skinned', mesh: mesh?.name })
     }
     if (!mesh || !(mesh instanceof THREE.SkinnedMesh) || !helper.value) return
     // Ensure matrices are up-to-date before solving

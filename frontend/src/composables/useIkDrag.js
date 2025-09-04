@@ -70,12 +70,12 @@ export function useIkDrag({
 
   function onPointerDown(event) {
     if (!renderer.value) {
-      console.error('renderer is not initialized')
+      devLog({ event: 'renderer:missing' })
       return
     }
     const element = renderer.value.domElement
     if (!element) {
-      console.error('renderer domElement is not initialized')
+      devLog({ event: 'renderer:dom-missing' })
       return
     }
     element.setPointerCapture(event.pointerId)
@@ -120,12 +120,12 @@ export function useIkDrag({
       return
     }
     if (!renderer.value) {
-      console.error('renderer is not initialized')
+      devLog({ event: 'renderer:missing' })
       return
     }
     const element = renderer.value.domElement
     if (!element) {
-      console.error('renderer domElement is not initialized')
+      devLog({ event: 'renderer:dom-missing' })
       return
     }
     if (isRotating.value) {
@@ -134,7 +134,7 @@ export function useIkDrag({
       if (rotationAxis) {
         rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
       } else {
-        console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
+        devLog({ event: 'drag:missing-local-axes', bone: bone.name })
         rotationAxis = new THREE.Vector3(0, 1, 0)
       }
       const angle = event.movementX * 0.01
@@ -161,7 +161,7 @@ export function useIkDrag({
             devLog({ event: 'drag-move', target: target.name, chainIndex, pos: dragPoint.toArray() })
             scheduleIKUpdate()
           } else {
-            console.warn('IK target parent missing worldToLocal method')
+            devLog({ event: 'drag:parent-no-worldToLocal', target: target.name })
           }
         }
       }
