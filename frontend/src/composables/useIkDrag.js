@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three'
+import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
 import { selectedIK, ikTargets, normalizeBoneName } from '../utils/ik.js'
@@ -27,18 +27,6 @@ export function useIkDrag({
     } catch { return false }
   }
 
-  function devLog(data) {
-    try {
-      if (typeof fetch === 'function' && typeof window !== 'undefined') {
-        fetch('/__dev__/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: 'ik-drag', ...data })
-        }).catch(() => {})
-      }
-    } catch {}
-  }
-
   function resolveDraggableBone(selectedBone) {
     const mesh = currentMeshRef.value
     const bones = mesh?.skeleton?.bones || []
@@ -58,7 +46,8 @@ export function useIkDrag({
         // Drag IK隕ｪ縺昴・繧ゅ・繧貞虚縺九☆縲ＤhainIdx 縺ｯ蜿ら・縺ｫ菫晄戟
         if (chainIdx !== -1) return { bone: selectedBone, index: chainIdx }
       }
-      // IK隕ｪ縺ｮ蜷榊燕縺縺悟ｯｾ蠢廬K縺瑚ｦ九▽縺九ｉ縺ｪ縺・ｴ蜷医ｂ縲∬ｦｪ閾ｪ菴薙ｒ蜍輔°縺・      return { bone: selectedBone, index: -1 }
+      // IK隕ｪ縺ｮ蜷榊燕縺縺悟ｯｾ蠢廬K縺瑚ｦ九▽縺九ｉ縺ｪ縺・ｴ蜷医ｂ縲∬ｦｪ閾ｪ菴薙ｒ蜍輔°縺・
+      return { bone: selectedBone, index: -1 }
     }
     // Fallback: same bone or chain containing this bone as link
     const byTarget = iks.findIndex(ik => bones[ik.target] === selectedBone)
@@ -107,7 +96,6 @@ export function useIkDrag({
     if (event.button !== 0) return
     const pos = new THREE.Vector3()
     const { bone: targetBone, index: chainIndex } = resolveDraggableBone(selectedIK.value.target)
-    devLog({ event: 'select', clicked: selectedIK.value.target?.name || null, resolved: targetBone?.name || null, chainIndex })
     targetBone.getWorldPosition(pos)
     const normal = new THREE.Vector3()
     camera.value.getWorldDirection(normal)
@@ -158,7 +146,6 @@ export function useIkDrag({
             parent.worldToLocal(dragPoint)
             target.position.copy(dragPoint)
             target.updateMatrixWorld(true)
-            devLog({ event: 'drag-move', target: target.name, chainIndex, pos: dragPoint.toArray() })
             scheduleIKUpdate()
           } else {
             console.warn('IK target parent missing worldToLocal method')
@@ -206,5 +193,3 @@ export function useIkDrag({
 
   return { onPointerDown, onPointerMove, onPointerUp, onControlStart, onControlEnd, isRotating }
 }
-
-

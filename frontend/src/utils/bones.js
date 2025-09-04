@@ -159,7 +159,7 @@ export function applyLocalAxisRotation(bone, quat) {
   if (!bone || !quat) return
   const axes = bone.userData?.localAxes
   if (!axes || !axes.xAxis || !axes.zAxis) {
-    bone.quaternion.multiply(quat)
+    bone.quaternion.premultiply(quat)
     bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
     return
   }
@@ -171,6 +171,6 @@ export function applyLocalAxisRotation(bone, quat) {
   _qTmp.copy(_qAxes).invert()
   _qTmp.multiply(quat)
   _qTmp.multiply(_qAxes)
-  bone.quaternion.multiply(_qTmp)
+  bone.quaternion.premultiply(_qTmp)
   bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
 }

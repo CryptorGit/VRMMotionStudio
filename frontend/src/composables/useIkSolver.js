@@ -1,24 +1,13 @@
-﻿import { ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import * as THREE from 'three'
 import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName } from '../utils/ik.js'
+import { initBoneOriginalQuaternions } from '../utils/bones.js'
 
 export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody, getAmmo }) {
   let ikUpdateScheduled = false
   const ikInitializedMeshes = new WeakSet()
   const updateIKMarkersBound = ref(null)
   const raycaster = new THREE.Raycaster()
-
-  const devLog = data => {
-    try {
-      if (typeof fetch === 'function' && typeof window !== 'undefined') {
-        fetch('/__dev__/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: 'ik-solver', ...data })
-        }).catch(() => {})
-      }
-    } catch {}
-  }
 
   watch(showIkMarkers, () => {
     try { updateIKMarkersBound.value?.() } catch (e) { console.error('Failed to toggle IK markers:', e) }
@@ -28,9 +17,9 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     try {
       await ikConfigPromise
       if (currentMeshRef.value === mesh) {
-        devLog({ event: 'mesh:change', name: mesh?.name, hasHelper: !!helper.value, ammo: !!getAmmo?.() })
         setupIKTargets(scene.value, mesh)
         if (mesh && !ikInitializedMeshes.has(mesh)) {
+          initBoneOriginalQuaternions(mesh.skeleton.bones)
           await initIKSolver(helper.value, mesh, ensureFloorRigidBody, getAmmo?.())
           ikInitializedMeshes.add(mesh)
         }
@@ -42,12 +31,10 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
             return typeof nn === 'string' && (nn.includes('ひざ') || /knee/.test(nn))
           }
           const related = grants.filter(g => isKnee(bones[g.index]?.name) || isKnee(bones[g.parentIndex]?.name))
-          devLog({ event: 'grant:stats', count: grants.length, related: related.map(g => ({ index: g.index, parentIndex: g.parentIndex, ratio: g.ratio, rot: g.affectRotation, pos: g.affectPosition, local: g.isLocal, after: g.isAfterPhysics, indexName: bones[g.index]?.name, parentName: bones[g.parentIndex]?.name })) })
         } catch {}
       }
     } catch (e) {
       console.error('Failed to setup IK targets:', e)
-      devLog({ event: 'mesh:ik-setup:error', message: String(e && e.message) })
     }
   })
 
@@ -63,8 +50,20 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     const obj = helper.value.objects.get(mesh)
     const solver = obj?.ikSolver || obj?.ik
     solver?.update?.()
+
+    // Reset grant bones before grant solver runs to prevent cumulative rotation
+    const grants = mesh.geometry?.userData?.MMD?.grants || []
+    const bones = mesh.skeleton.bones
+    for (const grant of grants) {
+      const bone = bones[grant.index]
+      if (bone && bone.userData._origQuat) {
+        bone.quaternion.copy(bone.userData._origQuat)
+      }
+    }
+
     // Try applying grants explicitly if present
     try { obj?.grantSolver?.update?.() } catch {}
+
     helper.value.update(0)
     // Clamp excessive knee rotations to avoid flipping/jitter
     try {
@@ -90,17 +89,8 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
           clamped++
         }
       }
-      if (import.meta.env.DEV && clamped) {
-        fetch('/__dev__/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'ik-solver', event: 'knee:clamp', count: clamped }) }).catch(() => {})
-      }
     } catch {}
     try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
-    if (import.meta.env.DEV) {
-      try {
-        const chains = Array.isArray(mesh.geometry?.userData?.MMD?.iks) ? mesh.geometry.userData.MMD.iks.length : 0
-        fetch('/__dev__/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'ik-solver', event: 'ik:solve', hasIk: !!solver, chains }) }).catch(() => {})
-      } catch {}
-    }
     updateIKMarkersBound.value?.(true)
   }
 
