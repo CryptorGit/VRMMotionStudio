@@ -27,6 +27,18 @@ export function useModelOperations({
   let nextModelId = 1
   const debugSkinning = import.meta.env.VITE_DEBUG_SKINNING === 'true'
 
+  const devLog = data => {
+    try {
+      if (typeof fetch === 'function' && typeof window !== 'undefined') {
+        fetch('/__dev__/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'model-ops', ...data })
+        }).catch(() => {})
+      }
+    } catch {}
+  }
+
   const LOCAL_MODELS_KEY = 'importedModels'
 
   function saveModelState() {
@@ -43,7 +55,7 @@ export function useModelOperations({
         localStorage.removeItem(LOCAL_MODELS_KEY)
       }
     } catch (e) {
-      console.warn('Failed to save model state', e)
+      logToServer?.({ event: 'model:save:error', message: String(e?.message) })
     }
   }
 
@@ -52,7 +64,7 @@ export function useModelOperations({
       const raw = localStorage.getItem(LOCAL_MODELS_KEY)
       return raw ? JSON.parse(raw) : []
     } catch (e) {
-      console.warn('Failed to load model state', e)
+      logToServer?.({ event: 'model:load-state:error', message: String(e?.message) })
       return []
     }
   }
@@ -77,7 +89,7 @@ export function useModelOperations({
   function warnMissingLocalAxes(bones) {
     bones.forEach(bone => {
       if (!bone.userData?.localAxes) {
-        console.warn(`localAxes missing for bone "${bone.name}"`)
+        devLog({ event: 'model:missing-local-axes', bone: bone.name })
       }
     })
   }
@@ -90,7 +102,7 @@ export function useModelOperations({
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       if (!ctx) {
-        console.warn('2D context not available, skipping bone name helper for', name)
+        devLog({ event: 'model:bone-label:no-context', bone: name })
         return
       }
       ctx.font = '40px sans-serif'
@@ -208,7 +220,7 @@ export function useModelOperations({
         })
       }
     } catch (e) {
-      console.error('Failed to dispose model resources:', e)
+      logToServer?.({ event: 'model:dispose:error', message: String(e?.message) })
     }
   }
 
@@ -239,7 +251,7 @@ export function useModelOperations({
         await cache.cacheFiles(models.value.map(m => m.files || []))
       }
     } catch (e) {
-      console.error('Failed to remove model:', e)
+      logToServer?.({ event: 'model:remove:error', message: String(e?.message) })
     } finally {
       saveModelState()
       requestAnimationFrame(() => effect.value.render(scene.value, camera.value))
@@ -309,7 +321,6 @@ export function useModelOperations({
       return fileMap[normalized] || fileMap[basename] || url
     })
     manager.onError = url => {
-      console.error('Resource load failed:', url)
       logToServer({ event: 'resource-error', url })
     }
 
@@ -346,7 +357,7 @@ export function useModelOperations({
           mesh => {
             const skinnedMesh = mesh.isSkinnedMesh ? mesh : mesh.getObjectByProperty('type', 'SkinnedMesh')
             if (!skinnedMesh) {
-              console.error('SkinnedMesh not found in model', modelFile.name)
+              logToServer?.({ event: 'model:no-skinned-mesh', name: modelFile.name })
               return resolve()
             }
             const isPhysicsBone = createIsPhysicsBone(skinnedMesh)
@@ -394,8 +405,7 @@ export function useModelOperations({
           undefined,
           error => {
             const status = error && error.target && error.target.status
-            console.error('Load error:', status, error)
-            logToServer({ event: 'error', message: error.message, status })
+            logToServer({ event: 'load:error', message: error.message, status })
             resolve()
           }
         )
@@ -406,10 +416,10 @@ export function useModelOperations({
     try {
       cached = await cache.cacheFiles(models.value.map(m => m.files))
     } catch (e) {
-      console.error('Failed to cache model files', e)
+      logToServer?.({ event: 'cache:error', message: String(e?.message) })
     }
     if (!cached) {
-      console.error('Failed to cache model files')
+      logToServer?.({ event: 'cache:failed' })
       alert('モデルのキャッシュに失敗しました')
     }
     try { logToServer?.({ event: 'handleFiles:cached', ok: !!cached, models: models.value.length }) } catch {}
@@ -418,22 +428,20 @@ export function useModelOperations({
   }
 
   async function restoreCachedModel(savedState = loadModelState()) {
-    console.debug('restoreCachedModel: start')
+    devLog({ event: 'restore:start' })
     try { logToServer?.({ event: 'restore:start' }) } catch {}
     let saved
     try {
       saved = await cache.loadCachedFiles()
-      console.debug('restoreCachedModel: load result', saved)
+      devLog({ event: 'restore:loaded', groups: saved.length })
       try { logToServer?.({ event: 'restore:loaded', groups: saved.length }) } catch {}
     } catch (e) {
-      console.warn('Failed to load cached files')
-      console.debug(e)
+      logToServer?.({ event: 'restore:load:error', message: String(e?.message) })
       alert('モデルの復元に失敗しました')
       return false
     }
     if (!saved.length) {
-      console.info('No cached model to restore')
-      try { logToServer?.({ event: 'restore:empty' }) } catch {}
+      logToServer?.({ event: 'restore:empty' })
       alert('復元するモデルがありません')
       return false
     }
@@ -453,8 +461,7 @@ export function useModelOperations({
           }
           files.push(file)
         } catch (err) {
-          console.error('Failed to reconstruct file from cache', err)
-          try { logToServer?.({ event: 'restore:reconstruct-error', name: f?.name, haveData: !!f?.data, dataType: Object.prototype.toString.call(f?.data), message: err?.message }) } catch {}
+          logToServer?.({ event: 'restore:reconstruct-error', name: f?.name, haveData: !!f?.data, dataType: Object.prototype.toString.call(f?.data), message: err?.message })
         }
       }
     }
@@ -472,11 +479,10 @@ export function useModelOperations({
         }
       })
       saveModelState()
-      console.info(`restoreCachedModel: restored ${models.value.length} model(s)`)
       try { logToServer?.({ event: 'restore:done', models: models.value.length }) } catch {}
       return true
     } catch (e) {
-      console.error('Failed to restore cached model files', e)
+      logToServer?.({ event: 'restore:error', message: String(e?.message) })
       alert('モデルの復元中にエラーが発生しました')
       return false
     }
