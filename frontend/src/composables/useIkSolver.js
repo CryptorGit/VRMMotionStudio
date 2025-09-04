@@ -61,9 +61,6 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     mesh.skeleton.update(); mesh.skeleton.needsUpdate = true; mesh.skeleton.update()
     const obj = helper.value.objects.get(mesh)
     const solver = obj?.ikSolver || obj?.ik
-    solver?.update?.()
-    // Try applying grants explicitly if present
-    try { obj?.grantSolver?.update?.() } catch {}
     helper.value.update(0)
     // Clamp excessive knee rotations to avoid flipping/jitter
     try {
