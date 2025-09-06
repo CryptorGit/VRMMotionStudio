@@ -174,3 +174,91 @@ export function applyLocalAxisRotation(bone, quat) {
   bone.quaternion.premultiply(_qTmp)
   bone.rotation.setFromQuaternion(bone.quaternion, bone.rotation.order)
 }
+
+// --- Bone type markers (MMD-like view) ---
+// Creates simple colored markers per bone type to aid debugging/visualization.
+// - IK: red cone
+// - Twist(捩)/Grant rotation only: cyan octahedron
+// - Rotation+Translation: green sphere
+// - Rotation only: yellow sphere
+// - Translation only: blue box
+// - Fixed axis: purple line along axis
+export function createBoneTypeMarkers(skinnedMesh) {
+  const bones = skinnedMesh?.skeleton?.bones || []
+  const boneDatas = skinnedMesh?.geometry?.userData?.MMD?.bones || []
+  const helpers = []
+  const getData = bone => boneDatas[bones.indexOf(bone)] || {}
+  const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
+  const ROTATABLE = 0x02
+  const TRANSLATABLE = 0x04
+  const IK_FLAG = 0x20
+  const FIX_AXIS = 0x400
+  const LOCAL_AXES = 0x800
+  const color = new THREE.Color()
+
+  const sphereGeom = new THREE.SphereGeometry(0.035, 8, 8)
+  const boxGeom = new THREE.BoxGeometry(0.06, 0.06, 0.06)
+  const coneGeom = new THREE.ConeGeometry(0.05, 0.12, 6)
+  const octGeom = new THREE.OctahedronGeometry(0.05)
+
+  bones.forEach(bone => {
+    const data = getData(bone)
+    const name = (bone.name || '').toLowerCase()
+    const isTwist = /捩|twist/.test(name) || (data?.grant?.affectRotation && !data?.grant?.affectPosition)
+    const rot = isFlag(data, ROTATABLE)
+    const tra = isFlag(data, TRANSLATABLE)
+    const ik = isFlag(data, IK_FLAG) || !!data?.ik
+    const fx = isFlag(data, FIX_AXIS)
+
+    let marker = null
+    if (ik) {
+      color.setHex(0xff6666)
+      const m = new THREE.Mesh(coneGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
+      m.rotation.x = Math.PI // point down
+      marker = m
+    } else if (isTwist) {
+      color.setHex(0x66ffff)
+      marker = new THREE.Mesh(octGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
+    } else if (rot && tra) {
+      color.setHex(0x66ff66)
+      marker = new THREE.Mesh(sphereGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
+    } else if (rot) {
+      color.setHex(0xffff66)
+      marker = new THREE.Mesh(sphereGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
+    } else if (tra) {
+      color.setHex(0x6688ff)
+      marker = new THREE.Mesh(boxGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
+    }
+    if (marker) {
+      marker.renderOrder = 998
+      marker.position.set(0, 0, 0)
+      marker.visible = false
+      bone.add(marker)
+      helpers.push(marker)
+    }
+    if (fx && data?.fixAxis) {
+      const ax = new THREE.Vector3().fromArray(data.fixAxis).normalize().multiplyScalar(0.2)
+      const geom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), ax])
+      const mat = new THREE.LineBasicMaterial({ color: 0xcc66ff, depthTest: false, depthWrite: false })
+      const line = new THREE.Line(geom, mat)
+      line.renderOrder = 998
+      line.visible = false
+      bone.add(line)
+      helpers.push(line)
+    }
+    // local axes indicator (optional small cross)
+    if (isFlag(data, LOCAL_AXES) && data?.localXVector && data?.localZVector) {
+      const x = new THREE.Vector3().fromArray(data.localXVector).normalize().multiplyScalar(0.15)
+      const z = new THREE.Vector3().fromArray(data.localZVector).normalize().multiplyScalar(0.15)
+      const gx = new THREE.BufferGeometry().setFromPoints([x.clone().negate(), x])
+      const gz = new THREE.BufferGeometry().setFromPoints([z.clone().negate(), z])
+      const lx = new THREE.Line(gx, new THREE.LineBasicMaterial({ color: 0xff8800, depthTest: false, depthWrite: false }))
+      const lz = new THREE.Line(gz, new THREE.LineBasicMaterial({ color: 0x00ffaa, depthTest: false, depthWrite: false }))
+      lx.renderOrder = lz.renderOrder = 998
+      lx.visible = lz.visible = false
+      bone.add(lx); bone.add(lz)
+      helpers.push(lx, lz)
+    }
+  })
+  return helpers
+}

@@ -21,7 +21,7 @@
       <option v-for="p in poses" :key="p.name" :value="p">{{ p.name }}</option>
     </select>
   </div>
-  <div v-if="ikWarning" id="ik-warning">{{ ikWarning }}</div>
+  
   <input
     type="file"
     ref="fileInput"
@@ -65,13 +65,7 @@ import {
   showLightMarker,
   loadLightingSettings
 } from '../utils/lighting.js'
-import {
-  showIkMarkers,
-  ikWarning,
-  ikConfigPromise,
-  ikTargets,
-  selectedIK
-} from '../utils/ik.js'
+import { showIkMarkers, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
 import useIkControls from '../composables/useIkControls.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useFileLoader } from '../composables/useFileLoader.js'
@@ -248,15 +242,5 @@ onUnmounted(() => {
 
 
 <style scoped>
-#ik-warning {
-  position: absolute;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  z-index: 1000;
-}
+/* warning overlay removed */
 </style>

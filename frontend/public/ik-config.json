@@ -1,7 +1,17 @@
 {
   "aliases": {
-    "左足ＩＫ": ["LeftLegIK"],
-    "右足ＩＫ": ["RightLegIK"]
+    "左足ＩＫ": ["LeftLegIK", "L_LegIK", "leftlegik", "llegik", "left_leg_ik"],
+    "右足ＩＫ": ["RightLegIK", "R_LegIK", "rightlegik", "rlegik", "right_leg_ik"],
+    "左手ＩＫ": ["LeftHandIK", "L_HandIK", "lefthandik", "lhandik", "left_hand_ik", "left_arm_ik", "leftarmik"],
+    "右手ＩＫ": ["RightHandIK", "R_HandIK", "righthandik", "rhandik", "right_hand_ik", "right_arm_ik", "rightarmik"],
+    "左手首": ["LeftWrist", "L_Wrist", "lwrist", "leftwrist"],
+    "右手首": ["RightWrist", "R_Wrist", "rwrist", "rightwrist"],
+    "左ひじ": ["LeftElbow", "L_Elbow", "lelbow", "leftelbow"],
+    "右ひじ": ["RightElbow", "R_Elbow", "relbow", "rightelbow"],
+    "左腕": ["LeftArm", "UpperArm_L", "L_UpperArm", "luparm", "upperarm_l", "leftarm"],
+    "右腕": ["RightArm", "UpperArm_R", "R_UpperArm", "ruparm", "upperarm_r", "rightarm"],
+    "左肩": ["LeftShoulder", "L_Shoulder", "lshoulder", "clavicle_l", "leftshoulder", "collar_l", "collarleft", "shoulder_l"],
+    "右肩": ["RightShoulder", "R_Shoulder", "rshoulder", "clavicle_r", "rightshoulder", "collar_r", "collarright", "shoulder_r"]
   },
   "extraIKBoneNames": [
     "左足ＩＫ",

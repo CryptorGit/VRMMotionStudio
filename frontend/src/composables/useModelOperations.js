@@ -3,7 +3,8 @@ import * as THREE from 'three'
 import {
   applyMmdRotationOrder,
   initBoneOriginalQuaternions,
-  ensureLocalAxes
+  ensureLocalAxes,
+  createBoneTypeMarkers
 } from '../utils/bones.js'
 import { setupIKTargets, ikTargets, ikConfigPromise } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
@@ -159,6 +160,11 @@ export function useModelOperations({
       model.bonesVisible = visible
       model.skeletonHelper.visible = visible && model.visible
     }
+    if (Array.isArray(model?.boneTypeHelpers)) {
+      model.boneTypeHelpers.forEach(h => {
+        if (h) h.visible = visible && model.visible
+      })
+    }
     saveModelState()
   }
 
@@ -176,7 +182,7 @@ export function useModelOperations({
 
   function disposeModelResources(model) {
     if (!model) return
-    const { mesh, skeletonHelper, boneNameHelpers } = model
+    const { mesh, skeletonHelper, boneNameHelpers, boneTypeHelpers } = model
     const objects = helper.value?.objects
     if (objects?.has?.(mesh) || objects?.get?.(mesh)) {
       helper.value?.remove?.(mesh)
@@ -204,6 +210,13 @@ export function useModelOperations({
         boneNameHelpers.forEach(h => {
           h.parent?.remove(h)
           h.material.map?.dispose?.()
+          h.material?.dispose?.()
+        })
+      }
+      if (boneTypeHelpers) {
+        boneTypeHelpers.forEach(h => {
+          h.parent?.remove(h)
+          h.geometry?.dispose?.()
           h.material?.dispose?.()
         })
       }
@@ -368,6 +381,7 @@ export function useModelOperations({
               skinnedMesh,
               isPhysicsBone
             )
+            const boneTypeHelpers = createBoneTypeMarkers(skinnedMesh)
             models.value.push({
               id: nextModelId++,
               mesh: markRaw(skinnedMesh),
@@ -377,6 +391,7 @@ export function useModelOperations({
               bonesVisible: debugSkinning,
               boneNameHelpers: boneNameHelpers.map(h => markRaw(h)),
               boneNameVisible: false,
+              boneTypeHelpers: boneTypeHelpers.map(h => markRaw(h)),
               isPhysicsBone,
               files: modelSpecificFiles
             })

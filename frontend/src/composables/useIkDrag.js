@@ -31,6 +31,10 @@ export function useIkDrag({
     const mesh = currentMeshRef.value
     const bones = mesh?.skeleton?.bones || []
     const iks = mesh?.geometry?.userData?.MMD?.iks || []
+    // IKトラッカー（Object3D）はそのまま返す
+    if (!selectedBone?.isBone) {
+      return { bone: selectedBone, index: -1 }
+    }
     // Prefer stored chainIndex
     const stored = selectedIK.value?.chainIndex
     if (typeof stored === 'number' && stored >= 0 && stored < iks.length) {
@@ -95,10 +99,10 @@ export function useIkDrag({
     }
     if (event.button !== 0) return
     const pos = new THREE.Vector3()
-    const { bone: targetBone, index: chainIndex } = resolveDraggableBone(selectedIK.value.target)
+    const { bone: targetBone } = resolveDraggableBone(selectedIK.value.target)
     targetBone.getWorldPosition(pos)
-    const normal = new THREE.Vector3()
-    camera.value.getWorldDirection(normal)
+    // カメラ中心→IKトラッカー直線を法線とする平面
+    const normal = new THREE.Vector3().subVectors(pos, camera.value.position).normalize()
     dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
     controls.value.enabled = false
   }
@@ -118,6 +122,7 @@ export function useIkDrag({
     }
     if (isRotating.value) {
       const bone = selectedIK.value.target
+      if (!bone?.isBone) return
       let rotationAxis = bone.userData?.localAxes?.xAxis
       if (rotationAxis) {
         rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
@@ -131,27 +136,30 @@ export function useIkDrag({
       scheduleIKUpdate()
       return
     }
-    if (!dragPlane) return
+    // 毎フレーム、直線が垂線の平面を再構築
     const rect = element.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
+    const curWorld = new THREE.Vector3()
+    const { bone: target } = resolveDraggableBone(selectedIK.value.target)
+    target.getWorldPosition(curWorld)
+    const normal = new THREE.Vector3().subVectors(curWorld, camera.value.position).normalize()
+    dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, curWorld)
     if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
-        const mesh = currentMeshRef.value
-        const { bone: target, index: chainIndex } = resolveDraggableBone(selectedIK.value.target)
-        if (target) {
-          const parent = target.parent
-          if (parent && typeof parent.worldToLocal === 'function') {
-            parent.updateMatrixWorld(true)
-            parent.worldToLocal(dragPoint)
-            target.position.copy(dragPoint)
-            target.updateMatrixWorld(true)
-            scheduleIKUpdate()
-          } else {
-            console.warn('IK target parent missing worldToLocal method')
-          }
+      if (target) {
+        const parent = target.parent
+        if (parent && typeof parent.worldToLocal === 'function') {
+          parent.updateMatrixWorld(true)
+          parent.worldToLocal(dragPoint)
+          target.position.copy(dragPoint)
+          target.updateMatrixWorld(true)
+          scheduleIKUpdate()
+        } else {
+          console.warn('IK target parent missing worldToLocal method')
         }
       }
+    }
   }
 
   function onPointerUp(event) {

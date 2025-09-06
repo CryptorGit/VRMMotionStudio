@@ -19,6 +19,8 @@ export const showIkMarkers = ref(true)
 export const ikWarning = ref('')
 export const selectedIK = ref(null)
 export let ikTargets = []
+// Runtime arm IK trackers (IKトラッカー) per mesh
+export const armIkTrackersByMesh = new WeakMap()
 
 // Config loaded from /ik-config.json (optional)
 export const extraIKBoneNames = []
@@ -31,6 +33,7 @@ let cachedFovRad = 0
 
 // Minimal alias table (extend via ik-config.json)
 const boneNameAliases = {
+  // Legs
   'right knee': '右ひざ',
   'r knee': '右ひざ',
   'left knee': '左ひざ',
@@ -42,9 +45,37 @@ const boneNameAliases = {
   'right ankle': '右足首',
   'left ankle': '左足首',
   'right toe': '右つま先',
-  'left toe': '左つま先'
+  'left toe': '左つま先',
+  // Arms / hands
+  'right elbow': '右ひじ',
+  'r elbow': '右ひじ',
+  'left elbow': '左ひじ',
+  'l elbow': '左ひじ',
+  'right arm': '右腕',
+  'r arm': '右腕',
+  'left arm': '左腕',
+  'l arm': '左腕',
+  'right wrist': '右手首',
+  'r wrist': '右手首',
+  'left wrist': '左手首',
+  'l wrist': '左手首',
+  'right shoulder': '右肩',
+  'left shoulder': '左肩'
 }
-const boneNameRegexes = []
+const boneNameRegexes = [
+  { regex: /^(lefthandik|lhandik)$/, value: '左手ＩＫ' },
+  { regex: /^(righthandik|rhandik)$/, value: '右手ＩＫ' },
+  { regex: /^(leftlegik|llegik)$/, value: '左足ＩＫ' },
+  { regex: /^(rightlegik|rlegik)$/, value: '右足ＩＫ' },
+  { regex: /^(leftwrist|lwrist)$/, value: '左手首' },
+  { regex: /^(rightwrist|rwrist)$/, value: '右手首' },
+  { regex: /^(leftelbow|lelbow)$/, value: '左ひじ' },
+  { regex: /^(rightelbow|relbow)$/, value: '右ひじ' },
+  { regex: /^(leftarm|luparm|upperarm_l)$/, value: '左腕' },
+  { regex: /^(rightarm|ruparm|upperarm_r)$/, value: '右腕' },
+  { regex: /^(leftshoulder|clavicle_l)$/, value: '左肩' },
+  { regex: /^(rightshoulder|clavicle_r)$/, value: '右肩' }
+]
 const linkIgnoreRegex = /(d)$/
 
 export async function loadIKConfig() {
@@ -112,8 +143,8 @@ const createBoneIndexMap = bones => {
     if (typeof idx === 'number') {
       map.set(alias, idx)
     } else {
-      console.warn('createBoneIndexMap: canonical bone not found for alias', canon)
-      ikWarning.value ||= `ボーン「${canon}」が見つかりません。ik-config.json の aliases に追加してください`
+      // Quietly ignore missing canonical names (models differ)
+      if (import.meta?.env?.DEV) try { console.debug('createBoneIndexMap: skip alias; canonical missing', canon) } catch {}
     }
   })
   return map
@@ -443,6 +474,283 @@ export function setupIKTargets(scene, mesh) {
   if (!Array.isArray(iks) || iks.length === 0) {
     ikWarning.value ||= 'IKチェーンが検出されませんでした（マーカーは表示されません）'
   }
+
+  // Ensure arm IK trackers (IKトラッカー) for wrists lacking PMX IK chains
+  try {
+    ensureArmTrackers(scene, mesh, iks)
+    const trackers = armIkTrackersByMesh.get(mesh) || []
+    for (const t of trackers) addMarker(t.tracker, null)
+  } catch (e) {
+    console.warn('setupIKTargets: ensureArmTrackers failed', e)
+  }
+}
+
+function findBoneByName(bones, name) {
+  const n = normalizeBoneName(name)
+  return bones.find(b => normalizeBoneName(b.name) === n) || null
+}
+
+function hasArmIKChainForWrist(bones, iks, wristIdx) {
+  if (!Array.isArray(iks)) return false
+  return iks.some(ik => {
+    const eff = typeof ik.effector === 'number' ? ik.effector : -1
+    if (eff !== wristIdx) return false
+    const linkIndices = (ik.links || []).map(l => l.index)
+    // Require elbow and upper arm in links
+    const wrist = bones[wristIdx]
+    const elbow = wrist?.parent
+    const upper = elbow?.parent
+    return elbow && upper && linkIndices.includes(bones.indexOf(elbow)) && linkIndices.includes(bones.indexOf(upper))
+  })
+}
+
+function isTwistBone(name) {
+  const n = normalizeBoneName(name)
+  return typeof n === 'string' && (n.includes('捩') || n.includes('twist'))
+}
+
+function categorize(name) {
+  const n = normalizeBoneName(name)
+  if (typeof n !== 'string') return 'unknown'
+  if (n.includes('手首') || n.includes('wrist')) return 'wrist'
+  if (n.includes('ひじ') || n.includes('肘') || n.includes('前腕') || n.includes('forearm') || n.includes('lowerarm')) return 'elbow'
+  if (n.includes('腕') || n.includes('upperarm') || n === 'arm') return 'arm'
+  if (n.includes('肩') || n.includes('shoulder') || n.includes('clavicle') || n.includes('collar') || n.includes('鎖骨')) return 'shoulder'
+  if (isTwistBone(n)) return 'twist'
+  return 'unknown'
+}
+
+export function ensureArmTrackers(scene, mesh, iks) {
+  if (!mesh || !mesh.skeleton) return
+  const bones = mesh.skeleton.bones
+  const trackers = []
+  const prev = armIkTrackersByMesh.get(mesh) || []
+  // Remove old trackers
+  prev.forEach(t => { try { t.tracker.parent?.remove(t.tracker) } catch {} })
+
+  const boneDatas = mesh.geometry?.userData?.MMD?.bones || []
+  const getData = bone => boneDatas[bones.indexOf(bone)] || {}
+  function isTwistObj(b) {
+    const d = getData(b)
+    const nameTwist = isTwistBone(b?.name)
+    const grantTwist = !!(d?.grant?.affectRotation) && !d?.grant?.affectPosition
+    const axisMarked = !!(d?.fixAxis || (d?.localXVector && d?.localZVector))
+    return nameTwist || (grantTwist && axisMarked)
+  }
+  function isHelperObj(b) {
+    const n = normalizeBoneName(b?.name)
+    if (typeof n !== 'string') return false
+    // Common helper/control suffixes and names
+    if (n.endsWith('親') || n.endsWith('先') || /ik親$/.test(n)) return true
+    if (n.includes('target') || n.includes('control') || n.includes('ctrl')) return true
+    // Shoulder-specific helper like 肩P/肩C (parent/control), and aliases
+    if (/(肩|shoulder|clavicle|collar|鎖骨)[pc]$/.test(n)) return true
+    return false
+  }
+
+  function buildChainFromWrist(wrist) {
+    let cur = wrist?.parent
+    const ancestors = []
+    let guard = 0
+    while (cur && cur.isBone && guard++ < 40) {
+      if (!isTwistObj(cur) && !isHelperObj(cur)) ancestors.push(cur)
+      cur = cur.parent
+    }
+    if (ancestors.length === 0) return null
+    // Prefer semantic categories, then fallback by topology
+    let elbow = null, arm = null, shoulder = null
+    for (const b of ancestors) {
+      const cat = categorize(b.name)
+      if (!elbow && cat === 'elbow') { elbow = b; continue }
+      if (elbow && !arm && cat === 'arm') { arm = b; continue }
+      if (arm && !shoulder && cat === 'shoulder') { shoulder = b; break }
+    }
+    // If shoulder wasn't found yet, choose the ancestor that is the direct parent of arm
+    if (!shoulder && arm) {
+      const parentOfArm = arm.parent
+      if (ancestors.includes(parentOfArm)) shoulder = parentOfArm
+    }
+    // Topology fallback
+    if (!elbow) elbow = ancestors[0] || null
+    if (!arm) arm = ancestors.find(a => a !== elbow) || null
+    if (!shoulder) shoulder = ancestors.find(a => a !== elbow && a !== arm) || null
+    // Require少なくとも ひじ・腕 が存在
+    if (!elbow || !arm) return null
+    return { shoulder, arm, elbow }
+  }
+
+  function createFor(side) {
+    const wrist = findBoneByName(bones, side === 'L' ? '左手首' : '右手首')
+    if (!wrist) return null
+    const wristIdx = bones.indexOf(wrist)
+    if (hasArmIKChainForWrist(bones, iks, wristIdx)) return null
+    const chain = buildChainFromWrist(wrist)
+    if (!chain) return null
+    // compute target position: prefer middle finger first segment (中指１)
+    function findDescendantBy(pred, root, maxDepth = 5) {
+      const q = [{ n: root, d: 0 }]
+      const seen = new Set()
+      while (q.length) {
+        const { n, d } = q.shift()
+        if (!n || seen.has(n) || d > maxDepth) continue
+        seen.add(n)
+        if (pred(n)) return n
+        for (const c of n.children) if (c && c.isBone) q.push({ n: c, d: d + 1 })
+      }
+      return null
+    }
+    const sidePrefix = side === 'L' ? '左' : '右'
+    const middle1 = findDescendantBy(
+      b => {
+        const nb = normalizeBoneName(b.name)
+        return typeof nb === 'string' && nb.includes('中指') && (nb.includes('1') || nb.includes('１')) && (!sidePrefix || nb.startsWith(normalizeBoneName(sidePrefix)))
+      },
+      wrist,
+      6
+    )
+    // compute wrist tip world position for initial tracker placement
+    const tipWorld = (() => {
+      if (middle1) return middle1.getWorldPosition(new THREE.Vector3())
+      // Prefer first bone child (e.g., finger root)
+      const childBone = wrist.children.find(c => c && c.isBone)
+      if (childBone) {
+        return childBone.getWorldPosition(new THREE.Vector3())
+      }
+      // Try PMX connectIndex
+      try {
+        const d = getData(wrist)
+        const idx = typeof d?.connectIndex === 'number' ? d.connectIndex : -1
+        if (idx >= 0 && bones[idx]) return bones[idx].getWorldPosition(new THREE.Vector3())
+      } catch {}
+      // Fallback: offset along local Y axis by small length
+      const base = wrist.getWorldPosition(new THREE.Vector3())
+      const y = new THREE.Vector3(0, 1, 0)
+      const dir = y.applyQuaternion(wrist.getWorldQuaternion(new THREE.Quaternion())).normalize()
+      return base.add(dir.multiplyScalar(0.2))
+    })()
+    // Create IK親（Arm IK root） aligned like wrist parent, but not parented to the arm chain
+    const ikRoot = new THREE.Object3D()
+    ikRoot.name = `${side === 'L' ? '左' : '右'}手ＩＫ親`
+    mesh.add(ikRoot)
+    // Match wrist.parent world transform
+    const parentBone = wrist.parent || mesh
+    const parentWorldPos = parentBone.getWorldPosition(new THREE.Vector3())
+    const parentWorldQuat = parentBone.getWorldQuaternion(new THREE.Quaternion())
+    const invMeshMat = new THREE.Matrix4().copy(mesh.matrixWorld).invert()
+    const invMeshQuat = mesh.getWorldQuaternion(new THREE.Quaternion()).invert()
+    ikRoot.position.copy(parentWorldPos.clone().applyMatrix4(invMeshMat))
+    ikRoot.quaternion.copy(invMeshQuat.clone().multiply(parentWorldQuat))
+    ikRoot.updateMatrixWorld(true)
+
+    // Create tracker under IK親, positioned at wrist tip in ikRoot local space
+    const tracker = new THREE.Object3D()
+    tracker.name = `${wrist.name || (side === 'L' ? '左手首' : '右手首')}_IK_TRACKER`
+    ikRoot.add(tracker)
+    tracker.position.copy(tipWorld.clone().applyMatrix4(new THREE.Matrix4().copy(ikRoot.matrixWorld).invert()))
+    tracker.updateMatrixWorld(true)
+    // effector: prefer middle1 if found, else wrist (最終到達点)
+    const effector = middle1 || wrist
+    return { side, wrist, effector, tracker, ikRoot, ...chain }
+  }
+
+  const left = createFor('L'); if (left) trackers.push(left)
+  const right = createFor('R'); if (right) trackers.push(right)
+  armIkTrackersByMesh.set(mesh, trackers)
+  return trackers
+}
+
+// Solve arm IK for IKトラッカー chains (shoulder->arm->elbow->wrist)
+export function solveArmIKTrackers(mesh, iterations = 48, maxStep = 0.25) {
+  const trackers = armIkTrackersByMesh.get(mesh)
+  if (!Array.isArray(trackers) || trackers.length === 0) return
+  for (const t of trackers) {
+    const { shoulder, arm, elbow, wrist, effector, tracker } = t
+    const eff = effector || wrist
+    if (!arm || !elbow || !wrist || !eff || !tracker) continue
+    const wristStep = maxStep * 0.35
+    const elbowStep = maxStep
+    const armStep = maxStep
+    const shoulderStep = maxStep
+    for (let i = 0; i < iterations; i++) {
+      // Distal to proximal: include wrist so 手首も回る
+      ccdStep(mesh, wrist, eff, tracker, wristStep)
+      ccdStep(mesh, elbow, eff, tracker, elbowStep)
+      ccdStep(mesh, arm, eff, tracker, armStep)
+      if (shoulder) ccdStep(mesh, shoulder, eff, tracker, shoulderStep)
+      // Early exit when effector is close to target
+      const dist = eff.getWorldPosition(_v1).distanceTo(tracker.getWorldPosition(_v2))
+      if (i > 12 && dist < 1e-3) break
+    }
+    // 手首の姿勢はチェーン解＋付与に委ねる（MMD準拠）
+  }
+  try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
+}
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3()
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion()
+
+function toArray3(v) {
+  if (!v) return null
+  if (Array.isArray(v)) return v
+  if (typeof v === 'object' && v !== null && 'x' in v && 'y' in v && 'z' in v) return [v.x, v.y, v.z]
+  return null
+}
+function degToRadIfNeeded(arr) {
+  if (!arr) return null
+  const absMax = Math.max(...arr.map(a => Math.abs(a ?? 0)))
+  if (absMax > Math.PI * 1.05) return arr.map(a => (a ?? 0) * Math.PI / 180)
+  return arr
+}
+function getBoneLimits(mesh, bone) {
+  try {
+    const bonesData = mesh.geometry?.userData?.MMD?.bones || []
+    const idx = mesh.skeleton?.bones?.indexOf(bone)
+    const data = idx >= 0 ? bonesData[idx] : null
+    const min = degToRadIfNeeded(toArray3(data?.rotationMin) || toArray3(data?.rotMin) || toArray3(data?.angleMin) || toArray3(data?.limitMin))
+    const max = degToRadIfNeeded(toArray3(data?.rotationMax) || toArray3(data?.rotMax) || toArray3(data?.angleMax) || toArray3(data?.limitMax))
+    if (min && max) return { min, max }
+  } catch {}
+  const n = (bone?.name || '').toLowerCase()
+  if (/(ひじ|elbow)/.test(n)) return { min: [-0.05, -0.02, -0.02], max: [2.6, 0.02, 0.02] }
+  if (/(腕|upperarm|arm)/.test(n)) return { min: [-1.0, -1.0, -1.0], max: [1.0, 1.0, 1.0] }
+  if (/(肩|shoulder|clavicle)/.test(n)) return { min: [-0.7, -0.7, -0.7], max: [0.7, 0.7, 0.7] }
+  return { min: [-Math.PI, -Math.PI, -Math.PI], max: [Math.PI, Math.PI, Math.PI] }
+}
+function clampBoneToLimits(bone, limits) {
+  if (!limits) return
+  const order = bone.rotation.order || 'XYZ'
+  const e = new THREE.Euler().setFromQuaternion(bone.quaternion, order)
+  const { min, max } = limits
+  const nx = THREE.MathUtils.clamp(e.x, min[0], max[0])
+  const ny = THREE.MathUtils.clamp(e.y, min[1], max[1])
+  const nz = THREE.MathUtils.clamp(e.z, min[2], max[2])
+  if (nx !== e.x || ny !== e.y || nz !== e.z) {
+    e.set(nx, ny, nz, order)
+    bone.quaternion.setFromEuler(e)
+  }
+}
+function ccdStep(mesh, bone, effector, targetObj, maxStep) {
+  bone.updateMatrixWorld(true); effector.updateMatrixWorld(true); targetObj.updateMatrixWorld(true)
+  const bp = bone.getWorldPosition(_v1)
+  const ep = effector.getWorldPosition(_v2)
+  const tp = targetObj.getWorldPosition(_v3)
+  const vEff = ep.sub(bp).normalize()
+  const vTar = tp.sub(bp).normalize()
+  const dot = THREE.MathUtils.clamp(vEff.dot(vTar), -1, 1)
+  let angle = Math.acos(dot)
+  if (!isFinite(angle) || angle < 1e-5) return
+  angle = Math.min(angle, maxStep)
+  const axis = new THREE.Vector3().crossVectors(vEff, vTar)
+  if (axis.lengthSq() < 1e-10) return
+  axis.normalize()
+  const parent = bone.parent
+  const parentWorldQuat = parent ? parent.getWorldQuaternion(_q1) : _q1.identity()
+  const boneWorldQuat = bone.getWorldQuaternion(_q2)
+  const deltaWorld = new THREE.Quaternion().setFromAxisAngle(axis, angle)
+  const newBoneWorld = deltaWorld.multiply(boneWorldQuat)
+  const parentInv = _q1.copy(parentWorldQuat).invert()
+  bone.quaternion.copy(parentInv.multiply(newBoneWorld)).normalize()
+  bone.updateMatrixWorld(true)
 }
 
 export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = false) {

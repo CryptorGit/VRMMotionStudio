@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import * as THREE from 'three'
-import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName } from '../utils/ik.js'
+import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName, solveArmIKTrackers } from '../utils/ik.js'
 import { initBoneOriginalQuaternions } from '../utils/bones.js'
 
 export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody, getAmmo }) {
@@ -67,31 +67,9 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     try { obj?.grantSolver?.update?.() } catch {}
 
     helper.value.update(0)
-    // Clamp excessive knee rotations to avoid flipping/jitter
-    try {
-      const bones = mesh.skeleton?.bones || []
-      let clamped = 0
-      for (const b of bones) {
-        const n = normalizeBoneName(b.name)
-        if (typeof n !== 'string') continue
-        const isKnee = n.includes('ひざ') || /knee/.test(n)
-        if (!isKnee) continue
-        const order = b.rotation.order || 'XYZ'
-        const e = new THREE.Euler().setFromQuaternion(b.quaternion, order)
-        // Typical MMD膝は一方向の曲げのみ。X（前後）を主に使用し、Y/Zはごく小さく抑える。
-        const maxBend = 2.2 // ~126 degrees
-        const minBend = -0.2 // small negative to allow slight recovery
-        const eps = 0.05
-        const nx = THREE.MathUtils.clamp(e.x, minBend, maxBend)
-        const ny = THREE.MathUtils.clamp(e.y, -eps, eps)
-        const nz = THREE.MathUtils.clamp(e.z, -eps, eps)
-        if (nx !== e.x || ny !== e.y || nz !== e.z) {
-          e.set(nx, ny, nz, order)
-          b.quaternion.setFromEuler(e)
-          clamped++
-        }
-      }
-    } catch {}
+    // ランタイム腕IK（IKトラッカー）を解決
+    try { solveArmIKTrackers(mesh) } catch {}
+    // No PMX min/max clamp; match MMD behavior
     try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
     updateIKMarkersBound.value?.(true)
   }
