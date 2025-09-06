@@ -1,6 +1,6 @@
-import { ref, watch } from 'vue'
+﻿import { ref, watch } from 'vue'
 import * as THREE from 'three'
-import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName, solveArmIKTrackers } from '../utils/ik.js'
+import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName, solveArmIKTrackers, solveLegIKTrackers, solveBodyTrackers } from '../utils/ik.js'
 import { initBoneOriginalQuaternions } from '../utils/bones.js'
 
 export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, ensureFloorRigidBody, getAmmo }) {
@@ -28,7 +28,8 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
           const bones = mesh.skeleton?.bones || []
           const isKnee = (n) => {
             const nn = normalizeBoneName(n)
-            return typeof nn === 'string' && (nn.includes('ひざ') || /knee/.test(nn))
+            // Robust knee detection: English 'knee' or common Japanese '膝'
+            return typeof nn === 'string' && (/knee/.test(nn) || nn.includes('膝'))
           }
           const related = grants.filter(g => isKnee(bones[g.index]?.name) || isKnee(bones[g.parentIndex]?.name))
         } catch {}
@@ -67,8 +68,10 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     try { obj?.grantSolver?.update?.() } catch {}
 
     helper.value.update(0)
-    // ランタイム腕IK（IKトラッカー）を解決
+    // ランタイム腕IK�E�EKトラチE��ー�E�を解決
     try { solveArmIKTrackers(mesh) } catch {}
+    try { solveLegIKTrackers(mesh) } catch {}
+    try { solveBodyTrackers(mesh) } catch {}
     // No PMX min/max clamp; match MMD behavior
     try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
     updateIKMarkersBound.value?.(true)

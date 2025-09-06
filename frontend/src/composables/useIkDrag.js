@@ -121,19 +121,41 @@ export function useIkDrag({
       return
     }
     if (isRotating.value) {
-      const bone = selectedIK.value.target
-      if (!bone?.isBone) return
-      let rotationAxis = bone.userData?.localAxes?.xAxis
-      if (rotationAxis) {
-        rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
-      } else {
-        console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
-        rotationAxis = new THREE.Vector3(0, 1, 0)
+      const targetObj = selectedIK.value.target
+      if (!targetObj) return
+      if (targetObj.isBone) {
+        const bone = targetObj
+        let rotationAxis = bone.userData?.localAxes?.xAxis
+        if (rotationAxis) {
+          rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
+        } else {
+          console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
+          rotationAxis = new THREE.Vector3(0, 1, 0)
+        }
+        const angle = event.movementX * 0.01
+        quat.setFromAxisAngle(rotationAxis, angle)
+        applyLocalAxisRotation(bone, quat)
+        scheduleIKUpdate()
+        return
       }
-      const angle = event.movementX * 0.01
-      quat.setFromAxisAngle(rotationAxis, angle)
-      applyLocalAxisRotation(bone, quat)
-      scheduleIKUpdate()
+      if (targetObj.isObject3D) {
+        const parent = targetObj.parent
+        const pwq = parent ? parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+        const pwqInv = parent ? pwq.clone().invert() : new THREE.Quaternion()
+        const worldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pwq).normalize()
+        const worldRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pwq).normalize()
+        const axisYLocal = worldUp.clone().applyQuaternion(pwqInv).normalize()
+        const axisXLocal = worldRight.clone().applyQuaternion(pwqInv).normalize()
+        const ax = (event.movementY || 0) * 0.01
+        const ay = (event.movementX || 0) * 0.01
+        const qx = new THREE.Quaternion().setFromAxisAngle(axisXLocal, ax)
+        const qy = new THREE.Quaternion().setFromAxisAngle(axisYLocal, ay)
+        targetObj.quaternion.premultiply(qy)
+        targetObj.quaternion.premultiply(qx)
+        targetObj.updateMatrixWorld(true)
+        scheduleIKUpdate()
+        return
+      }
       return
     }
     // 毎フレーム、直線が垂線の平面を再構築
@@ -149,14 +171,30 @@ export function useIkDrag({
     if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
       if (target) {
         const parent = target.parent
+        // dragPoint is in world space
         if (parent && typeof parent.worldToLocal === 'function') {
           parent.updateMatrixWorld(true)
           parent.worldToLocal(dragPoint)
           target.position.copy(dragPoint)
           target.updateMatrixWorld(true)
           scheduleIKUpdate()
+        } else if (!parent) {
+          // Root-level object: position is already in world space
+          target.position.copy(dragPoint)
+          target.updateMatrixWorld(true)
+          scheduleIKUpdate()
         } else {
-          console.warn('IK target parent missing worldToLocal method')
+          // Fallback: compute local via parent.matrixWorld inverse
+          try {
+            parent.updateMatrixWorld(true)
+            const inv = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+            const local = dragPoint.clone().applyMatrix4(inv)
+            target.position.copy(local)
+            target.updateMatrixWorld(true)
+            scheduleIKUpdate()
+          } catch (e) {
+            console.warn('IK target parent missing worldToLocal method')
+          }
         }
       }
     }

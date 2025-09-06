@@ -210,13 +210,12 @@ export function createBoneTypeMarkers(skinnedMesh) {
     const ik = isFlag(data, IK_FLAG) || !!data?.ik
     const fx = isFlag(data, FIX_AXIS)
 
-    let marker = null
+    // IKボーンは表示しない
     if (ik) {
-      color.setHex(0xff6666)
-      const m = new THREE.Mesh(coneGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
-      m.rotation.x = Math.PI // point down
-      marker = m
-    } else if (isTwist) {
+      return
+    }
+    let marker = null
+    if (isTwist) {
       color.setHex(0x66ffff)
       marker = new THREE.Mesh(octGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
     } else if (rot && tra) {

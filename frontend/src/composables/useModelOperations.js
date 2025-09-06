@@ -85,7 +85,18 @@ export function useModelOperations({
 
   function createBoneNameHelpers(skinnedMesh, isPhysicsBone) {
     const helpers = []
-    skinnedMesh.skeleton.bones.forEach(bone => {
+    const bones = skinnedMesh.skeleton?.bones || []
+    const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
+    const IK_FLAG = 0x20
+    const isIkBone = (bone) => {
+      try {
+        const idx = bones.indexOf(bone)
+        const data = idx >= 0 ? boneDatas[idx] : null
+        return ((data?.flag || 0) & IK_FLAG) !== 0 || !!data?.ik
+      } catch { return false }
+    }
+    bones.forEach(bone => {
+      if (isIkBone(bone)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
