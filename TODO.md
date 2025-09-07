@@ -1,0 +1,2 @@
+- Elbow and shoulder rotation calculations need to be implemented.
+- Integrate IK solver with actual tracker objects in the full application.
