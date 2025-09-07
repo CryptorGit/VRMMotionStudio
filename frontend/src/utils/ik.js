@@ -1112,9 +1112,18 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       const posChanged = obj.position.distanceToSquared(lp) > 1e-10
       const dot = Math.abs(lq.dot(obj.quaternion))
       const rotChanged = (1 - dot) > 1e-6
+      const wp = obj.getWorldPosition(_v1)
+      const lw = obj.userData._lastWPos || (obj.userData._lastWPos = wp.clone())
+      const wPosChanged = wp.distanceToSquared(lw) > 1e-10
+      const wq = obj.getWorldQuaternion(_q1)
+      const lqw = obj.userData._lastWQuat || (obj.userData._lastWQuat = wq.clone())
+      const wDot = Math.abs(lqw.dot(wq))
+      const wRotChanged = (1 - wDot) > 1e-6
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      if (wPosChanged) lw.copy(wp)
+      if (wRotChanged) lqw.copy(wq)
+      return posChanged || rotChanged || wPosChanged || wRotChanged || selObj === obj
     }
     const movedLeg = moved(legTracker)
     const movedKnee = moved(kneeTracker)
@@ -1163,6 +1172,17 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
         }
       }
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
+      // Update leg and foot tracker positions to follow bones after knee-driven rotation
+      try {
+        const ankleLocal = kneeTracker.worldToLocal(ankle.getWorldPosition(_v1))
+        legTracker.position.copy(ankleLocal)
+        legTracker.updateMatrixWorld(true)
+        if (footTracker) {
+          const toeLocal = legTracker.worldToLocal((toe ? toe.getWorldPosition(_v2) : ankle.getWorldPosition(_v2)))
+          footTracker.position.copy(toeLocal)
+          footTracker.updateMatrixWorld(true)
+        }
+      } catch {}
     }
 
     if (footTracker && movedFoot) {
