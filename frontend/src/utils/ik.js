@@ -801,18 +801,29 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     const shoulderStep = maxStep * 0.5
     const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
 
-    // どのトラッカーが操作されたか検出（ローカル変化 or 選択中）
+    // どのトラッカーが操作されたか検出（ローカル変化 or 選択中 + ワールド差分）
     const moved = obj => {
       if (!obj) return false
-      // use local position/quaternion to avoid false positives when parent moves
+      // ローカル座標での変化
       const lp = obj.userData._lastLPos || (obj.userData._lastLPos = obj.position.clone())
       const lq = obj.userData._lastLQuat || (obj.userData._lastLQuat = obj.quaternion.clone())
       const posChanged = obj.position.distanceToSquared(lp) > 1e-10
       const dot = Math.abs(lq.dot(obj.quaternion))
       const rotChanged = (1 - dot) > 1e-6
+      // ワールド座標での変化（親移動検知）
+      const wp = obj.userData._lastWPos || (obj.userData._lastWPos = obj.getWorldPosition(new THREE.Vector3()))
+      const wq = obj.userData._lastWQuat || (obj.userData._lastWQuat = obj.getWorldQuaternion(new THREE.Quaternion()))
+      const curWPos = obj.getWorldPosition(_v1)
+      const curWQuat = obj.getWorldQuaternion(_q1)
+      const wPosChanged = curWPos.distanceToSquared(wp) > 1e-10
+      const wDot = Math.abs(wq.dot(curWQuat))
+      const wRotChanged = (1 - wDot) > 1e-6
+      // 更新
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      if (wPosChanged) wp.copy(curWPos)
+      if (wRotChanged) wq.copy(curWQuat)
+      return posChanged || rotChanged || wPosChanged || wRotChanged || selObj === obj
     }
     const movedArmTracker = moved(armTracker)
     const movedElbowTracker = moved(elbowTracker)
@@ -872,6 +883,19 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (i > 10 && okW && okE && okS) break
     }
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
+
+    // 肘・肩の回転計算後、手先トラッカー位置を最新の骨位置に合わせる
+    try {
+      if (handTracker && armTracker) {
+        // 手首と指先（中指１など）をワールド座標で取得
+        const wristWorld = wrist.getWorldPosition(_v1)
+        const tipWorld = finger1 ? finger1.getWorldPosition(_v2) : wristWorld.clone()
+        // armTracker のローカル座標へ変換して handTracker を更新
+        const tipLocal = armTracker.worldToLocal(tipWorld.clone())
+        handTracker.position.copy(tipLocal)
+        handTracker.updateMatrixWorld(true)
+      }
+    } catch {}
 
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
     try {
