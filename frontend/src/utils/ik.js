@@ -507,6 +507,7 @@ export function setupIKTargets(scene, mesh) {
     ensureArmTrackers(scene, mesh, iks)
     const trackers = armIkTrackersByMesh.get(mesh) || []
     for (const t of trackers) {
+      if (t.shoulderTracker) addMarker(t.shoulderTracker, null)
       if (t.elbowTracker) addMarker(t.elbowTracker, null)
       if (t.armTracker) addMarker(t.armTracker, null)
       if (t.handTracker) addMarker(t.handTracker, null)
@@ -580,6 +581,7 @@ export function ensureArmTrackers(scene, mesh, iks) {
     t.handTracker?.parent?.remove(t.handTracker)
     t.tracker?.parent?.remove(t.tracker)
     t.elbowTracker?.parent?.remove(t.elbowTracker)
+    t.shoulderTracker?.parent?.remove(t.shoulderTracker)
   } catch {} })
 
   const boneDatas = mesh.geometry?.userData?.MMD?.bones || []
@@ -603,33 +605,22 @@ export function ensureArmTrackers(scene, mesh, iks) {
   }
 
   function buildChainFromWrist(wrist) {
-    let cur = wrist?.parent
-    const ancestors = []
-    let guard = 0
-    while (cur && cur.isBone && guard++ < 40) {
-      if (!isTwistObj(cur) && !isHelperObj(cur)) ancestors.push(cur)
-      cur = cur.parent
+    // 即時の非補助（非Twist/非Helper）祖先を段階的に取得し、
+    // 肘（wristの直上）、腕（肘の直上）、肩（腕の直上）を確実に分離して特定する。
+    const nextCoreAncestor = start => {
+      let cur = start?.parent || null
+      let guard = 0
+      while (cur && cur.isBone && guard++ < 64) {
+        if (!isTwistObj(cur) && !isHelperObj(cur)) return cur
+        cur = cur.parent
+      }
+      return null
     }
-    if (ancestors.length === 0) return null
-    // Prefer semantic categories, then fallback by topology
-    let elbow = null, arm = null, shoulder = null
-    for (const b of ancestors) {
-      const cat = categorize(b.name)
-      if (!elbow && cat === 'elbow') { elbow = b; continue }
-      if (elbow && !arm && cat === 'arm') { arm = b; continue }
-      if (arm && !shoulder && cat === 'shoulder') { shoulder = b; break }
-    }
-    // If shoulder wasn't found yet, choose the ancestor that is the direct parent of arm
-    if (!shoulder && arm) {
-      const parentOfArm = arm.parent
-      if (ancestors.includes(parentOfArm)) shoulder = parentOfArm
-    }
-    // Topology fallback
-    if (!elbow) elbow = ancestors[0] || null
-    if (!arm) arm = ancestors.find(a => a !== elbow) || null
-    if (!shoulder) shoulder = ancestors.find(a => a !== elbow && a !== arm) || null
-    // Require少なくとも ひじ・腕 が存在
-    if (!elbow || !arm) return null
+    const elbow = nextCoreAncestor(wrist)
+    if (!elbow) return null
+    const arm = nextCoreAncestor(elbow)
+    if (!arm) return { shoulder: null, arm: elbow.parent?.isBone ? elbow.parent : null, elbow }
+    const shoulder = nextCoreAncestor(arm)
     return { shoulder, arm, elbow }
   }
 
@@ -682,14 +673,33 @@ export function ensureArmTrackers(scene, mesh, iks) {
       const dir = y.applyQuaternion(wrist.getWorldQuaternion(new THREE.Quaternion())).normalize()
       return base.add(dir.multiplyScalar(0.2))
     })()
-    // 親IKトラッカーは作らず、肘＞手＞手先の親子関係で配置
-    // Elbow tracker (root of arm trackers)
+    // 親IKトラッカーは作らず、肩＞肘＞手＞手先の親子関係で配置
+    // Shoulder tracker (new root of arm trackers)
+    const shoulderTracker = new THREE.Object3D()
+    // 要望: 名称は「腕IKトラッカー」（肩の回転を担当）
+    shoulderTracker.name = `${side === 'L' ? '左' : '右'}腕_IK_TRACKER`
+    mesh.add(shoulderTracker)
+    const invMeshMat = new THREE.Matrix4().copy(mesh.matrixWorld).invert()
+    // 配置は「腕（上腕）位置＋わずかな側方オフセット」（指定どおり：肘ではなく腕）
+    const armWorldForRoot = (chain.arm || chain.shoulder || wrist).getWorldPosition(new THREE.Vector3())
+    // Torso基準のright/upで少しだけ世界座標オフセット
+    const torso = findTorsoRef(mesh, chain.shoulder || chain.arm)
+    const basis = getWorldBasis(torso || mesh)
+    const sideSign = side === 'R' ? +1 : -1
+    const offsetWorld = new THREE.Vector3()
+      .add(basis.right.clone().multiplyScalar(0.08 * sideSign))
+      .add(basis.up.clone().multiplyScalar(0.02))
+    const initWorld = armWorldForRoot.clone().add(offsetWorld)
+    shoulderTracker.position.copy(initWorld.applyMatrix4(invMeshMat))
+    shoulderTracker.quaternion.identity()
+    shoulderTracker.updateMatrixWorld(true)
+
+    // Elbow tracker (child of shoulder)
     const elbowTracker = new THREE.Object3D()
     elbowTracker.name = `${side === 'L' ? '左' : '右'}肘_IK_TRACKER`
-    mesh.add(elbowTracker)
+    shoulderTracker.add(elbowTracker)
     const elbowWorld = (chain.elbow || wrist).getWorldPosition(new THREE.Vector3())
-    const invMeshMat = new THREE.Matrix4().copy(mesh.matrixWorld).invert()
-    elbowTracker.position.copy(elbowWorld.clone().applyMatrix4(invMeshMat))
+    elbowTracker.position.copy(elbowWorld.clone().applyMatrix4(new THREE.Matrix4().copy(shoulderTracker.matrixWorld).invert()))
     elbowTracker.quaternion.identity()
     elbowTracker.updateMatrixWorld(true)
 
@@ -717,7 +727,7 @@ export function ensureArmTrackers(scene, mesh, iks) {
     const upperLen = lengthBetween(chain.arm, chain.elbow)
     const lowerLen = lengthBetween(chain.elbow, wrist)
     // For backward compatibility, set tracker=armTracker
-    return { side, wrist, effector, tracker: armTracker, armTracker, handTracker, elbowTracker, torsoRef, upperLen, lowerLen, finger1: middle1, ...chain }
+    return { side, wrist, effector, tracker: armTracker, armTracker, handTracker, elbowTracker, shoulderTracker, torsoRef, upperLen, lowerLen, finger1: middle1, ...chain }
   }
 
   const left = createFor('L'); if (left) trackers.push(left)
@@ -758,37 +768,86 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
   const trackers = armIkTrackersByMesh.get(mesh)
   if (!Array.isArray(trackers) || trackers.length === 0) return
   for (const t of trackers) {
-    const { shoulder, arm, elbow, wrist, effector, armTracker, handTracker, finger1, tracker: compatTracker } = t
+    const { shoulder, arm, elbow, wrist, effector, armTracker, handTracker, elbowTracker, shoulderTracker, finger1, tracker: compatTracker } = t
     const eff = effector || wrist
     const targetObj = armTracker || compatTracker
     if (!arm || !elbow || !wrist || !targetObj) continue
     const elbowStep = maxStep
     const armStep = maxStep * 0.75
     const shoulderStep = maxStep * 0.5
+    const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
+
+    // どのトラッカーが操作されたか検出（移動量 or 選択中）
+    const moved = obj => {
+      if (!obj) return false
+      const now = obj.getWorldPosition(new THREE.Vector3())
+      const last = obj.userData._lastWPos || (obj.userData._lastWPos = now.clone())
+      const dist2 = now.distanceToSquared(last)
+      obj.userData._lastWPos.copy(now)
+      return dist2 > 1e-8 || selObj === obj
+    }
+    const movedArmTracker = moved(armTracker)
+    const movedElbowTracker = moved(elbowTracker)
+    const movedShoulderTracker = moved(shoulderTracker)
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
     //  - 手首回転は固定しておき、後段で手先トラッカーから与える
     const wristKeepQuat = wrist.quaternion.clone()
     for (let i = 0; i < iterations; i++) {
-      if (armTracker) {
+      if (armTracker && movedArmTracker) {
         // 肘のみで手首位置を腕トラッカーに近づける
         ccdStep(mesh, elbow, wrist, armTracker, elbowStep)
       }
-      if (t.elbowTracker) {
-        // 上腕（＋肩）で肘位置を肘トラッカーへ近づける
-        ccdStep(mesh, arm, elbow, t.elbowTracker, armStep)
-        if (shoulder) ccdStep(mesh, shoulder, elbow, t.elbowTracker, shoulderStep)
+      if (elbowTracker && movedElbowTracker) {
+        // 上腕のみで肘位置を「腕IKトラッカー(=肘位置トラッカー)」へ近づける
+        ccdStep(mesh, arm, elbow, elbowTracker, armStep)
+      }
+      if (shoulder && shoulderTracker && movedShoulderTracker) {
+        // 肩のみで肘位置を「肩IKトラッカー」方向へ近づける
+        // 目標は「上腕起点からトラッカー方向に上腕長だけ伸ばした仮想肘位置」に設定
+        try {
+          const A = arm.getWorldPosition(new THREE.Vector3())
+          const E = elbow.getWorldPosition(new THREE.Vector3())
+          const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
+          const dir = ST.clone().sub(A)
+          if (dir.lengthSq() > 1e-10) {
+            dir.normalize()
+            const len = E.distanceTo(A)
+            const desiredElbow = A.clone().add(dir.multiplyScalar(len))
+            const tmpTarget = t._shoulderElbowTarget || (t._shoulderElbowTarget = new THREE.Object3D())
+            tmpTarget.position.copy(desiredElbow)
+            ccdStep(mesh, shoulder, elbow, tmpTarget, shoulderStep)
+          }
+        } catch {}
       }
 
-      const dist = wrist.getWorldPosition(_v1).distanceTo(targetObj.getWorldPosition(_v2))
-      if (i > 10 && dist < 1e-3) break
+      // Multi-target convergence check（このフレームで操作されたターゲットのみ判定）
+      let okW = true, okE = true, okS = true
+      if (movedArmTracker && armTracker) {
+        const dW = wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2))
+        okW = dW < 1e-3
+      }
+      if (movedElbowTracker && elbowTracker) {
+        const ePos = elbow.getWorldPosition(new THREE.Vector3())
+        const eTar = elbowTracker.getWorldPosition(new THREE.Vector3())
+        okE = ePos.distanceTo(eTar) < 1e-3
+      }
+      if (movedShoulderTracker && shoulder && shoulderTracker) {
+        const A = arm.getWorldPosition(new THREE.Vector3())
+        const E = elbow.getWorldPosition(new THREE.Vector3())
+        const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
+        const dir = ST.clone().sub(A).normalize()
+        const desiredElbow = A.clone().add(dir.multiplyScalar(E.distanceTo(A)))
+        okS = E.distanceTo(desiredElbow) < 1e-3
+      }
+      if (i > 10 && okW && okE && okS) break
     }
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
-    // Clamp joints to reasonable limits（肘は制限しない）
+    // Clamp joints to model-provided limits（正確なクランプのみ適用）
     try {
-      // elbow: no constraint per request
+      clampBoneToLimits(elbow, getBoneLimits(mesh, elbow))
       clampBoneToLimits(arm, getBoneLimits(mesh, arm))
       if (shoulder) clampBoneToLimits(shoulder, getBoneLimits(mesh, shoulder))
     } catch {}
@@ -812,16 +871,18 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       }
     }
 
-    // Shoulder return-to-rest bias
-    try {
-      if (shoulder && shoulder.userData?._origQuat) {
-        const effDist = wrist.getWorldPosition(_v1).distanceTo((shoulder || arm).getWorldPosition(_v2))
-        const reach = (t.upperLen || lengthBetween(arm, elbow)) + (t.lowerLen || lengthBetween(elbow, wrist))
-        const slack = THREE.MathUtils.clamp(1 - (effDist / Math.max(reach, 1e-3)), 0, 1)
-        const relax = 0.08 * (0.5 + 0.5 * slack)
-        if (relax > 0) shoulder.quaternion.slerp(shoulder.userData._origQuat, relax)
-      }
-    } catch {}
+    // Shoulder return-to-rest bias（肩IKトラッカー存在時は無効）
+    if (!shoulderTracker) {
+      try {
+        if (shoulder && shoulder.userData?._origQuat) {
+          const effDist = wrist.getWorldPosition(_v1).distanceTo((shoulder || arm).getWorldPosition(_v2))
+          const reach = (t.upperLen || lengthBetween(arm, elbow)) + (t.lowerLen || lengthBetween(elbow, wrist))
+          const slack = THREE.MathUtils.clamp(1 - (effDist / Math.max(reach, 1e-3)), 0, 1)
+          const relax = 0.08 * (0.5 + 0.5 * slack)
+          if (relax > 0) shoulder.quaternion.slerp(shoulder.userData._origQuat, relax)
+        }
+      } catch {}
+    }
   }
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
@@ -1266,8 +1327,43 @@ function degToRadIfNeeded(arr) {
   if (absMax > Math.PI * 1.05) return arr.map(a => (a ?? 0) * Math.PI / 180)
   return arr
 }
+function getBoneLimitsFromIK(mesh, bone) {
+  try {
+    const geom = mesh.geometry
+    const udMMD = geom?.userData?.MMD || {}
+    const iks = udMMD.__origIks || udMMD.iks || []
+    const bones = mesh.skeleton?.bones || []
+    const idx = bones.indexOf(bone)
+    if (idx < 0) return null
+    let min = null, max = null
+    for (const ik of iks) {
+      const links = ik?.links || []
+      for (const link of links) {
+        if ((link?.index ?? -1) !== idx) continue
+        // Collect any shape of min/max
+        const candMin = degToRadIfNeeded(
+          toArray3(link?.rotationMin) || toArray3(link?.rotMin) || toArray3(link?.angleMin) || toArray3(link?.limitMin) || toArray3(link?.lower) || toArray3(link?.min)
+        )
+        const candMax = degToRadIfNeeded(
+          toArray3(link?.rotationMax) || toArray3(link?.rotMax) || toArray3(link?.angleMax) || toArray3(link?.limitMax) || toArray3(link?.upper) || toArray3(link?.max)
+        )
+        if (candMin && candMax) {
+          if (!min) { min = candMin.slice() } else { min = [Math.max(min[0], candMin[0]), Math.max(min[1], candMin[1]), Math.max(min[2], candMin[2])] }
+          if (!max) { max = candMax.slice() } else { max = [Math.min(max[0], candMax[0]), Math.min(max[1], candMax[1]), Math.min(max[2], candMax[2])] }
+        }
+      }
+    }
+    if (min && max) return { min, max }
+  } catch {}
+  return null
+}
+
 function getBoneLimits(mesh, bone) {
   try {
+    // 1) 優先: PMXのIKリンクにある角度制限（最も正確）
+    const fromIK = getBoneLimitsFromIK(mesh, bone)
+    if (fromIK) return fromIK
+    // 2) 次点: ボーンデータに直接ある回転Min/Max（あれば）
     const bonesData = mesh.geometry?.userData?.MMD?.bones || []
     const idx = mesh.skeleton?.bones?.indexOf(bone)
     const data = idx >= 0 ? bonesData[idx] : null
@@ -1275,11 +1371,8 @@ function getBoneLimits(mesh, bone) {
     const max = degToRadIfNeeded(toArray3(data?.rotationMax) || toArray3(data?.rotMax) || toArray3(data?.angleMax) || toArray3(data?.limitMax))
     if (min && max) return { min, max }
   } catch {}
-  const n = (bone?.name || '').toLowerCase()
-  if (/(ひじ|elbow)/.test(n)) return { min: [-0.05, -0.02, -0.02], max: [2.6, 0.02, 0.02] }
-  if (/(腕|upperarm|arm)/.test(n)) return { min: [-1.0, -1.0, -1.0], max: [1.0, 1.0, 1.0] }
-  if (/(肩|shoulder|clavicle)/.test(n)) return { min: [-0.7, -0.7, -0.7], max: [0.7, 0.7, 0.7] }
-  return { min: [-Math.PI, -Math.PI, -Math.PI], max: [Math.PI, Math.PI, Math.PI] }
+  // 3) フォールバックは適用しない（正確なクランプのみ適用）
+  return null
 }
 function clampBoneToLimits(bone, limits) {
   if (!limits) return
@@ -1361,9 +1454,14 @@ export async function initIKSolver(helper, mesh, ensureFloorRigidBody, Ammo) {
     devLog({ event: 'ik:init', mesh: skinnedMesh.name, ammoArg: !!Ammo, globalAmmo: !!(typeof window !== 'undefined' && window.Ammo) })
   } catch {}
   // PMXのIKチェーンは使用しない
-  let iks = []
-  skinnedMesh.geometry.userData.MMD = skinnedMesh.geometry.userData.MMD || {}
-  skinnedMesh.geometry.userData.MMD.iks = iks
+  const udMMD = (skinnedMesh.geometry.userData.MMD = skinnedMesh.geometry.userData.MMD || {})
+  // 元のIKリンク情報はクランプ推定に使用するため退避
+  try {
+    if (!udMMD.__origIks && Array.isArray(udMMD.iks)) {
+      udMMD.__origIks = JSON.parse(JSON.stringify(udMMD.iks))
+    }
+  } catch {}
+  udMMD.iks = []
   if (!helper.objects.get(skinnedMesh)) {
     const hasAmmo = !!(Ammo || (typeof window !== 'undefined' && window.Ammo))
     // three.jsのMMD IKは無効化（ik:false）
