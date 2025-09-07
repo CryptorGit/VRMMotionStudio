@@ -1107,6 +1107,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
     const moved = obj => {
       if (!obj) return false
+      obj.updateMatrixWorld(true)
       const lp = obj.userData._lastLPos || (obj.userData._lastLPos = obj.position.clone())
       const lq = obj.userData._lastLQuat || (obj.userData._lastLQuat = obj.quaternion.clone())
       const posChanged = obj.position.distanceToSquared(lp) > 1e-10
@@ -1114,7 +1115,16 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       const rotChanged = (1 - dot) > 1e-6
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      const wp = obj.userData._lastWPos || (obj.userData._lastWPos = obj.getWorldPosition(new THREE.Vector3()))
+      const wq = obj.userData._lastWQuat || (obj.userData._lastWQuat = obj.getWorldQuaternion(new THREE.Quaternion()))
+      const curWPos = obj.getWorldPosition(_v1)
+      const curWQuat = obj.getWorldQuaternion(_q1)
+      const wPosChanged = curWPos.distanceToSquared(wp) > 1e-10
+      const wDot = Math.abs(wq.dot(curWQuat))
+      const wRotChanged = (1 - wDot) > 1e-6
+      if (wPosChanged) wp.copy(curWPos)
+      if (wRotChanged) wq.copy(curWQuat)
+      return posChanged || rotChanged || wPosChanged || wRotChanged || selObj === obj
     }
     const movedLeg = moved(legTracker)
     const movedKnee = moved(kneeTracker)
@@ -1163,6 +1173,22 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
         }
       }
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
+    }
+
+    // Update tracker positions to follow current bone locations
+    if (kneeTracker && legTracker) {
+      const ankleWorld = ankle.getWorldPosition(_v1)
+      const invKnee = _tmpM4.copy(kneeTracker.matrixWorld).invert()
+      legTracker.position.copy(ankleWorld.applyMatrix4(invKnee))
+      legTracker.updateMatrixWorld(true)
+      moved(legTracker)
+    }
+    if (legTracker && footTracker) {
+      const toeWorld = (toe ? toe.getWorldPosition(_v2) : ankle.getWorldPosition(_v2))
+      const invLeg = _tmpM4.copy(legTracker.matrixWorld).invert()
+      footTracker.position.copy(toeWorld.applyMatrix4(invLeg))
+      footTracker.updateMatrixWorld(true)
+      moved(footTracker)
     }
 
     if (footTracker && movedFoot) {
