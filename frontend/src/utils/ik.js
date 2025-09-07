@@ -1165,6 +1165,30 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
     }
 
+    // Knee-driven bone update 完了後にトラッカーをボーン位置へ再配置
+    if (movedKnee) {
+      // === legTracker を ankle ボーンのワールド位置へ合わせる ===
+      ankle.getWorldPosition(_tmpV1);                           // ankle の世界座標
+      _tmpV1.applyMatrix4(_tmpM4.copy(kneeTracker.matrixWorld).invert());
+      legTracker.position.copy(_tmpV1);
+      // ankle の向きに合わせて legTracker の回転も更新
+      const ankleWorldQ = ankle.getWorldQuaternion(_tmpQ1);
+      const kneeInvQ = kneeTracker.getWorldQuaternion(_tmpQ2).invert();
+      legTracker.quaternion.copy(kneeInvQ.multiply(ankleWorldQ));
+      legTracker.updateMatrixWorld(true);
+
+      // === footTracker を toe ボーンのワールド位置へ合わせる ===
+      if (footTracker) {
+        (toe || ankle).getWorldPosition(_tmpV2);                 // toe が無ければ ankle を代用
+        _tmpV2.applyMatrix4(_tmpM4.copy(legTracker.matrixWorld).invert());
+        footTracker.position.copy(_tmpV2);
+        const toeWorldQ = (toe || ankle).getWorldQuaternion(_tmpQ1);
+        const legInvQ = legTracker.getWorldQuaternion(_tmpQ2).invert();
+        footTracker.quaternion.copy(legInvQ.multiply(toeWorldQ));
+        footTracker.updateMatrixWorld(true);
+      }
+    }
+
     if (footTracker && movedFoot) {
       // Phase 2: 足IK（足先トラッカー方向に足首の回転のみ合わせる）
       const parent = ankle.parent
