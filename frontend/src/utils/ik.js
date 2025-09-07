@@ -804,6 +804,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     // どのトラッカーが操作されたか検出（ローカル変化 or 選択中）
     const moved = obj => {
       if (!obj) return false
+      obj.updateMatrixWorld(true)
       // use local position/quaternion to avoid false positives when parent moves
       const lp = obj.userData._lastLPos || (obj.userData._lastLPos = obj.position.clone())
       const lq = obj.userData._lastLQuat || (obj.userData._lastLQuat = obj.quaternion.clone())
@@ -812,7 +813,16 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       const rotChanged = (1 - dot) > 1e-6
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      const wp = obj.userData._lastWPos || (obj.userData._lastWPos = obj.getWorldPosition(new THREE.Vector3()))
+      const wq = obj.userData._lastWQuat || (obj.userData._lastWQuat = obj.getWorldQuaternion(new THREE.Quaternion()))
+      const curWPos = obj.getWorldPosition(_v1)
+      const curWQuat = obj.getWorldQuaternion(_q1)
+      const wPosChanged = curWPos.distanceToSquared(wp) > 1e-10
+      const wDot = Math.abs(wq.dot(curWQuat))
+      const wRotChanged = (1 - wDot) > 1e-6
+      if (wPosChanged) wp.copy(curWPos)
+      if (wRotChanged) wq.copy(curWQuat)
+      return posChanged || rotChanged || wPosChanged || wRotChanged || selObj === obj
     }
     const movedArmTracker = moved(armTracker)
     const movedElbowTracker = moved(elbowTracker)
@@ -872,6 +882,18 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (i > 10 && okW && okE && okS) break
     }
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
+
+    // 手先トラッカーの位置を再計算（親移動にも追従）
+    try {
+      if (armTracker && handTracker) {
+        const wPos = wrist.getWorldPosition(new THREE.Vector3())
+        const tipPos = finger1 ? finger1.getWorldPosition(new THREE.Vector3()) : wPos.clone()
+        const wristLocal = armTracker.worldToLocal(wPos.clone())
+        const tipLocal = armTracker.worldToLocal(tipPos.clone())
+        handTracker.position.copy(tipLocal.sub(wristLocal))
+        handTracker.updateMatrixWorld(true)
+      }
+    } catch {}
 
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
     try {
