@@ -818,6 +818,34 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     const movedElbowTracker = moved(elbowTracker)
     const movedShoulderTracker = moved(shoulderTracker)
 
+    if (movedElbowTracker || movedShoulderTracker) {
+      try {
+        shoulderTracker?.updateMatrixWorld(true)
+        if (shoulderTracker && elbowTracker) {
+          const shInv = _tmpM4.copy(shoulderTracker.matrixWorld).invert()
+          elbowTracker.position.copy(elbow.getWorldPosition(_v1).applyMatrix4(shInv))
+          elbowTracker.updateMatrixWorld(true)
+        }
+        if (elbowTracker && armTracker) {
+          const elInv = _tmpM4.copy(elbowTracker.matrixWorld).invert()
+          armTracker.position.copy(wrist.getWorldPosition(_v2).applyMatrix4(elInv))
+          armTracker.updateMatrixWorld(true)
+        }
+        if (armTracker && handTracker) {
+          const armInv = _tmpM4.copy(armTracker.matrixWorld).invert()
+          const tipWorld = finger1
+            ? finger1.getWorldPosition(_v3)
+            : wrist.getWorldPosition(_v3)
+          handTracker.position.copy(tipWorld.applyMatrix4(armInv))
+          const parentInvQuat = armTracker.getWorldQuaternion(_q1).invert()
+          const wristWorldQuat = wrist.getWorldQuaternion(_q2)
+          handTracker.quaternion.copy(parentInvQuat.multiply(wristWorldQuat))
+          handTracker.updateMatrixWorld(true)
+        }
+        shoulderTracker?.updateMatrixWorld(true)
+      } catch {}
+    }
+
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
     //  - 手首回転は固定しておき、後段で手先トラッカーから与える
