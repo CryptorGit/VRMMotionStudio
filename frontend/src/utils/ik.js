@@ -1185,6 +1185,22 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
       try { clampBoneToLimits(ankle, getBoneLimits(mesh, ankle)) } catch {}
     }
+    // Sync trackers with current bone transforms
+    if (kneeTracker && movedKnee && legTracker) {
+      const kneeInv = _tmpM4.copy(kneeTracker.matrixWorld).invert()
+      legTracker.position.copy(ankle.getWorldPosition(_v1).applyMatrix4(kneeInv))
+      legTracker.updateMatrixWorld(true)
+      if (footTracker) {
+        const ankleWorldQuat = ankle.getWorldQuaternion(_q1)
+        const parentInvQuat = legTracker.getWorldQuaternion(_q2).invert()
+        footTracker.quaternion.copy(parentInvQuat.multiply(ankleWorldQuat))
+        const legInv = _tmpM4.copy(legTracker.matrixWorld).invert()
+        const toeWorld = toe ? toe.getWorldPosition(_v2) : ankle.getWorldPosition(_v2)
+        footTracker.position.copy(toeWorld.applyMatrix4(legInv))
+        footTracker.updateMatrixWorld(true)
+      }
+    }
+
     // Update leg link lines
     try {
       if (kneeLegLine && legTracker) {
