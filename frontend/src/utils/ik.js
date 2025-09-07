@@ -873,6 +873,38 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     }
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
+    // 肘 or 肩トラッカーが動いた場合、ボーン結果に合わせて子トラッカーを再配置
+    if (movedElbowTracker || movedShoulderTracker) {
+      // --- elbowTracker を elbow ボーンに合わせる ---
+      elbow.getWorldPosition(_tmpV1)
+      _tmpV1.applyMatrix4(_tmpM4.copy(shoulderTracker.matrixWorld).invert())
+      elbowTracker.position.copy(_tmpV1)
+      const elbowWorldQ = elbow.getWorldQuaternion(_tmpQ1)
+      const shoulderInvQ = shoulderTracker.getWorldQuaternion(_tmpQ2).invert()
+      elbowTracker.quaternion.copy(shoulderInvQ.multiply(elbowWorldQ))
+      elbowTracker.updateMatrixWorld(true)
+
+      // --- armTracker を wrist ボーンに合わせる ---
+      wrist.getWorldPosition(_tmpV2)
+      _tmpV2.applyMatrix4(_tmpM4.copy(elbowTracker.matrixWorld).invert())
+      armTracker.position.copy(_tmpV2)
+      const wristWorldQ = wrist.getWorldQuaternion(_tmpQ1)
+      const elbowInvQ = elbowTracker.getWorldQuaternion(_tmpQ2).invert()
+      armTracker.quaternion.copy(elbowInvQ.multiply(wristWorldQ))
+      armTracker.updateMatrixWorld(true)
+
+      // --- handTracker を finger1（無ければ wrist）に合わせる ---
+      if (handTracker) {
+        (finger1 || wrist).getWorldPosition(_tmpV3)
+        _tmpV3.applyMatrix4(_tmpM4.copy(armTracker.matrixWorld).invert())
+        handTracker.position.copy(_tmpV3)
+        const tipWorldQ = (finger1 || wrist).getWorldQuaternion(_tmpQ1)
+        const armInvQ = armTracker.getWorldQuaternion(_tmpQ2).invert()
+        handTracker.quaternion.copy(armInvQ.multiply(tipWorldQ))
+        handTracker.updateMatrixWorld(true)
+      }
+    }
+
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
     try {
       // elbow pole (deprecated) removed

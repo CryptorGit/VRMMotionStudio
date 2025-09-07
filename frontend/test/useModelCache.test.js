@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { useModelCache } from '../src/composables/useModelCache.js'
 
 describe('useModelCache', () => {
-  it('skips caching when total file size exceeds limit', async () => {
+  it('caches even when total file size exceeds previous limit', async () => {
     const { cacheFiles } = useModelCache()
     const mockFile = {
       name: 'large.pmx',
@@ -12,7 +12,7 @@ describe('useModelCache', () => {
       webkitRelativePath: ''
     }
     const result = await cacheFiles([[mockFile]])
-    expect(result).toBe(false)
-    expect(mockFile.arrayBuffer).not.toHaveBeenCalled()
+    expect(result).toBe(true)
+    expect(mockFile.arrayBuffer).toHaveBeenCalled()
   })
 })
