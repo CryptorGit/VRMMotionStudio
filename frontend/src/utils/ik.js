@@ -582,6 +582,12 @@ export function ensureArmTrackers(scene, mesh, iks) {
     t.tracker?.parent?.remove(t.tracker)
     t.elbowTracker?.parent?.remove(t.elbowTracker)
     t.shoulderTracker?.parent?.remove(t.shoulderTracker)
+    // elbow pole has been deprecated
+    if (t.elbowPole) t.elbowPole.parent?.remove(t.elbowPole)
+    if (t.elbowPoleLine) { t.elbowPoleLine.parent?.remove(t.elbowPoleLine); try { t.elbowPoleLine.geometry?.dispose(); t.elbowPoleLine.material?.dispose() } catch {} }
+    if (t.shoulderElbowLine) { t.shoulderElbowLine.parent?.remove(t.shoulderElbowLine); try { t.shoulderElbowLine.geometry?.dispose(); t.shoulderElbowLine.material?.dispose() } catch {} }
+    if (t.elbowArmLine) { t.elbowArmLine.parent?.remove(t.elbowArmLine); try { t.elbowArmLine.geometry?.dispose(); t.elbowArmLine.material?.dispose() } catch {} }
+    if (t.armHandLine) { t.armHandLine.parent?.remove(t.armHandLine); try { t.armHandLine.geometry?.dispose(); t.armHandLine.material?.dispose() } catch {} }
   } catch {} })
 
   const boneDatas = mesh.geometry?.userData?.MMD?.bones || []
@@ -703,6 +709,7 @@ export function ensureArmTrackers(scene, mesh, iks) {
     elbowTracker.quaternion.identity()
     elbowTracker.updateMatrixWorld(true)
 
+
     // Hand tracker (child of elbow)
     const armTracker = new THREE.Object3D()
     armTracker.name = `${side === 'L' ? '左' : '右'}手_IK_TRACKER`
@@ -721,13 +728,30 @@ export function ensureArmTrackers(scene, mesh, iks) {
     handTracker.quaternion.copy(parentInvQuat.multiply(wristWorldQuat))
     handTracker.position.copy(tipWorld.clone().applyMatrix4(new THREE.Matrix4().copy(armTracker.matrixWorld).invert()))
     handTracker.updateMatrixWorld(true)
+
+    // Visual link lines for parent-child tracker relations in arm
+    const mkLink = (parentObj, childObj, color = 0xffaa00) => {
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0), childObj.position.clone()
+      ])
+      const line = new THREE.Line(
+        geom,
+        new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false })
+      )
+      line.renderOrder = 998
+      parentObj.add(line)
+      return line
+    }
+    const shoulderElbowLine = mkLink(shoulderTracker, elbowTracker, 0xff8800)
+    const elbowArmLine = mkLink(elbowTracker, armTracker, 0xff8800)
+    const armHandLine = mkLink(armTracker, handTracker, 0xff8800)
     // effector: prefer middle1 if found, else wrist (最終到達点)
     const effector = middle1 || wrist
     const torsoRef = findTorsoRef(mesh, chain.shoulder || chain.arm)
     const upperLen = lengthBetween(chain.arm, chain.elbow)
     const lowerLen = lengthBetween(chain.elbow, wrist)
     // For backward compatibility, set tracker=armTracker
-    return { side, wrist, effector, tracker: armTracker, armTracker, handTracker, elbowTracker, shoulderTracker, torsoRef, upperLen, lowerLen, finger1: middle1, ...chain }
+    return { side, wrist, effector, tracker: armTracker, armTracker, handTracker, elbowTracker, shoulderTracker, shoulderElbowLine, elbowArmLine, armHandLine, torsoRef, upperLen, lowerLen, finger1: middle1, ...chain }
   }
 
   const left = createFor('L'); if (left) trackers.push(left)
@@ -777,14 +801,18 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     const shoulderStep = maxStep * 0.5
     const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
 
-    // どのトラッカーが操作されたか検出（移動量 or 選択中）
+    // どのトラッカーが操作されたか検出（ローカル変化 or 選択中）
     const moved = obj => {
       if (!obj) return false
-      const now = obj.getWorldPosition(new THREE.Vector3())
-      const last = obj.userData._lastWPos || (obj.userData._lastWPos = now.clone())
-      const dist2 = now.distanceToSquared(last)
-      obj.userData._lastWPos.copy(now)
-      return dist2 > 1e-8 || selObj === obj
+      // use local position/quaternion to avoid false positives when parent moves
+      const lp = obj.userData._lastLPos || (obj.userData._lastLPos = obj.position.clone())
+      const lq = obj.userData._lastLQuat || (obj.userData._lastLQuat = obj.quaternion.clone())
+      const posChanged = obj.position.distanceToSquared(lp) > 1e-10
+      const dot = Math.abs(lq.dot(obj.quaternion))
+      const rotChanged = (1 - dot) > 1e-6
+      if (posChanged) lp.copy(obj.position)
+      if (rotChanged) lq.copy(obj.quaternion)
+      return posChanged || rotChanged || selObj === obj
     }
     const movedArmTracker = moved(armTracker)
     const movedElbowTracker = moved(elbowTracker)
@@ -844,6 +872,46 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (i > 10 && okW && okE && okS) break
     }
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
+
+    // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
+    try {
+      // elbow pole (deprecated) removed
+    } catch {}
+
+    // (elbow pole removed)
+    try {
+      // Update parent-child link lines for arm trackers
+      if (t.shoulderElbowLine && t.elbowTracker) {
+        const geom = t.shoulderElbowLine.geometry
+        const arr = geom.getAttribute('position')
+        if (arr && arr.count >= 2) {
+          arr.setXYZ(0, 0, 0, 0)
+          arr.setXYZ(1, t.elbowTracker.position.x, t.elbowTracker.position.y, t.elbowTracker.position.z)
+          arr.needsUpdate = true
+          geom.computeBoundingSphere?.()
+        }
+      }
+      if (t.elbowArmLine && t.armTracker) {
+        const geom = t.elbowArmLine.geometry
+        const arr = geom.getAttribute('position')
+        if (arr && arr.count >= 2) {
+          arr.setXYZ(0, 0, 0, 0)
+          arr.setXYZ(1, t.armTracker.position.x, t.armTracker.position.y, t.armTracker.position.z)
+          arr.needsUpdate = true
+          geom.computeBoundingSphere?.()
+        }
+      }
+      if (t.armHandLine && t.handTracker) {
+        const geom = t.armHandLine.geometry
+        const arr = geom.getAttribute('position')
+        if (arr && arr.count >= 2) {
+          arr.setXYZ(0, 0, 0, 0)
+          arr.setXYZ(1, t.handTracker.position.x, t.handTracker.position.y, t.handTracker.position.z)
+          arr.needsUpdate = true
+          geom.computeBoundingSphere?.()
+        }
+      }
+    } catch {}
 
     // Clamp joints to model-provided limits（正確なクランプのみ適用）
     try {
@@ -962,7 +1030,18 @@ export function ensureLegTrackers(scene, mesh) {
   if (!mesh || !mesh.skeleton) return
   const bones = mesh.skeleton.bones
   const prev = legIkTrackersByMesh.get(mesh) || []
-  prev.forEach(t => { try { t.legTracker?.parent?.remove(t.legTracker); t.footTracker?.parent?.remove(t.footTracker); t.kneeTracker?.parent?.remove(t.kneeTracker) } catch {} })
+  prev.forEach(t => { try {
+    t.legTracker?.parent?.remove(t.legTracker);
+    t.footTracker?.parent?.remove(t.footTracker);
+    t.kneeTracker?.parent?.remove(t.kneeTracker);
+    t.kneePole?.parent?.remove(t.kneePole);
+    if (t.kneePoleLine) {
+      t.kneePoleLine.parent?.remove(t.kneePoleLine)
+      try { t.kneePoleLine.geometry?.dispose(); t.kneePoleLine.material?.dispose() } catch {}
+    }
+    if (t.kneeLegLine) { t.kneeLegLine.parent?.remove(t.kneeLegLine); try { t.kneeLegLine.geometry?.dispose(); t.kneeLegLine.material?.dispose() } catch {} }
+    if (t.legFootLine) { t.legFootLine.parent?.remove(t.legFootLine); try { t.legFootLine.geometry?.dispose(); t.legFootLine.material?.dispose() } catch {} }
+  } catch {} })
   const trackers = []
   const findBone = (name) => findBoneByName(bones, name)
   function createFor(side) {
@@ -979,6 +1058,7 @@ export function ensureLegTrackers(scene, mesh) {
     kneeTracker.position.copy(knee.getWorldPosition(new THREE.Vector3()).applyMatrix4(invMeshMat))
     kneeTracker.quaternion.identity()
     kneeTracker.updateMatrixWorld(true)
+    const torso = findTorsoRef(mesh, upper)
     // Foot tracker (child of knee)
     const legTracker = new THREE.Object3D(); legTracker.name = `${side === 'L' ? '左' : '右'}足_IK_TRACKER`; kneeTracker.add(legTracker)
     legTracker.position.copy(ankle.getWorldPosition(new THREE.Vector3()).applyMatrix4(new THREE.Matrix4().copy(kneeTracker.matrixWorld).invert()))
@@ -992,9 +1072,25 @@ export function ensureLegTrackers(scene, mesh) {
     const toeWorldPos = (toe ? toe.getWorldPosition(new THREE.Vector3()) : ankle.getWorldPosition(new THREE.Vector3()))
     footTracker.position.copy(toeWorldPos.applyMatrix4(new THREE.Matrix4().copy(legTracker.matrixWorld).invert()))
     footTracker.updateMatrixWorld(true)
-    const torso = findTorsoRef(mesh, upper)
+
+    // Visual link lines for parent-child tracker relations in leg
+    const mkLink = (parentObj, childObj, color = 0x00ff88) => {
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0), childObj.position.clone()
+      ])
+      const line = new THREE.Line(
+        geom,
+        new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false })
+      )
+      line.renderOrder = 998
+      parentObj.add(line)
+      return line
+    }
+    const kneeLegLine = mkLink(kneeTracker, legTracker, 0x00cc88)
+    const legFootLine = mkLink(legTracker, footTracker, 0x00cc88)
+    // torso already defined above
     // Return trackers
-    return { side, upper, knee, ankle, toe, legTracker, kneeTracker, footTracker, torsoRef: torso }
+    return { side, upper, knee, ankle, toe, legTracker, kneeTracker, kneeLegLine, legFootLine, footTracker, torsoRef: torso }
   }
   const left = createFor('L'); if (left) trackers.push(left)
   const right = createFor('R'); if (right) trackers.push(right)
@@ -1006,15 +1102,31 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
   const trackers = legIkTrackersByMesh.get(mesh)
   if (!Array.isArray(trackers) || trackers.length === 0) return
   for (const t of trackers) {
-    const { upper, knee, ankle, toe, legTracker, kneeTracker, footTracker, torsoRef } = t
+    const { upper, knee, ankle, toe, legTracker, kneeTracker, kneeLegLine, legFootLine, footTracker, torsoRef } = t
     if (!upper || !knee || !ankle || !legTracker) continue
+    const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
+    const moved = obj => {
+      if (!obj) return false
+      const lp = obj.userData._lastLPos || (obj.userData._lastLPos = obj.position.clone())
+      const lq = obj.userData._lastLQuat || (obj.userData._lastLQuat = obj.quaternion.clone())
+      const posChanged = obj.position.distanceToSquared(lp) > 1e-10
+      const dot = Math.abs(lq.dot(obj.quaternion))
+      const rotChanged = (1 - dot) > 1e-6
+      if (posChanged) lp.copy(obj.position)
+      if (rotChanged) lq.copy(obj.quaternion)
+      return posChanged || rotChanged || selObj === obj
+    }
+    const movedLeg = moved(legTracker)
+    const movedKnee = moved(kneeTracker)
+    
+    const movedFoot = moved(footTracker)
     const kneeStep = maxStep
     const upperStep = maxStep
     // Phase 1: 脚IK（膝と大腿の回転のみで、足首の位置を legTracker に合わせる。足首の回転は固定）
     const ankleQuatKeep = ankle.quaternion.clone()
     for (let i = 0; i < iterations; i++) {
       // 両足は膝の回転（足トラッカーで膝のみを回す）
-      ccdStep(mesh, knee, ankle, legTracker, kneeStep)
+      if (movedLeg) ccdStep(mesh, knee, ankle, legTracker, kneeStep)
       // no knee pole correction (no pole mode)
       const dist = ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2))
       if (i > 10 && dist < 1e-3) break
@@ -1025,26 +1137,35 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     // ヒンジ固定は行わない（モデルの可動域/ローカル軸に任せる）
     try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)); clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
 
+    // (knee pole removed)
+
     // Knee-tracker drives hip (upper leg) rotation: 両膝は股関節（足）の回転
-    if (kneeTracker) {
+    if (kneeTracker && movedKnee) {
       const U = upper.getWorldPosition(new THREE.Vector3())
       const K = knee.getWorldPosition(new THREE.Vector3())
       const KT = kneeTracker.getWorldPosition(new THREE.Vector3())
-      const vCur = K.clone().sub(U).normalize()
-      const vTar = KT.clone().sub(U).normalize()
+      const vCur = K.clone().sub(U)
+      const vTar = KT.clone().sub(U)
       if (vCur.lengthSq() > 1e-10 && vTar.lengthSq() > 1e-10) {
-        const dQ = new THREE.Quaternion().setFromUnitVectors(vCur, vTar)
-        const parentInv = upper.parent ? upper.parent.getWorldQuaternion(new THREE.Quaternion()).invert() : new THREE.Quaternion().identity()
-        const localDelta = parentInv.multiply(dQ)
-        // Apply gently to stabilize
-        const newQ = upper.quaternion.clone().multiply(localDelta)
-        upper.quaternion.slerp(newQ, 0.6)
-        upper.updateMatrixWorld(true)
+        const vC = vCur.clone().normalize()
+        const vT = vTar.clone().normalize()
+        const dot = THREE.MathUtils.clamp(vC.dot(vT), -1, 1)
+        let ang = Math.acos(dot)
+        if (ang > 1e-6) {
+          const axis = new THREE.Vector3().crossVectors(vC, vT)
+          if (axis.lengthSq() > 1e-12) {
+            axis.normalize()
+            // limit per-iteration rotation for stability
+            const step = Math.min(ang, upperStep)
+            rotateBoneAroundWorldAxis(upper, axis, step)
+            upper.updateMatrixWorld(true)
+          }
+        }
       }
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
     }
 
-    if (footTracker) {
+    if (footTracker && movedFoot) {
       // Phase 2: 足IK（足先トラッカー方向に足首の回転のみ合わせる）
       const parent = ankle.parent
       const A = ankle.getWorldPosition(new THREE.Vector3())
@@ -1064,6 +1185,19 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
       try { clampBoneToLimits(ankle, getBoneLimits(mesh, ankle)) } catch {}
     }
+    // Update leg link lines
+    try {
+      if (kneeLegLine && legTracker) {
+        const g = kneeLegLine.geometry
+        const a = g.getAttribute('position')
+        if (a && a.count >= 2) { a.setXYZ(0,0,0,0); a.setXYZ(1, legTracker.position.x, legTracker.position.y, legTracker.position.z); a.needsUpdate = true; g.computeBoundingSphere?.() }
+      }
+      if (legFootLine && footTracker) {
+        const g = legFootLine.geometry
+        const a = g.getAttribute('position')
+        if (a && a.count >= 2) { a.setXYZ(0,0,0,0); a.setXYZ(1, footTracker.position.x, footTracker.position.y, footTracker.position.z); a.needsUpdate = true; g.computeBoundingSphere?.() }
+      }
+    } catch {}
   }
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
@@ -1288,6 +1422,9 @@ export function ensureBodyTrackers(scene, mesh) {
 export function solveBodyTrackers(mesh, slerp = 0.5) {
   const body = bodyTrackersByMesh.get(mesh)
   if (!body) return
+  const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
+  const affectsThis = selObj && (selObj === body.head || selObj === body.chest || selObj === body.hip)
+  if (!affectsThis) return
   const apply = (bone, target) => {
     if (!bone || !target) return
     bone.updateMatrixWorld(true); target.updateMatrixWorld(true)
