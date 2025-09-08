@@ -606,6 +606,11 @@ export function resetIkTrackerChain(mesh, rootTracker) {
       } catch {}
     }
     tracker.updateMatrixWorld(true)
+    const u = tracker.userData || (tracker.userData = {})
+    if (u._lastLPos) u._lastLPos.copy(tracker.position)
+    else u._lastLPos = tracker.position.clone()
+    if (u._lastLQuat) u._lastLQuat.copy(tracker.quaternion)
+    else u._lastLQuat = tracker.quaternion.clone()
   }
 }
 
