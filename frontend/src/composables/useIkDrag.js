@@ -215,29 +215,28 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
-      scheduleIKUpdate()
-      if (selectedIK.value?.target?.isObject3D) {
-        const targetObj = selectedIK.value.target
+      const targetObj = selectedIK.value.target
+      if (targetObj?.isObject3D) {
+        const wp = targetObj.getWorldPosition(new THREE.Vector3())
+        const wq = targetObj.getWorldQuaternion(new THREE.Quaternion())
         const { bone: targetBone } = resolveDraggableBone(targetObj)
         if (targetBone) {
-          targetBone.updateMatrixWorld(true)
-          const wp = targetBone.getWorldPosition(new THREE.Vector3())
-          const wq = targetBone.getWorldQuaternion(new THREE.Quaternion())
-          const parent = targetObj.parent
+          const parent = targetBone.parent
           if (parent) {
             parent.updateMatrixWorld(true)
             const invM = new THREE.Matrix4().copy(parent.matrixWorld).invert()
-            targetObj.position.copy(wp.applyMatrix4(invM))
+            targetBone.position.copy(wp.clone().applyMatrix4(invM))
             const invQ = parent.getWorldQuaternion(new THREE.Quaternion()).invert()
-            targetObj.quaternion.copy(invQ.multiply(wq))
+            targetBone.quaternion.copy(invQ.multiply(wq))
           } else {
-            targetObj.position.copy(wp)
-            targetObj.quaternion.copy(wq)
+            targetBone.position.copy(wp)
+            targetBone.quaternion.copy(wq)
           }
-          targetObj.updateMatrixWorld(true)
+          targetBone.updateMatrixWorld(true)
         }
-        updateIKMarkersBound?.()
       }
+      scheduleIKUpdate()
+      updateIKMarkersBound?.()
     }
     selectedIK.value = null
   }
