@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName, findBoneByName } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerChain } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -215,128 +215,10 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
-      scheduleIKUpdate()
-
-      const ikTarget = selectedIK.value.target;
-      const chainIndex = selectedIK.value.chainIndex;
-
-      console.log('selectedIK.value:', selectedIK.value); // 追加
-      console.log('ikTarget:', ikTarget); // 追加
-      console.log('chainIndex:', chainIndex); // 追加
-
-      if (!ikTarget) {
-        console.warn('selectedIK.value.target is undefined. Skipping IK target reset.');
-        selectedIK.value = null;
-        return;
-      }
-
       const mesh = currentMeshRef.value
-
-      let targetBone = null; // 再配置対象のボーン
-
-      if (chainIndex !== null && chainIndex !== -1) {
-        // PMXのIKチェーンに紐づくトラッカーの場合
-        const iks = mesh.geometry.userData.MMD.iks;
-        if (!iks || !Array.isArray(iks) || chainIndex >= iks.length) {
-          console.warn('Invalid iks or chainIndex. Skipping IK target reset.');
-          selectedIK.value = null;
-          return;
-        }
-        const ikChain = iks[chainIndex];
-        if (!ikChain || typeof ikChain.target === 'undefined') {
-          console.warn('Invalid ikChain or ikChain.target. Skipping IK target reset.');
-          selectedIK.value = null;
-          return;
-        }
-        targetBone = mesh.skeleton.bones[ikChain.target];
-      } else {
-        // ランタイムIKトラッカーの場合 (chainIndex が null)
-        // ikTarget.name から対応するボーンを特定
-        const boneName = ikTarget.name.replace(/_IK_TRACKER$/, ''); // "_IK_TRACKER" を除去
-        // トラッカー名からボーン名へのマッピング
-        const trackerBoneNameMap = {
-          '左膝': '左ひざ',
-          '右膝': '右ひざ',
-          '左腕': '左腕',
-          '右腕': '右腕',
-          '左肘': '左ひじ',
-          '右肘': '右ひじ',
-          '左手': '左手首',
-          '右手': '右手首',
-          '左足': '左足首',
-          '右足': '右足首',
-          '頭': '頭',
-          '胸': '上半身',
-          '腰': '下半身',
-          '左手先': '左手首',
-          '右手先': '右手首',
-          '左足先': '左足首',
-          '右足先': '右足首',
-        };
-        const actualBoneName = trackerBoneNameMap[boneName] || boneName;
-        targetBone = findBoneByName(mesh.skeleton.bones, actualBoneName);
-
-        if (!targetBone) {
-          console.warn(`Could not find bone for runtime IK tracker: ${boneName} (mapped to ${actualBoneName}). Skipping IK target reset.`);
-          selectedIK.value = null;
-          return;
-        }
-        console.log('Found targetBone for runtime IK tracker:', targetBone);
-      }
-
-      const targetParent = ikTarget.parent
-
-      console.log('effectorBone:', targetBone); // 追加
-      console.log('targetParent:', targetParent); // 追加
-
-      if (targetBone && targetParent) {
-        // IK計算が完了した次のフレームで実行
-        requestAnimationFrame(() => {
-          // ★ここから追加ログ
-          console.log('--- Before IK target reset (in rAF) ---');
-          ikTargets.forEach(t => {
-            const currentWorldPos = new THREE.Vector3();
-            t.marker.getWorldPosition(currentWorldPos);
-            console.log(`Marker ${t.marker.name} (current):`, currentWorldPos);
-            if (t.actualBone) {
-              const actualBoneWorldPos = new THREE.Vector3();
-              t.actualBone.getWorldPosition(actualBoneWorldPos);
-              console.log(`Bone ${t.actualBone.name} (current):`, actualBoneWorldPos);
-            }
-          });
-          // ★ここまで追加ログ
-
-          const worldPosition = new THREE.Vector3()
-          targetBone.getWorldPosition(worldPosition) // 更新されたボーンのワールド座標を取得
-
-          console.log('effectorBone worldPosition (after IK):', worldPosition); // ログ名を変更
-
-          targetParent.updateMatrixWorld(true)
-          const localPosition = targetParent.worldToLocal(worldPosition.clone())
-          ikTarget.position.copy(localPosition) // IKターゲットの位置をボーンの位置に合わせる
-
-          console.log('ikTarget new localPosition:', ikTarget.position); // ログ名を変更
-
-          updateIKMarkersBound.value?.() // IKマーカーの位置を即時更新
-
-          // ★ここから追加ログ
-          console.log('--- After IK target reset and marker update (in rAF) ---');
-          ikTargets.forEach(t => {
-            const finalWorldPos = new THREE.Vector3();
-            t.marker.getWorldPosition(finalWorldPos);
-            console.log(`Marker ${t.marker.name} (final):`, finalWorldPos);
-            if (t.actualBone) {
-              const actualBoneWorldPos = new THREE.Vector3();
-              t.actualBone.getWorldPosition(actualBoneWorldPos);
-              console.log(`Bone ${t.actualBone.name} (final):`, actualBoneWorldPos);
-            }
-          });
-          // ★ここまで追加ログ
-        })
-      } else {
-        console.warn('Target bone or target parent is invalid. Skipping IK target reset.');
-        selectedIK.value = null;
-      }
+      resetIkTrackerChain(mesh, selectedIK.value.target)
+      updateIKMarkersBound.value?.()
+      scheduleIKUpdate()
     }
     selectedIK.value = null
   }
