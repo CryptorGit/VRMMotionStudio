@@ -20,6 +20,7 @@ export function useIkDrag({
   const isRotating = ref(false)
   const quat = new THREE.Quaternion()
   let physicsWasEnabled = false
+  let draggingBone = null
   function hasAfterPhysicsGrants(mesh) {
     try {
       const grants = mesh?.geometry?.userData?.MMD?.grants || []
@@ -84,6 +85,8 @@ export function useIkDrag({
     const target = ikTargets.find(t => t.marker === intersects[0].object)
     if (!target) return
     selectedIK.value = target
+    // resolve once and store for later use
+    draggingBone = resolveDraggableBone(selectedIK.value.target).bone
     physicsWasEnabled = enablePhysics.value
     const mesh = currentMeshRef.value
     // Keep physics enabled if model uses after-physics grants (so grant propagation runs during drag)
@@ -99,7 +102,7 @@ export function useIkDrag({
     }
     if (event.button !== 0) return
     const pos = new THREE.Vector3()
-    const { bone: targetBone } = resolveDraggableBone(selectedIK.value.target)
+    const targetBone = draggingBone || resolveDraggableBone(selectedIK.value.target).bone
     targetBone.getWorldPosition(pos)
     // カメラ中心→IKトラッカー直線を法線とする平面
     const normal = new THREE.Vector3().subVectors(pos, camera.value.position).normalize()
@@ -164,7 +167,7 @@ export function useIkDrag({
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(mouse, camera.value)
     const curWorld = new THREE.Vector3()
-    const { bone: target } = resolveDraggableBone(selectedIK.value.target)
+    const target = draggingBone || resolveDraggableBone(selectedIK.value.target).bone
     target.getWorldPosition(curWorld)
     const normal = new THREE.Vector3().subVectors(curWorld, camera.value.position).normalize()
     dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, curWorld)
@@ -201,6 +204,7 @@ export function useIkDrag({
   }
 
   function onPointerUp(event) {
+    const releasedIK = selectedIK.value
     renderer.value?.domElement?.releasePointerCapture(event?.pointerId)
     controls.value.enabled = true
     if (isRotating.value) {
@@ -214,8 +218,32 @@ export function useIkDrag({
       helper.value?.update(0)
       physicsWasEnabled = false
     }
-    if (selectedIK.value) {
+    if (releasedIK) {
       scheduleIKUpdate()
+      // IKトラッカーをドラッグ後の関節位置へ戻す
+      requestAnimationFrame(() => {
+        try {
+          const targetBone = draggingBone || resolveDraggableBone(releasedIK.target).bone
+          if (targetBone && releasedIK.target) {
+            const pos = new THREE.Vector3()
+            targetBone.getWorldPosition(pos)
+            const parent = releasedIK.target.parent
+            if (parent && typeof parent.worldToLocal === 'function') {
+              parent.updateMatrixWorld(true)
+              parent.worldToLocal(pos)
+            }
+            releasedIK.target.position.copy(pos)
+            releasedIK.target.updateMatrixWorld(true)
+          }
+          updateIKMarkersBound.value?.()
+        } catch (e) {
+          console.warn('Failed to reset IK tracker position', e)
+        } finally {
+          draggingBone = null
+        }
+      })
+    } else {
+      draggingBone = null
     }
     selectedIK.value = null
   }
