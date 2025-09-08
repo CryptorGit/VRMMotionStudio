@@ -491,11 +491,11 @@ export function setupIKTargets(scene, mesh) {
     const t = typeof c.target === 'number' ? bones[c.target]?.name : c.target
     if (t) targetNames.add(normalizeBoneName(t))
   })
-  const addMarker = (target, chainIndex) => {
+  const addMarker = (target, chainIndex, actualBone = null) => {
     const marker = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff0000, depthTest: false, depthWrite: false }))
     marker.renderOrder = 999
     target.getWorldPosition(marker.position)
-    ikTargets.push({ target, marker, chainIndex })
+    ikTargets.push({ target, marker, chainIndex, actualBone })
     scene.add(marker)
   }
   // 既存IKボーンへのマーカー追加は行わない
@@ -519,23 +519,23 @@ export function setupIKTargets(scene, mesh) {
     ensureLegTrackers(scene, mesh)
     const legs = legIkTrackersByMesh.get(mesh) || []
     for (const t of legs) {
-      if (t.kneeTracker) addMarker(t.kneeTracker, null)
-      if (t.legTracker) addMarker(t.legTracker, null)
-      if (t.footTracker) addMarker(t.footTracker, null)
+      if (t.kneeTracker) addMarker(t.kneeTracker, null, t.knee)
+      if (t.legTracker) addMarker(t.legTracker, null, t.ankle)
+      if (t.footTracker) addMarker(t.footTracker, null, t.toe || t.ankle)
     }
   } catch (e) { console.warn('setupIKTargets: ensureLegTrackers failed', e) }
   try {
     ensureBodyTrackers(scene, mesh)
     const body = bodyTrackersByMesh.get(mesh)
     if (body) {
-      if (body.head) addMarker(body.head, null)
-      if (body.chest) addMarker(body.chest, null)
-      if (body.hip) addMarker(body.hip, null)
+      if (body.head) addMarker(body.head, null, body.headBone)
+      if (body.chest) addMarker(body.chest, null, body.chestBone)
+      if (body.hip) addMarker(body.hip, null, body.hipBone)
     }
   } catch (e) { console.warn('setupIKTargets: ensureBodyTrackers failed', e) }
 }
 
-function findBoneByName(bones, name) {
+export function findBoneByName(bones, name) {
   const n = normalizeBoneName(name)
   return bones.find(b => normalizeBoneName(b.name) === n) || null
 }
@@ -1657,8 +1657,9 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
   const fov = cachedFovRad
   let maxScale = 0
   ikTargets.forEach(t => {
-    if (!skipMatrixUpdate) t.target.updateMatrixWorld(true)
-    t.target.getWorldPosition(t.marker.position)
+    const targetObject = t.actualBone || t.target; // actualBone があればそれを使う
+    if (!skipMatrixUpdate) targetObject.updateMatrixWorld(true)
+    targetObject.getWorldPosition(t.marker.position)
     const dist = t.marker.position.distanceTo(camera.position)
     const scale = (2 * dist * Math.tan(fov / 2) * IK_MARKER_PIXEL_SIZE) / height
     t.marker.scale.set(scale, scale, scale)
