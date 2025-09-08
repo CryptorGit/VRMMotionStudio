@@ -872,29 +872,46 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (i > 10 && okW && okE && okS) break
     }
 
-    // Shoulder tracker movement can rotate the shoulder, which misaligns the elbow/wrist bones.
+    // Shoulder/elbow tracker movement can rotate the shoulder/arm, which misaligns the child bones.
     // Re-solve CCD to align them with their respective trackers.
-    if (movedShoulderTracker) {
+    if (movedShoulderTracker || movedElbowTracker) {
+      const armQuatKeep = arm.quaternion.clone()
       const elbowQuatKeep = elbow.quaternion.clone()
       const wristQuatKeep = wrist.quaternion.clone()
 
-      // 1. Align elbow bone to elbow tracker
-      for (let i = 0; i < 8; i++) {
-        ccdStep(mesh, arm, elbow, elbowTracker, armStep * 0.5)
-        if (elbow.getWorldPosition(_v1).distanceTo(elbowTracker.getWorldPosition(_v2)) < 1e-3) break
+      // Align elbow bone to elbow tracker (driven by arm rotation)
+      if (movedShoulderTracker) {
+        for (let i = 0; i < 8; i++) {
+          ccdStep(mesh, arm, elbow, elbowTracker, armStep * 0.5)
+          if (elbow.getWorldPosition(_v1).distanceTo(elbowTracker.getWorldPosition(_v2)) < 1e-3) break
+        }
+        // Preserve elbow rotation, only arm rotation is used for alignment
+        elbow.quaternion.copy(elbowQuatKeep)
+        elbow.updateMatrixWorld(true)
+        try { clampBoneToLimits(arm, getBoneLimits(mesh, arm)) } catch {}
       }
-      elbow.quaternion.copy(elbowQuatKeep)
-      elbow.updateMatrixWorld(true)
-      try { clampBoneToLimits(arm, getBoneLimits(mesh, arm)) } catch {}
 
-      // 2. Align wrist bone to arm tracker (hand tracker)
+      // Align wrist bone to arm tracker (hand tracker) (driven by elbow rotation)
       for (let i = 0; i < 8; i++) {
         ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.5)
         if (wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2)) < 1e-3) break
       }
+      // Preserve wrist rotation, only elbow rotation is used for alignment
       wrist.quaternion.copy(wristQuatKeep)
       wrist.updateMatrixWorld(true)
       try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
+
+      // Align hand-tip bone to hand-tip tracker (driven by elbow rotation)
+      if (handTracker && eff) {
+        for (let i = 0; i < 8; i++) {
+          ccdStep(mesh, elbow, eff, handTracker, elbowStep * 0.5)
+          if (eff.getWorldPosition(_v1).distanceTo(handTracker.getWorldPosition(_v2)) < 1e-3) break
+        }
+        // Preserve wrist rotation, as hand-tip is also controlled by elbow
+        wrist.quaternion.copy(wristQuatKeep)
+        wrist.updateMatrixWorld(true)
+        try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
+      }
     }
 
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
@@ -1212,17 +1229,31 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
     }
 
-    // Knee-tracker movement can rotate the hip, which misaligns the ankle bone from the leg-tracker.
-    // Re-solve CCD for the knee to align the ankle bone with the leg-tracker after hip rotation.
+    // Knee-tracker movement can rotate the hip, which misaligns the ankle and toe bones.
+    // Re-solve CCD for the knee to align the bones with their respective trackers.
     if (movedKnee) {
       const ankleQuatKeep = ankle.quaternion.clone()
+      const toeQuatKeep = toe?.quaternion.clone()
+
+      // 1. Align ankle bone to leg tracker
       for (let i = 0; i < 8; i++) {
         ccdStep(mesh, knee, ankle, legTracker, kneeStep * 0.5)
-        const dist = ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2))
-        if (dist < 1e-3) break
+        if (ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2)) < 1e-3) break
       }
+
+      // 2. Align toe bone to foot tracker
+      if (toe && footTracker) {
+        for (let i = 0; i < 8; i++) {
+          ccdStep(mesh, knee, toe, footTracker, kneeStep * 0.5)
+          if (toe.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2)) < 1e-3) break
+        }
+      }
+
+      // Restore original rotations of ankle and toe
       ankle.quaternion.copy(ankleQuatKeep)
+      if (toe && toeQuatKeep) toe.quaternion.copy(toeQuatKeep)
       ankle.updateMatrixWorld(true)
+      if (toe) toe.updateMatrixWorld(true)
       try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
     }
 
