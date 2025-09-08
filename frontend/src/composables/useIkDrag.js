@@ -201,6 +201,7 @@ export function useIkDrag({
   }
 
   function onPointerUp(event) {
+    const releasedIK = selectedIK.value
     renderer.value?.domElement?.releasePointerCapture(event?.pointerId)
     controls.value.enabled = true
     if (isRotating.value) {
@@ -214,8 +215,28 @@ export function useIkDrag({
       helper.value?.update(0)
       physicsWasEnabled = false
     }
-    if (selectedIK.value) {
+    if (releasedIK) {
       scheduleIKUpdate()
+      // IKトラッカーをドラッグ後の関節位置へ戻す
+      requestAnimationFrame(() => {
+        try {
+          const { bone: targetBone } = resolveDraggableBone(releasedIK.target)
+          if (targetBone && releasedIK.target && releasedIK.target !== targetBone) {
+            const pos = new THREE.Vector3()
+            targetBone.getWorldPosition(pos)
+            const parent = releasedIK.target.parent
+            if (parent && typeof parent.worldToLocal === 'function') {
+              parent.updateMatrixWorld(true)
+              parent.worldToLocal(pos)
+            }
+            releasedIK.target.position.copy(pos)
+            releasedIK.target.updateMatrixWorld(true)
+          }
+          updateIKMarkersBound.value?.()
+        } catch (e) {
+          console.warn('Failed to reset IK tracker position', e)
+        }
+      })
     }
     selectedIK.value = null
   }
