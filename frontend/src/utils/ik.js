@@ -1116,10 +1116,10 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedLeg = moved(legTracker)
     const movedKnee = moved(kneeTracker)
-    
-    const movedFoot = moved(footTracker)
+    const movedLeg = moved(legTracker) || movedKnee
+
+    const movedFoot = moved(footTracker) || movedLeg
     const kneeStep = maxStep
     const upperStep = maxStep
     // Phase 1: 脚IK（膝と大腿の回転のみで、足首の位置を legTracker に合わせる。足首の回転は固定）

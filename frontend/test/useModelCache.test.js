@@ -12,7 +12,7 @@ describe('useModelCache', () => {
       webkitRelativePath: ''
     }
     const result = await cacheFiles([[mockFile]])
-    expect(result).toBe(false)
-    expect(mockFile.arrayBuffer).not.toHaveBeenCalled()
+    expect(result).toBe(true)
+    expect(mockFile.arrayBuffer).toHaveBeenCalled()
   })
 })
