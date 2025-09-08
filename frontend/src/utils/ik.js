@@ -609,6 +609,32 @@ export function resetIkTrackerChain(mesh, rootTracker) {
   }
 }
 
+// トラッカー間リンクライン（親子関係を示すライン）を更新
+export function updateTrackerLinks(mesh) {
+  if (!mesh) return
+  const updateLine = (line, child) => {
+    const geom = line?.geometry
+    const attr = geom?.getAttribute('position')
+    if (attr && attr.count >= 2 && child) {
+      attr.setXYZ(0, 0, 0, 0)
+      attr.setXYZ(1, child.position.x, child.position.y, child.position.z)
+      attr.needsUpdate = true
+      geom.computeBoundingSphere?.()
+    }
+  }
+  const legs = legIkTrackersByMesh.get(mesh) || []
+  for (const t of legs) {
+    updateLine(t.kneeLegLine, t.legTracker)
+    updateLine(t.legFootLine, t.footTracker)
+  }
+  const arms = armIkTrackersByMesh.get(mesh) || []
+  for (const t of arms) {
+    updateLine(t.shoulderElbowLine, t.elbowTracker)
+    updateLine(t.elbowArmLine, t.armTracker)
+    updateLine(t.armHandLine, t.handTracker)
+  }
+}
+
 function hasArmIKChainForWrist(bones, iks, wristIdx) {
   if (!Array.isArray(iks)) return false
   return iks.some(ik => {
@@ -991,39 +1017,6 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     } catch {}
 
     // (elbow pole removed)
-    try {
-      // Update parent-child link lines for arm trackers
-      if (t.shoulderElbowLine && t.elbowTracker) {
-        const geom = t.shoulderElbowLine.geometry
-        const arr = geom.getAttribute('position')
-        if (arr && arr.count >= 2) {
-          arr.setXYZ(0, 0, 0, 0)
-          arr.setXYZ(1, t.elbowTracker.position.x, t.elbowTracker.position.y, t.elbowTracker.position.z)
-          arr.needsUpdate = true
-          geom.computeBoundingSphere?.()
-        }
-      }
-      if (t.elbowArmLine && t.armTracker) {
-        const geom = t.elbowArmLine.geometry
-        const arr = geom.getAttribute('position')
-        if (arr && arr.count >= 2) {
-          arr.setXYZ(0, 0, 0, 0)
-          arr.setXYZ(1, t.armTracker.position.x, t.armTracker.position.y, t.armTracker.position.z)
-          arr.needsUpdate = true
-          geom.computeBoundingSphere?.()
-        }
-      }
-      if (t.armHandLine && t.handTracker) {
-        const geom = t.armHandLine.geometry
-        const arr = geom.getAttribute('position')
-        if (arr && arr.count >= 2) {
-          arr.setXYZ(0, 0, 0, 0)
-          arr.setXYZ(1, t.handTracker.position.x, t.handTracker.position.y, t.handTracker.position.z)
-          arr.needsUpdate = true
-          geom.computeBoundingSphere?.()
-        }
-      }
-    } catch {}
 
     // Clamp joints to model-provided limits（正確なクランプのみ適用）
     try {
@@ -1064,6 +1057,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       } catch {}
     }
   }
+  updateTrackerLinks(mesh)
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
 
@@ -1346,20 +1340,8 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
       try { clampBoneToLimits(ankle, getBoneLimits(mesh, ankle)) } catch {}
     }
-    // Update leg link lines
-    try {
-      if (kneeLegLine && legTracker) {
-        const g = kneeLegLine.geometry
-        const a = g.getAttribute('position')
-        if (a && a.count >= 2) { a.setXYZ(0,0,0,0); a.setXYZ(1, legTracker.position.x, legTracker.position.y, legTracker.position.z); a.needsUpdate = true; g.computeBoundingSphere?.() }
-      }
-      if (legFootLine && footTracker) {
-        const g = legFootLine.geometry
-        const a = g.getAttribute('position')
-        if (a && a.count >= 2) { a.setXYZ(0,0,0,0); a.setXYZ(1, footTracker.position.x, footTracker.position.y, footTracker.position.z); a.needsUpdate = true; g.computeBoundingSphere?.() }
-      }
-    } catch {}
   }
+  updateTrackerLinks(mesh)
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
 

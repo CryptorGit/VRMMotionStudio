@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerChain } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerChain, updateTrackerLinks } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -217,6 +217,7 @@ export function useIkDrag({
     if (selectedIK.value) {
       const mesh = currentMeshRef.value
       resetIkTrackerChain(mesh, selectedIK.value.target)
+      updateTrackerLinks(mesh)
       updateIKMarkersBound.value?.()
       scheduleIKUpdate()
     }
