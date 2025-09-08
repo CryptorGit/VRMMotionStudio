@@ -1185,6 +1185,27 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
       try { clampBoneToLimits(ankle, getBoneLimits(mesh, ankle)) } catch {}
     }
+    // ドラッグ終了後: 未操作トラッカー側にボーンを合わせる
+    const snapBone = (bone, tracker) => {
+      if (!bone || !tracker) return
+      const wp = tracker.getWorldPosition(new THREE.Vector3())
+      const wq = tracker.getWorldQuaternion(new THREE.Quaternion())
+      const parent = bone.parent
+      if (parent) {
+        parent.updateMatrixWorld(true)
+        const invM = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+        bone.position.copy(wp.applyMatrix4(invM))
+        const invQ = parent.getWorldQuaternion(new THREE.Quaternion()).invert()
+        bone.quaternion.copy(invQ.multiply(wq))
+      } else {
+        bone.position.copy(wp)
+        bone.quaternion.copy(wq)
+      }
+      bone.updateMatrixWorld(true)
+    }
+    // 膝以外のトラッカーは常に IK 側を優先
+    if (!movedLeg && legTracker) snapBone(ankle, legTracker)
+    if (!movedFoot && footTracker) snapBone(toe || ankle, footTracker)
     // Update leg link lines
     try {
       if (kneeLegLine && legTracker) {
