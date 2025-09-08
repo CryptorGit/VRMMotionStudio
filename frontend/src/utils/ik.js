@@ -814,9 +814,9 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedArmTracker = moved(armTracker)
-    const movedElbowTracker = moved(elbowTracker)
     const movedShoulderTracker = moved(shoulderTracker)
+    const movedElbowTracker = moved(elbowTracker) || movedShoulderTracker
+    const movedArmTracker = moved(armTracker) || movedElbowTracker
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
