@@ -871,6 +871,32 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       }
       if (i > 10 && okW && okE && okS) break
     }
+
+    // Shoulder tracker movement can rotate the shoulder, which misaligns the elbow/wrist bones.
+    // Re-solve CCD to align them with their respective trackers.
+    if (movedShoulderTracker) {
+      const elbowQuatKeep = elbow.quaternion.clone()
+      const wristQuatKeep = wrist.quaternion.clone()
+
+      // 1. Align elbow bone to elbow tracker
+      for (let i = 0; i < 8; i++) {
+        ccdStep(mesh, arm, elbow, elbowTracker, armStep * 0.5)
+        if (elbow.getWorldPosition(_v1).distanceTo(elbowTracker.getWorldPosition(_v2)) < 1e-3) break
+      }
+      elbow.quaternion.copy(elbowQuatKeep)
+      elbow.updateMatrixWorld(true)
+      try { clampBoneToLimits(arm, getBoneLimits(mesh, arm)) } catch {}
+
+      // 2. Align wrist bone to arm tracker (hand tracker)
+      for (let i = 0; i < 8; i++) {
+        ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.5)
+        if (wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2)) < 1e-3) break
+      }
+      wrist.quaternion.copy(wristQuatKeep)
+      wrist.updateMatrixWorld(true)
+      try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
+    }
+
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
@@ -1166,6 +1192,41 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     }
 
     if (footTracker && movedFoot) {
+      // Phase 2: 足IK（足先トラッカー方向に足首の回転のみ合わせる）
+      const parent = ankle.parent
+      const A = ankle.getWorldPosition(new THREE.Vector3())
+      const T = toe ? toe.getWorldPosition(new THREE.Vector3()) : A.clone().add(new THREE.Vector3(0, -1, 0).applyQuaternion(ankle.getWorldQuaternion(new THREE.Quaternion())))
+      const F = footTracker.getWorldPosition(new THREE.Vector3())
+      const vToToe = T.clone().sub(A).normalize()
+      const vToTarget = F.clone().sub(A).normalize()
+      if (vToToe.lengthSq() > 1e-10 && vToTarget.lengthSq() > 1e-10) {
+        const deltaWorld = new THREE.Quaternion().setFromUnitVectors(vToToe, vToTarget)
+        const ankleWorldQuat = ankle.getWorldQuaternion(new THREE.Quaternion())
+        const desiredWorldQuat = deltaWorld.multiply(ankleWorldQuat)
+        const parentWorldInv = parent ? parent.getWorldQuaternion(new THREE.Quaternion()).invert() : new THREE.Quaternion().identity()
+        const desiredLocal = parentWorldInv.multiply(desiredWorldQuat)
+        ankle.quaternion.slerp(desiredLocal, 0.6)
+        ankle.updateMatrixWorld(true)
+      }
+      // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
+      try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
+    }
+
+    // Knee-tracker movement can rotate the hip, which misaligns the ankle bone from the leg-tracker.
+    // Re-solve CCD for the knee to align the ankle bone with the leg-tracker after hip rotation.
+    if (movedKnee) {
+      const ankleQuatKeep = ankle.quaternion.clone()
+      for (let i = 0; i < 8; i++) {
+        ccdStep(mesh, knee, ankle, legTracker, kneeStep * 0.5)
+        const dist = ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2))
+        if (dist < 1e-3) break
+      }
+      ankle.quaternion.copy(ankleQuatKeep)
+      ankle.updateMatrixWorld(true)
+      try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
+    }
+
+    if (footTracker && (movedFoot || movedKnee)) {
       // Phase 2: 足IK（足先トラッカー方向に足首の回転のみ合わせる）
       const parent = ankle.parent
       const A = ankle.getWorldPosition(new THREE.Vector3())
