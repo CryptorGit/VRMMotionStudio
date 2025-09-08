@@ -540,6 +540,75 @@ export function findBoneByName(bones, name) {
   return bones.find(b => normalizeBoneName(b.name) === n) || null
 }
 
+// 指定したトラッカーとその子孫トラッカーを対応するボーン位置に戻す
+export function resetIkTrackerChain(mesh, rootTracker) {
+  if (!mesh || !rootTracker) return
+  const bones = mesh.skeleton?.bones || []
+  const trackerSet = new Set(ikTargets.map(t => t.target))
+
+  // 対象トラッカーと子孫トラッカーを列挙
+  const chain = []
+  const collect = obj => {
+    if (!obj) return
+    if (trackerSet.has(obj)) chain.push(obj)
+    for (const c of obj.children || []) collect(c)
+  }
+  collect(rootTracker)
+
+  const getBone = obj => {
+    // ikTargets に actualBone があればそれを優先
+    const entry = ikTargets.find(t => t.target === obj)
+    if (entry?.actualBone) return entry.actualBone
+    // Leg trackers
+    const legs = legIkTrackersByMesh.get(mesh) || []
+    for (const l of legs) {
+      if (obj === l.kneeTracker) return l.knee
+      if (obj === l.legTracker) return l.ankle
+      if (obj === l.footTracker) return l.toe || l.ankle
+    }
+    // Arm trackers
+    const arms = armIkTrackersByMesh.get(mesh) || []
+    for (const a of arms) {
+      if (obj === a.shoulderTracker) return a.arm || a.shoulder
+      if (obj === a.elbowTracker) return a.elbow
+      if (obj === a.armTracker) return a.wrist
+      if (obj === a.handTracker) return a.finger1 || a.wrist
+    }
+    // Body trackers
+    const body = bodyTrackersByMesh.get(mesh)
+    if (body) {
+      if (obj === body.head) return body.headBone
+      if (obj === body.chest) return body.chestBone
+      if (obj === body.hip) return body.hipBone
+    }
+    // Fallback: tracker名からボーンを推測
+    const name = obj.name?.replace(/_IK_TRACKER$/, '')
+    return findBoneByName(bones, name)
+  }
+
+  for (const tracker of chain) {
+    const bone = getBone(tracker)
+    if (!bone) continue
+    const worldPos = new THREE.Vector3()
+    bone.getWorldPosition(worldPos)
+    const parent = tracker.parent
+    if (parent && typeof parent.worldToLocal === 'function') {
+      parent.updateMatrixWorld(true)
+      tracker.position.copy(parent.worldToLocal(worldPos))
+    } else if (!parent) {
+      tracker.position.copy(worldPos)
+    } else {
+      // fallback when parent lacks worldToLocal
+      try {
+        parent.updateMatrixWorld(true)
+        const inv = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+        tracker.position.copy(worldPos.applyMatrix4(inv))
+      } catch {}
+    }
+    tracker.updateMatrixWorld(true)
+  }
+}
+
 function hasArmIKChainForWrist(bones, iks, wristIdx) {
   if (!Array.isArray(iks)) return false
   return iks.some(ik => {
