@@ -817,6 +817,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     const movedArmTracker = moved(armTracker)
     const movedElbowTracker = moved(elbowTracker)
     const movedShoulderTracker = moved(shoulderTracker)
+    const movedHand = moved(handTracker)
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
@@ -879,6 +880,27 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
     } catch {}
 
     // (elbow pole removed)
+    const snapBone = (bone, tracker) => {
+      if (!bone || !tracker) return
+      const wp = tracker.getWorldPosition(new THREE.Vector3())
+      const wq = tracker.getWorldQuaternion(new THREE.Quaternion())
+      const parent = bone.parent
+      if (parent) {
+        parent.updateMatrixWorld(true)
+        const invM = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+        bone.position.copy(wp.applyMatrix4(invM))
+        const invQ = parent.getWorldQuaternion(new THREE.Quaternion()).invert()
+        bone.quaternion.copy(invQ.multiply(wq))
+      } else {
+        bone.position.copy(wp)
+        bone.quaternion.copy(wq)
+      }
+      bone.updateMatrixWorld(true)
+    }
+    if (!movedArmTracker && armTracker) snapBone(wrist, armTracker)
+    if (!movedElbowTracker && elbowTracker) snapBone(elbow, elbowTracker)
+    if (!movedShoulderTracker && shoulderTracker) snapBone(shoulder, shoulderTracker)
+    if (!movedHand && handTracker) snapBone(finger1 || wrist, handTracker)
     try {
       // Update parent-child link lines for arm trackers
       if (t.shoulderElbowLine && t.elbowTracker) {
