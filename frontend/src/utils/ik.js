@@ -814,9 +814,9 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedArmTracker = moved(armTracker)
-    const movedElbowTracker = moved(elbowTracker)
     const movedShoulderTracker = moved(shoulderTracker)
+    const movedElbowTracker = moved(elbowTracker) || movedShoulderTracker
+    const movedArmTracker = moved(armTracker) || movedElbowTracker
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
@@ -938,6 +938,22 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
         wrist.updateMatrixWorld(true)
       }
     }
+
+    // トラッカー位置にボーンを合わせる
+    try {
+      if (armTracker) {
+        const handPos = armTracker.getWorldPosition(_v1)
+        const elbowInv = new THREE.Matrix4().copy(elbow.matrixWorld).invert()
+        wrist.position.copy(handPos.applyMatrix4(elbowInv))
+        wrist.updateMatrixWorld(true)
+      }
+      if (finger1 && handTracker) {
+        const tipPos = handTracker.getWorldPosition(_v2)
+        const wristInv = new THREE.Matrix4().copy(wrist.matrixWorld).invert()
+        finger1.position.copy(tipPos.applyMatrix4(wristInv))
+        finger1.updateMatrixWorld(true)
+      }
+    } catch {}
 
     // Shoulder return-to-rest bias（肩IKトラッカー存在時は無効）
     if (!shoulderTracker) {
@@ -1116,10 +1132,9 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedLeg = moved(legTracker)
     const movedKnee = moved(kneeTracker)
-    
-    const movedFoot = moved(footTracker)
+    const movedLeg = moved(legTracker) || movedKnee
+    const movedFoot = moved(footTracker) || movedLeg
     const kneeStep = maxStep
     const upperStep = maxStep
     // Phase 1: 脚IK（膝と大腿の回転のみで、足首の位置を legTracker に合わせる。足首の回転は固定）
@@ -1185,6 +1200,22 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
       try { clampBoneToLimits(ankle, getBoneLimits(mesh, ankle)) } catch {}
     }
+
+    // トラッカー位置にボーンを合わせる
+    try {
+      if (legTracker) {
+        const legPos = legTracker.getWorldPosition(_v1)
+        const kneeInv = new THREE.Matrix4().copy(knee.matrixWorld).invert()
+        ankle.position.copy(legPos.applyMatrix4(kneeInv))
+        ankle.updateMatrixWorld(true)
+      }
+      if (toe && footTracker) {
+        const toePos = footTracker.getWorldPosition(_v2)
+        const ankleInv = new THREE.Matrix4().copy(ankle.matrixWorld).invert()
+        toe.position.copy(toePos.applyMatrix4(ankleInv))
+        toe.updateMatrixWorld(true)
+      }
+    } catch {}
     // Update leg link lines
     try {
       if (kneeLegLine && legTracker) {
