@@ -216,6 +216,28 @@ export function useIkDrag({
     }
     if (selectedIK.value) {
       scheduleIKUpdate()
+      if (selectedIK.value?.target?.isObject3D) {
+        const targetObj = selectedIK.value.target
+        const { bone: targetBone } = resolveDraggableBone(targetObj)
+        if (targetBone) {
+          targetBone.updateMatrixWorld(true)
+          const wp = targetBone.getWorldPosition(new THREE.Vector3())
+          const wq = targetBone.getWorldQuaternion(new THREE.Quaternion())
+          const parent = targetObj.parent
+          if (parent) {
+            parent.updateMatrixWorld(true)
+            const invM = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+            targetObj.position.copy(wp.applyMatrix4(invM))
+            const invQ = parent.getWorldQuaternion(new THREE.Quaternion()).invert()
+            targetObj.quaternion.copy(invQ.multiply(wq))
+          } else {
+            targetObj.position.copy(wp)
+            targetObj.quaternion.copy(wq)
+          }
+          targetObj.updateMatrixWorld(true)
+        }
+        updateIKMarkersBound?.()
+      }
     }
     selectedIK.value = null
   }
