@@ -1,4 +1,4 @@
-﻿import { ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import * as THREE from 'three'
 import { showIkMarkers, ikConfigPromise, setupIKTargets, updateIKMarkers, initIKSolver, normalizeBoneName, solveArmIKTrackers, solveLegIKTrackers, solveBodyTrackers } from '../utils/ik.js'
 import { initBoneOriginalQuaternions } from '../utils/bones.js'
@@ -39,7 +39,7 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     }
   })
 
-  function applyIKUpdate() {
+  function applyIKUpdate(force = false) {
     const mesh = currentMeshRef.value
     if (import.meta.env.DEV && !(mesh instanceof THREE.SkinnedMesh)) {
       console.warn('currentMeshRef should point to a SkinnedMesh', mesh)
@@ -68,19 +68,22 @@ export function useIkSolver({ scene, camera, renderer, helper, currentMeshRef, e
     try { obj?.grantSolver?.update?.() } catch {}
 
     helper.value.update(0)
-    // ランタイム腕IK�E�EKトラチE��ー�E�を解決
-    try { solveArmIKTrackers(mesh) } catch {}
-    try { solveLegIKTrackers(mesh) } catch {}
+    // ランタイム腕IK・脚IKトラッカーを解決
+    try { solveArmIKTrackers(mesh, undefined, undefined, force) } catch {}
+    try { solveLegIKTrackers(mesh, undefined, undefined, force) } catch {}
     try { solveBodyTrackers(mesh) } catch {}
     // No PMX min/max clamp; match MMD behavior
     try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
     updateIKMarkersBound.value?.(true)
   }
 
-  function scheduleIKUpdate() {
-    if (ikUpdateScheduled) return
+  function scheduleIKUpdate(force = false) {
+    if (ikUpdateScheduled && !force) return
     ikUpdateScheduled = true
-    requestAnimationFrame(() => { ikUpdateScheduled = false; applyIKUpdate() })
+    requestAnimationFrame(() => {
+      ikUpdateScheduled = false
+      applyIKUpdate(force)
+    })
   }
 
   function initUpdateIKMarkers() {

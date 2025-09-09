@@ -788,7 +788,7 @@ function solveArmIKTrackersLegacy(mesh, iterations = 48, maxStep = 0.25) {
 }
 
 // Improved VRChat-like arm IK solver with elbow pole and shoulder stabilization
-export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
+export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force = false) {
   const trackers = armIkTrackersByMesh.get(mesh)
   if (!Array.isArray(trackers) || trackers.length === 0) return
   for (const t of trackers) {
@@ -814,9 +814,9 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedArmTracker = moved(armTracker)
-    const movedElbowTracker = moved(elbowTracker)
-    const movedShoulderTracker = moved(shoulderTracker)
+    const movedArmTracker = force || moved(armTracker)
+    const movedElbowTracker = force || moved(elbowTracker)
+    const movedShoulderTracker = force || moved(shoulderTracker)
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
@@ -1141,7 +1141,7 @@ export function ensureLegTrackers(scene, mesh) {
   return trackers
 }
 
-export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
+export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force = false) {
   const trackers = legIkTrackersByMesh.get(mesh)
   if (!Array.isArray(trackers) || trackers.length === 0) return
   for (const t of trackers) {
@@ -1159,10 +1159,10 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedLeg = moved(legTracker)
-    const movedKnee = moved(kneeTracker)
-    
-    const movedFoot = moved(footTracker)
+    const movedLeg = force || moved(legTracker)
+    const movedKnee = force || moved(kneeTracker)
+    const movedFoot = force || moved(footTracker)
+
     const kneeStep = maxStep
     const upperStep = maxStep
     // Phase 1: 脚IK（膝と大腿の回転のみで、足首の位置を legTracker に合わせる。足首の回転は固定）
@@ -1704,4 +1704,3 @@ export async function initIKSolver(helper, mesh, ensureFloorRigidBody, Ammo) {
 watch(showIkMarkers, v => {
   ikTargets.forEach(t => (t.marker.visible = v))
 })
-

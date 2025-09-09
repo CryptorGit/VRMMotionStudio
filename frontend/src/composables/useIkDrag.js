@@ -11,6 +11,7 @@ export function useIkDrag({
   currentMeshRef,
   enablePhysics,
   scheduleIKUpdate,
+  applyIKUpdate, // Pass applyIKUpdate directly
   updateIKMarkersBound
 }) {
   const raycaster = new THREE.Raycaster()
@@ -200,7 +201,7 @@ export function useIkDrag({
     }
   }
 
-  function onPointerUp(event) {
+      function onPointerUp(event) {
     renderer.value?.domElement?.releasePointerCapture(event?.pointerId)
     controls.value.enabled = true
     if (isRotating.value) {
@@ -215,7 +216,7 @@ export function useIkDrag({
       physicsWasEnabled = false
     }
     if (selectedIK.value) {
-      scheduleIKUpdate()
+      applyIKUpdate(true) // Force a final, full, synchronous update
     }
     selectedIK.value = null
   }
