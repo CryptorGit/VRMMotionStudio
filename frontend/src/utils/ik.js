@@ -1672,6 +1672,53 @@ export function updateIKMarkers(camera, renderer, raycaster, skipMatrixUpdate = 
   }
 }
 
+
+// === Added: recenter IK trackers to updated joint positions ===
+export function recenterTrackersToBones(mesh) {
+  try {
+    if (!mesh) return;
+    const arms = armIkTrackersByMesh.get(mesh) || [];
+    const legs = legIkTrackersByMesh.get(mesh) || [];
+    const body = bodyTrackersByMesh.get(mesh) || null;
+
+    // Arms
+    for (const t of arms) {
+      try {
+        const { shoulder, arm, elbow, wrist, shoulderTracker, armTracker, elbowTracker, handTracker } = t || {};
+        if (shoulderTracker && shoulder) snapTracker(shoulderTracker, shoulder);
+        if (armTracker && arm) snapTracker(armTracker, arm);
+        if (elbowTracker && elbow) snapTracker(elbowTracker, elbow);
+        if (handTracker && wrist) snapTracker(handTracker, wrist);
+      } catch {}
+    }
+
+    // Legs
+    for (const t of legs) {
+      try {
+        const { upper, knee, ankle, legTracker, kneeTracker, footTracker } = t || {};
+        if (legTracker && upper) snapTracker(legTracker, upper);
+        if (kneeTracker && knee) snapTracker(kneeTracker, knee);
+        if (footTracker && ankle) snapTracker(footTracker, ankle);
+      } catch {}
+    }
+
+    // Body
+    if (body) {
+      try {
+        if (body.head && body.headBone) snapTracker(body.head, body.headBone);
+      } catch {}
+      try {
+        if (body.chest && body.chestBone) snapTracker(body.chest, body.chestBone);
+      } catch {}
+      try {
+        if (body.hip && body.hipBone) snapTracker(body.hip, body.hipBone);
+      } catch {}
+    }
+  } catch (e) {
+    try { console.warn('recenterTrackersToBones failed', e) } catch {}
+  }
+}
+
 export async function initIKSolver(helper, mesh, ensureFloorRigidBody, Ammo) {
   if (!mesh || !helper) return
   const skinnedMesh = mesh.isSkinnedMesh ? mesh : mesh.getObjectByProperty('type', 'SkinnedMesh')

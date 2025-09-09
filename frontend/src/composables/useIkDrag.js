@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName, recenterTrackersToBones } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -214,10 +214,25 @@ export function useIkDrag({
       helper.value?.update(0)
       physicsWasEnabled = false
     }
+    if (selectedIK.value && selectedIK.value.marker) {
+      selectedIK.value.marker.userData.dragging = false
+    }
     if (selectedIK.value) {
       scheduleIKUpdate()
     }
     selectedIK.value = null
+
+    // After finishing drag, snap IK trackers back to the updated joint positions
+    try {
+      const mesh = currentMeshRef.value
+      if (mesh) {
+        // Ensure one final IK update has applied
+        try { scheduleIKUpdate?.() } catch {}
+        recenterTrackersToBones(mesh)
+        // Also refresh 2D overlay marker positions if present
+        try { updateIKMarkersBound?.value?.() } catch {}
+      }
+    } catch {}
   }
 
   function onControlStart() {
