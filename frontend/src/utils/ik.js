@@ -1541,6 +1541,102 @@ export function solveBodyTrackers(mesh, slerp = 0.5) {
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
 
+// 関節の最新位置に各IKトラッカーを再配置する
+export function resetIkTrackerPositions(mesh) {
+  if (!mesh) return
+  const tmpV = new THREE.Vector3()
+  const armTrackers = armIkTrackersByMesh.get(mesh) || []
+  for (const t of armTrackers) {
+    if (t.shoulderTracker && (t.arm || t.shoulder)) {
+      const src = t.arm || t.shoulder
+      src.getWorldPosition(tmpV)
+      mesh.worldToLocal(tmpV)
+      t.shoulderTracker.position.copy(tmpV)
+      t.shoulderTracker.updateMatrixWorld(true)
+    }
+    if (t.elbowTracker && t.elbow) {
+      const parent = t.elbowTracker.parent
+      t.elbow.getWorldPosition(tmpV)
+      parent?.worldToLocal(tmpV)
+      t.elbowTracker.position.copy(tmpV)
+      t.elbowTracker.updateMatrixWorld(true)
+    }
+    if (t.armTracker && t.wrist) {
+      const parent = t.armTracker.parent
+      t.wrist.getWorldPosition(tmpV)
+      parent?.worldToLocal(tmpV)
+      t.armTracker.position.copy(tmpV)
+      t.armTracker.updateMatrixWorld(true)
+    }
+    if (t.handTracker && (t.effector || t.wrist)) {
+      const parent = t.handTracker.parent
+      const src = t.effector || t.wrist
+      src.getWorldPosition(tmpV)
+      parent?.worldToLocal(tmpV)
+      t.handTracker.position.copy(tmpV)
+      const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+      const worldQuat = src.getWorldQuaternion(new THREE.Quaternion())
+      if (parentInvQuat) t.handTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+      t.handTracker.updateMatrixWorld(true)
+    }
+  }
+  const legTrackers = legIkTrackersByMesh.get(mesh) || []
+  for (const t of legTrackers) {
+    if (t.kneeTracker && t.knee) {
+      t.knee.getWorldPosition(tmpV)
+      mesh.worldToLocal(tmpV)
+      t.kneeTracker.position.copy(tmpV)
+      t.kneeTracker.updateMatrixWorld(true)
+    }
+    if (t.legTracker && t.ankle) {
+      const parent = t.legTracker.parent
+      t.ankle.getWorldPosition(tmpV)
+      parent?.worldToLocal(tmpV)
+      t.legTracker.position.copy(tmpV)
+      t.legTracker.updateMatrixWorld(true)
+    }
+    if (t.footTracker && (t.toe || t.ankle)) {
+      const parent = t.footTracker.parent
+      const src = t.toe || t.ankle
+      src.getWorldPosition(tmpV)
+      parent?.worldToLocal(tmpV)
+      t.footTracker.position.copy(tmpV)
+      const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+      const worldQuat = t.ankle.getWorldQuaternion(new THREE.Quaternion())
+      if (parentInvQuat) t.footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+      t.footTracker.updateMatrixWorld(true)
+    }
+  }
+  const body = bodyTrackersByMesh.get(mesh)
+  if (body) {
+    const meshInvQuat = mesh.getWorldQuaternion(new THREE.Quaternion()).invert()
+    if (body.head && body.headBone) {
+      body.headBone.getWorldPosition(tmpV)
+      mesh.worldToLocal(tmpV)
+      body.head.position.copy(tmpV)
+      const wq = body.headBone.getWorldQuaternion(new THREE.Quaternion())
+      body.head.quaternion.copy(meshInvQuat.clone().multiply(wq))
+      body.head.updateMatrixWorld(true)
+    }
+    if (body.chest && body.chestBone) {
+      body.chestBone.getWorldPosition(tmpV)
+      mesh.worldToLocal(tmpV)
+      body.chest.position.copy(tmpV)
+      const wq = body.chestBone.getWorldQuaternion(new THREE.Quaternion())
+      body.chest.quaternion.copy(meshInvQuat.clone().multiply(wq))
+      body.chest.updateMatrixWorld(true)
+    }
+    if (body.hip && body.hipBone) {
+      body.hipBone.getWorldPosition(tmpV)
+      mesh.worldToLocal(tmpV)
+      body.hip.position.copy(tmpV)
+      const wq = body.hipBone.getWorldQuaternion(new THREE.Quaternion())
+      body.hip.quaternion.copy(meshInvQuat.clone().multiply(wq))
+      body.hip.updateMatrixWorld(true)
+    }
+  }
+}
+
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3()
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion()
 
