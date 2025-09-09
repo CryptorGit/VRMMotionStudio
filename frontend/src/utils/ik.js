@@ -1226,6 +1226,32 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       }
 
       try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
+
+      // リーチ外に出た子トラッカーはボーン位置へ戻す
+      if (legTracker) {
+        const ankleDist = ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2))
+        if (ankleDist > 1e-3) {
+          const parent = legTracker.parent
+          ankle.getWorldPosition(_v1)
+          parent?.worldToLocal(_v1)
+          legTracker.position.copy(_v1)
+          legTracker.updateMatrixWorld(true)
+        }
+      }
+      if (footTracker) {
+        const eff = toe || ankle
+        const effDist = eff.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2))
+        if (effDist > 1e-3) {
+          const parent = footTracker.parent
+          eff.getWorldPosition(_v1)
+          parent?.worldToLocal(_v1)
+          footTracker.position.copy(_v1)
+          const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+          const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+          if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+          footTracker.updateMatrixWorld(true)
+        }
+      }
     }
 
     if (footTracker && movedFoot) {
