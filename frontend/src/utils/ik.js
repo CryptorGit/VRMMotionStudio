@@ -1161,7 +1161,9 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     }
     const movedLeg = force || moved(legTracker)
     const movedKnee = force || moved(kneeTracker)
-    const movedFoot = force || moved(footTracker)
+    // 足首トラッカーの移動でも足先トラッカーはワールド座標が変化するため、
+    // legTracker の移動を足先トラッカーの移動として扱う
+    const movedFoot = force || moved(footTracker) || movedLeg
 
     const kneeStep = maxStep
     const upperStep = maxStep
@@ -1229,29 +1231,36 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
 
       // リーチ外に出た子トラッカーはボーン位置へ戻す
       if (legTracker) {
-        const ankleDist = ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2))
-        if (ankleDist > 1e-3) {
-          const parent = legTracker.parent
-          ankle.getWorldPosition(_v1)
-          parent?.worldToLocal(_v1)
-          legTracker.position.copy(_v1)
-          legTracker.updateMatrixWorld(true)
-        }
+        const parent = legTracker.parent
+        ankle.getWorldPosition(_v1)
+        parent?.worldToLocal(_v1)
+        legTracker.position.copy(_v1)
+        legTracker.updateMatrixWorld(true)
       }
       if (footTracker) {
         const eff = toe || ankle
-        const effDist = eff.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2))
-        if (effDist > 1e-3) {
-          const parent = footTracker.parent
-          eff.getWorldPosition(_v1)
-          parent?.worldToLocal(_v1)
-          footTracker.position.copy(_v1)
-          const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
-          const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
-          if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
-          footTracker.updateMatrixWorld(true)
-        }
+        const parent = footTracker.parent
+        eff.getWorldPosition(_v1)
+        parent?.worldToLocal(_v1)
+        footTracker.position.copy(_v1)
+        const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+        const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+        if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+        footTracker.updateMatrixWorld(true)
       }
+    }
+
+    if (movedLeg && footTracker) {
+      // 足首トラッカー移動時も足先トラッカーをつま先ボーン位置に追従させる
+      const eff = toe || ankle
+      const parent = footTracker.parent
+      eff.getWorldPosition(_v1)
+      parent?.worldToLocal(_v1)
+      footTracker.position.copy(_v1)
+      const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+      const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+      if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+      footTracker.updateMatrixWorld(true)
     }
 
     if (footTracker && movedFoot) {
