@@ -1624,6 +1624,14 @@ export function resetIkTrackerPositions(mesh) {
       t.ankle.getWorldPosition(tmpV)
       parent?.worldToLocal(tmpV)
       t.legTracker.position.copy(tmpV)
+      const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+      const worldQuat = t.ankle.getWorldQuaternion(new THREE.Quaternion())
+      if (parentInvQuat) t.legTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+      // keep movement detectors in sync after auto repositioning
+      const lp = t.legTracker.userData._lastLPos || (t.legTracker.userData._lastLPos = t.legTracker.position.clone())
+      lp.copy(t.legTracker.position)
+      const lq = t.legTracker.userData._lastLQuat || (t.legTracker.userData._lastLQuat = t.legTracker.quaternion.clone())
+      lq.copy(t.legTracker.quaternion)
       t.legTracker.updateMatrixWorld(true)
       updateLine(t.kneeLegLine, t.legTracker)
     }
