@@ -1616,7 +1616,7 @@ export function resetIkTrackerPositions(mesh) {
       parent?.worldToLocal(tmpV)
       t.footTracker.position.copy(tmpV)
       const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
-      const worldQuat = t.ankle.getWorldQuaternion(new THREE.Quaternion())
+      const worldQuat = src.getWorldQuaternion(new THREE.Quaternion())
       if (parentInvQuat) t.footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
       t.footTracker.updateMatrixWorld(true)
       updateLine(t.legFootLine, t.footTracker)

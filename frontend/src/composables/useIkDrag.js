@@ -219,7 +219,7 @@ export function useIkDrag({
       applyIKUpdate(true) // Force a final, full, synchronous update
       // 更新された関節位置にトラッカーを戻す
       resetIkTrackerPositions(currentMeshRef.value)
-      updateIKMarkersBound.value?.()
+      updateIKMarkersBound.value?.(true)
     }
     selectedIK.value = null
   }
