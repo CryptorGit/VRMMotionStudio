@@ -1264,14 +1264,12 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     }
 
     if (footTracker && movedFoot) {
-      // 足IKトラッカーを動かした場合、つま先がトラッカー位置に来るように膝を調整
+      // 足IKトラッカーを動かした場合、つま先がトラッカー位置に来るように足首のみを調整
       const eff = toe || ankle
       for (let i = 0; i < iterations; i++) {
-        if (legTracker) ccdStep(mesh, knee, ankle, legTracker, kneeStep)
-        ccdStep(mesh, knee, eff, footTracker, kneeStep)
-        const ankleDist = legTracker ? ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2)) : 0
+        ccdStep(mesh, ankle, eff, footTracker, kneeStep)
         const effDist = eff.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2))
-        if (ankleDist < 1e-3 && effDist < 1e-3) break
+        if (effDist < 1e-3) break
       }
     }
 
