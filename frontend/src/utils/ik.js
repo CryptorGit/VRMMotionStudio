@@ -94,6 +94,51 @@ function computeElbowPoleDir(t) {
   return lat
 }
 
+function _setTrackerToBone(tracker, bone) {
+  if (!tracker || !bone || !tracker.parent) return
+  bone.updateMatrixWorld(true)
+  const invMat = _tmpM4.copy(tracker.parent.matrixWorld).invert()
+  tracker.position.copy(bone.getWorldPosition(_tmpV1).applyMatrix4(invMat))
+  const invQuat = tracker.parent.getWorldQuaternion(_tmpQ1).invert()
+  tracker.quaternion.copy(invQuat.multiply(bone.getWorldQuaternion(_tmpQ2)))
+  tracker.updateMatrixWorld(true)
+}
+
+function _syncArmTrackers(t, selObj) {
+  const { shoulderTracker, elbowTracker, armTracker, handTracker, shoulder, arm, elbow, wrist, effector, finger1 } = t || {}
+  if (shoulderTracker && shoulderTracker !== selObj) _setTrackerToBone(shoulderTracker, shoulder || arm)
+  if (elbowTracker && elbowTracker !== selObj) _setTrackerToBone(elbowTracker, elbow)
+  if (armTracker && armTracker !== selObj) _setTrackerToBone(armTracker, wrist)
+  const tipBone = finger1 || effector || wrist
+  if (handTracker && handTracker !== selObj) _setTrackerToBone(handTracker, tipBone)
+}
+
+function _syncLegTrackers(t, selObj) {
+  const { kneeTracker, legTracker, footTracker, knee, ankle, toe } = t || {}
+  if (kneeTracker && kneeTracker !== selObj) _setTrackerToBone(kneeTracker, knee)
+  if (legTracker && legTracker !== selObj) _setTrackerToBone(legTracker, ankle)
+  const tipBone = toe || ankle
+  if (footTracker && footTracker !== selObj) _setTrackerToBone(footTracker, tipBone)
+}
+
+function _syncBodyTrackers(body, selObj) {
+  if (!body) return
+  const { head, chest, hip, headBone, chestBone, hipBone } = body
+  if (hip && hip !== selObj) _setTrackerToBone(hip, hipBone)
+  if (chest && chest !== selObj) _setTrackerToBone(chest, chestBone)
+  if (head && head !== selObj) _setTrackerToBone(head, headBone)
+}
+
+export function syncIKTrackers(mesh) {
+  const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
+  const arms = armIkTrackersByMesh.get(mesh) || []
+  for (const t of arms) _syncArmTrackers(t, selObj)
+  const legs = legIkTrackersByMesh.get(mesh) || []
+  for (const t of legs) _syncLegTrackers(t, selObj)
+  const body = bodyTrackersByMesh.get(mesh)
+  if (body) _syncBodyTrackers(body, selObj)
+}
+
 // Config loaded from /ik-config.json (optional)
 export const extraIKBoneNames = []
 export const extraIKChains = {}
@@ -994,6 +1039,8 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
         }
       } catch {}
     }
+    // トラッカーをボーン位置へ戻す（ドラッグ中は除外）
+    _syncArmTrackers(t, selObj)
   }
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
@@ -1290,6 +1337,8 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22) {
         if (a && a.count >= 2) { a.setXYZ(0,0,0,0); a.setXYZ(1, footTracker.position.x, footTracker.position.y, footTracker.position.z); a.needsUpdate = true; g.computeBoundingSphere?.() }
       }
     } catch {}
+    // トラッカーをボーン位置へ戻す（ドラッグ中は除外）
+    _syncLegTrackers(t, selObj)
   }
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
@@ -1516,7 +1565,6 @@ export function solveBodyTrackers(mesh, slerp = 0.5) {
   if (!body) return
   const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
   const affectsThis = selObj && (selObj === body.head || selObj === body.chest || selObj === body.hip)
-  if (!affectsThis) return
   const apply = (bone, target) => {
     if (!bone || !target) return
     bone.updateMatrixWorld(true); target.updateMatrixWorld(true)
@@ -1536,8 +1584,12 @@ export function solveBodyTrackers(mesh, slerp = 0.5) {
     }
     bone.updateMatrixWorld(true)
   }
-  apply(body.chestBone, body.chest)
-  apply(body.headBone, body.head)
+  if (affectsThis) {
+    apply(body.chestBone, body.chest)
+    apply(body.headBone, body.head)
+  }
+  // トラッカーをボーン位置へ戻す（ドラッグ中は除外）
+  _syncBodyTrackers(body, selObj)
   try { mesh.skeleton.update(); mesh.skeleton.boneMatricesNeedUpdate = true } catch {}
 }
 
