@@ -1208,33 +1208,9 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
     }
 
-    if (footTracker && movedFoot) {
-      // Phase 2: 足IK（足先トラッカー方向に足首の回転のみ合わせる）
-      const parent = ankle.parent
-      const A = ankle.getWorldPosition(new THREE.Vector3())
-      const T = toe ? toe.getWorldPosition(new THREE.Vector3()) : A.clone().add(new THREE.Vector3(0, -1, 0).applyQuaternion(ankle.getWorldQuaternion(new THREE.Quaternion())))
-      const F = footTracker.getWorldPosition(new THREE.Vector3())
-      const vToToe = T.clone().sub(A).normalize()
-      const vToTarget = F.clone().sub(A).normalize()
-      if (vToToe.lengthSq() > 1e-10 && vToTarget.lengthSq() > 1e-10) {
-        const deltaWorld = new THREE.Quaternion().setFromUnitVectors(vToToe, vToTarget)
-        const ankleWorldQuat = ankle.getWorldQuaternion(new THREE.Quaternion())
-        const desiredWorldQuat = deltaWorld.multiply(ankleWorldQuat)
-        const parentWorldInv = parent ? parent.getWorldQuaternion(new THREE.Quaternion()).invert() : new THREE.Quaternion().identity()
-        const desiredLocal = parentWorldInv.multiply(desiredWorldQuat)
-        ankle.quaternion.slerp(desiredLocal, 0.6)
-        ankle.updateMatrixWorld(true)
-      }
-      // 位置補正は行わない（ボーン長維持のため）。回転クランプのみ適用
-      try { clampBoneToLimits(upper, getBoneLimits(mesh, upper)) } catch {}
-    }
-
     // Knee-tracker movement can rotate the hip, which misaligns the ankle and toe bones.
     // Re-solve CCD for the knee to align the bones with their respective trackers.
     if (movedKnee) {
-      const ankleQuatKeep = ankle.quaternion.clone()
-      const toeQuatKeep = toe?.quaternion.clone()
-
       // 1. Align ankle bone to leg tracker
       for (let i = 0; i < 8; i++) {
         ccdStep(mesh, knee, ankle, legTracker, kneeStep * 0.5)
@@ -1249,12 +1225,19 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         }
       }
 
-      // Restore original rotations of ankle and toe
-      ankle.quaternion.copy(ankleQuatKeep)
-      if (toe && toeQuatKeep) toe.quaternion.copy(toeQuatKeep)
-      ankle.updateMatrixWorld(true)
-      if (toe) toe.updateMatrixWorld(true)
       try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
+    }
+
+    if (footTracker && movedFoot) {
+      // 足IKトラッカーを動かした場合、つま先がトラッカー位置に来るように膝を調整
+      const eff = toe || ankle
+      for (let i = 0; i < iterations; i++) {
+        if (legTracker) ccdStep(mesh, knee, ankle, legTracker, kneeStep)
+        ccdStep(mesh, knee, eff, footTracker, kneeStep)
+        const ankleDist = legTracker ? ankle.getWorldPosition(_v1).distanceTo(legTracker.getWorldPosition(_v2)) : 0
+        const effDist = eff.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2))
+        if (ankleDist < 1e-3 && effDist < 1e-3) break
+      }
     }
 
     if (footTracker && (movedFoot || movedKnee)) {
