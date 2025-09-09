@@ -1545,6 +1545,16 @@ export function solveBodyTrackers(mesh, slerp = 0.5) {
 export function resetIkTrackerPositions(mesh) {
   if (!mesh) return
   const tmpV = new THREE.Vector3()
+  const updateLine = (line, child) => {
+    const g = line?.geometry
+    const a = g?.getAttribute('position')
+    if (a && a.count >= 2 && child) {
+      a.setXYZ(0, 0, 0, 0)
+      a.setXYZ(1, child.position.x, child.position.y, child.position.z)
+      a.needsUpdate = true
+      g.computeBoundingSphere?.()
+    }
+  }
   const armTrackers = armIkTrackersByMesh.get(mesh) || []
   for (const t of armTrackers) {
     if (t.shoulderTracker && (t.arm || t.shoulder)) {
@@ -1560,6 +1570,7 @@ export function resetIkTrackerPositions(mesh) {
       parent?.worldToLocal(tmpV)
       t.elbowTracker.position.copy(tmpV)
       t.elbowTracker.updateMatrixWorld(true)
+      updateLine(t.shoulderElbowLine, t.elbowTracker)
     }
     if (t.armTracker && t.wrist) {
       const parent = t.armTracker.parent
@@ -1567,6 +1578,7 @@ export function resetIkTrackerPositions(mesh) {
       parent?.worldToLocal(tmpV)
       t.armTracker.position.copy(tmpV)
       t.armTracker.updateMatrixWorld(true)
+      updateLine(t.elbowArmLine, t.armTracker)
     }
     if (t.handTracker && (t.effector || t.wrist)) {
       const parent = t.handTracker.parent
@@ -1578,6 +1590,7 @@ export function resetIkTrackerPositions(mesh) {
       const worldQuat = src.getWorldQuaternion(new THREE.Quaternion())
       if (parentInvQuat) t.handTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
       t.handTracker.updateMatrixWorld(true)
+      updateLine(t.armHandLine, t.handTracker)
     }
   }
   const legTrackers = legIkTrackersByMesh.get(mesh) || []
@@ -1594,6 +1607,7 @@ export function resetIkTrackerPositions(mesh) {
       parent?.worldToLocal(tmpV)
       t.legTracker.position.copy(tmpV)
       t.legTracker.updateMatrixWorld(true)
+      updateLine(t.kneeLegLine, t.legTracker)
     }
     if (t.footTracker && (t.toe || t.ankle)) {
       const parent = t.footTracker.parent
@@ -1605,6 +1619,7 @@ export function resetIkTrackerPositions(mesh) {
       const worldQuat = t.ankle.getWorldQuaternion(new THREE.Quaternion())
       if (parentInvQuat) t.footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
       t.footTracker.updateMatrixWorld(true)
+      updateLine(t.legFootLine, t.footTracker)
     }
   }
   const body = bodyTrackersByMesh.get(mesh)
