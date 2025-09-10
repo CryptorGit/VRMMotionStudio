@@ -6,6 +6,7 @@ import {
   ensureLocalAxes,
   createBoneTypeMarkers,
   isSupportBone,
+  isTipBone,
 } from '../utils/bones.js'
 import { setupIKTargets, ikTargets, ikConfigPromise } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
@@ -71,6 +72,30 @@ export function useModelOperations({
         physicsIndices.add(index)
       }
     })
+
+    // mark descendant bones as physics-controlled
+    function markDescendants(idx) {
+      const bone = bones[idx]
+      if (!bone) return
+      bone.children.forEach(child => {
+        if (!child.isBone) return
+        const cIdx = boneToIndex.get(child)
+        if (cIdx !== undefined && !physicsIndices.has(cIdx)) {
+          physicsIndices.add(cIdx)
+          markDescendants(cIdx)
+        }
+      })
+    }
+    Array.from(physicsIndices).forEach(markDescendants)
+
+    // fallback by bone name patterns for typical physics bones
+    const namePattern = /物理|髪|スカート|cloth|phys/i
+    bones.forEach((b, i) => {
+      if (namePattern.test(b.name) && !physicsIndices.has(i)) {
+        physicsIndices.add(i)
+      }
+    })
+
     return bone => {
       const index = boneToIndex.get(bone)
       return index !== undefined && physicsIndices.has(index)
@@ -107,6 +132,7 @@ export function useModelOperations({
       if (isIkBone(bone)) return
       if (isPhysicsBone(bone)) return
       if (isSupportBone(bone, data)) return
+      if (isTipBone(bone)) return
       if (data.flag !== undefined && !isFlag(data, VISIBLE)) return
       const name = bone.name
       if (!name) return
@@ -404,9 +430,12 @@ export function useModelOperations({
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
             skeletonHelper.bones = skeletonHelper.bones.filter(b => {
               const data = getData(b)
-              return (data.flag === undefined || isFlag(data, VISIBLE)) &&
+              return (
+                (data.flag === undefined || isFlag(data, VISIBLE)) &&
                 !isPhysicsBone(b) &&
-                !isSupportBone(b, data)
+                !isSupportBone(b, data) &&
+                !isTipBone(b)
+              )
             })
             skeletonHelper.visible = debugSkinning
             skeletonHelper.updateMatrixWorld(true)

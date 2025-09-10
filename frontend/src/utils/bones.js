@@ -236,6 +236,7 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
     const data = getData(bone)
     if (isPhysicsBone(bone)) return
     if (isSupportBone(bone, data)) return
+    if (isTipBone(bone)) return
     if (data.flag !== undefined && !isFlag(data, VISIBLE)) return
     const name = (bone.name || '').toLowerCase()
     const isTwist =
