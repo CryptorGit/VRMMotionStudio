@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerPositions } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerPositions, rotateBoneAroundWorldAxis } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -140,19 +140,25 @@ export function useIkDrag({
         return
       }
       if (targetObj.isObject3D) {
-        const parent = targetObj.parent
-        const pwq = parent ? parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-        const pwqInv = parent ? pwq.clone().invert() : new THREE.Quaternion()
-        const worldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pwq).normalize()
-        const worldRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pwq).normalize()
-        const axisYLocal = worldUp.clone().applyQuaternion(pwqInv).normalize()
-        const axisXLocal = worldRight.clone().applyQuaternion(pwqInv).normalize()
-        const ax = (event.movementY || 0) * 0.01
-        const ay = (event.movementX || 0) * 0.01
-        const qx = new THREE.Quaternion().setFromAxisAngle(axisXLocal, ax)
-        const qy = new THREE.Quaternion().setFromAxisAngle(axisYLocal, ay)
-        targetObj.quaternion.premultiply(qy)
-        targetObj.quaternion.premultiply(qx)
+        const { bone } = resolveDraggableBone(selectedIK.value.target)
+        if (!bone) return
+        const p = bone.getWorldPosition(new THREE.Vector3())
+        const child = bone.children.find(c => c.isBone)
+        let axis = new THREE.Vector3(0, 1, 0)
+        if (child) {
+          axis.subVectors(child.getWorldPosition(new THREE.Vector3()), p).normalize()
+        } else {
+          axis.applyQuaternion(bone.getWorldQuaternion(new THREE.Quaternion())).normalize()
+        }
+        const angle = (event.movementX || 0) * 0.01
+        rotateBoneAroundWorldAxis(bone, axis, angle)
+        const boneWorldQuat = bone.getWorldQuaternion(new THREE.Quaternion())
+        if (targetObj.parent) {
+          const parentInv = targetObj.parent.getWorldQuaternion(new THREE.Quaternion()).invert()
+          targetObj.quaternion.copy(parentInv.multiply(boneWorldQuat))
+        } else {
+          targetObj.quaternion.copy(boneWorldQuat)
+        }
         targetObj.updateMatrixWorld(true)
         scheduleIKUpdate()
         return
