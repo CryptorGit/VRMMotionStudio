@@ -107,7 +107,7 @@ export function useModelOperations({
       if (isIkBone(bone)) return
       if (isPhysicsBone(bone)) return
       if (isSupportBone(bone, data)) return
-      if (!isFlag(data, VISIBLE)) return
+      if (data.flag !== undefined && !isFlag(data, VISIBLE)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -404,7 +404,7 @@ export function useModelOperations({
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
             skeletonHelper.bones = skeletonHelper.bones.filter(b => {
               const data = getData(b)
-              return isFlag(data, VISIBLE) &&
+              return (data.flag === undefined || isFlag(data, VISIBLE)) &&
                 !isPhysicsBone(b) &&
                 !isSupportBone(b, data)
             })
