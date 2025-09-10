@@ -1,5 +1,14 @@
 import * as THREE from 'three'
 
+export function isTipBone(bone) {
+  return /(先|tip)$/i.test(bone?.name || '')
+}
+
+export function isSupportBone(bone, data = {}) {
+  const name = (bone?.name || '').toLowerCase()
+  return /補助|dummy|dmy|影|shadow/.test(name) || !!data?.grant
+}
+
 /**
  * 指定された軸ベクトルに対し、軸の入れ替えと符号反転を行う。
  * @param {THREE.Vector3} axis - 変換対象の軸ベクトル
@@ -176,12 +185,11 @@ export function applyLocalAxisRotation(bone, quat) {
 }
 
 // --- Bone type markers (MMD-like view) ---
-// Creates simple colored markers per bone type to aid debugging/visualization.
-// - IK: red cone
-// - Twist(捩)/Grant rotation only: cyan octahedron
-// - Rotation+Translation: green sphere
-// - Rotation only: yellow sphere
-// - Translation only: blue box
+// Creates MMD-like 2D markers for visible bones.
+// - ◎ : rotatable only
+// - □ : translatable (with or without rotation)
+// - IK target : orange □
+// - Twist : cyan ◎
 // - Fixed axis: purple line along axis
 export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) {
   const bones = skinnedMesh?.skeleton?.bones || []
@@ -195,17 +203,40 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   const IK_FLAG = 0x20
   const FIX_AXIS = 0x400
   const LOCAL_AXES = 0x800
-  const color = new THREE.Color()
 
-  const sphereGeom = new THREE.SphereGeometry(0.035, 8, 8)
-  const boxGeom = new THREE.BoxGeometry(0.06, 0.06, 0.06)
-  const coneGeom = new THREE.ConeGeometry(0.05, 0.12, 6)
-  const octGeom = new THREE.OctahedronGeometry(0.05)
+  const texCache = {}
+  const getTexture = (shape, colorHex) => {
+    const key = `${shape}_${colorHex}`
+    if (!texCache[key]) {
+      const size = 64
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = size
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, size, size)
+      ctx.strokeStyle = `#${colorHex.toString(16).padStart(6, '0')}`
+      ctx.lineWidth = 6
+      if (shape === 'circle') {
+        ctx.beginPath()
+        ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2)
+        ctx.stroke()
+      } else {
+        ctx.strokeRect(4, 4, size - 8, size - 8)
+      }
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.needsUpdate = true
+      tex.minFilter = THREE.LinearFilter
+      tex.magFilter = THREE.LinearFilter
+      tex.generateMipmaps = false
+      texCache[key] = tex
+    }
+    return texCache[key]
+  }
 
   bones.forEach(bone => {
-    if (isPhysicsBone(bone)) return
     const data = getData(bone)
+    if (isPhysicsBone(bone)) return
     if (!isFlag(data, VISIBLE)) return
+    if (isTipBone(bone) || isSupportBone(bone, data)) return
     const name = (bone.name || '').toLowerCase()
     const isTwist =
       /捩|twist/.test(name) ||
@@ -215,31 +246,36 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
     const ik = isFlag(data, IK_FLAG) || !!data?.ik
     const fx = isFlag(data, FIX_AXIS)
 
-    // IKボーンは表示しない
+    let shape = tra ? 'square' : 'circle'
+    let colorHex = 0xbb88ff
     if (ik) {
+      shape = 'square'
+      colorHex = 0xff8800
+    } else if (isTwist) {
+      colorHex = 0x66ffff
+    } else if (rot && tra) {
+      colorHex = 0x66ff66
+    } else if (rot) {
+      colorHex = 0xffff66
+    } else if (tra) {
+      colorHex = 0x6688ff
+    } else {
       return
     }
-    let marker = null
-    if (isTwist) {
-      color.setHex(0x66ffff)
-      marker = new THREE.Mesh(octGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
-    } else if (rot && tra) {
-      color.setHex(0x66ff66)
-      marker = new THREE.Mesh(sphereGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
-    } else if (rot) {
-      color.setHex(0xffff66)
-      marker = new THREE.Mesh(sphereGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
-    } else if (tra) {
-      color.setHex(0x6688ff)
-      marker = new THREE.Mesh(boxGeom, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }))
-    }
-    if (marker) {
-      marker.renderOrder = 998
-      marker.position.set(0, 0, 0)
-      marker.visible = false
-      bone.add(marker)
-      helpers.push(marker)
-    }
+
+    const material = new THREE.SpriteMaterial({
+      map: getTexture(shape, colorHex),
+      depthTest: false,
+      depthWrite: false,
+      transparent: true
+    })
+    const sprite = new THREE.Sprite(material)
+    sprite.renderOrder = 998
+    sprite.scale.set(0.15, 0.15, 0.15)
+    sprite.visible = false
+    bone.add(sprite)
+    helpers.push(sprite)
+
     if (fx && data?.fixAxis) {
       const ax = new THREE.Vector3().fromArray(data.fixAxis).normalize().multiplyScalar(0.2)
       const geom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), ax])

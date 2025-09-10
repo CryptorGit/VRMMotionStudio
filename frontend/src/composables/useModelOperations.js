@@ -4,7 +4,9 @@ import {
   applyMmdRotationOrder,
   initBoneOriginalQuaternions,
   ensureLocalAxes,
-  createBoneTypeMarkers
+  createBoneTypeMarkers,
+  isSupportBone,
+  isTipBone
 } from '../utils/bones.js'
 import { setupIKTargets, ikTargets, ikConfigPromise } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
@@ -87,16 +89,25 @@ export function useModelOperations({
     const helpers = []
     const bones = skinnedMesh.skeleton?.bones || []
     const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
+    const getData = bone => boneDatas[bones.indexOf(bone)] || {}
+    const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
+    const VISIBLE = 0x08
     const IK_FLAG = 0x20
-    const isIkBone = (bone) => {
+    const isIkBone = bone => {
       try {
         const idx = bones.indexOf(bone)
         const data = idx >= 0 ? boneDatas[idx] : null
         return ((data?.flag || 0) & IK_FLAG) !== 0 || !!data?.ik
-      } catch { return false }
+      } catch {
+        return false
+      }
     }
     bones.forEach(bone => {
+      const data = getData(bone)
       if (isIkBone(bone)) return
+      if (isPhysicsBone(bone)) return
+      if (!isFlag(data, VISIBLE)) return
+      if (isTipBone(bone) || isSupportBone(bone, data)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -385,8 +396,23 @@ export function useModelOperations({
               (typeof metaName === 'string' && metaName.trim()) ||
               modelFile.name.replace(/\.(pmx|pmd)$/i, '')
             scene.value.add(skinnedMesh)
+            const bones = skinnedMesh.skeleton.bones
+            const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
+            const getData = bone => boneDatas[bones.indexOf(bone)] || {}
+            const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
+            const VISIBLE = 0x08
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
+            skeletonHelper.bones = skeletonHelper.bones.filter(b => {
+              const data = getData(b)
+              return (
+                !isPhysicsBone(b) &&
+                isFlag(data, VISIBLE) &&
+                !isTipBone(b) &&
+                !isSupportBone(b, data)
+              )
+            })
             skeletonHelper.visible = debugSkinning
+            skeletonHelper.update()
             scene.value.add(skeletonHelper)
             const boneNameHelpers = createBoneNameHelpers(
               skinnedMesh,
