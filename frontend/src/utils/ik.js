@@ -719,9 +719,9 @@ export function ensureArmTrackers(scene, mesh, iks) {
     armTracker.quaternion.identity()
     armTracker.updateMatrixWorld(true)
 
-    // Hand-tip tracker (child of hand)
+    // Hand tracker (child of wrist)
     const handTracker = new THREE.Object3D()
-    handTracker.name = `${side === 'L' ? '左' : '右'}手先_IK_TRACKER`
+    handTracker.name = `${side === 'L' ? '左' : '右'}手_IK_TRACKER`
     armTracker.add(handTracker)
     const parentInvQuat = armTracker.getWorldQuaternion(new THREE.Quaternion()).invert()
     const wristWorldQuat = wrist.getWorldQuaternion(new THREE.Quaternion())
