@@ -183,7 +183,7 @@ export function applyLocalAxisRotation(bone, quat) {
 // - Rotation only: yellow sphere
 // - Translation only: blue box
 // - Fixed axis: purple line along axis
-export function createBoneTypeMarkers(skinnedMesh) {
+export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) {
   const bones = skinnedMesh?.skeleton?.bones || []
   const boneDatas = skinnedMesh?.geometry?.userData?.MMD?.bones || []
   const helpers = []
@@ -191,6 +191,7 @@ export function createBoneTypeMarkers(skinnedMesh) {
   const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
   const ROTATABLE = 0x02
   const TRANSLATABLE = 0x04
+  const VISIBLE = 0x08
   const IK_FLAG = 0x20
   const FIX_AXIS = 0x400
   const LOCAL_AXES = 0x800
@@ -202,9 +203,13 @@ export function createBoneTypeMarkers(skinnedMesh) {
   const octGeom = new THREE.OctahedronGeometry(0.05)
 
   bones.forEach(bone => {
+    if (isPhysicsBone(bone)) return
     const data = getData(bone)
+    if (!isFlag(data, VISIBLE)) return
     const name = (bone.name || '').toLowerCase()
-    const isTwist = /捩|twist/.test(name) || (data?.grant?.affectRotation && !data?.grant?.affectPosition)
+    const isTwist =
+      /捩|twist/.test(name) ||
+      (data?.grant?.affectRotation && !data?.grant?.affectPosition)
     const rot = isFlag(data, ROTATABLE)
     const tra = isFlag(data, TRANSLATABLE)
     const ik = isFlag(data, IK_FLAG) || !!data?.ik

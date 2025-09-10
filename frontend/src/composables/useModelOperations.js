@@ -392,7 +392,10 @@ export function useModelOperations({
               skinnedMesh,
               isPhysicsBone
             )
-            const boneTypeHelpers = createBoneTypeMarkers(skinnedMesh)
+            const boneTypeHelpers = createBoneTypeMarkers(
+              skinnedMesh,
+              isPhysicsBone
+            )
             models.value.push({
               id: nextModelId++,
               mesh: markRaw(skinnedMesh),
