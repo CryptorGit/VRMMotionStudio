@@ -199,7 +199,6 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
   const ROTATABLE = 0x02
   const TRANSLATABLE = 0x04
-  const VISIBLE = 0x08
   const IK_FLAG = 0x20
   const FIX_AXIS = 0x400
   const LOCAL_AXES = 0x800
@@ -235,7 +234,6 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   bones.forEach(bone => {
     const data = getData(bone)
     if (isPhysicsBone(bone)) return
-    if (!isFlag(data, VISIBLE)) return
     if (isSupportBone(bone, data)) return
     const name = (bone.name || '').toLowerCase()
     const isTwist =
