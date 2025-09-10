@@ -6,7 +6,7 @@ export function isTipBone(bone) {
 
 export function isSupportBone(bone, data = {}) {
   const name = (bone?.name || '').toLowerCase()
-  return /補助|dummy|dmy|影|shadow/.test(name) || !!data?.grant
+  return /補助|dummy|dmy|影|shadow/.test(name)
 }
 
 /**
@@ -236,7 +236,7 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
     const data = getData(bone)
     if (isPhysicsBone(bone)) return
     if (!isFlag(data, VISIBLE)) return
-    if (isTipBone(bone) || isSupportBone(bone, data)) return
+    if (isSupportBone(bone, data)) return
     const name = (bone.name || '').toLowerCase()
     const isTwist =
       /捩|twist/.test(name) ||

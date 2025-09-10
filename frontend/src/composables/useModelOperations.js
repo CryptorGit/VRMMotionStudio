@@ -6,7 +6,6 @@ import {
   ensureLocalAxes,
   createBoneTypeMarkers,
   isSupportBone,
-  isTipBone
 } from '../utils/bones.js'
 import { setupIKTargets, ikTargets, ikConfigPromise } from '../utils/ik.js'
 import { createLoader } from '../utils/createLoader.js'
@@ -66,7 +65,8 @@ export function useModelOperations({
     const physicsIndices = new Set()
     const rigidBodies = skinnedMesh.geometry?.userData?.MMD?.rigidBodies || []
     rigidBodies.forEach(rb => {
-      const index = rb.boneIndex
+      const { boneIndex: index, type } = rb
+      if (type === 0) return
       if (typeof index === 'number' && index >= 0 && index < bones.length) {
         physicsIndices.add(index)
       }
@@ -107,7 +107,7 @@ export function useModelOperations({
       if (isIkBone(bone)) return
       if (isPhysicsBone(bone)) return
       if (!isFlag(data, VISIBLE)) return
-      if (isTipBone(bone) || isSupportBone(bone, data)) return
+      if (isSupportBone(bone, data)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -407,7 +407,6 @@ export function useModelOperations({
               return (
                 !isPhysicsBone(b) &&
                 isFlag(data, VISIBLE) &&
-                !isTipBone(b) &&
                 !isSupportBone(b, data)
               )
             })
