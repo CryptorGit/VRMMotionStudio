@@ -1,7 +1,15 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerPositions } from '../utils/ik.js'
+import {
+  selectedIK,
+  ikTargets,
+  normalizeBoneName,
+  resetIkTrackerPositions,
+  armIkTrackersByMesh,
+  legIkTrackersByMesh,
+  bodyTrackersByMesh
+} from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -26,6 +34,29 @@ export function useIkDrag({
       const grants = mesh?.geometry?.userData?.MMD?.grants || []
       return grants.some(g => g?.isAfterPhysics)
     } catch { return false }
+  }
+
+  function findBoneForTracker(obj, mesh) {
+    if (!obj || !mesh) return null
+    const arms = armIkTrackersByMesh.get(mesh) || []
+    for (const t of arms) {
+      if (obj === t.handTracker) return t.wrist || t.effector || null
+      if (obj === t.armTracker) return t.elbow || t.arm || null
+      if (obj === t.elbowTracker) return t.elbow || null
+      if (obj === t.shoulderTracker) return t.shoulder || null
+    }
+    const legs = legIkTrackersByMesh.get(mesh) || []
+    for (const t of legs) {
+      if (obj === t.footTracker) return t.toe || t.ankle || null
+      if (obj === t.legTracker) return t.ankle || null
+      if (obj === t.kneeTracker) return t.knee || null
+    }
+    const body = bodyTrackersByMesh.get(mesh)
+    if (body) {
+      if (obj === body.head) return body.headBone || null
+      if (obj === body.chest) return body.chestBone || null
+    }
+    return null
   }
 
   function resolveDraggableBone(selectedBone) {
@@ -122,41 +153,22 @@ export function useIkDrag({
       return
     }
     if (isRotating.value) {
-      const targetObj = selectedIK.value.target
-      if (!targetObj) return
-      if (targetObj.isBone) {
-        const bone = targetObj
-        let rotationAxis = bone.userData?.localAxes?.xAxis
-        if (rotationAxis) {
-          rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
-        } else {
-          console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
-          rotationAxis = new THREE.Vector3(0, 1, 0)
-        }
-        const angle = event.movementX * 0.01
-        quat.setFromAxisAngle(rotationAxis, angle)
-        applyLocalAxisRotation(bone, quat)
-        scheduleIKUpdate()
-        return
+      const mesh = currentMeshRef.value
+      const obj = selectedIK.value.target
+      const bone = obj?.isBone ? obj : findBoneForTracker(obj, mesh)
+      if (!bone) return
+      let rotationAxis = bone.userData?.localAxes?.xAxis
+      if (rotationAxis) {
+        rotationAxis = adjustAxis(rotationAxis, [0, 1, 2], [1, 1, -1]).normalize()
+      } else {
+        console.warn(`localAxes missing for bone "${bone.name}", using Y axis`)
+        rotationAxis = new THREE.Vector3(0, 1, 0)
       }
-      if (targetObj.isObject3D) {
-        const parent = targetObj.parent
-        const pwq = parent ? parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-        const pwqInv = parent ? pwq.clone().invert() : new THREE.Quaternion()
-        const worldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pwq).normalize()
-        const worldRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pwq).normalize()
-        const axisYLocal = worldUp.clone().applyQuaternion(pwqInv).normalize()
-        const axisXLocal = worldRight.clone().applyQuaternion(pwqInv).normalize()
-        const ax = (event.movementY || 0) * 0.01
-        const ay = (event.movementX || 0) * 0.01
-        const qx = new THREE.Quaternion().setFromAxisAngle(axisXLocal, ax)
-        const qy = new THREE.Quaternion().setFromAxisAngle(axisYLocal, ay)
-        targetObj.quaternion.premultiply(qy)
-        targetObj.quaternion.premultiply(qx)
-        targetObj.updateMatrixWorld(true)
-        scheduleIKUpdate()
-        return
-      }
+      const angle = (event.movementX || 0) * 0.01
+      quat.setFromAxisAngle(rotationAxis, angle)
+      applyLocalAxisRotation(bone, quat)
+      scheduleIKUpdate()
+      resetIkTrackerPositions(mesh)
       return
     }
     // 毎フレーム、直線が垂線の平面を再構築
