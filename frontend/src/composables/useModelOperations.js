@@ -91,6 +91,8 @@ export function useModelOperations({
     const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
     const getData = bone => boneDatas[bones.indexOf(bone)] || {}
     const IK_FLAG = 0x20
+    const VISIBLE = 0x08
+    const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
     const isIkBone = bone => {
       try {
         const idx = bones.indexOf(bone)
@@ -105,6 +107,7 @@ export function useModelOperations({
       if (isIkBone(bone)) return
       if (isPhysicsBone(bone)) return
       if (isSupportBone(bone, data)) return
+      if (!isFlag(data, VISIBLE)) return
       const name = bone.name
       if (!name) return
       const canvas = document.createElement('canvas')
@@ -396,10 +399,14 @@ export function useModelOperations({
             const bones = skinnedMesh.skeleton.bones
             const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
             const getData = bone => boneDatas[bones.indexOf(bone)] || {}
+            const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
+            const VISIBLE = 0x08
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
             skeletonHelper.bones = skeletonHelper.bones.filter(b => {
               const data = getData(b)
-              return !isPhysicsBone(b) && !isSupportBone(b, data)
+              return isFlag(data, VISIBLE) &&
+                !isPhysicsBone(b) &&
+                !isSupportBone(b, data)
             })
             skeletonHelper.visible = debugSkinning
             skeletonHelper.updateMatrixWorld(true)

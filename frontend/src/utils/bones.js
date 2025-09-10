@@ -202,6 +202,7 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   const IK_FLAG = 0x20
   const FIX_AXIS = 0x400
   const LOCAL_AXES = 0x800
+  const VISIBLE = 0x08
 
   const texCache = {}
   const getTexture = (shape, colorHex) => {
@@ -235,6 +236,7 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
     const data = getData(bone)
     if (isPhysicsBone(bone)) return
     if (isSupportBone(bone, data)) return
+    if (!isFlag(data, VISIBLE)) return
     const name = (bone.name || '').toLowerCase()
     const isTwist =
       /捩|twist/.test(name) ||
