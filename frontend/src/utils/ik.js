@@ -52,6 +52,28 @@ export function rotateBoneAroundWorldAxis(bone, axisWorld, angle) {
   bone.quaternion.copy(parentInv.multiply(newBoneWorld)).normalize()
   bone.updateMatrixWorld(true)
 }
+
+function applyTrackerTwist(parentBone, childBone, tracker) {
+  if (!parentBone || !childBone || !tracker) return
+  const p = parentBone.getWorldPosition(_tmpV1)
+  const c = childBone.getWorldPosition(_tmpV2)
+  const axis = c.sub(p).normalize()
+  const boneDir = new THREE.Vector3(0, 1, 0)
+    .applyQuaternion(childBone.getWorldQuaternion(_tmpQ1))
+    .projectOnPlane(axis)
+    .normalize()
+  const trackerDir = new THREE.Vector3(0, 1, 0)
+    .applyQuaternion(tracker.getWorldQuaternion(_tmpQ2))
+    .projectOnPlane(axis)
+    .normalize()
+  if (boneDir.lengthSq() < 1e-6 || trackerDir.lengthSq() < 1e-6) return
+  const cross = _tmpV3.crossVectors(boneDir, trackerDir)
+  const dot = THREE.MathUtils.clamp(boneDir.dot(trackerDir), -1, 1)
+  let angle = Math.acos(dot)
+  if (cross.dot(axis) < 0) angle = -angle
+  rotateBoneAroundWorldAxis(parentBone, axis, angle)
+  parentBone.updateMatrixWorld(true)
+}
 function findTorsoRef(mesh, shoulder) {
   if (shoulder?.parent && shoulder.parent.isBone) return shoulder.parent
   try {
@@ -917,6 +939,10 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
 
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
+    if (armTracker && movedArmTracker) {
+      applyTrackerTwist(elbow, wrist, armTracker)
+    }
+
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
     try {
       // elbow pole (deprecated) removed
@@ -1284,6 +1310,10 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
       if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
       footTracker.updateMatrixWorld(true)
+    }
+
+    if (legTracker && movedLeg) {
+      applyTrackerTwist(knee, ankle, legTracker)
     }
 
     if (footTracker && movedFoot) {
