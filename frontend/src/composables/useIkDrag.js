@@ -42,14 +42,14 @@ export function useIkDrag({
     for (const t of arms) {
       if (obj === t.handTracker) return t.wrist || t.effector || null
       if (obj === t.armTracker) return t.elbow || t.arm || null
-      if (obj === t.elbowTracker) return t.elbow || null
+      if (obj === t.elbowTracker) return t.arm || null
       if (obj === t.shoulderTracker) return t.shoulder || null
     }
     const legs = legIkTrackersByMesh.get(mesh) || []
     for (const t of legs) {
-      if (obj === t.footTracker) return t.toe || t.ankle || null
-      if (obj === t.legTracker) return t.ankle || null
-      if (obj === t.kneeTracker) return t.knee || null
+      if (obj === t.footTracker) return t.ankle || null
+      if (obj === t.legTracker) return t.knee || null
+      if (obj === t.kneeTracker) return t.upper || null
     }
     const body = bodyTrackersByMesh.get(mesh)
     if (body) {
