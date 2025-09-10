@@ -712,7 +712,7 @@ export function ensureArmTrackers(scene, mesh, iks) {
 
     // Hand tracker (child of elbow)
     const armTracker = new THREE.Object3D()
-    armTracker.name = `${side === 'L' ? '左' : '右'}手_IK_TRACKER`
+    armTracker.name = `${side === 'L' ? '左' : '右'}手首_IK_TRACKER`
     elbowTracker.add(armTracker)
     const wristWorld = wrist.getWorldPosition(new THREE.Vector3())
     armTracker.position.copy(wristWorld.clone().applyMatrix4(new THREE.Matrix4().copy(elbowTracker.matrixWorld).invert()))
@@ -814,9 +814,11 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedArmTracker = force || moved(armTracker)
-    const movedElbowTracker = force || moved(elbowTracker)
-    const movedShoulderTracker = force || moved(shoulderTracker)
+    const forceArm = force && selObj !== handTracker
+    const movedArmTracker = forceArm || moved(armTracker)
+    const movedElbowTracker = forceArm || moved(elbowTracker)
+    const movedShoulderTracker = forceArm || moved(shoulderTracker)
+    const movedHandTracker = force || moved(handTracker)
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
@@ -980,6 +982,26 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         wrist.quaternion.slerp(desiredLocal, 0.6)
         wrist.updateMatrixWorld(true)
       }
+      if (movedHandTracker) {
+        if (armTracker) {
+          const p = armTracker.parent
+          wrist.getWorldPosition(_v1)
+          p?.worldToLocal(_v1)
+          armTracker.position.copy(_v1)
+          armTracker.updateMatrixWorld(true)
+        }
+        const effWorld = eff.getWorldPosition(_v1)
+        const htWorld = handTracker.getWorldPosition(_v2)
+        if (effWorld.distanceToSquared(htWorld) > 1e-4) {
+          const parentHT = handTracker.parent
+          parentHT?.worldToLocal(effWorld)
+          handTracker.position.copy(effWorld)
+          const parentInvQuat = parentHT?.getWorldQuaternion(new THREE.Quaternion()).invert()
+          const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+          if (parentInvQuat) handTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+          handTracker.updateMatrixWorld(true)
+        }
+      }
     }
 
     // Shoulder return-to-rest bias（肩IKトラッカー存在時は無効）
@@ -1102,13 +1124,13 @@ export function ensureLegTrackers(scene, mesh) {
     kneeTracker.quaternion.identity()
     kneeTracker.updateMatrixWorld(true)
     const torso = findTorsoRef(mesh, upper)
-    // Foot tracker (child of knee)
-    const legTracker = new THREE.Object3D(); legTracker.name = `${side === 'L' ? '左' : '右'}足_IK_TRACKER`; kneeTracker.add(legTracker)
+    // Ankle tracker (child of knee)
+    const legTracker = new THREE.Object3D(); legTracker.name = `${side === 'L' ? '左' : '右'}足首_IK_TRACKER`; kneeTracker.add(legTracker)
     legTracker.position.copy(ankle.getWorldPosition(new THREE.Vector3()).applyMatrix4(new THREE.Matrix4().copy(kneeTracker.matrixWorld).invert()))
     legTracker.quaternion.identity()
     legTracker.updateMatrixWorld(true)
-    // Foot-tip tracker (child of foot)
-    const footTracker = new THREE.Object3D(); footTracker.name = `${side === 'L' ? '左' : '右'}足先_IK_TRACKER`; legTracker.add(footTracker)
+    // Toe tracker (child of ankle)
+    const footTracker = new THREE.Object3D(); footTracker.name = `${side === 'L' ? '左' : '右'}つま先_IK_TRACKER`; legTracker.add(footTracker)
     const ankleWorldQuat = ankle.getWorldQuaternion(new THREE.Quaternion())
     const parentInvQuat = legTracker.getWorldQuaternion(new THREE.Quaternion()).invert()
     footTracker.quaternion.copy(parentInvQuat.multiply(ankleWorldQuat))
@@ -1159,11 +1181,13 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       if (rotChanged) lq.copy(obj.quaternion)
       return posChanged || rotChanged || selObj === obj
     }
-    const movedLeg = force || moved(legTracker)
-    const movedKnee = force || moved(kneeTracker)
+    const forceLeg = force && selObj !== footTracker
+    const movedLeg = forceLeg || moved(legTracker)
+    const movedKnee = forceLeg || moved(kneeTracker)
+    const movedFootTracker = force || moved(footTracker)
     // 足首トラッカーの移動でも足先トラッカーはワールド座標が変化するため、
     // legTracker の移動を足先トラッカーの移動として扱う
-    const movedFoot = force || moved(footTracker) || movedLeg
+    const movedFoot = movedFootTracker || movedLeg
 
     const kneeStep = maxStep
     const upperStep = maxStep
@@ -1270,6 +1294,26 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         ccdStep(mesh, ankle, eff, footTracker, kneeStep)
         const effDist = eff.getWorldPosition(_v1).distanceTo(footTracker.getWorldPosition(_v2))
         if (effDist < 1e-3) break
+      }
+      // 足首IKトラッカーは常に足首ボーン位置に維持
+      if (!movedLeg && legTracker) {
+        const parent = legTracker.parent
+        ankle.getWorldPosition(_v1)
+        parent?.worldToLocal(_v1)
+        legTracker.position.copy(_v1)
+        legTracker.updateMatrixWorld(true)
+      }
+      // 到達不能な位置に移動した場合はつま先トラッカーをボーン位置へ戻す
+      const effWorld = eff.getWorldPosition(_v1)
+      const trackerWorld = footTracker.getWorldPosition(_v2)
+      if (effWorld.distanceToSquared(trackerWorld) > 1e-4) {
+        const parent = footTracker.parent
+        parent?.worldToLocal(effWorld)
+        footTracker.position.copy(effWorld)
+        const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+        const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+        if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+        footTracker.updateMatrixWorld(true)
       }
     }
 
@@ -1486,7 +1530,7 @@ function ensureLegTrackers__old(scene, mesh) {
     if (toe) tipWorld = toe.getWorldPosition(new THREE.Vector3())
     else tipWorld = ankle.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, -0.2, 0).applyQuaternion(ankle.getWorldQuaternion(new THREE.Quaternion())))
     const tracker = new THREE.Object3D()
-    tracker.name = `${side === 'L' ? '左' : '右'}足_IK_TRACKER`
+    tracker.name = `${side === 'L' ? '左' : '右'}足首_IK_TRACKER`
     ikRoot.add(tracker)
     tracker.position.copy(tipWorld.applyMatrix4(new THREE.Matrix4().copy(ikRoot.matrixWorld).invert()))
     tracker.updateMatrixWorld(true)
