@@ -412,7 +412,7 @@ export function useModelOperations({
               )
             })
             skeletonHelper.visible = debugSkinning
-            skeletonHelper.update()
+            skeletonHelper.updateMatrixWorld(true)
             scene.value.add(skeletonHelper)
             const boneNameHelpers = createBoneNameHelpers(
               skinnedMesh,
