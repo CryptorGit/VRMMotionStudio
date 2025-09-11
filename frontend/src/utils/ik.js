@@ -1609,6 +1609,7 @@ export function solveBodyTrackers(mesh, slerp = 0.5) {
 // 関節の最新位置に各IKトラッカーを再配置する
 export function resetIkTrackerPositions(mesh) {
   if (!mesh) return
+  const selObj = (typeof selectedIK !== 'undefined' && selectedIK?.value?.target) || null
   const tmpV = new THREE.Vector3()
   const updateLine = (line, child) => {
     const g = line?.geometry
@@ -1622,6 +1623,10 @@ export function resetIkTrackerPositions(mesh) {
   }
   const armTrackers = armIkTrackersByMesh.get(mesh) || []
   for (const t of armTrackers) {
+    // ドラッグ中の腕IKチェーンはリセットしない
+    if (selObj && (selObj === t.handTracker || selObj === t.armTracker || selObj === t.elbowTracker || selObj === t.shoulderTracker)) {
+      continue
+    }
     if (t.shoulderTracker && (t.arm || t.shoulder)) {
       const src = t.arm || t.shoulder
       src.getWorldPosition(tmpV)
@@ -1660,6 +1665,10 @@ export function resetIkTrackerPositions(mesh) {
   }
   const legTrackers = legIkTrackersByMesh.get(mesh) || []
   for (const t of legTrackers) {
+    // ドラッグ中の脚IKチェーンはリセットしない
+    if (selObj && (selObj === t.footTracker || selObj === t.legTracker || selObj === t.kneeTracker)) {
+      continue
+    }
     if (t.kneeTracker && t.knee) {
       t.knee.getWorldPosition(tmpV)
       mesh.worldToLocal(tmpV)
