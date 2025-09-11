@@ -6,9 +6,9 @@
 
 export const boneDisplayConfig = {
   // Visible types for all views (skeleton lines, labels, markers)
-  showTypes: new Set([0, 1, 3, 4, 6]),
+  showTypes: new Set([0, 1, 3, 4, 5, 6]),
   // Hidden types for all views
-  hideTypes: new Set([2, 5, 7, 8, 9])
+  hideTypes: new Set([2, 7, 8, 9])
 }
 
 export function isDisplayableBoneTypeNumber(typeNumber) {
