@@ -990,16 +990,19 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
           armTracker.position.copy(_v1)
           armTracker.updateMatrixWorld(true)
         }
-        const effWorld = eff.getWorldPosition(_v1)
-        const htWorld = handTracker.getWorldPosition(_v2)
-        if (effWorld.distanceToSquared(htWorld) > 1e-4) {
-          const parentHT = handTracker.parent
-          parentHT?.worldToLocal(effWorld)
-          handTracker.position.copy(effWorld)
-          const parentInvQuat = parentHT?.getWorldQuaternion(new THREE.Quaternion()).invert()
-          const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
-          if (parentInvQuat) handTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
-          handTracker.updateMatrixWorld(true)
+        // 操作中はトラッカー位置をボーンに引き戻さない
+        if (selObj !== handTracker) {
+          const effWorld = eff.getWorldPosition(_v1)
+          const htWorld = handTracker.getWorldPosition(_v2)
+          if (effWorld.distanceToSquared(htWorld) > 1e-4) {
+            const parentHT = handTracker.parent
+            parentHT?.worldToLocal(effWorld)
+            handTracker.position.copy(effWorld)
+            const parentInvQuat = parentHT?.getWorldQuaternion(new THREE.Quaternion()).invert()
+            const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+            if (parentInvQuat) handTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+            handTracker.updateMatrixWorld(true)
+          }
         }
       }
     }
@@ -1253,15 +1256,15 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
 
       try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
 
-      // リーチ外に出た子トラッカーはボーン位置へ戻す
-      if (legTracker) {
+      // リーチ外に出た子トラッカーはボーン位置へ戻す（操作中は除外）
+      if (legTracker && selObj !== legTracker) {
         const parent = legTracker.parent
         ankle.getWorldPosition(_v1)
         parent?.worldToLocal(_v1)
         legTracker.position.copy(_v1)
         legTracker.updateMatrixWorld(true)
       }
-      if (footTracker) {
+      if (footTracker && selObj !== footTracker) {
         const eff = toe || ankle
         const parent = footTracker.parent
         eff.getWorldPosition(_v1)
@@ -1274,7 +1277,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       }
     }
 
-    if (movedLeg && footTracker) {
+    if (movedLeg && footTracker && selObj !== footTracker) {
       // 足首トラッカー移動時も足先トラッカーをつま先ボーン位置に追従させる
       const eff = toe || ankle
       const parent = footTracker.parent
@@ -1303,17 +1306,19 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         legTracker.position.copy(_v1)
         legTracker.updateMatrixWorld(true)
       }
-      // 到達不能な位置に移動した場合はつま先トラッカーをボーン位置へ戻す
-      const effWorld = eff.getWorldPosition(_v1)
-      const trackerWorld = footTracker.getWorldPosition(_v2)
-      if (effWorld.distanceToSquared(trackerWorld) > 1e-4) {
-        const parent = footTracker.parent
-        parent?.worldToLocal(effWorld)
-        footTracker.position.copy(effWorld)
-        const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
-        const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
-        if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
-        footTracker.updateMatrixWorld(true)
+      // 到達不能な位置に移動した場合はつま先トラッカーをボーン位置へ戻す（操作中は除外）
+      if (selObj !== footTracker) {
+        const effWorld = eff.getWorldPosition(_v1)
+        const trackerWorld = footTracker.getWorldPosition(_v2)
+        if (effWorld.distanceToSquared(trackerWorld) > 1e-4) {
+          const parent = footTracker.parent
+          parent?.worldToLocal(effWorld)
+          footTracker.position.copy(effWorld)
+          const parentInvQuat = parent?.getWorldQuaternion(new THREE.Quaternion()).invert()
+          const worldQuat = eff.getWorldQuaternion(new THREE.Quaternion())
+          if (parentInvQuat) footTracker.quaternion.copy(parentInvQuat.multiply(worldQuat))
+          footTracker.updateMatrixWorld(true)
+        }
       }
     }
 
