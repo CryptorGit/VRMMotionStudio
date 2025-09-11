@@ -814,13 +814,17 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       const rotChanged = (1 - dot) > 1e-6
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      // Treat selection as movement only while actively dragging to avoid sudden jumps on click
+      return posChanged || rotChanged || (isDraggingIk.value && selObj === obj)
     }
-    const forceArm = force && selObj !== handTracker
+    const isSelectedChain = !!selObj && (
+      selObj === handTracker || selObj === armTracker || selObj === elbowTracker || selObj === shoulderTracker
+    )
+    const forceArm = !!force && isSelectedChain && selObj !== handTracker
     const movedArmTracker = forceArm || moved(armTracker)
     const movedElbowTracker = forceArm || moved(elbowTracker)
     const movedShoulderTracker = forceArm || moved(shoulderTracker)
-    const movedHandTracker = force || moved(handTracker)
+    const movedHandTracker = (!!force && isSelectedChain) || moved(handTracker)
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
@@ -931,7 +935,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     } catch {}
 
     // Phase 2: 手IK（handTracker の位置から手首回転を導出）
-    if (handTracker) {
+    if (handTracker && (movedHandTracker || movedArmTracker || movedElbowTracker || movedShoulderTracker)) {
       const parent = wrist.parent
       const A = wrist.getWorldPosition(_v1)
       const tip = finger1 ? finger1.getWorldPosition(_v2) : A.clone().add(new THREE.Vector3(0, 1, 0).applyQuaternion(wrist.getWorldQuaternion(new THREE.Quaternion())))
@@ -1147,12 +1151,16 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       const rotChanged = (1 - dot) > 1e-6
       if (posChanged) lp.copy(obj.position)
       if (rotChanged) lq.copy(obj.quaternion)
-      return posChanged || rotChanged || selObj === obj
+      // Treat selection as movement only while actively dragging to avoid sudden jumps on click
+      return posChanged || rotChanged || (isDraggingIk.value && selObj === obj)
     }
-    const forceLeg = force && selObj !== footTracker
+    const isSelectedChain = !!selObj && (
+      selObj === legTracker || selObj === kneeTracker || selObj === footTracker
+    )
+    const forceLeg = !!force && isSelectedChain && selObj !== footTracker
     const movedLeg = forceLeg || moved(legTracker)
     const movedKnee = forceLeg || moved(kneeTracker)
-    const movedFootTracker = force || moved(footTracker)
+    const movedFootTracker = (!!force && isSelectedChain) || moved(footTracker)
     // 足首トラッカーの移動でも足先トラッカーはワールド座標が変化するため、
     // legTracker の移動を足先トラッカーの移動として扱う
     const movedFoot = movedFootTracker || movedLeg

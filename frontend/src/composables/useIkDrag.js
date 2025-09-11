@@ -21,6 +21,19 @@ export function useIkDrag({
   const isRotating = ref(false)
   const quat = new THREE.Quaternion()
   let physicsWasEnabled = false
+  let physicsTemporarilyDisabled = false
+  let didMoveDuringDrag = false
+  function ensurePhysicsDisabledIfNeeded() {
+    if (physicsTemporarilyDisabled) return
+    if (!physicsWasEnabled) return
+    const mesh = currentMeshRef.value
+    if (mesh && !hasAfterPhysicsGrants(mesh)) {
+      helper.value?.enable('physics', false)
+      // Defer skeleton/grant consistency to IK update loop to avoid global first-frame jumps
+      try { scheduleIKUpdate(true) } catch {}
+      physicsTemporarilyDisabled = true
+    }
+  }
   function hasAfterPhysicsGrants(mesh) {
     try {
       const grants = mesh?.geometry?.userData?.MMD?.grants || []
@@ -86,12 +99,7 @@ export function useIkDrag({
     if (!target) return
     selectedIK.value = target
     physicsWasEnabled = enablePhysics.value
-    const mesh = currentMeshRef.value
-    // Keep physics enabled if model uses after-physics grants (so grant propagation runs during drag)
-    if (physicsWasEnabled && mesh && !hasAfterPhysicsGrants(mesh)) {
-      helper.value?.enable('physics', false)
-      helper.value?.update(0)
-    }
+    physicsTemporarilyDisabled = false
     if (event.button === 2) {
       event.preventDefault()
       isRotating.value = true
@@ -101,6 +109,7 @@ export function useIkDrag({
     if (event.button !== 0) return
     // Start IK dragging on left button
     isDraggingIk.value = true
+    didMoveDuringDrag = false
     const pos = new THREE.Vector3()
     const { bone: targetBone } = resolveDraggableBone(selectedIK.value.target)
     targetBone.getWorldPosition(pos)
@@ -138,6 +147,8 @@ export function useIkDrag({
         const angle = event.movementX * 0.01
         quat.setFromAxisAngle(rotationAxis, angle)
         applyLocalAxisRotation(bone, quat)
+        ensurePhysicsDisabledIfNeeded()
+        didMoveDuringDrag = true
         scheduleIKUpdate()
         return
       }
@@ -156,6 +167,8 @@ export function useIkDrag({
         targetObj.quaternion.premultiply(qy)
         targetObj.quaternion.premultiply(qx)
         targetObj.updateMatrixWorld(true)
+        ensurePhysicsDisabledIfNeeded()
+        didMoveDuringDrag = true
         scheduleIKUpdate()
         return
       }
@@ -180,11 +193,15 @@ export function useIkDrag({
           parent.worldToLocal(dragPoint)
           target.position.copy(dragPoint)
           target.updateMatrixWorld(true)
+          ensurePhysicsDisabledIfNeeded()
+          didMoveDuringDrag = true
           scheduleIKUpdate()
         } else if (!parent) {
           // Root-level object: position is already in world space
           target.position.copy(dragPoint)
           target.updateMatrixWorld(true)
+          ensurePhysicsDisabledIfNeeded()
+          didMoveDuringDrag = true
           scheduleIKUpdate()
         } else {
           // Fallback: compute local via parent.matrixWorld inverse
@@ -194,6 +211,8 @@ export function useIkDrag({
             const local = dragPoint.clone().applyMatrix4(inv)
             target.position.copy(local)
             target.updateMatrixWorld(true)
+            ensurePhysicsDisabledIfNeeded()
+            didMoveDuringDrag = true
             scheduleIKUpdate()
           } catch (e) {
             console.warn('IK target parent missing worldToLocal method')
@@ -212,19 +231,23 @@ export function useIkDrag({
       isRotating.value = false
     }
     dragPlane = null
-    if (physicsWasEnabled) {
+    if (physicsTemporarilyDisabled) {
       const mesh = currentMeshRef.value
       helper.value?.enable('physics', true)
       helper.value?.objects.get(mesh)?.physics?.reset()
       helper.value?.update(0)
       physicsWasEnabled = false
+      physicsTemporarilyDisabled = false
     }
     if (selectedIK.value) {
-      applyIKUpdate(true) // Force a final, full, synchronous update
-      // 譖ｴ譁ｰ縺輔ｌ縺滄未遽菴咲ｽｮ縺ｫ繝医Λ繝・き繝ｼ繧呈綾縺・
-      resetIkTrackerPositions(currentMeshRef.value)
+      if (didMoveDuringDrag) {
+        applyIKUpdate(true) // Force a final, full, synchronous update
+        // Reset tracker positions to follow final bone states only if there was movement
+        resetIkTrackerPositions(currentMeshRef.value)
+      }
       updateIKMarkersBound.value?.(true)
     }
+    didMoveDuringDrag = false
     selectedIK.value = null
   }
 
