@@ -983,7 +983,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         wrist.updateMatrixWorld(true)
       }
       if (movedHandTracker) {
-        if (armTracker) {
+        if (armTracker && selObj !== handTracker) {
           const p = armTracker.parent
           wrist.getWorldPosition(_v1)
           p?.worldToLocal(_v1)
@@ -1299,7 +1299,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         if (effDist < 1e-3) break
       }
       // 足首IKトラッカーは常に足首ボーン位置に維持
-      if (!movedLeg && legTracker) {
+      if (!movedLeg && legTracker && selObj !== footTracker) {
         const parent = legTracker.parent
         ankle.getWorldPosition(_v1)
         parent?.worldToLocal(_v1)
