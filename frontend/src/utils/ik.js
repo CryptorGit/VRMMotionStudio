@@ -794,7 +794,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
   const trackers = armIkTrackersByMesh.get(mesh)
   if (!Array.isArray(trackers) || trackers.length === 0) return
   for (const t of trackers) {
-    const { shoulder, arm, elbow, wrist, effector, armTracker, handTracker, elbowTracker, shoulderTracker, finger1, tracker: compatTracker } = t
+    const { shoulder, arm, elbow, wrist, effector, armTracker, handTracker, elbowTracker, shoulderTracker, tracker: compatTracker } = t
     const eff = effector || wrist
     const targetObj = armTracker || compatTracker
     if (!arm || !elbow || !wrist || !targetObj) continue
@@ -824,8 +824,6 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
 
     // Phase 1: 腕IK（脚と同様の分担）
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
-    //  - 手首回転は固定しておき、後段で手先トラッカーから与える
-    const wristKeepQuat = wrist.quaternion.clone()
     for (let i = 0; i < iterations; i++) {
       if (armTracker && movedArmTracker) {
         // 肘のみで手首位置を腕トラッカーに近づける
@@ -879,9 +877,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     // Shoulder/elbow tracker movement can rotate the shoulder/arm, which misaligns the child bones.
     // Re-solve CCD to align them with their respective trackers.
     if (movedShoulderTracker || movedElbowTracker) {
-      const armQuatKeep = arm.quaternion.clone()
       const elbowQuatKeep = elbow.quaternion.clone()
-      const wristQuatKeep = wrist.quaternion.clone()
 
       // Align elbow bone to elbow tracker (driven by arm rotation)
       if (movedShoulderTracker) {
@@ -900,9 +896,6 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.5)
         if (wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2)) < 1e-3) break
       }
-      // Preserve wrist rotation, only elbow rotation is used for alignment
-      wrist.quaternion.copy(wristQuatKeep)
-      wrist.updateMatrixWorld(true)
       try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
 
       // Align hand-tip bone to hand-tip tracker (driven by elbow rotation)
@@ -911,14 +904,10 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
           ccdStep(mesh, elbow, eff, handTracker, elbowStep * 0.5)
           if (eff.getWorldPosition(_v1).distanceTo(handTracker.getWorldPosition(_v2)) < 1e-3) break
         }
-        // Preserve wrist rotation, as hand-tip is also controlled by elbow
-        wrist.quaternion.copy(wristQuatKeep)
-        wrist.updateMatrixWorld(true)
         try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
       }
     }
 
-    wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
     // 肘ポール制約（上腕軸回りのねじれ方向を安定化）
     try {
@@ -970,20 +959,10 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     // Phase 2: 手IK（handTracker の位置から手首回転を導出）
     if (handTracker) {
       const parent = wrist.parent
-      const A = wrist.getWorldPosition(_v1)
-      const tip = finger1 ? finger1.getWorldPosition(_v2) : A.clone().add(new THREE.Vector3(0, 1, 0).applyQuaternion(wrist.getWorldQuaternion(new THREE.Quaternion())))
-      const H = handTracker.getWorldPosition(_v3)
-      const vToTip = tip.clone().sub(A).normalize()
-      const vToTarget = H.clone().sub(A).normalize()
-      if (vToTip.lengthSq() > 1e-10 && vToTarget.lengthSq() > 1e-10) {
-        const deltaWorld = new THREE.Quaternion().setFromUnitVectors(vToTip, vToTarget)
-        const wristWorldQuat = wrist.getWorldQuaternion(new THREE.Quaternion())
-        const desiredWorldQuat = deltaWorld.multiply(wristWorldQuat)
-        const parentWorldInv = parent ? parent.getWorldQuaternion(new THREE.Quaternion()).invert() : new THREE.Quaternion().identity()
-        const desiredLocal = parentWorldInv.multiply(desiredWorldQuat)
-        wrist.quaternion.slerp(desiredLocal, 0.6)
-        wrist.updateMatrixWorld(true)
-      }
+      const parentWorldInv = parent ? parent.getWorldQuaternion(new THREE.Quaternion()).invert() : new THREE.Quaternion().identity()
+      const targetLocal = parentWorldInv.multiply(handTracker.getWorldQuaternion(new THREE.Quaternion()))
+      wrist.quaternion.slerp(targetLocal, 0.6)
+      wrist.updateMatrixWorld(true)
       if (movedHandTracker) {
         if (armTracker && selObj !== handTracker && !isDraggingIk.value) {
           const p = armTracker.parent
