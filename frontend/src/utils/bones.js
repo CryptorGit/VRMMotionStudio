@@ -1,4 +1,120 @@
 import * as THREE from 'three'
+import { isDisplayableBoneTypeNumber } from '../config/boneDisplay.js'
+
+export const BoneType = {
+  Rotation: 0,
+  RotationTranslation: 1,
+  IK: 2,
+  Unknown: 3,
+  UnderIK: 4,
+  RotationInfluenced: 5,
+  IKLinkTarget: 6,
+  NonDisplay: 7,
+  Twist: 8,
+  RotationLink: 9
+}
+
+const ROTATABLE = 0x02
+const TRANSLATABLE = 0x04
+const VISIBLE = 0x08
+const IK_FLAG = 0x20
+const FIX_AXIS = 0x400
+const LOCAL_AXES = 0x800
+
+function isFlag(data, mask) {
+  return ((data?.flag || 0) & mask) !== 0
+}
+
+function isTwistLike(name, data) {
+  const n = (name || '').toLowerCase()
+  const nameTwist = /捩|twist/.test(n)
+  const grantTwist = !!(data?.grant?.affectRotation) && !data?.grant?.affectPosition
+  const axisMarked = !!(data?.fixAxis || (data?.localXVector && data?.localZVector))
+  return nameTwist || (grantTwist && axisMarked)
+}
+
+export function classifyBoneTypes(skinnedMesh) {
+  const bones = skinnedMesh?.skeleton?.bones || []
+  const boneDatas = skinnedMesh?.geometry?.userData?.MMD?.bones || []
+  const types = new Array(bones.length).fill(BoneType.Unknown)
+  const effectorSet = new Set()
+  const linkSet = new Set()
+  const ikBoneSet = new Set()
+
+  for (let i = 0; i < boneDatas.length; i++) {
+    const d = boneDatas[i]
+    if (!d) continue
+    if (isFlag(d, IK_FLAG) || d.ik) ikBoneSet.add(i)
+    if (d.ik) {
+      if (typeof d.ik.effector === 'number') effectorSet.add(d.ik.effector)
+      const links = d.ik.links || []
+      for (const l of links) {
+        const idx = typeof l?.index === 'number' ? l.index : undefined
+        if (typeof idx === 'number') linkSet.add(idx)
+      }
+    }
+  }
+
+  for (let i = 0; i < bones.length; i++) {
+    const bone = bones[i]
+    const data = boneDatas[i] || {}
+    const rot = isFlag(data, ROTATABLE)
+    const tra = isFlag(data, TRANSLATABLE)
+
+    if (data.flag !== undefined && !isFlag(data, VISIBLE)) {
+      types[i] = BoneType.NonDisplay
+      continue
+    }
+    if (isSupportBone(bone, data)) {
+      types[i] = BoneType.NonDisplay
+      continue
+    }
+    if (isTipBone(bone)) {
+      types[i] = BoneType.NonDisplay
+      continue
+    }
+    if (ikBoneSet.has(i)) {
+      types[i] = BoneType.IK
+      continue
+    }
+    if (effectorSet.has(i)) {
+      types[i] = BoneType.IKLinkTarget
+      continue
+    }
+    if (linkSet.has(i)) {
+      types[i] = BoneType.UnderIK
+      continue
+    }
+    if (isTwistLike(bone?.name, data)) {
+      types[i] = BoneType.Twist
+      continue
+    }
+    if (data?.grant && data.grant.affectRotation) {
+      types[i] = BoneType.RotationInfluenced
+      continue
+    }
+    if (tra && rot) {
+      types[i] = BoneType.RotationTranslation
+      continue
+    }
+    if (rot) {
+      types[i] = BoneType.Rotation
+      continue
+    }
+    if (tra) {
+      types[i] = BoneType.RotationTranslation
+      continue
+    }
+    types[i] = BoneType.Unknown
+  }
+
+  return { types, effectorSet, linkSet, ikBoneSet }
+}
+
+export function isDisplayableBoneType(type) {
+  // Delegate to config (type is a number)
+  return isDisplayableBoneTypeNumber(type)
+}
 
 export function isTipBone(bone) {
   return /(先|tip)$/i.test(bone?.name || '')
@@ -196,13 +312,7 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   const boneDatas = skinnedMesh?.geometry?.userData?.MMD?.bones || []
   const helpers = []
   const getData = bone => boneDatas[bones.indexOf(bone)] || {}
-  const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
-  const ROTATABLE = 0x02
-  const TRANSLATABLE = 0x04
-  const IK_FLAG = 0x20
-  const FIX_AXIS = 0x400
-  const LOCAL_AXES = 0x800
-  const VISIBLE = 0x08
+  const { types } = classifyBoneTypes(skinnedMesh)
 
   const texCache = {}
   const getTexture = (shape, colorHex) => {
@@ -233,15 +343,14 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
   }
 
   bones.forEach(bone => {
+    const idx = bones.indexOf(bone)
     const data = getData(bone)
     if (isPhysicsBone(bone)) return
+    if (data.flag !== undefined && !isFlag(data, VISIBLE)) return
     if (isSupportBone(bone, data)) return
     if (isTipBone(bone)) return
-    if (data.flag !== undefined && !isFlag(data, VISIBLE)) return
-    const name = (bone.name || '').toLowerCase()
-    const isTwist =
-      /捩|twist/.test(name) ||
-      (data?.grant?.affectRotation && !data?.grant?.affectPosition)
+    const t = types[idx]
+    if (!isDisplayableBoneType(t)) return
     const rot = isFlag(data, ROTATABLE)
     const tra = isFlag(data, TRANSLATABLE)
     const ik = isFlag(data, IK_FLAG) || !!data?.ik
@@ -249,17 +358,20 @@ export function createBoneTypeMarkers(skinnedMesh, isPhysicsBone = () => false) 
 
     let shape = tra ? 'square' : 'circle'
     let colorHex = 0xbb88ff
-    if (ik) {
+    if (ik || t === BoneType.IK) {
       shape = 'square'
       colorHex = 0xff8800
-    } else if (isTwist) {
-      colorHex = 0x66ffff
     } else if (rot && tra) {
       colorHex = 0x66ff66
     } else if (rot) {
       colorHex = 0xffff66
     } else if (tra) {
       colorHex = 0x6688ff
+    } else if (isDisplayableBoneType(t)) {
+      // For other displayable types (e.g., Unknown, UnderIK, Grant, Twist, RotationLink),
+      // show a default circle marker so they are represented.
+      shape = 'circle'
+      colorHex = 0xbb88ff
     } else {
       return
     }

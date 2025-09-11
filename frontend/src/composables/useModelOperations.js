@@ -5,6 +5,8 @@ import {
   initBoneOriginalQuaternions,
   ensureLocalAxes,
   createBoneTypeMarkers,
+  classifyBoneTypes,
+  isDisplayableBoneType,
   isSupportBone,
   isTipBone,
 } from '../utils/bones.js'
@@ -115,21 +117,14 @@ export function useModelOperations({
     const bones = skinnedMesh.skeleton?.bones || []
     const boneDatas = skinnedMesh.geometry?.userData?.MMD?.bones || []
     const getData = bone => boneDatas[bones.indexOf(bone)] || {}
-    const IK_FLAG = 0x20
     const VISIBLE = 0x08
     const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
-    const isIkBone = bone => {
-      try {
-        const idx = bones.indexOf(bone)
-        const data = idx >= 0 ? boneDatas[idx] : null
-        return ((data?.flag || 0) & IK_FLAG) !== 0 || !!data?.ik
-      } catch {
-        return false
-      }
-    }
+    const { types } = classifyBoneTypes(skinnedMesh)
     bones.forEach(bone => {
       const data = getData(bone)
-      if (isIkBone(bone)) return
+      const idx = bones.indexOf(bone)
+      const t = types[idx]
+      if (!isDisplayableBoneType(t)) return
       if (isPhysicsBone(bone)) return
       if (isSupportBone(bone, data)) return
       if (isTipBone(bone)) return
@@ -427,15 +422,18 @@ export function useModelOperations({
             const getData = bone => boneDatas[bones.indexOf(bone)] || {}
             const isFlag = (data, mask) => ((data?.flag || 0) & mask) !== 0
             const VISIBLE = 0x08
+            const { types } = classifyBoneTypes(skinnedMesh)
             const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh)
             skeletonHelper.bones = skeletonHelper.bones.filter(b => {
               const data = getData(b)
-              return (
-                (data.flag === undefined || isFlag(data, VISIBLE)) &&
-                !isPhysicsBone(b) &&
-                !isSupportBone(b, data) &&
-                !isTipBone(b)
-              )
+              const idx = bones.indexOf(b)
+              const t = types[idx]
+              if (!isDisplayableBoneType(t)) return false
+              if (data.flag !== undefined && !isFlag(data, VISIBLE)) return false
+              if (isPhysicsBone(b)) return false
+              if (isSupportBone(b, data)) return false
+              if (isTipBone(b)) return false
+              return true
             })
             skeletonHelper.visible = debugSkinning
             skeletonHelper.updateMatrixWorld(true)
