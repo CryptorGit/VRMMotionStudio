@@ -830,10 +830,13 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
     //  - 腕IKトラッカー(手)で肘だけを回して手首位置を合わせる（CCD）
     //  - 手首回転は固定しておき、後段で手先トラッカーから与える
     const wristKeepQuat = wrist.quaternion.clone()
-    for (let i = 0; i < iterations; i++) {
+    const iterCount = (movedShoulderTracker ? Math.max(iterations, 54) : iterations)
+    for (let i = 0; i < iterCount; i++) {
       if (armTracker && movedArmTracker) {
         // 肘のみで手首位置を腕トラッカーに近づける
         ccdStep(mesh, elbow, wrist, armTracker, elbowStep)
+        ccdStep(mesh, arm,   wrist, armTracker, armStep)
+        if (shoulder) ccdStep(mesh, shoulder, wrist, armTracker, shoulderStep)
       }
       if (elbowTracker && movedElbowTracker) {
         // 上腕のみで肘位置を「腕IKトラッカー(=肘位置トラッカー)」へ近づける
@@ -854,6 +857,13 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
             const tmpTarget = t._shoulderElbowTarget || (t._shoulderElbowTarget = new THREE.Object3D())
             tmpTarget.position.copy(desiredElbow)
             ccdStep(mesh, shoulder, elbow, tmpTarget, shoulderStep)
+            // 肩トラッカー移動時も、手首が armTracker 側へ寄るように
+            // （脚の膝トラッカーと同様の“親を動かしても子トラッカー基準を維持”挙動）
+            const tgtWrist = armTracker || compatTracker
+            if (tgtWrist) {
+              ccdStep(mesh, elbow, wrist, tgtWrist, Math.max(elbowStep * 0.75, 1e-3))
+              ccdStep(mesh, arm,   wrist, tgtWrist, Math.max(armStep   * 0.75, 1e-3))
+            }
           }
         } catch {}
       }
@@ -876,13 +886,34 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         const dir = ST.clone().sub(A).normalize()
         const desiredElbow = A.clone().add(dir.multiplyScalar(E.distanceTo(A)))
         okS = E.distanceTo(desiredElbow) < 1e-3
+        // 併せて手首が armTracker に近いことも収束条件に含める
+        if (armTracker) {
+          const dW2 = wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2))
+          okW = dW2 < 1e-3
+        }
       }
       if (i > 10 && okW && okE && okS) break
     }
 
-    // Per requirements: when moving shoulder/elbow trackers,
-    // do not rotate other joints to realign children.
-    // (No additional alignment steps here.)
+    // After moving shoulder/elbow trackers, realign child bones to their trackers
+    // to match leg behavior (keep child trackers as constraints, not followers).
+    // 1) Bring wrist to armTracker when elbow/shoulder moved
+    if (armTracker && (movedElbowTracker || movedShoulderTracker || movedArmTracker)) {
+      for (let i = 0; i < 8; i++) {
+        ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.5)
+        const d = wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2))
+        if (d < 1e-3) break
+      }
+    }
+    // 2) Bring effector (finger1 or wrist) to handTracker when upstream moved
+    if (handTracker && (movedElbowTracker || movedShoulderTracker || movedArmTracker)) {
+      const eff = finger1 || wrist
+      for (let i = 0; i < 8; i++) {
+        ccdStep(mesh, elbow, eff, handTracker, armStep * 0.5)
+        const d = eff.getWorldPosition(_v1).distanceTo(handTracker.getWorldPosition(_v2))
+        if (d < 1e-3) break
+      }
+    }
 
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
@@ -931,8 +962,22 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       if (movedArmTracker) clampBoneToLimits(elbow, getBoneLimits(mesh, elbow))
       if (movedElbowTracker) clampBoneToLimits(arm, getBoneLimits(mesh, arm))
       if (movedShoulderTracker && shoulder) clampBoneToLimits(shoulder, getBoneLimits(mesh, shoulder))
+      if (movedShoulderTracker) {
+        // 肩トラッカー移動で腕/肘も回した分を安全域へクランプ
+        clampBoneToLimits(arm, getBoneLimits(mesh, arm))
+        clampBoneToLimits(elbow, getBoneLimits(mesh, elbow))
+      }
       if (movedHandTracker) clampBoneToLimits(wrist, getBoneLimits(mesh, wrist))
     } catch {}
+
+    // クランプ後にわずかなズレが出るため、肩操作時は再度追従を軽くかける
+    if (movedShoulderTracker && armTracker) {
+      for (let i = 0; i < 6; i++) {
+        ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.4)
+        const d = wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2))
+        if (d < 7e-4) break
+      }
+    }
 
     // Phase 2: 手IK（handTracker の位置から手首回転を導出）
     if (handTracker && (movedHandTracker || movedArmTracker || movedElbowTracker || movedShoulderTracker)) {
