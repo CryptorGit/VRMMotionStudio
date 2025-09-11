@@ -876,47 +876,9 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       if (i > 10 && okW && okE && okS) break
     }
 
-    // Shoulder/elbow tracker movement can rotate the shoulder/arm, which misaligns the child bones.
-    // Re-solve CCD to align them with their respective trackers.
-    if (movedShoulderTracker || movedElbowTracker) {
-      const armQuatKeep = arm.quaternion.clone()
-      const elbowQuatKeep = elbow.quaternion.clone()
-      const wristQuatKeep = wrist.quaternion.clone()
-
-      // Align elbow bone to elbow tracker (driven by arm rotation)
-      if (movedShoulderTracker) {
-        for (let i = 0; i < 8; i++) {
-          ccdStep(mesh, arm, elbow, elbowTracker, armStep * 0.5)
-          if (elbow.getWorldPosition(_v1).distanceTo(elbowTracker.getWorldPosition(_v2)) < 1e-3) break
-        }
-        // Preserve elbow rotation, only arm rotation is used for alignment
-        elbow.quaternion.copy(elbowQuatKeep)
-        elbow.updateMatrixWorld(true)
-        try { clampBoneToLimits(arm, getBoneLimits(mesh, arm)) } catch {}
-      }
-
-      // Align wrist bone to arm tracker (hand tracker) (driven by elbow rotation)
-      for (let i = 0; i < 8; i++) {
-        ccdStep(mesh, elbow, wrist, armTracker, elbowStep * 0.5)
-        if (wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2)) < 1e-3) break
-      }
-      // Preserve wrist rotation, only elbow rotation is used for alignment
-      wrist.quaternion.copy(wristQuatKeep)
-      wrist.updateMatrixWorld(true)
-      try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
-
-      // Align hand-tip bone to hand-tip tracker (driven by elbow rotation)
-      if (handTracker && eff) {
-        for (let i = 0; i < 8; i++) {
-          ccdStep(mesh, elbow, eff, handTracker, elbowStep * 0.5)
-          if (eff.getWorldPosition(_v1).distanceTo(handTracker.getWorldPosition(_v2)) < 1e-3) break
-        }
-        // Preserve wrist rotation, as hand-tip is also controlled by elbow
-        wrist.quaternion.copy(wristQuatKeep)
-        wrist.updateMatrixWorld(true)
-        try { clampBoneToLimits(elbow, getBoneLimits(mesh, elbow)) } catch {}
-      }
-    }
+    // Per requirements: when moving shoulder/elbow trackers,
+    // do not rotate other joints to realign children.
+    // (No additional alignment steps here.)
 
     wrist.quaternion.copy(wristKeepQuat); wrist.updateMatrixWorld(true)
 
@@ -960,11 +922,12 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       }
     } catch {}
 
-    // Clamp joints to model-provided limits（正確なクランプのみ適用）
+    // Clamp only the joint(s) rotated by the moved tracker
     try {
-      clampBoneToLimits(elbow, getBoneLimits(mesh, elbow))
-      clampBoneToLimits(arm, getBoneLimits(mesh, arm))
-      if (shoulder) clampBoneToLimits(shoulder, getBoneLimits(mesh, shoulder))
+      if (movedArmTracker) clampBoneToLimits(elbow, getBoneLimits(mesh, elbow))
+      if (movedElbowTracker) clampBoneToLimits(arm, getBoneLimits(mesh, arm))
+      if (movedShoulderTracker && shoulder) clampBoneToLimits(shoulder, getBoneLimits(mesh, shoulder))
+      if (movedHandTracker) clampBoneToLimits(wrist, getBoneLimits(mesh, wrist))
     } catch {}
 
     // Phase 2: 手IK（handTracker の位置から手首回転を導出）
