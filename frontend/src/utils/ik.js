@@ -18,6 +18,8 @@ export const IK_MARKER_PIXEL_SIZE = 16
 export const showIkMarkers = ref(true)
 export const ikWarning = ref('')
 export const selectedIK = ref(null)
+// While true, user is actively dragging an IK tracker.
+export const isDraggingIk = ref(false)
 export let ikTargets = []
 // Runtime arm IK trackers (IKトラッカー) per mesh
 export const armIkTrackersByMesh = new WeakMap()
@@ -983,7 +985,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         wrist.updateMatrixWorld(true)
       }
       if (movedHandTracker) {
-        if (armTracker && selObj !== handTracker) {
+        if (armTracker && selObj !== handTracker && !isDraggingIk.value) {
           const p = armTracker.parent
           wrist.getWorldPosition(_v1)
           p?.worldToLocal(_v1)
@@ -991,7 +993,7 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
           armTracker.updateMatrixWorld(true)
         }
         // 操作中はトラッカー位置をボーンに引き戻さない
-        if (selObj !== handTracker) {
+        if (selObj !== handTracker && !isDraggingIk.value) {
           const effWorld = eff.getWorldPosition(_v1)
           const htWorld = handTracker.getWorldPosition(_v2)
           if (effWorld.distanceToSquared(htWorld) > 1e-4) {
@@ -1257,14 +1259,14 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       try { clampBoneToLimits(knee, getBoneLimits(mesh, knee)) } catch {}
 
       // リーチ外に出た子トラッカーはボーン位置へ戻す（操作中は除外）
-      if (legTracker && selObj !== legTracker) {
+      if (legTracker && selObj !== legTracker && !isDraggingIk.value) {
         const parent = legTracker.parent
         ankle.getWorldPosition(_v1)
         parent?.worldToLocal(_v1)
         legTracker.position.copy(_v1)
         legTracker.updateMatrixWorld(true)
       }
-      if (footTracker && selObj !== footTracker) {
+      if (footTracker && selObj !== footTracker && !isDraggingIk.value) {
         const eff = toe || ankle
         const parent = footTracker.parent
         eff.getWorldPosition(_v1)
@@ -1277,7 +1279,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       }
     }
 
-    if (movedLeg && footTracker && selObj !== footTracker) {
+    if (movedLeg && footTracker && selObj !== footTracker && !isDraggingIk.value) {
       // 足首トラッカー移動時も足先トラッカーをつま先ボーン位置に追従させる
       const eff = toe || ankle
       const parent = footTracker.parent
@@ -1299,7 +1301,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         if (effDist < 1e-3) break
       }
       // 足首IKトラッカーは常に足首ボーン位置に維持
-      if (!movedLeg && legTracker && selObj !== footTracker) {
+      if (!movedLeg && legTracker && selObj !== footTracker && !isDraggingIk.value) {
         const parent = legTracker.parent
         ankle.getWorldPosition(_v1)
         parent?.worldToLocal(_v1)
@@ -1307,7 +1309,7 @@ export function solveLegIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         legTracker.updateMatrixWorld(true)
       }
       // 到達不能な位置に移動した場合はつま先トラッカーをボーン位置へ戻す（操作中は除外）
-      if (selObj !== footTracker) {
+      if (selObj !== footTracker && !isDraggingIk.value) {
         const effWorld = eff.getWorldPosition(_v1)
         const trackerWorld = footTracker.getWorldPosition(_v2)
         if (effWorld.distanceToSquared(trackerWorld) > 1e-4) {

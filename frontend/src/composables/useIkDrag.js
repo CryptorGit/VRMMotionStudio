@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { ref } from 'vue'
 import { adjustAxis, applyLocalAxisRotation } from '../utils/bones.js'
-import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerPositions } from '../utils/ik.js'
+import { selectedIK, ikTargets, normalizeBoneName, resetIkTrackerPositions, isDraggingIk } from '../utils/ik.js'
 
 export function useIkDrag({
   camera,
@@ -32,7 +32,7 @@ export function useIkDrag({
     const mesh = currentMeshRef.value
     const bones = mesh?.skeleton?.bones || []
     const iks = mesh?.geometry?.userData?.MMD?.iks || []
-    // IKトラッカー（Object3D）はそのまま返す
+    // IK繝医Λ繝・き繝ｼ・・bject3D・峨・縺昴・縺ｾ縺ｾ霑斐☆
     if (!selectedBone?.isBone) {
       return { bone: selectedBone, index: -1 }
     }
@@ -41,17 +41,17 @@ export function useIkDrag({
     if (typeof stored === 'number' && stored >= 0 && stored < iks.length) {
       return { bone: bones[iks[stored].target], index: stored }
     }
-    // Try by name heuristic: IK隕ｪ -> IK
+    // Try by name heuristic: IK髫包ｽｪ -> IK
     const norm = normalizeBoneName(selectedBone?.name)
-    if (typeof norm === 'string' && /ik隕ｪ$/.test(norm)) {
-      const targetName = norm.replace(/ik隕ｪ$/, 'ik')
+    if (typeof norm === 'string' && /ik髫包ｽｪ$/.test(norm)) {
+      const targetName = norm.replace(/ik髫包ｽｪ$/, 'ik')
       const targetIdx = bones.findIndex(b => normalizeBoneName(b.name) === targetName)
       if (targetIdx !== -1) {
         const chainIdx = iks.findIndex(ik => bones[ik.target] === bones[targetIdx])
-        // Drag IK隕ｪ縺昴・繧ゅ・繧貞虚縺九☆縲ＤhainIdx 縺ｯ蜿ら・縺ｫ菫晄戟
+        // Drag IK髫包ｽｪ邵ｺ譏ｴ繝ｻ郢ｧ繧・・郢ｧ雋櫁劒邵ｺ荵昶・邵ｲ・､hainIdx 邵ｺ・ｯ陷ｿ繧峨・邵ｺ・ｫ闖ｫ譎・亜
         if (chainIdx !== -1) return { bone: selectedBone, index: chainIdx }
       }
-      // IK隕ｪ縺ｮ蜷榊燕縺縺悟ｯｾ蠢廬K縺瑚ｦ九▽縺九ｉ縺ｪ縺・ｴ蜷医ｂ縲∬ｦｪ閾ｪ菴薙ｒ蜍輔°縺・
+      // IK髫包ｽｪ邵ｺ・ｮ陷ｷ讎顔√邵ｺ・ｰ邵ｺ謔滂ｽｯ・ｾ陟｢蟒ｬK邵ｺ迹夲ｽｦ荵昶命邵ｺ荵晢ｽ臥ｸｺ・ｪ邵ｺ繝ｻ・ｰ・ｴ陷ｷ蛹ｻ・らｸｲ竏ｬ・ｦ・ｪ髢ｾ・ｪ闖ｴ阮呻ｽ定恪霈板ｰ邵ｺ繝ｻ
       return { bone: selectedBone, index: -1 }
     }
     // Fallback: same bone or chain containing this bone as link
@@ -99,10 +99,12 @@ export function useIkDrag({
       return
     }
     if (event.button !== 0) return
+    // Start IK dragging on left button
+    isDraggingIk.value = true
     const pos = new THREE.Vector3()
     const { bone: targetBone } = resolveDraggableBone(selectedIK.value.target)
     targetBone.getWorldPosition(pos)
-    // カメラ中心→IKトラッカー直線を法線とする平面
+    // 繧ｫ繝｡繝ｩ荳ｭ蠢・・IK繝医Λ繝・き繝ｼ逶ｴ邱壹ｒ豕慕ｷ壹→縺吶ｋ蟷ｳ髱｢
     const normal = new THREE.Vector3().subVectors(pos, camera.value.position).normalize()
     dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, pos)
     controls.value.enabled = false
@@ -159,7 +161,7 @@ export function useIkDrag({
       }
       return
     }
-    // 毎フレーム、直線が垂線の平面を再構築
+    // 豈弱ヵ繝ｬ繝ｼ繝縲∫峩邱壹′蝙らｷ壹・蟷ｳ髱｢繧貞・讒狗ｯ・
     const rect = element.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -202,7 +204,9 @@ export function useIkDrag({
   }
 
       function onPointerUp(event) {
-    renderer.value?.domElement?.releasePointerCapture(event?.pointerId)
+    
+    // End dragging state on any pointer up
+    isDraggingIk.value = false
     controls.value.enabled = true
     if (isRotating.value) {
       isRotating.value = false
@@ -217,7 +221,7 @@ export function useIkDrag({
     }
     if (selectedIK.value) {
       applyIKUpdate(true) // Force a final, full, synchronous update
-      // 更新された関節位置にトラッカーを戻す
+      // 譖ｴ譁ｰ縺輔ｌ縺滄未遽菴咲ｽｮ縺ｫ繝医Λ繝・き繝ｼ繧呈綾縺・
       resetIkTrackerPositions(currentMeshRef.value)
       updateIKMarkersBound.value?.(true)
     }
