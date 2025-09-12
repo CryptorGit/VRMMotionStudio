@@ -842,28 +842,36 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         // 上腕のみで肘位置を「腕IKトラッカー(=肘位置トラッカー)」へ近づける
         ccdStep(mesh, arm, elbow, elbowTracker, armStep)
       }
-      if (shoulder && shoulderTracker && movedShoulderTracker) {
-        // 肩のみで肘位置を「肩IKトラッカー」方向へ近づける
-        // 目標は「上腕起点からトラッカー方向に上腕長だけ伸ばした仮想肘位置」に設定
+      if (shoulderTracker && movedShoulderTracker) {
+        // 腕IKトラッカー（UI名: 腕_IK_TRACKER）移動時の肘収束：
+        // 可能なら「肘IKトラッカー（elbowTracker）」へ肘位置を合わせる。
+        // なければ従来の仮想肘ターゲット（肩方向に上腕長ぶん）を使用。
         try {
           const A = arm.getWorldPosition(new THREE.Vector3())
           const E = elbow.getWorldPosition(new THREE.Vector3())
-          const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
-          const dir = ST.clone().sub(A)
-          if (dir.lengthSq() > 1e-10) {
-            dir.normalize()
-            const len = E.distanceTo(A)
-            const desiredElbow = A.clone().add(dir.multiplyScalar(len))
-            const tmpTarget = t._shoulderElbowTarget || (t._shoulderElbowTarget = new THREE.Object3D())
-            tmpTarget.position.copy(desiredElbow)
-            ccdStep(mesh, shoulder, elbow, tmpTarget, shoulderStep)
-            // 肩トラッカー移動時も、手首が armTracker 側へ寄るように
-            // （脚の膝トラッカーと同様の“親を動かしても子トラッカー基準を維持”挙動）
-            const tgtWrist = armTracker || compatTracker
-            if (tgtWrist) {
-              ccdStep(mesh, elbow, wrist, tgtWrist, Math.max(elbowStep * 0.75, 1e-3))
-              ccdStep(mesh, arm,   wrist, tgtWrist, Math.max(armStep   * 0.75, 1e-3))
+          if (elbowTracker) {
+            // 上腕と（あれば）肩で、肘を elbowTracker に近づける
+            ccdStep(mesh, arm, elbow, elbowTracker, armStep)
+            if (shoulder) ccdStep(mesh, shoulder, elbow, elbowTracker, shoulderStep)
+          } else if (shoulder) {
+            // フォールバック：従来の仮想肘位置（肩方向）
+            const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
+            const dir = ST.clone().sub(A)
+            if (dir.lengthSq() > 1e-10) {
+              dir.normalize()
+              const len = E.distanceTo(A)
+              const desiredElbow = A.clone().add(dir.multiplyScalar(len))
+              const tmpTarget = t._shoulderElbowTarget || (t._shoulderElbowTarget = new THREE.Object3D())
+              tmpTarget.position.copy(desiredElbow)
+              ccdStep(mesh, shoulder, elbow, tmpTarget, shoulderStep)
             }
+          }
+          // 腕IKトラッカー移動時も、手首が armTracker 側へ寄るように
+          // （脚の膝トラッカーと同様の“親を動かしても子トラッカー基準を維持”挙動）
+          const tgtWrist = armTracker || compatTracker
+          if (tgtWrist) {
+            ccdStep(mesh, elbow, wrist, tgtWrist, Math.max(elbowStep * 0.75, 1e-3))
+            ccdStep(mesh, arm,   wrist, tgtWrist, Math.max(armStep   * 0.75, 1e-3))
           }
         } catch {}
       }
@@ -879,13 +887,19 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
         const eTar = elbowTracker.getWorldPosition(new THREE.Vector3())
         okE = ePos.distanceTo(eTar) < 1e-3
       }
-      if (movedShoulderTracker && shoulder && shoulderTracker) {
-        const A = arm.getWorldPosition(new THREE.Vector3())
-        const E = elbow.getWorldPosition(new THREE.Vector3())
-        const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
-        const dir = ST.clone().sub(A).normalize()
-        const desiredElbow = A.clone().add(dir.multiplyScalar(E.distanceTo(A)))
-        okS = E.distanceTo(desiredElbow) < 1e-3
+      if (movedShoulderTracker && shoulderTracker) {
+        if (elbowTracker) {
+          const ePos = elbow.getWorldPosition(new THREE.Vector3())
+          const eTar = elbowTracker.getWorldPosition(new THREE.Vector3())
+          okS = ePos.distanceTo(eTar) < 1e-3
+        } else if (shoulder) {
+          const A = arm.getWorldPosition(new THREE.Vector3())
+          const E = elbow.getWorldPosition(new THREE.Vector3())
+          const ST = shoulderTracker.getWorldPosition(new THREE.Vector3())
+          const dir = ST.clone().sub(A).normalize()
+          const desiredElbow = A.clone().add(dir.multiplyScalar(E.distanceTo(A)))
+          okS = E.distanceTo(desiredElbow) < 1e-3
+        }
         // 併せて手首が armTracker に近いことも収束条件に含める
         if (armTracker) {
           const dW2 = wrist.getWorldPosition(_v1).distanceTo(armTracker.getWorldPosition(_v2))
