@@ -835,8 +835,6 @@ export function solveArmIKTrackers(mesh, iterations = 36, maxStep = 0.22, force 
       if (armTracker && movedArmTracker) {
         // 肘のみで手首位置を腕トラッカーに近づける
         ccdStep(mesh, elbow, wrist, armTracker, elbowStep)
-        ccdStep(mesh, arm,   wrist, armTracker, armStep)
-        if (shoulder) ccdStep(mesh, shoulder, wrist, armTracker, shoulderStep)
       }
       if (elbowTracker && movedElbowTracker) {
         // 上腕のみで肘位置を「腕IKトラッカー(=肘位置トラッカー)」へ近づける
