@@ -25,8 +25,8 @@
       v-model:show-light-marker="showLightMarker"
       v-model:marker-color="markerColor"
       v-model:directional-intensity="directionalIntensity"
-      v-model:show-ik-markers="showIkMarkers"
-      v-model:enable-physics="enablePhysics"
+      v-model:spring-bone-enabled="springBoneEnabled"
+      v-model:look-at-enabled="lookAtEnabled"
       @toggle-model="toggleModel"
       @toggle-bone="toggleBone"
       @toggle-bone-names="toggleBoneNames"
@@ -50,16 +50,16 @@ const props = defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  showIkMarkers: { type: Boolean, required: true },
-  enablePhysics: { type: Boolean, required: true }
+  springBoneEnabled: { type: Boolean, required: true },
+  lookAtEnabled: { type: Boolean, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
-  'update:showIkMarkers',
-  'update:enablePhysics',
+  'update:springBoneEnabled',
+  'update:lookAtEnabled',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
@@ -77,14 +77,15 @@ const directionalIntensity = computed({
   get: () => props.directionalIntensity,
   set: v => emit('update:directionalIntensity', v)
 })
-const showIkMarkers = computed({
-  get: () => props.showIkMarkers,
-  set: v => emit('update:showIkMarkers', v)
+const springBoneEnabled = computed({
+  get: () => props.springBoneEnabled,
+  set: v => emit('update:springBoneEnabled', v)
 })
-const enablePhysics = computed({
-  get: () => props.enablePhysics,
-  set: v => emit('update:enablePhysics', v)
+const lookAtEnabled = computed({
+  get: () => props.lookAtEnabled,
+  set: v => emit('update:lookAtEnabled', v)
 })
+// IK/SpringBone UI は VRM最適化のため削除
 
 function toggleModel(i, v) {
   emit('toggle-model', i, v)
@@ -108,8 +109,8 @@ const {
 } = useSidebarState({
   width,
   showLightMarker,
-  showIkMarkers,
-  enablePhysics,
+  springBoneEnabled,
+  lookAtEnabled,
   markerColor,
   directionalIntensity,
   directional
@@ -135,8 +136,8 @@ const sidebarStyle = computed(() => {
 defineExpose({
   visibleSections,
   showLightMarker,
-  showIkMarkers,
-  enablePhysics,
+  springBoneEnabled,
+  lookAtEnabled,
   markerColor
 })
 </script>

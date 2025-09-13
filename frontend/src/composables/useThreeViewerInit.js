@@ -1,14 +1,12 @@
 import { markRaw } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 
 export function useThreeViewerInit({
   viewer,
   scene,
   camera,
   renderer,
-  effect,
   controls,
   ambientLight,
   directionalLight,
@@ -25,8 +23,6 @@ export function useThreeViewerInit({
     renderer.value.setPixelRatio(window.devicePixelRatio)
     renderer.value.setSize(container.clientWidth, container.clientHeight)
     container.appendChild(renderer.value.domElement)
-
-    effect.value = markRaw(new OutlineEffect(renderer.value))
 
     scene.value = markRaw(new THREE.Scene())
     scene.value.background = new THREE.Color(0xeeeeee)

@@ -4,8 +4,8 @@ import { STORAGE_KEY } from '../config.js'
 export function useSidebarState({
   width,
   showLightMarker,
-  showIkMarkers,
-  enablePhysics,
+  springBoneEnabled,
+  lookAtEnabled,
   markerColor,
   directionalIntensity,
   directional
@@ -33,8 +33,8 @@ export function useSidebarState({
         width: width?.value,
         visibleSections: { ...visibleSections },
         showLightMarker: showLightMarker?.value,
-        showIkMarkers: showIkMarkers?.value,
-        enablePhysics: enablePhysics?.value,
+        springBoneEnabled: springBoneEnabled?.value,
+        lookAtEnabled: lookAtEnabled?.value,
         markerColor: markerColor?.value,
         directionalIntensity: directionalIntensity?.value,
         directional: directional
@@ -70,8 +70,8 @@ export function useSidebarState({
           width: savedWidth,
           visibleSections: savedVisible,
           showLightMarker: savedShowMarker,
-          showIkMarkers: savedShowIk,
-          enablePhysics: savedEnablePhysics,
+          springBoneEnabled: savedSpringBoneEnabled,
+          lookAtEnabled: savedLookAtEnabled,
           markerColor: savedMarkerColor,
           directionalIntensity: savedDirectionalIntensity,
           directional: savedDirectional
@@ -86,10 +86,10 @@ export function useSidebarState({
         }
         if (showLightMarker && savedShowMarker !== undefined)
           showLightMarker.value = savedShowMarker
-        if (showIkMarkers && savedShowIk !== undefined)
-          showIkMarkers.value = savedShowIk
-        if (enablePhysics && savedEnablePhysics !== undefined)
-          enablePhysics.value = savedEnablePhysics
+        if (springBoneEnabled && savedSpringBoneEnabled !== undefined)
+          springBoneEnabled.value = savedSpringBoneEnabled
+        if (lookAtEnabled && savedLookAtEnabled !== undefined)
+          lookAtEnabled.value = savedLookAtEnabled
         if (markerColor && savedMarkerColor !== undefined)
           markerColor.value = savedMarkerColor
         if (directionalIntensity && savedDirectionalIntensity !== undefined)
@@ -120,8 +120,8 @@ export function useSidebarState({
     collapsed.value
     width && width.value
     showLightMarker && showLightMarker.value
-    showIkMarkers && showIkMarkers.value
-    enablePhysics && enablePhysics.value
+    springBoneEnabled && springBoneEnabled.value
+    lookAtEnabled && lookAtEnabled.value
     markerColor && markerColor.value
     directionalIntensity && directionalIntensity.value
     JSON.stringify(visibleSections)

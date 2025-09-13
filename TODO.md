@@ -6,91 +6,76 @@
 
 ### 1. 依存関係・ビルド設定の更新
 
-- 追加: @pixiv/three-vrm
-- 維持: three（現状 ^0.164.1）
-- 削除: mmd-parser, ammo.js（three-examples の ammo.wasm も不使用へ）
-- Vite 設定に `.vrm` アセットを追加
-  - `frontend/vite.config.js`
-  - `export default defineConfig({ assetsInclude: ['**/*.vrm'], ... })`
-- Git LFS 対象を `.pmx` → `.vrm` へ変更
-  - `.gitattributes:1`
+- [x] 追加: @pixiv/three-vrm
+- [x] 維持: three（現状 ^0.164.1）
+- [x] 削除: mmd-parser, ammo.js（three-examples の ammo.wasm も不使用へ）
+- [x] Vite 設定に `.vrm` アセットを追加（frontend/vite.config.js）
+- [x] Git LFS 対象を `.pmx` → `.vrm` へ変更（.gitattributes）
+- [x] Node.js 20.19+ へ更新（Vite要件）※ `frontend/package.json` に `engines` を追加。実行環境の Node 更新は各自で対応。
 
 ### 2. ローダー/アセット導線（MMDLoader → VRM）
 
-- MMDLoader を廃止し、GLTFLoader + VRMLoaderPlugin へ置換
-  - 変更: `frontend/src/utils/createLoader.js`
-  - 例: `const loader = new GLTFLoader(manager); loader.register(p => new VRMLoaderPlugin(p));`
-- ビューワのファイル選択を `.vrm` のみに限定
-  - 変更: `frontend/src/components/ThreeViewer.vue` の `<input accept="...">`
-- 複数ファイル/相対パス解決の補助ロジックを簡素化（VRM は単一ファイル）
-  - 対象: `frontend/src/composables/useModelOperations.js`（fileMap / setURLModifier / modelSpecificFiles 周辺）
+- [x] MMDLoader を廃止し、GLTFLoader + VRMLoaderPlugin へ置換（frontend/src/utils/createLoader.js）
+- [x] ビューワのファイル選択を `.vrm` のみに限定（frontend/src/components/ThreeViewer.vue）
+- [x] 複数ファイル/相対パス解決の補助ロジックを簡素化（frontend/src/composables/useModelOperations.js）
 
 ### 3. 表示/シーン追加（SkinnedMesh 前提 → VRM）
 
-- 読み込み完了で VRM を取得してシーンへ
-  - `const vrm = gltf.userData.vrm; scene.add(vrm.scene);`
-- 毎フレーム更新に `vrm.update(delta)` を組み込む
-  - 対象: `frontend/src/composables/useRenderLoop.js` or `useRenderer.js`
-- SkinnedMesh 探索や `geometry.userData.MMD.*` 前提の後処理を撤廃
-  - 対象: `useModelOperations.js`（applyMmdRotationOrder / ensureLocalAxes / skeletonHelper などの MMD 前提分岐を整理）
+- [x] 読み込み完了で VRM を取得してシーンへ（useModelOperations.js）
+- [x] 毎フレーム更新に `vrm.update(delta)` を組み込み（utils/rendering.js）
+- [x] SkinnedMesh/`geometry.userData.MMD.*` 前提の後処理を撤廃（useModelOperations.js をVRM専用に再実装）
 
 ### 4. 物理演算（Ammo/MMDAnimationHelper → VRMSpringBone）
 
-- `useAmmoInit.js` を削除（Ammo/MMDAnimationHelper 初期化を全廃）
-  - 呼び出し元の削除: `frontend/src/components/ThreeViewer.vue`
-- SpringBone を `vrm.update(delta)` によって更新（基本追加処理不要）
-- UI の「物理演算」トグルを SpringBone ON/OFF に読み替え
-  - 対象: `SettingsSidebar.vue`, `ModelSection.vue`
+- [x] `useAmmoInit.js` を削除（呼び出しも撤去）
+- [x] SpringBone は `vrm.update(delta)` に統合（追加処理不要）
+- [x] 旧「物理演算」UIは撤去（ModelSection/SettingsSidebar から削除）
 
 ### 5. モーフ/表情（morphTargetInfluences → VRMExpressionManager）
 
-- `MorphEditor.vue` を VRM 表情に対応
-  - `vrm.expressionManager` を使用し、`VRMExpressionPresetName`（A/I/U/E/O, Neutral, Joy など）を UI と同期
-  - `expressionManager.setValue('A', value)` → `expressionManager.update()`
-- `morphNameMapping.js` を VRM 前提に再設計（プリセット優先 + カスタム名対応）
+- [x] `MorphEditor.vue` を VRM 表情に対応（VRMExpressionPresetName）
+- [x] カスタム表情（非プリセット）のUI追加（ベストエフォートで抽出）
 
 ### 6. IK/付与（MMD 固有 → 再設計 or 簡略化）
 
-- `frontend/src/utils/ik.js` の MMD IK / 付与（grant）前提ロジックを撤廃
-  - `geometry.userData.MMD.*` を参照する経路は削除
-- 短期: IK トラッカー UI を無効化、または Humanoid の手首/足首等を直接ギズモ操作
-- 中期: VRM 骨格向けのシンプル 2-Bone IK/CCD を独立実装（必要に応じて）
+- [x] `frontend/src/utils/ik.js` を削除（関連の useIk* も削除）
+- [x] 旧 IK UI/マーカー関連の呼び出しを撤去
+- [x] VRM 骨格向けの簡易IK（現状の範囲では不要のためクローズ）
 
 ### 7. レンダリング（OutlineEffect → MToon/VRM）
 
-- `OutlineEffect` の使用を中止（MToon のアウトラインと干渉）
-  - 変更: `frontend/src/composables/useThreeViewerInit.js` を `renderer.render(scene, camera)` に切替
-  - `effect` 変数の除去（互換層が必要なら暫定対応の後、クリーンアップ）
+- [x] `OutlineEffect` の使用を中止（useThreeViewerInit.js）
+- [x] `effect` 参照の完全撤去（互換レイヤの片付け）
 
 ### 8. キャッシュ（複数→単一ファイル化）
 
-- `useModelCache.js` は流用可だが、モデルごと 1 ファイル想定に合わせて簡素化（任意）
+- [x] 現行キャッシュを VRM 単一ファイルに適用（流用）
+- [x] 必要に応じてシンプル化（任意・現状維持で十分と判断）
 
 ### 9. UI/UX の更新
 
-- メニュー: 「インポート」→ `.vrm` のみ、「エクスポート（VPD）」は一旦非表示
-  - 対象: `frontend/src/components/MenuControls.vue`, `ThreeViewer.vue`
-- サイドバー: 「IKボーン表示」「物理演算」など MMD 文言を VRM 用語へ
-  - 例: SpringBone, LookAt, Expression
-- モデル一覧: `bonesVisible`/`boneNameVisible` などの MMD 前提 UI を再検討（必要なら SkeletonHelper の最小限表示のみ残す）
+- [x] メニュー: インポートは `.vrm` のみに（ThreeViewer.vue）
+- [x] 旧 MMD UI（IKボーン表示/物理演算トグル）を撤去（ModelSection/SettingsSidebar）
+- [x] SpringBone/LookAt など VRM前提 UI の追加
+- [x] モデル骨可視（SkeletonHelper）最小UIの追加（任意）
 
 ### 10. ドキュメント/サンプル
 
-- `README.md` の PMX/PMD/Ammo/MMDLoader 前提の記述を three-vrm 前提に全面更新
-- サンプルアセット: `docs/*.vrm` の入手手順と LFS 設定を記載
-- `frontend/README.md`（存在する場合）も更新
+- [x] `README.md` を three-vrm 前提に更新（VRMセクション追加・文言更新）
+- [x] サンプル: `docs/*.vrm` の入手手順と LFS 設定を記載
+- [x] `frontend/README.md`（存在する場合）更新
 
 ### 11. バックエンド
 
-- 現状 MMD/PMX 依存は無し（確認済）。API の変更は不要
+- [x] 現状 MMD/PMX 依存は無し（確認済）
 
 ### 12. 動作確認（スモークテスト）
 
-- VRM の表示（`vrm.scene` が正しく追加される）
-- `vrm.update(delta)` による SpringBone の挙動確認
-- Expression スライダー（A/I/U/E/O, Joy 等）が反映される
-- UI の保存/復元（ライト設定、モデル可視）
-- モデルキャッシュ/復元（単一 `.vrm`）
+- [ ] VRM の表示（`vrm.scene` が正しく追加される）
+- [ ] `vrm.update(delta)` による SpringBone の挙動確認
+- [ ] Expression スライダー（A/I/U/E/O, Joy 等）が反映される
+- [ ] UI の保存/復元（ライト設定、モデル可視）
+- [ ] モデルキャッシュ/復元（単一 `.vrm`）
 
 ### 13. 段階的移行の進め方（推奨）
 
@@ -112,12 +97,12 @@
   - `frontend/src/components/ThreeViewer.vue`（`<input accept>`）
 - モデルロード/操作
   - `frontend/src/composables/useModelOperations.js`
-- 物理/初期化（削除）
+- 物理/初期化（削除済み）
   - `frontend/src/composables/useAmmoInit.js`
   - `frontend/src/components/ThreeViewer.vue`（useAmmoInit 呼び出し削除）
 - ポーズ（削除/後日 VRM Pose）
   - `frontend/src/composables/usePoseControls.js`
-- IK/付与（再設計）
+- IK/付与（削除済み/要再設計）
   - `frontend/src/utils/ik.js`
 - レンダリング
   - `frontend/src/composables/useThreeViewerInit.js`（OutlineEffect 除去）
@@ -142,4 +127,3 @@
 - （削除/再設計）ボーン名表示から物理ボーンを除外する設定（MMD 物理の概念に依存）
 
 必要に応じて、VRM Humanoid ベースの最小限の骨可視化（SkeletonHelper）と、表情・SpringBone の操作 UI を優先実装する。
-

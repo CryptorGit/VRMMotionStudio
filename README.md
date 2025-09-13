@@ -19,7 +19,7 @@ MokuMokuDanceWeb は、マルチプラットフォーム向けに MikuMikuDance 
   - `db/`
 
 ## 外部リソース
-`docs/艾莲.pmx` は容量削減のためリポジトリには含まれていません。配布元からダウンロードし、`docs/` ディレクトリに配置してください。PMX ファイルは Git LFS で管理されるため、リポジトリをクローンした後は `git lfs install` を実行してください。
+`docs/sample.vrm` は容量削減のためリポジトリには含まれていません。配布元（VRoid Studio 等で作成、または各配布サイトのライセンスに従って取得）からダウンロードし、`docs/` ディレクトリに配置してください。VRM ファイルは Git LFS で管理されるため、初回は `git lfs install` を実行してください。
 
 ## 起動方法
 ### フロントエンド
@@ -90,7 +90,25 @@ API_KEY=your-api-key
 - モーショントラッキング
 - 姿勢推定
 
-## 実装方針・技術概要
+## 実装方針・技術概要（VRM）
+本プロジェクトは VRM を唯一の公式フォーマットとし、three.js と @pixiv/three-vrm を中核に Web ブラウザでの表示・操作を実現します。追加ソフト不要で高速な WebGL 描画を行い、VRM特有の表情（Expressions）やスプリングボーン（SpringBone）を活用します。
+
+### 3D モデルの読み込みとレンダリング（VRM）
+- Three.js の `GLTFLoader` に `VRMLoaderPlugin` を登録し、`.vrm` を読み込みます。読み込み後は `const vrm = gltf.userData.vrm;` として取得し、`vrm.scene` をシーンに追加します。
+- 毎フレーム `vrm.update(delta)` を呼び出し、SpringBone/LookAt/Expressions などの内部更新を反映します。
+- マテリアルは three-vrm の MToon を前提とし、アウトラインは MToon の機能で再現します（`OutlineEffect` は使用しません）。
+- 照明は Three.js 標準ライト（ディレクショナル等）、カメラ制御は `OrbitControls` を利用します。
+
+### モーフ/表情（Expressions）
+- `VRMExpressionManager` を使用し、プリセット（A/I/U/E/O, Neutral, Joy など）と、検出可能なカスタム表情を UI から調整できます。
+
+### 物理（SpringBone）
+- VRM の SpringBone を `vrm.update(delta)` により更新します。Ammo.js 等の外部物理は使用しません。UI から ON/OFF 切替が可能です。
+
+### UI 概要
+- 設定サイドバーからライトやマーカー、SpringBone/LookAt を切替できます。モデル一覧からモデル可視や最小限のボーン可視（SkeletonHelper）を切替できます。表情調整 UI ではプリセットと検出可能なカスタム表情をスライダで操作できます。
+
+## 参考：旧実装方針（MMD）
 本プロジェクトでは、MikuMikuDance (MMD) の主要機能を Web ブラウザ上で再現するため、以下のようなクロスプラットフォームな最新 Web 技術を採用しています。ブラウザ上で WebGL による高速な 3D 描画を行い、モバイルを含むあらゆる環境で追加のソフトウェア無しに MMD モデルの表示・操作・アニメーションが可能です。主な技術スタックおよび機能の実装方針は次の通りです。
 
 ### 3D モデルの読み込みとレンダリング
@@ -131,29 +149,17 @@ API_KEY=your-api-key
 以上のような技術スタックにより、Web ブラウザ上で MMD の豊富な機能を再現し、プラグイン不要・クロスプラットフォームで動作する使いやすいアプリケーションを目指します。本実装方針により、開発効率を高めつつもユーザーにとって馴染みのある MMD 操作性と表現力を提供していきます。
 
 ## ビジョン
-いつでもどこでも MMD 制作を可能にし、キャラクターコンテンツのさらなる発展を目指します。
+いつでもどこでも 3D アバター（VRM）の制作・活用を可能にし、キャラクターコンテンツのさらなる発展を目指します。
 
 ## 参考文献
-[1] MMD file support, similar or better than the one in threejs - Feature requests - Babylon.js
-https://forum.babylonjs.com/t/mmd-file-support-similar-or-better-than-the-one-in-threejs/3615
+[1] three-vrm (VRM for Three.js)
+https://github.com/pixiv/three-vrm
 
-[2] GitHub - hanakla/three-mmd-loader: MMD pmd/pmx/vmd loader for Three.js
-https://github.com/hanakla/three-mmd-loader
-
-[3] GitHub - kripken/ammo.js: Direct port of the Bullet physics engine to JavaScript using Emscripten
-https://github.com/kripken/ammo.js/
-
-[4] cannon-es
-https://pmndrs.github.io/cannon-es/docs/
-
-[5] Dat.gui | Three.js Resources
+[2] Dat.gui | Three.js Resources
 https://threejsresources.com/tool/dat-gui
 
-[6] Pose landmark detection guide for Web  |  Google AI Edge  |  Google AI for Developers
+[3] Pose landmark detection guide for Web | Google AI for Developers
 https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker/web_js
 
-[7][8] Real-Time Human Pose Detection with TensorFlow.js in the Browser | by Rubens Zimbres | Medium
-https://medium.com/@rubenszimbres/real-time-human-pose-detection-with-tensorflow-js-in-the-browser-f7202b88ae5c
-
-[9] Record canvas stream
+[4] Record canvas stream
 https://webrtc.github.io/samples/src/content/capture/canvas-record/

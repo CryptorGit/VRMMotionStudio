@@ -36,10 +36,6 @@ export function loadLightingSettings(opts = {}) {
     const data = JSON.parse(saved)
     if (data.markerColor !== undefined) lightMarkerColor.value = data.markerColor
     if (data.showLightMarker !== undefined) showLightMarker.value = data.showLightMarker
-    if (data.showIkMarkers !== undefined && opts.showIkMarkers)
-      opts.showIkMarkers.value = data.showIkMarkers
-    if (data.enablePhysics !== undefined && opts.enablePhysics)
-      opts.enablePhysics.value = data.enablePhysics
     if (data.directionalIntensity !== undefined)
       directionalIntensity.value = data.directionalIntensity
     if (data.directional?.position) {

@@ -2,11 +2,12 @@ export function createAnimator({
   clock,
   targetFps,
   helper,
-  effect,
+  renderer,
   scene,
   camera,
   updateIKMarkers,
-  directionalLightHelper
+  directionalLightHelper,
+  vrmGetter
 }) {
   let lastFrameTime = 0
   let avgUpdate = 0
@@ -21,9 +22,14 @@ export function createAnimator({
     lastFrameTime = time
 
     const updateStart = performance.now()
-    if (helper.value) {
-      helper.value.update(delta)
-    }
+    if (helper.value) helper.value.update(delta)
+    // Update VRM spring bones, lookAt, etc.
+    try {
+      const list = typeof vrmGetter === 'function' ? vrmGetter() : []
+      if (Array.isArray(list)) {
+        for (const v of list) v?.update?.(delta)
+      }
+    } catch {}
     const updateDuration = performance.now() - updateStart
     avgUpdate =
       avgUpdate === 0
@@ -33,8 +39,8 @@ export function createAnimator({
     updateIKMarkers()
 
     const renderStart = performance.now()
-    if (effect.value && scene.value && camera.value) {
-      effect.value.render(scene.value, camera.value)
+    if (scene.value && camera.value && renderer?.value?.render) {
+      renderer.value.render(scene.value, camera.value)
     }
     const renderDuration = performance.now() - renderStart
     avgRender =
@@ -47,7 +53,7 @@ export function createAnimator({
     if (time - lastPerfLogTime >= 1000) {
       if (import.meta.env.DEV) {
         console.debug(
-          `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg effect.render: ${avgRender.toFixed(2)}ms`
+          `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg render: ${avgRender.toFixed(2)}ms`
         )
       }
       lastPerfLogTime = time

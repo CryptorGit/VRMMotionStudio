@@ -4,23 +4,24 @@ export function useRenderLoop({
   clock,
   targetFps,
   helper,
-  effect,
+  renderer,
   scene,
   camera,
   updateIKMarkers,
   directionalLightHelper,
-  renderer,
-  viewer
+  viewer,
+  vrmGetter
 }) {
   const animate = createAnimator({
     clock,
     targetFps,
     helper,
-    effect,
+    renderer,
     scene,
     camera,
     updateIKMarkers,
-    directionalLightHelper
+    directionalLightHelper,
+    vrmGetter
   })
 
   function onWindowResize() {

@@ -15,19 +15,13 @@
     :open-sidebar-section="openSidebarSection"
     :clear-cache="clearCache"
   />
-  <div v-if="poses.length" id="pose-selector">
-    <select v-model="selectedPose" @change="applyPose">
-      <option disabled value="">ポーズを選択</option>
-      <option v-for="p in poses" :key="p.name" :value="p">{{ p.name }}</option>
-    </select>
-  </div>
+  
   
   <input
     type="file"
     ref="fileInput"
-    accept=".pmx,.pmd,.vpd"
+    accept=".vrm"
     multiple
-    webkitdirectory
     style="display:none"
     @change="onFileChange"
   />
@@ -40,8 +34,8 @@
     v-model:directional-intensity="directionalIntensity"
     v-model:show-light-marker="showLightMarker"
     v-model:marker-color="lightMarkerColor"
-    v-model:showIkMarkers="showIkMarkers"
-    v-model:enable-physics="enablePhysics"
+    v-model:spring-bone-enabled="springBoneEnabled"
+    v-model:look-at-enabled="lookAtEnabled"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @toggle-bone-names="toggleBoneNameVisibility"
@@ -50,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import MenuControls from './MenuControls.vue'
 import * as THREE from 'three'
@@ -60,30 +54,27 @@ import {
   directionalLight,
   directionalLightHelper,
   lightMarkerColor,
-  LIGHT_MARKER_LENGTH,
   directionalIntensity,
   showLightMarker,
   loadLightingSettings
 } from '../utils/lighting.js'
-import { showIkMarkers, ikConfigPromise, ikTargets, selectedIK } from '../utils/ik.js'
-import useIkControls from '../composables/useIkControls.js'
 import { useMenu } from '../composables/useMenu.js'
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
-import { useAmmoInit } from '../composables/useAmmoInit.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 
 const viewer = ref(null)
 const menu = ref(null)
 const settingsSidebar = ref(null)
 const currentMeshRef = ref(null)
-const enablePhysics = ref(true)
-const ammo = shallowRef(null)
+// VRM runtime feature toggles
+const springBoneEnabled = ref(true)
+const lookAtEnabled = ref(true)
+//
 
 const scene = shallowRef(null)
 const camera = shallowRef(null)
 const renderer = shallowRef(null)
-const effect = shallowRef(null)
 const controls = shallowRef(null)
 const helper = shallowRef(null)
 const transformControls = shallowRef(null)
@@ -105,39 +96,20 @@ const { menuOpen, toggleMenu, openSidebarSection } = useMenu({
   logToServer
 })
 
-const ikControls = useIkControls({
-  scene,
-  camera,
-  renderer,
-  controls,
-  helper,
-  currentMeshRef,
-  enablePhysics
-})
-const {
-  onPointerDown,
-  onControlStart,
-  onControlEnd,
-  ensureFloorRigidBody,
-  updateIKMarkersBound,
-  setAmmo,
-  initUpdateIKMarkers,
-  applyIKUpdate
-} = ikControls
+function onPointerDown() {}
+function onControlStart() {}
+function onControlEnd() {}
 
 const fileLoader = useFileLoader({
   scene,
   camera,
   renderer,
-  effect,
   helper,
   currentMeshRef,
   menuOpen,
   logToServer,
-  updateIKMarkersBound,
   viewer,
-  transformControls,
-  applyIKUpdate
+  transformControls
 })
 const {
   fileInput,
@@ -163,10 +135,9 @@ const { animate, initRenderer, cleanupRenderer } = useRenderer({
   clock,
   targetFps: TARGET_FPS,
   helper,
-  effect,
   scene,
   camera,
-  updateIKMarkers: () => updateIKMarkersBound.value?.(),
+  updateIKMarkers: () => {},
   directionalLightHelper,
   renderer,
   viewer,
@@ -175,7 +146,8 @@ const { animate, initRenderer, cleanupRenderer } = useRenderer({
   directionalLight,
   onControlStart,
   onControlEnd,
-  onPointerDown
+  onPointerDown,
+  vrmGetter: () => (models?.value || []).map(m => m.vrm).filter(Boolean)
 })
 
 function handleDocumentClick(e) {
@@ -200,43 +172,48 @@ function handleUnhandledRejection(e) {
   }
 }
 
-const { init: initAmmo, cleanup: cleanupAmmo } = useAmmoInit({
-  helper,
-  enablePhysics,
-  setAmmo,
-  ensureFloorRigidBody
-})
-
 const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHandlers({
   handleError,
   handleUnhandledRejection
 })
 
 onMounted(async () => {
-  loadLightingSettings({ showIkMarkers, enablePhysics })
-  await ikConfigPromise
+  loadLightingSettings({})
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
-  ammo.value = await initAmmo()
   // Always try restoring from cache; if saved UI state exists, pass it
   await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
-  initUpdateIKMarkers()
+  // Apply initial toggles to restored VRMs
+  try {
+    const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
+    list.forEach(vrm => {
+      try { vrm.springBoneManager?.setEnabled?.(springBoneEnabled.value) } catch {}
+      try { vrm.springBoneManager && (vrm.springBoneManager.enabled = springBoneEnabled.value) } catch {}
+      try { vrm.lookAt && (vrm.lookAt.enabled = lookAtEnabled.value) } catch {}
+    })
+  } catch {}
   document.addEventListener('click', handleDocumentClick)
   logToServer({ event: 'init' })
-  ensureFloorRigidBody()
   animate(0)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   cleanupErrorHandlers()
-  cleanupAmmo()
   cleanupRenderer()
-  ikTargets.forEach(t => (t.marker.visible = false))
-  selectedIK.value = null
-  enablePhysics.value = false
-  ensureFloorRigidBody()
+})
+
+// Sync VRM feature toggles to loaded models
+watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
+  try {
+    const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
+    list.forEach(vrm => {
+      try { vrm.springBoneManager?.setEnabled?.(s) } catch {}
+      try { vrm.springBoneManager && (vrm.springBoneManager.enabled = s) } catch {}
+      try { vrm.lookAt && (vrm.lookAt.enabled = l) } catch {}
+    })
+  } catch {}
 })
 </script>
 

@@ -11,10 +11,10 @@
     </h3>
     <div v-show="expanded" class="section-content">
       <label>
-        <input type="checkbox" v-model="enablePhysics" /> 物理演算
+        <input type="checkbox" v-model="springBoneEnabledLocal" /> SpringBone 有効
       </label>
       <label>
-        <input type="checkbox" v-model="showIkMarkers" /> IKボーン表示
+        <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
       </label>
       <ModelList
         :models="models"
@@ -33,29 +33,29 @@ import ModelList from './ModelList.vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
-  showIkMarkers: { type: Boolean, required: true },
-  enablePhysics: { type: Boolean, required: true }
+  springBoneEnabled: { type: Boolean, required: true },
+  lookAtEnabled: { type: Boolean, required: true }
 })
 
 const emit = defineEmits([
   'hide',
-  'update:showIkMarkers',
-  'update:enablePhysics',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
-  'remove-model'
+  'remove-model',
+  'update:springBoneEnabled',
+  'update:lookAtEnabled'
 ])
 
 const expanded = ref(false)
 
-const showIkMarkers = computed({
-  get: () => props.showIkMarkers,
-  set: v => emit('update:showIkMarkers', v)
+const springBoneEnabledLocal = computed({
+  get: () => props.springBoneEnabled,
+  set: v => emit('update:springBoneEnabled', v)
 })
-const enablePhysics = computed({
-  get: () => props.enablePhysics,
-  set: v => emit('update:enablePhysics', v)
+const lookAtEnabledLocal = computed({
+  get: () => props.lookAtEnabled,
+  set: v => emit('update:lookAtEnabled', v)
 })
 </script>
 

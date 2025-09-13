@@ -20,10 +20,10 @@
     <ModelSection
       v-if="visibleSections.models"
       :models="models"
-      :show-ik-markers="showIkMarkers"
-      :enable-physics="enablePhysics"
-      @update:show-ik-markers="v => emit('update:showIkMarkers', v)"
-      @update:enable-physics="v => emit('update:enablePhysics', v)"
+      :spring-bone-enabled="springBoneEnabled"
+      :look-at-enabled="lookAtEnabled"
+      @update:spring-bone-enabled="v => emit('update:springBoneEnabled', v)"
+      @update:look-at-enabled="v => emit('update:lookAtEnabled', v)"
       @toggle-model="(...args) => emit('toggle-model', ...args)"
       @toggle-bone="(...args) => emit('toggle-bone', ...args)"
       @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
@@ -47,16 +47,16 @@ defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  showIkMarkers: { type: Boolean, required: true },
-  enablePhysics: { type: Boolean, required: true }
+  springBoneEnabled: { type: Boolean, required: true },
+  lookAtEnabled: { type: Boolean, required: true }
 })
 
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
-  'update:showIkMarkers',
-  'update:enablePhysics',
+  'update:springBoneEnabled',
+  'update:lookAtEnabled',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
