@@ -654,7 +654,7 @@ export function useModelOperations({
       }
       return model.boneGizmos
     }
-    const vrm = model.vrm
+  const vrm = model.vrm
     const parser = getParserFromModel(model)
     const indexToObj = buildIndexToObjectMap(model?.gltf?.scene, parser, vrm.scene)
 
@@ -764,6 +764,31 @@ export function useModelOperations({
       const matches = findInTreeByName(vrm.scene, name)
       return bestPathMatch(obj, matches, vrm.scene) || obj
     }
+    // Heuristics: detect extended bones by name patterns
+    function isExtendedName(name) {
+      if (!name) return false
+      const n = String(name)
+      const patterns = [
+        /(Twist|Roll)\d*$/i,
+        /(Thumb|Index|Middle|Ring|Pinky)(?:[4-9]|\d{2,})$/i,
+        /(Skirt|Hair|Ribbon|Braid|Cloth|Tail|Fringe|Bang|Cape)/i,
+        /(IK|Pole|Target|Hint|Effector|Ctrl|Control)$/i,
+        /(Attach|Prop|Weapon|Backpack|Sheath|Accessory|Bag|Belt)/i,
+        /(Helper|NonDeform|NonDeformBone|Guide)/i
+      ]
+      return patterns.some(rx => rx.test(n))
+    }
+    function detectExtendedBones(humanoidSet, physicalSet, colliderSet) {
+      const out = new Set()
+      const allBones = enumerateAllBones(vrm.scene)
+      for (const b of allBones) {
+        if (humanoidSet.has(b)) continue
+        if (physicalSet.has(b)) continue
+        if (colliderSet.has(b)) continue
+        if (isExtendedName(b.name)) out.add(b)
+      }
+      return out
+    }
     const physicalIndexSet = collectPhysicalBoneIndexSet(model)
     try {
       const dbg = {
@@ -774,10 +799,14 @@ export function useModelOperations({
       logToServer?.(dbg)
     } catch {}
     const humanoidIndexSet = collectHumanoidIndexSet(model)
+    const colliderIndexSet = parser?.json ? collectColliderIndexSet(parser.json) : new Set()
+    const constraintIndexSet = parser?.json ? collectConstraintIndexSet(parser.json) : new Set()
 
     // Build object sets from indices
     const humanoidObjSet = new Set()
     const physicalObjSet = new Set()
+    const colliderObjSet = new Set()
+    const constraintObjSet = new Set()
     for (const idx of humanoidIndexSet) {
       const v = resolveIndexToVrmObject(idx)
       if (v) humanoidObjSet.add(v)
@@ -786,7 +815,21 @@ export function useModelOperations({
       const v = resolveIndexToVrmObject(idx)
       if (v) physicalObjSet.add(v)
     }
+    for (const idx of colliderIndexSet) {
+      const v = resolveIndexToVrmObject(idx)
+      if (v) colliderObjSet.add(v)
+    }
+    for (const idx of constraintIndexSet) {
+      const v = resolveIndexToVrmObject(idx)
+      if (v) constraintObjSet.add(v)
+    }
 
+
+  // Colliders are separate; don't treat collider attachments as physical
+  for (const o of colliderObjSet) physicalObjSet.delete(o)
+  // Priority: Humanoid/Physical over Collider category (display)
+  for (const o of humanoidObjSet) colliderObjSet.delete(o)
+  for (const o of physicalObjSet) colliderObjSet.delete(o)
     // Runtime fallback enrichment
     // - Humanoid: add runtime nodes if mapping failed
     try { enumerateHumanoidBones(vrm).forEach(o => o && humanoidObjSet.add(o)) } catch {}
@@ -801,8 +844,8 @@ export function useModelOperations({
       }
     } catch {}
 
-    // Priority: Humanoid > Physical. Remove overlaps from physical.
-    for (const o of humanoidObjSet) physicalObjSet.delete(o)
+  // Priority: Humanoid > Physical. Remove overlaps from physical.
+  for (const o of humanoidObjSet) physicalObjSet.delete(o)
 
     // Debug logging to investigate classification issues
     try {
@@ -917,23 +960,88 @@ export function useModelOperations({
     // Prepare arrays for gizmo creation
     const humanoidBones = Array.from(humanoidObjSet)
     const physicalBones = Array.from(physicalObjSet)
-    // Other bones: everything not recognized as humanoid or physical
+    // Extended bones via heuristics, after removing humanoid/physical/collider
+    const extendedObjSet = detectExtendedBones(humanoidObjSet, physicalObjSet, colliderObjSet)
+    const extendedBones = Array.from(extendedObjSet)
+    // Non-deforming: JSON-first via skins[joints] plus runtime weight analysis
+    const skinJointIdxSet = parser?.json ? collectSkinJointIndexSet(parser.json) : new Set()
+    // Compute max skin weight per glTF node index
+    const weightMaxByNode = new Map()
+    const NONDEF_EPS = 0.02
+    try {
+      vrm.scene.traverse(obj => {
+        if (!obj || !obj.isSkinnedMesh) return
+        const skel = obj.skeleton
+        const geom = obj.geometry
+        if (!skel || !geom) return
+        const si = geom.attributes?.skinIndex
+        const sw = geom.attributes?.skinWeight
+        if (!si || !sw) return
+        const aI = si.array
+        const aW = sw.array
+        const strideI = si.itemSize || 4
+        const strideW = sw.itemSize || 4
+        const count = Math.min(si.count || (aI.length / strideI), sw.count || (aW.length / strideW))
+        for (let v = 0; v < count; v++) {
+          const baseI = v * strideI
+          const baseW = v * strideW
+          for (let k = 0; k < 4; k++) {
+            const boneIdx = aI[baseI + k] | 0
+            const w = aW[baseW + k] || 0
+            if (w <= 1e-6) continue
+            const boneObj = skel.bones[boneIdx]
+            if (!boneObj) continue
+            const nodeIdx = getObjectNodeIndex(boneObj, parser)
+            if (typeof nodeIdx !== 'number') continue
+            const prev = weightMaxByNode.get(nodeIdx) || 0
+            if (w > prev) weightMaxByNode.set(nodeIdx, w)
+          }
+        }
+      })
+    } catch {}
+    const nonDeformingBones = []
+    for (const b of enumerateAllBones(vrm.scene)) {
+      if (humanoidObjSet.has(b)) continue
+      if (physicalObjSet.has(b)) continue
+      if (extendedObjSet.has(b)) continue
+      // colliderObjSet may include non-bones; skip bone categorization impact
+      const idx = getObjectNodeIndex(b, parser)
+      const inSkin = typeof idx === 'number' && skinJointIdxSet.has(idx)
+      const maxW = (typeof idx === 'number') ? (weightMaxByNode.get(idx) || 0) : 0
+      if (!inSkin || maxW < NONDEF_EPS) nonDeformingBones.push(b)
+    }
+    // Other bones: everything not recognized as above
     const otherBones = []
     for (const b of enumerateAllBones(vrm.scene)) {
       if (humanoidObjSet.has(b)) continue
       if (physicalObjSet.has(b)) continue
+      if (extendedObjSet.has(b)) continue
+      if (nonDeformingBones.includes(b)) continue
       otherBones.push(b)
     }
+    // Collider nodes: object set may include non-bones; list directly
+    const colliderNodes = Array.from(colliderObjSet)
+
     const geom = new THREE.SphereGeometry(0.02, 8, 8)
     const matHuman = new THREE.MeshBasicMaterial({ color: 0x00aaff, depthTest: false, depthWrite: false })
     const matPhys = new THREE.MeshBasicMaterial({ color: 0xff8800, depthTest: false, depthWrite: false })
+    const matExt = new THREE.MeshBasicMaterial({ color: 0x22cc88, depthTest: false, depthWrite: false })
+    const matCollider = new THREE.MeshBasicMaterial({ color: 0xaa44ff, depthTest: false, depthWrite: false })
+    const matNonDef = new THREE.MeshBasicMaterial({ color: 0xffcc00, depthTest: false, depthWrite: false })
     const matOther = new THREE.MeshBasicMaterial({ color: 0x888888, depthTest: false, depthWrite: false })
     const humanoidMeshes = []
     const humanoidLabels = []
     const physicalMeshes = []
     const physicalLabels = []
+    const extendedMeshes = []
+    const extendedLabels = []
+    const colliderMeshes = []
+    const colliderLabels = []
+    const nonDefMeshes = []
+    const nonDefLabels = []
     const otherMeshes = []
     const otherLabels = []
+    const constraintBadges = []
     const added = new Set()
     const pushNode = (node, mat, arrMeshes, arrLabels) => {
       if (!node || added.has(node)) return
@@ -948,21 +1056,66 @@ export function useModelOperations({
       label.position.set(0, 0.05, 0)
       node.add(label)
       arrLabels.push(label)
+      // Constraint badge attachment (tag)
+      if (constraintObjSet.has(node)) {
+        const badge = createTextSprite('C')
+        badge.position.set(0.05, 0.08, 0)
+        badge.scale.multiplyScalar(0.6)
+        badge.userData.__constraintBadge = true
+        node.add(badge)
+        constraintBadges.push(badge)
+      }
     }
     humanoidBones.forEach(node => pushNode(node, matHuman, humanoidMeshes, humanoidLabels))
     physicalBones.forEach(node => pushNode(node, matPhys, physicalMeshes, physicalLabels))
+    extendedBones.forEach(node => pushNode(node, matExt, extendedMeshes, extendedLabels))
+    nonDeformingBones.forEach(node => pushNode(node, matNonDef, nonDefMeshes, nonDefLabels))
     otherBones.forEach(node => pushNode(node, matOther, otherMeshes, otherLabels))
+    // Collider nodes (may be non-bone)
+    const pushAnyNode = (node) => {
+      if (!node || added.has(node)) return
+      added.add(node)
+      const dot = new THREE.Mesh(geom, matCollider)
+      dot.name = `collider-dot:${node.name || ''}`
+      dot.renderOrder = 998
+      dot.userData.__helper = true
+      node.add(dot)
+      colliderMeshes.push(dot)
+      const label = createTextSprite(node.name || 'collider')
+      label.position.set(0, 0.05, 0)
+      node.add(label)
+      colliderLabels.push(label)
+      if (constraintObjSet.has(node)) {
+        const badge = createTextSprite('C')
+        badge.position.set(0.05, 0.08, 0)
+        badge.scale.multiplyScalar(0.6)
+        badge.userData.__constraintBadge = true
+        node.add(badge)
+        constraintBadges.push(badge)
+      }
+    }
+    colliderNodes.forEach(node => pushAnyNode(node))
     model.boneGizmos = {
       humanoidMeshes,
       humanoidLabels,
       physicalMeshes,
       physicalLabels,
+      extendedMeshes,
+      extendedLabels,
+      colliderMeshes,
+      colliderLabels,
+      nonDefMeshes,
+      nonDefLabels,
       otherMeshes,
       otherLabels,
       geom,
       matHuman,
       matPhys,
-      matOther
+      matExt,
+      matCollider,
+      matNonDef,
+  matOther,
+  constraintBadges
     }
     return model.boneGizmos
   }
@@ -974,14 +1127,37 @@ export function useModelOperations({
     const vis = !!model.visible
     const showPhys = !!(showPhysicalBones?.value)
     const showOther = !!(showOtherBones?.value)
+    const showExt = !!(showExtendedBones?.value)
+    const showCol = !!(showColliderNodes?.value)
+    const showNonDef = !!(showNonDeformingBones?.value)
+    const showCtag = !!(highlightConstraint?.value)
     try {
       const scaleS = size / 0.02
-      ;[...g.humanoidMeshes, ...g.physicalMeshes, ...g.otherMeshes].forEach(m => m.scale.setScalar(scaleS))
+      ;[
+        ...g.humanoidMeshes,
+        ...g.physicalMeshes,
+        ...g.extendedMeshes || [],
+        ...g.colliderMeshes || [],
+        ...g.nonDefMeshes || [],
+        ...g.otherMeshes
+      ].forEach(m => m.scale.setScalar(scaleS))
       g.humanoidLabels.forEach(s => {
         const b = s.userData.baseScale || { x: s.scale.x, y: s.scale.y }
         s.scale.set(b.x * labelScale, b.y * labelScale, 1)
       })
       g.physicalLabels.forEach(s => {
+        const b = s.userData.baseScale || { x: s.scale.x, y: s.scale.y }
+        s.scale.set(b.x * labelScale, b.y * labelScale, 1)
+      })
+      ;(g.extendedLabels || []).forEach(s => {
+        const b = s.userData.baseScale || { x: s.scale.x, y: s.scale.y }
+        s.scale.set(b.x * labelScale, b.y * labelScale, 1)
+      })
+      ;(g.colliderLabels || []).forEach(s => {
+        const b = s.userData.baseScale || { x: s.scale.x, y: s.scale.y }
+        s.scale.set(b.x * labelScale, b.y * labelScale, 1)
+      })
+      ;(g.nonDefLabels || []).forEach(s => {
         const b = s.userData.baseScale || { x: s.scale.x, y: s.scale.y }
         s.scale.set(b.x * labelScale, b.y * labelScale, 1)
       })
@@ -994,15 +1170,27 @@ export function useModelOperations({
       g.humanoidLabels.forEach(s => (s.visible = vis && !!model.bonesVisible && !!model.boneNameVisible))
       g.physicalMeshes.forEach(m => (m.visible = vis && showPhys))
       g.physicalLabels.forEach(s => (s.visible = vis && !!model.boneNameVisible && showPhys))
+      ;(g.extendedMeshes || []).forEach(m => (m.visible = vis && showExt))
+      ;(g.extendedLabels || []).forEach(s => (s.visible = vis && !!model.boneNameVisible && showExt))
+      ;(g.colliderMeshes || []).forEach(m => (m.visible = vis && showCol))
+      ;(g.colliderLabels || []).forEach(s => (s.visible = vis && !!model.boneNameVisible && showCol))
+      ;(g.nonDefMeshes || []).forEach(m => (m.visible = vis && showNonDef))
+      ;(g.nonDefLabels || []).forEach(s => (s.visible = vis && !!model.boneNameVisible && showNonDef))
       g.otherMeshes.forEach(m => (m.visible = vis && showOther))
       g.otherLabels.forEach(s => (s.visible = vis && !!model.boneNameVisible && showOther))
+      // Constraint badges visibility
+      const badges = g.constraintBadges || []
+      badges.forEach(s => (s.visible = vis && showCtag))
       try {
         const counts = {
           humanoidDots: g.humanoidMeshes.filter(x => x.visible).length,
           physicalDots: g.physicalMeshes.filter(x => x.visible).length,
+          extendedDots: (g.extendedMeshes || []).filter(x => x.visible).length,
+          colliderDots: (g.colliderMeshes || []).filter(x => x.visible).length,
+          nonDefDots: (g.nonDefMeshes || []).filter(x => x.visible).length,
           otherDots: g.otherMeshes.filter(x => x.visible).length
         }
-        logToServer?.({ event: 'bone-visibility-update', model: model.name, counts, toggles: { vis, showPhys, showOther, bonesVisible: !!model.bonesVisible, boneNameVisible: !!model.boneNameVisible } })
+        logToServer?.({ event: 'bone-visibility-update', model: model.name, counts, toggles: { vis, showPhys, showOther, showExt, showCol, showNonDef, showCtag, bonesVisible: !!model.bonesVisible, boneNameVisible: !!model.boneNameVisible } })
       } catch {}
     } catch {}
   }
@@ -1101,8 +1289,23 @@ export function useModelOperations({
       }
       if (boneGizmos) {
         try {
-          ;[...boneGizmos.humanoidMeshes, ...boneGizmos.physicalMeshes, ...boneGizmos.otherMeshes].forEach(x => x.parent?.remove(x))
-          ;[...boneGizmos.humanoidLabels, ...boneGizmos.physicalLabels, ...boneGizmos.otherLabels].forEach(s => {
+          ;[
+            ...boneGizmos.humanoidMeshes,
+            ...boneGizmos.physicalMeshes,
+            ...boneGizmos.extendedMeshes || [],
+            ...boneGizmos.colliderMeshes || [],
+            ...boneGizmos.nonDefMeshes || [],
+            ...boneGizmos.otherMeshes
+          ].forEach(x => x.parent?.remove(x))
+          ;[
+            ...boneGizmos.humanoidLabels,
+            ...boneGizmos.physicalLabels,
+            ...boneGizmos.extendedLabels || [],
+            ...boneGizmos.colliderLabels || [],
+            ...boneGizmos.nonDefLabels || [],
+            ...boneGizmos.otherLabels,
+            ...boneGizmos.constraintBadges || []
+          ].forEach(s => {
             try { s.material?.map?.dispose?.() } catch {}
             try { s.material?.dispose?.() } catch {}
             s.parent?.remove(s)
@@ -1110,6 +1313,9 @@ export function useModelOperations({
           boneGizmos.geom?.dispose?.()
           boneGizmos.matHuman?.dispose?.()
           boneGizmos.matPhys?.dispose?.()
+          boneGizmos.matExt?.dispose?.()
+          boneGizmos.matCollider?.dispose?.()
+          boneGizmos.matNonDef?.dispose?.()
           boneGizmos.matOther?.dispose?.()
         } catch {}
       }

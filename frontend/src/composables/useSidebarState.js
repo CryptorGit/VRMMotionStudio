@@ -6,6 +6,10 @@ export function useSidebarState({
   showLightMarker,
   springBoneEnabled,
   lookAtEnabled,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint,
   showPhysicalBones,
   showOtherBones,
   boneDotSize,
@@ -40,7 +44,11 @@ export function useSidebarState({
         visibleSections: { ...visibleSections },
         showLightMarker: showLightMarker?.value,
         springBoneEnabled: springBoneEnabled?.value,
-        lookAtEnabled: lookAtEnabled?.value,
+  lookAtEnabled: lookAtEnabled?.value,
+  showExtendedBones: showExtendedBones?.value,
+  showColliderNodes: showColliderNodes?.value,
+  showNonDeformingBones: showNonDeformingBones?.value,
+  highlightConstraint: highlightConstraint?.value,
         showPhysicalBones: showPhysicalBones?.value,
         showOtherBones: showOtherBones?.value,
         boneDotSize: boneDotSize?.value,
@@ -82,6 +90,10 @@ export function useSidebarState({
           showLightMarker: savedShowMarker,
           springBoneEnabled: savedSpringBoneEnabled,
           lookAtEnabled: savedLookAtEnabled,
+          showExtendedBones: savedShowExtendedBones,
+          showColliderNodes: savedShowColliderNodes,
+          showNonDeformingBones: savedShowNonDeformingBones,
+          highlightConstraint: savedHighlightConstraint,
           showPhysicalBones: savedShowPhysicalBones,
           showOtherBones: savedShowOtherBones,
           boneDotSize: savedBoneDotSize,
@@ -106,6 +118,14 @@ export function useSidebarState({
           springBoneEnabled.value = savedSpringBoneEnabled
         if (lookAtEnabled && savedLookAtEnabled !== undefined)
           lookAtEnabled.value = savedLookAtEnabled
+        if (showExtendedBones && savedShowExtendedBones !== undefined)
+          showExtendedBones.value = savedShowExtendedBones
+        if (showColliderNodes && savedShowColliderNodes !== undefined)
+          showColliderNodes.value = savedShowColliderNodes
+        if (showNonDeformingBones && savedShowNonDeformingBones !== undefined)
+          showNonDeformingBones.value = savedShowNonDeformingBones
+        if (highlightConstraint && savedHighlightConstraint !== undefined)
+          highlightConstraint.value = savedHighlightConstraint
         if (showPhysicalBones && savedShowPhysicalBones !== undefined)
           showPhysicalBones.value = savedShowPhysicalBones
         if (showOtherBones && savedShowOtherBones !== undefined)
@@ -146,6 +166,10 @@ export function useSidebarState({
     showLightMarker && showLightMarker.value
     springBoneEnabled && springBoneEnabled.value
     lookAtEnabled && lookAtEnabled.value
+  showExtendedBones && showExtendedBones.value
+  showColliderNodes && showColliderNodes.value
+  showNonDeformingBones && showNonDeformingBones.value
+  highlightConstraint && highlightConstraint.value
     showPhysicalBones && showPhysicalBones.value
     showOtherBones && showOtherBones.value
     boneDotSize && boneDotSize.value
