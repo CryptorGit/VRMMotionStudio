@@ -23,11 +23,11 @@
       <div class="row">
         <label>
           ボーン表示（人型）
-          <input type="checkbox" @change="onToggleAllBones($event.target.checked)" />
+          <input type="checkbox" v-model="allBonesVisible" />
         </label>
         <label>
           ボーン名表示
-          <input type="checkbox" @change="onToggleAllBoneNames($event.target.checked)" />
+          <input type="checkbox" v-model="allBoneNamesVisible" />
         </label>
       </div>
       <div class="row">
@@ -181,6 +181,16 @@ function onToggleAllBones(v) {
 function onToggleAllBoneNames(v) {
   emit('toggle-all-bone-names', !!v)
 }
+
+// Reflect per-model state in master toggles so UI stays in sync after restore
+const allBonesVisible = computed({
+  get: () => (props.models?.length ? props.models.every(m => !!m.bonesVisible) : false),
+  set: v => emit('toggle-all-bones', !!v)
+})
+const allBoneNamesVisible = computed({
+  get: () => (props.models?.length ? props.models.every(m => !!m.boneNameVisible) : false),
+  set: v => emit('toggle-all-bone-names', !!v)
+})
 </script>
 
 <style scoped>

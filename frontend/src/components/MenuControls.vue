@@ -10,6 +10,7 @@
       <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ</li>
       <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル管理</li>
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
+  <li id="toggle-restore" @click="toggleAutoRestore"><i class="fa-solid fa-rotate"></i> モデル自動復元: {{ autoRestore ? 'ON' : 'OFF' }}</li>
     </ul>
   </div>
 </template>
@@ -27,7 +28,32 @@ const props = defineProps({
 })
 
 const menu = ref(null)
+const autoRestore = ref(true)
+
+function loadAutoRestore() {
+  try {
+    const v = localStorage.getItem('autoRestore')
+    // default ON when key missing; store '0' to disable
+    autoRestore.value = v !== '0'
+  } catch {
+    autoRestore.value = true
+  }
+}
+
+function toggleAutoRestore() {
+  autoRestore.value = !autoRestore.value
+  try {
+    if (autoRestore.value) {
+      // Remove or set to non-'0' to enable default ON
+      localStorage.removeItem('autoRestore')
+    } else {
+      localStorage.setItem('autoRestore', '0')
+    }
+  } catch {}
+}
+
 defineExpose({ menu })
+  loadAutoRestore()
 </script>
 
 <style scoped>

@@ -27,6 +27,12 @@ export function useSidebarState({
     physics: false
   })
 
+  // Optional global master toggles for bone visibility state across models.
+  // These are UI-level preferences to keep the checkboxes sticky across reloads
+  // when models are restored.
+  const masterBonesVisible = ref(undefined) // undefined = derive from models
+  const masterBoneNamesVisible = ref(undefined)
+
   function hideSection(section) {
     visibleSections[section] = false
   }
@@ -42,6 +48,8 @@ export function useSidebarState({
         collapsed: collapsed.value,
         width: width?.value,
         visibleSections: { ...visibleSections },
+  masterBonesVisible: masterBonesVisible.value,
+  masterBoneNamesVisible: masterBoneNamesVisible.value,
         showLightMarker: showLightMarker?.value,
         springBoneEnabled: springBoneEnabled?.value,
   lookAtEnabled: lookAtEnabled?.value,
@@ -87,6 +95,8 @@ export function useSidebarState({
           collapsed: savedCollapsed,
           width: savedWidth,
           visibleSections: savedVisible,
+          masterBonesVisible: savedMasterBonesVisible,
+          masterBoneNamesVisible: savedMasterBoneNamesVisible,
           showLightMarker: savedShowMarker,
           springBoneEnabled: savedSpringBoneEnabled,
           lookAtEnabled: savedLookAtEnabled,
@@ -112,6 +122,8 @@ export function useSidebarState({
           visibleSections.display = savedVisible.display ?? false
           visibleSections.physics = savedVisible.physics ?? false
         }
+  masterBonesVisible.value = savedMasterBonesVisible
+  masterBoneNamesVisible.value = savedMasterBoneNamesVisible
         if (showLightMarker && savedShowMarker !== undefined)
           showLightMarker.value = savedShowMarker
         if (springBoneEnabled && savedSpringBoneEnabled !== undefined)

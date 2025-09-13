@@ -229,8 +229,25 @@ onMounted(async () => {
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
-  // Always try restoring from cache; if saved UI state exists, pass it
-  await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
+  // Auto-restore models by default on reload to keep the user session.
+  // Opt-out methods:
+  //  - URL query: ?restore=0
+  //  - LocalStorage flag: localStorage.setItem('autoRestore', '0')
+  let shouldRestore = true
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('restore') === '0') shouldRestore = false
+  } catch {}
+  try {
+    if (localStorage.getItem('autoRestore') === '0') shouldRestore = false
+  } catch {}
+
+  if (shouldRestore) {
+    // If saved UI state exists, pass it to the restore function
+    await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
+  } else {
+    try { await logToServer({ event: 'restore:skipped' }) } catch {}
+  }
   // Apply initial toggles to restored VRMs
   try {
     const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
