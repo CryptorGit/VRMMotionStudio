@@ -222,14 +222,37 @@ export function useModelOperations({
     return undefined
   }
 
-  function buildIndexToObjectMap(root, parser) {
+  function buildIndexToObjectMap(root, parser, extraRoot) {
     const map = new Map()
-    if (!root || !parser?.associations) return map
-    try {
-      root.traverse(o => {
+    if (!parser) return map
+    const uuidMap = new Map()
+    const visited = new Set()
+    function traverse(o) {
+      if (!o || visited.has(o)) return
+      visited.add(o)
+      try {
         const idx = getObjectNodeIndex(o, parser)
-        if (typeof idx === 'number') map.set(idx, o)
-      })
+        if (typeof idx === 'number' && !map.has(idx)) map.set(idx, o)
+      } catch {}
+      uuidMap.set(o.uuid, o)
+      for (const c of o.children || []) traverse(c)
+    }
+    if (root) traverse(root)
+    if (extraRoot && extraRoot !== root) traverse(extraRoot)
+    try {
+      const nodes = parser?.json?.nodes
+      if (Array.isArray(nodes)) {
+        nodes.forEach((n, idx) => {
+          if (map.has(idx)) return
+          const u = n?.extras?.uuid
+          if (u && uuidMap.has(u)) map.set(idx, uuidMap.get(u))
+          else if (typeof n?.name === 'string') {
+            const matches = []
+            for (const o of uuidMap.values()) if (o.name === n.name) matches.push(o)
+            if (matches.length === 1) map.set(idx, matches[0])
+          }
+        })
+      }
     } catch {}
     return map
   }
@@ -250,16 +273,14 @@ export function useModelOperations({
     if (out.length === 0) {
       const visited = new Set()
       function scan(obj, depth = 0) {
-        if (!obj || typeof obj !== 'object' || visited.has(obj) || depth > 10) return
+        if (!obj || typeof obj !== 'object' || visited.has(obj) || depth > 50) return
         visited.add(obj)
+        if (obj.node || obj.bone || obj.target || obj.joint) out.push(obj)
         if (Array.isArray(obj)) {
-          for (const v of obj) {
-            if (v && (v.node || v.bone || v.target || v.joint)) out.push(v)
-            else scan(v, depth + 1)
-          }
-          return
+          for (const v of obj) scan(v, depth + 1)
+        } else {
+          for (const k in obj) scan(obj[k], depth + 1)
         }
-        for (const k in obj) scan(obj[k], depth + 1)
       }
       try { scan(mgr) } catch {}
     }
@@ -336,12 +357,12 @@ export function useModelOperations({
     const parser = getParserFromModel(model)
     const json = parser?.json || null
     const vrm = model?.vrm
-    const indexToObj = buildIndexToObjectMap(vrm?.scene, parser)
-    // VRM1.0: prefer runtime
-    let usedRuntime = false
+    const indexToObj = buildIndexToObjectMap(vrm?.scene, parser, model?.gltf?.scene)
+    // VRM1.0: runtime joints
+    const unresolved = []
     try {
       const joints = getRuntimeSpringJoints(vrm)
-      if (Array.isArray(joints) && joints.length && parser) {
+      if (Array.isArray(joints) && parser) {
         function pathOf(o) {
           const names = []
           let cur = o
@@ -374,18 +395,24 @@ export function useModelOperations({
           const obj = j?.node || j?.bone || j?.target || j?.joint
           const idx = resolveIdx(obj)
           if (typeof idx === 'number') indices.add(idx)
+          else unresolved.push(obj?.name || obj?.uuid || 'unknown')
         }
-        usedRuntime = indices.size > 0
       }
     } catch {}
-    // Fallback to JSON
-    if (!usedRuntime && json?.extensions?.VRMC_springBone?.springs) {
+    // JSON: union with VRMC_springBone definitions
+    if (json?.extensions?.VRMC_springBone) {
       try {
-        for (const s of json.extensions.VRMC_springBone.springs) {
+        const ext1 = json.extensions.VRMC_springBone
+        for (const s of ext1.springs || []) {
+          if (typeof s?.root === 'number') indices.add(s.root)
           for (const j of s?.joints || []) {
             const n = j?.node
             if (typeof n === 'number') indices.add(n)
           }
+        }
+        for (const c of ext1.colliders || []) {
+          const n = c?.node
+          if (typeof n === 'number') indices.add(n)
         }
       } catch {}
     }
@@ -416,12 +443,8 @@ export function useModelOperations({
         }
       } catch {}
     }
-    // Exclude explicit collider attachment nodes by schema path
-    if (json) {
-      try {
-        const colliders = collectColliderIndexSet(json)
-        for (const c of colliders) indices.delete(c)
-      } catch {}
+    if (unresolved.length) {
+      try { console.debug('unresolved spring joints', unresolved) } catch {}
     }
     return indices
   }
@@ -465,7 +488,7 @@ export function useModelOperations({
         try {
           const vrm = model.vrm
           const parser = getParserFromModel(model)
-          const indexToObj = buildIndexToObjectMap(vrm.scene, parser)
+          const indexToObj = buildIndexToObjectMap(vrm.scene, parser, model?.gltf?.scene)
           const json = parser?.json
           const colliderIdxSet = json ? collectColliderIndexSet(json) : new Set()
           const allBoneObjs = enumerateAllBones(vrm.scene)
@@ -527,7 +550,7 @@ export function useModelOperations({
     }
     const vrm = model.vrm
     const parser = getParserFromModel(model)
-    const indexToObj = buildIndexToObjectMap(vrm.scene, parser)
+    const indexToObj = buildIndexToObjectMap(vrm.scene, parser, model?.gltf?.scene)
     const physicalIndexSet = collectPhysicalBoneIndexSet(model)
     const humanoidIndexSet = collectHumanoidIndexSet(model)
 
