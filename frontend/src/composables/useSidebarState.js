@@ -6,6 +6,10 @@ export function useSidebarState({
   showLightMarker,
   springBoneEnabled,
   lookAtEnabled,
+  showPhysicalBones,
+  showOtherBones,
+  boneDotSize,
+  boneLabelScale,
   markerColor,
   directionalIntensity,
   directional
@@ -14,7 +18,9 @@ export function useSidebarState({
   const visibleSections = reactive({
     lighting: false,
     morph: false,
-    models: false
+    models: false,
+    display: false,
+    physics: false
   })
 
   function hideSection(section) {
@@ -35,6 +41,10 @@ export function useSidebarState({
         showLightMarker: showLightMarker?.value,
         springBoneEnabled: springBoneEnabled?.value,
         lookAtEnabled: lookAtEnabled?.value,
+        showPhysicalBones: showPhysicalBones?.value,
+        showOtherBones: showOtherBones?.value,
+        boneDotSize: boneDotSize?.value,
+        boneLabelScale: boneLabelScale?.value,
         markerColor: markerColor?.value,
         directionalIntensity: directionalIntensity?.value,
         directional: directional
@@ -72,6 +82,10 @@ export function useSidebarState({
           showLightMarker: savedShowMarker,
           springBoneEnabled: savedSpringBoneEnabled,
           lookAtEnabled: savedLookAtEnabled,
+          showPhysicalBones: savedShowPhysicalBones,
+          showOtherBones: savedShowOtherBones,
+          boneDotSize: savedBoneDotSize,
+          boneLabelScale: savedBoneLabelScale,
           markerColor: savedMarkerColor,
           directionalIntensity: savedDirectionalIntensity,
           directional: savedDirectional
@@ -83,6 +97,8 @@ export function useSidebarState({
           visibleSections.lighting = savedVisible.lighting ?? false
           visibleSections.morph = savedVisible.morph ?? false
           visibleSections.models = savedVisible.models ?? false
+          visibleSections.display = savedVisible.display ?? false
+          visibleSections.physics = savedVisible.physics ?? false
         }
         if (showLightMarker && savedShowMarker !== undefined)
           showLightMarker.value = savedShowMarker
@@ -90,6 +106,14 @@ export function useSidebarState({
           springBoneEnabled.value = savedSpringBoneEnabled
         if (lookAtEnabled && savedLookAtEnabled !== undefined)
           lookAtEnabled.value = savedLookAtEnabled
+        if (showPhysicalBones && savedShowPhysicalBones !== undefined)
+          showPhysicalBones.value = savedShowPhysicalBones
+        if (showOtherBones && savedShowOtherBones !== undefined)
+          showOtherBones.value = savedShowOtherBones
+        if (boneDotSize && savedBoneDotSize !== undefined)
+          boneDotSize.value = savedBoneDotSize
+        if (boneLabelScale && savedBoneLabelScale !== undefined)
+          boneLabelScale.value = savedBoneLabelScale
         if (markerColor && savedMarkerColor !== undefined)
           markerColor.value = savedMarkerColor
         if (directionalIntensity && savedDirectionalIntensity !== undefined)
@@ -122,6 +146,10 @@ export function useSidebarState({
     showLightMarker && showLightMarker.value
     springBoneEnabled && springBoneEnabled.value
     lookAtEnabled && lookAtEnabled.value
+    showPhysicalBones && showPhysicalBones.value
+    showOtherBones && showOtherBones.value
+    boneDotSize && boneDotSize.value
+    boneLabelScale && boneLabelScale.value
     markerColor && markerColor.value
     directionalIntensity && directionalIntensity.value
     JSON.stringify(visibleSections)

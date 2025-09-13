@@ -5,7 +5,7 @@
         class="toggle-icon"
         :class="expanded ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"
       ></i>
-      ライト設定
+      照明設定
       <span class="spacer"></span>
       <i class="fa-solid fa-times close-icon" @click.stop="$emit('hide')"></i>
     </h3>
@@ -14,8 +14,6 @@
         :ambient="ambient"
         :directional="directional"
         v-model:directional-intensity="directionalIntensity"
-        v-model:show-light-marker="showLightMarker"
-        v-model:marker-color="markerColor"
       />
     </div>
   </div>
@@ -28,28 +26,16 @@ import LightingPanel from './LightingPanel.vue'
 const props = defineProps({
   ambient: Object,
   directional: Object,
-  showLightMarker: Boolean,
-  markerColor: String,
   directionalIntensity: Number
 })
 
 const emit = defineEmits([
   'hide',
-  'update:showLightMarker',
-  'update:markerColor',
   'update:directionalIntensity'
 ])
 
 const expanded = ref(false)
 
-const showLightMarker = computed({
-  get: () => props.showLightMarker,
-  set: v => emit('update:showLightMarker', v)
-})
-const markerColor = computed({
-  get: () => props.markerColor,
-  set: v => emit('update:markerColor', v)
-})
 const directionalIntensity = computed({
   get: () => props.directionalIntensity,
   set: v => emit('update:directionalIntensity', v)

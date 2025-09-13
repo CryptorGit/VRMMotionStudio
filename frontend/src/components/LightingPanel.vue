@@ -1,20 +1,5 @@
 <template>
   <div class="lighting-panel">
-    <h2>ライト設定</h2>
-    <div class="marker-controls">
-      <div>
-        <label>
-          マーカー表示
-          <input type="checkbox" v-model="showLightMarker" />
-        </label>
-      </div>
-      <div>
-        <label>
-          マーカー色
-          <input type="color" v-model="markerColor" />
-        </label>
-      </div>
-    </div>
     <section>
       <h3>Ambient Light</h3>
       <label>
@@ -22,7 +7,7 @@
         <input type="color" v-model="ambientColor" />
       </label>
       <label>
-        強度
+        強さ
         <input type="range" min="0" max="5" step="0.1" v-model.number="ambientIntensity" />
       </label>
     </section>
@@ -33,27 +18,27 @@
         <input type="color" v-model="directionalColor" />
       </label>
       <label>
-        強度
-        <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensity" />
+        強さ
+        <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensityProxy" />
       </label>
-      <p class="section-description">ライトの位置と方向を角度で指定</p>
+      <p class="section-description">位置と向きを角度で調整できます</p>
       <div class="position-inputs">
         <label>
-          ライト位置X
+          位置X
           <input type="number" v-model.number="directionalX" />
         </label>
         <label>
-          ライト位置Y
+          位置Y
           <input type="number" v-model.number="directionalY" />
         </label>
         <label>
-          ライト位置Z
+          位置Z
           <input type="number" v-model.number="directionalZ" />
         </label>
       </div>
       <div class="position-inputs">
         <label>
-          方位角 (°)
+          方位角(°)
           <input
             type="range"
             min="0"
@@ -63,7 +48,7 @@
           />
         </label>
         <label>
-          仰角 (°)
+          仰角(°)
           <input
             type="range"
             min="-90"
@@ -84,23 +69,9 @@ import * as THREE from 'three'
 const props = defineProps({
   ambient: { type: Object, required: true },
   directional: { type: Object, required: true },
-  showLightMarker: { type: Boolean, required: true },
-  markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true }
 })
-const emit = defineEmits([
-  'update:showLightMarker',
-  'update:markerColor',
-  'update:directionalIntensity'
-])
-const showLightMarker = computed({
-  get: () => props.showLightMarker,
-  set: v => emit('update:showLightMarker', v)
-})
-const markerColor = computed({
-  get: () => props.markerColor,
-  set: v => emit('update:markerColor', v)
-})
+const emit = defineEmits(['update:directionalIntensity'])
 
 const ambientColor = computed({
   get: () => '#' + props.ambient.color.getHexString(),
@@ -117,7 +88,7 @@ const directionalColor = computed({
   set: v => props.directional.color.set(v)
 })
 
-const directionalIntensity = computed({
+const directionalIntensityProxy = computed({
   get: () => props.directionalIntensity,
   set: v => emit('update:directionalIntensity', v)
 })
@@ -195,18 +166,8 @@ const directionalElevation = computed({
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-.lighting-panel h2 {
-  margin-top: 0;
-}
 .lighting-panel section {
   margin-bottom: 1rem;
-}
-.marker-controls {
-  margin-bottom: 1rem;
-}
-.marker-controls label {
-  display: block;
-  margin: 0.5rem 0;
 }
 .position-inputs {
   display: flex;

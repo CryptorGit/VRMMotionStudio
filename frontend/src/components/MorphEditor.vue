@@ -1,10 +1,10 @@
 <template>
   <div id="morph-editor">
     <div v-if="vrm">
-      <template v-if="presets && presets.length">
+      <template v-if="presentPresets && presentPresets.length">
         <div class="section-title">プリセット</div>
         <div
-          v-for="p in presets"
+          v-for="p in presentPresets"
           :key="p.key"
           class="morph-row"
         >
@@ -40,12 +40,12 @@
         </div>
       </template>
     </div>
-    <div v-else>VRM 表情がありません</div>
+    <div v-else>VRM が読み込まれていません</div>
   </div>
   </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { VRMExpressionPresetName } from '@pixiv/three-vrm'
 
 const props = defineProps({
@@ -54,46 +54,55 @@ const props = defineProps({
 
 const vrm = computed(() => props.mesh?.userData?.vrm || null)
 
-const presets = [
-  { key: VRMExpressionPresetName.A, label: 'あ' },
-  { key: VRMExpressionPresetName.I, label: 'い' },
-  { key: VRMExpressionPresetName.U, label: 'う' },
-  { key: VRMExpressionPresetName.E, label: 'え' },
-  { key: VRMExpressionPresetName.O, label: 'お' },
-  { key: VRMExpressionPresetName.Neutral, label: 'Neutral' },
-  { key: VRMExpressionPresetName.Joy, label: 'Joy' },
-  { key: VRMExpressionPresetName.Angry, label: 'Angry' },
-  { key: VRMExpressionPresetName.Sorrow, label: 'Sorrow' },
-  { key: VRMExpressionPresetName.Fun, label: 'Fun' }
-]
+// 再取得トリガ（リロードボタン用・依存に含めて再計算させる）
+const refreshTick = ref(0)
 
-const customNames = computed(() => {
+// VRMに実際に含まれるExpression名一覧
+const expressionNames = computed(() => {
+  refreshTick.value // 参照で依存に含める
   const em = vrm.value?.expressionManager
   if (!em) return []
-  const presetSet = new Set(presets.map(p => String(p.key)))
-  const names = new Set()
   try {
-    // v2: try known collections
-    const maybeList = em.expressions || em._expressions || []
-    if (Array.isArray(maybeList)) {
-      maybeList.forEach(e => {
-        const n = e?.name || e?.expressionName || e?.presetName
-        if (n && !presetSet.has(String(n))) names.add(String(n))
-      })
-    }
+    const list = em.getExpressionNames?.()
+    if (Array.isArray(list)) return list.map(n => String(n))
   } catch {}
   try {
     const map = em._expressionMap || em.expressionMap
     if (map && typeof map.forEach === 'function') {
-      map.forEach((_, k) => { if (!presetSet.has(String(k))) names.add(String(k)) })
+      const names = []
+      map.forEach((_, k) => names.push(String(k)))
+      return names
     }
   } catch {}
-  try {
-    const keys = em?.getExpressionNames?.()
-    if (Array.isArray(keys)) keys.forEach(k => { if (!presetSet.has(String(k))) names.add(String(k)) })
-  } catch {}
-  return Array.from(names)
+  return []
 })
+
+const presetLabels = {
+  [VRMExpressionPresetName.A]: 'A',
+  [VRMExpressionPresetName.I]: 'I',
+  [VRMExpressionPresetName.U]: 'U',
+  [VRMExpressionPresetName.E]: 'E',
+  [VRMExpressionPresetName.O]: 'O',
+  [VRMExpressionPresetName.Neutral]: 'Neutral',
+  [VRMExpressionPresetName.Joy]: 'Joy',
+  [VRMExpressionPresetName.Angry]: 'Angry',
+  [VRMExpressionPresetName.Sorrow]: 'Sorrow',
+  [VRMExpressionPresetName.Fun]: 'Fun'
+}
+
+const presetNameSet = computed(() => new Set(Object.values(VRMExpressionPresetName).map(String)))
+
+// VRMに存在するプリセットのみ
+const presentPresets = computed(() =>
+  expressionNames.value
+    .filter(n => presetNameSet.value.has(String(n)))
+    .map(n => ({ key: n, label: presetLabels[n] || String(n) }))
+)
+
+// VRMに存在するカスタム名のみ
+const customNames = computed(() =>
+  expressionNames.value.filter(n => !presetNameSet.value.has(String(n)))
+)
 
 function getVal(key) {
   const em = vrm.value?.expressionManager
@@ -110,8 +119,12 @@ function setVal(key, event) {
   em.update?.()
 }
 
-// API 互換のため（呼び出し元から参照される）
-defineExpose({ reloadMorphs: () => {} })
+// Morph一覧を再取得（VRM切替や外部更新時用）
+defineExpose({
+  reloadMorphs: () => {
+    refreshTick.value++
+  }
+})
 </script>
 
 <style scoped>
@@ -136,4 +149,3 @@ defineExpose({ reloadMorphs: () => {} })
   flex: 1;
 }
 </style>
-

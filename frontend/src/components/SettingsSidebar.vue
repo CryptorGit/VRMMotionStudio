@@ -27,9 +27,15 @@
       v-model:directional-intensity="directionalIntensity"
       v-model:spring-bone-enabled="springBoneEnabled"
       v-model:look-at-enabled="lookAtEnabled"
+      v-model:show-physical-bones="showPhysicalBones"
+      v-model:show-other-bones="showOtherBones"
+      v-model:bone-dot-size="boneDotSize"
+      v-model:bone-label-scale="boneLabelScale"
       @toggle-model="toggleModel"
       @toggle-bone="toggleBone"
       @toggle-bone-names="toggleBoneNames"
+      @toggle-all-bones="toggleAllBones"
+      @toggle-all-bone-names="toggleAllBoneNames"
       @remove-model="removeModel"
       @hide="hideSection"
     />
@@ -51,7 +57,11 @@ const props = defineProps({
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
   springBoneEnabled: { type: Boolean, required: true },
-  lookAtEnabled: { type: Boolean, required: true }
+  lookAtEnabled: { type: Boolean, required: true },
+  showPhysicalBones: { type: Boolean, required: true },
+  showOtherBones: { type: Boolean, required: true },
+  boneDotSize: { type: Number, required: true },
+  boneLabelScale: { type: Number, required: true }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
@@ -60,9 +70,15 @@ const emit = defineEmits([
   'update:directionalIntensity',
   'update:springBoneEnabled',
   'update:lookAtEnabled',
+  'update:showPhysicalBones',
+  'update:showOtherBones',
+  'update:boneDotSize',
+  'update:boneLabelScale',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
+  'toggle-all-bones',
+  'toggle-all-bone-names',
   'remove-model'
 ])
 const showLightMarker = computed({
@@ -85,6 +101,22 @@ const lookAtEnabled = computed({
   get: () => props.lookAtEnabled,
   set: v => emit('update:lookAtEnabled', v)
 })
+const showPhysicalBones = computed({
+  get: () => props.showPhysicalBones,
+  set: v => emit('update:showPhysicalBones', v)
+})
+const showOtherBones = computed({
+  get: () => props.showOtherBones,
+  set: v => emit('update:showOtherBones', v)
+})
+const boneDotSize = computed({
+  get: () => props.boneDotSize,
+  set: v => emit('update:boneDotSize', v)
+})
+const boneLabelScale = computed({
+  get: () => props.boneLabelScale,
+  set: v => emit('update:boneLabelScale', v)
+})
 // IK/SpringBone UI は VRM最適化のため削除
 
 function toggleModel(i, v) {
@@ -100,6 +132,13 @@ function removeModel(i) {
   emit('remove-model', i)
 }
 
+function toggleAllBones(v) {
+  emit('toggle-all-bones', v)
+}
+function toggleAllBoneNames(v) {
+  emit('toggle-all-bone-names', v)
+}
+
 const { width, isResizing, startResize } = useResizableSidebar(300)
 const {
   collapsed,
@@ -111,6 +150,10 @@ const {
   showLightMarker,
   springBoneEnabled,
   lookAtEnabled,
+  showPhysicalBones,
+  showOtherBones,
+  boneDotSize,
+  boneLabelScale,
   markerColor,
   directionalIntensity,
   directional
@@ -138,7 +181,11 @@ defineExpose({
   showLightMarker,
   springBoneEnabled,
   lookAtEnabled,
-  markerColor
+  markerColor,
+  showPhysicalBones,
+  showOtherBones,
+  boneDotSize,
+  boneLabelScale
 })
 </script>
 

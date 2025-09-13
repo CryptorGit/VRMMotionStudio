@@ -4,9 +4,11 @@
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
       <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
       <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
-      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> ライト設定</li>
-      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ編集</li>
-      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル一覧</li>
+      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> 照明設定</li>
+      <li id="display-option" @click="openSidebarSection('display')"><i class="fa-solid fa-eye"></i> 表示管理</li>
+      <li id="physics-option" @click="openSidebarSection('physics')"><i class="fa-solid fa-atom"></i> 物理設定</li>
+      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ</li>
+      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル管理</li>
       <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
     </ul>
   </div>
@@ -27,3 +29,12 @@ const props = defineProps({
 const menu = ref(null)
 defineExpose({ menu })
 </script>
+
+<style scoped>
+#menu { position: fixed; top: 10px; left: 10px; z-index: 1000; }
+#menu-button { padding: 6px 10px; }
+#menu-list { list-style: none; padding: 6px; margin: 6px 0 0; background: #fff; border: 1px solid #ccc; }
+#menu-list.hidden { display: none; }
+#menu-list li { cursor: pointer; padding: 4px 8px; }
+#menu-list li:hover { background: #f0f0f0; }
+</style>

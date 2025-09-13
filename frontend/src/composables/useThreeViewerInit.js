@@ -39,7 +39,7 @@ export function useThreeViewerInit({
     scene.value.add(floorMesh)
 
     camera.value = markRaw(
-      new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 2000)
+      new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000)
     )
     camera.value.position.set(0, 10, 30)
 

@@ -11,21 +11,16 @@
     </h3>
     <div v-show="expanded" class="section-content">
       <label>
-        <input type="checkbox" v-model="springBoneEnabledLocal" /> SpringBone 有効
-      </label>
-      <label>
         <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
       </label>
       <ModelList
         :models="models"
         @toggle="(i, v) => emit('toggle-model', i, v)"
-        @toggle-bone="(i, v) => emit('toggle-bone', i, v)"
-        @toggle-bone-names="(i, v) => emit('toggle-bone-names', i, v)"
         @remove="i => emit('remove-model', i)"
       />
     </div>
   </div>
-</template>
+  </template>
 
 <script setup>
 import { ref, computed } from 'vue'
@@ -33,26 +28,18 @@ import ModelList from './ModelList.vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
-  springBoneEnabled: { type: Boolean, required: true },
   lookAtEnabled: { type: Boolean, required: true }
 })
 
 const emit = defineEmits([
   'hide',
   'toggle-model',
-  'toggle-bone',
-  'toggle-bone-names',
   'remove-model',
-  'update:springBoneEnabled',
   'update:lookAtEnabled'
 ])
 
 const expanded = ref(false)
 
-const springBoneEnabledLocal = computed({
-  get: () => props.springBoneEnabled,
-  set: v => emit('update:springBoneEnabled', v)
-})
 const lookAtEnabledLocal = computed({
   get: () => props.lookAtEnabled,
   set: v => emit('update:lookAtEnabled', v)

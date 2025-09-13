@@ -5,12 +5,27 @@
       :ambient="ambient"
       :directional="directional"
       :directional-intensity="directionalIntensity"
+      @update:directional-intensity="v => emit('update:directionalIntensity', v)"
+      @hide="emit('hide', 'lighting')"
+    />
+    <DisplaySection
+      v-if="visibleSections.display"
+      :models="models"
       :show-light-marker="showLightMarker"
       :marker-color="markerColor"
-      @update:directional-intensity="v => emit('update:directionalIntensity', v)"
+      :show-physical-bones="showPhysicalBones"
+      :show-other-bones="showOtherBones"
+      :bone-dot-size="boneDotSize"
+      :bone-label-scale="boneLabelScale"
       @update:show-light-marker="v => emit('update:showLightMarker', v)"
       @update:marker-color="v => emit('update:markerColor', v)"
-      @hide="emit('hide', 'lighting')"
+      @update:show-physical-bones="v => emit('update:showPhysicalBones', v)"
+      @update:show-other-bones="v => emit('update:showOtherBones', v)"
+      @update:bone-dot-size="v => emit('update:boneDotSize', v)"
+      @update:bone-label-scale="v => emit('update:boneLabelScale', v)"
+      @toggle-all-bones="v => emit('toggle-all-bones', v)"
+      @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
+      @hide="emit('hide', 'display')"
     />
     <MorphSection
       v-if="visibleSections.morph"
@@ -20,15 +35,17 @@
     <ModelSection
       v-if="visibleSections.models"
       :models="models"
-      :spring-bone-enabled="springBoneEnabled"
       :look-at-enabled="lookAtEnabled"
-      @update:spring-bone-enabled="v => emit('update:springBoneEnabled', v)"
       @update:look-at-enabled="v => emit('update:lookAtEnabled', v)"
       @toggle-model="(...args) => emit('toggle-model', ...args)"
-      @toggle-bone="(...args) => emit('toggle-bone', ...args)"
-      @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
       @remove-model="(...args) => emit('remove-model', ...args)"
       @hide="emit('hide', 'models')"
+    />
+    <PhysicsSection
+      v-if="visibleSections.physics"
+      :spring-bone-enabled="springBoneEnabled"
+      @update:spring-bone-enabled="v => emit('update:springBoneEnabled', v)"
+      @hide="emit('hide', 'physics')"
     />
   </div>
 </template>
@@ -37,6 +54,8 @@
 import LightingSection from './LightingSection.vue'
 import MorphSection from './MorphSection.vue'
 import ModelSection from './ModelSection.vue'
+import DisplaySection from './DisplaySection.vue'
+import PhysicsSection from './PhysicsSection.vue'
 
 defineProps({
   ambient: Object,
@@ -48,7 +67,11 @@ defineProps({
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
   springBoneEnabled: { type: Boolean, required: true },
-  lookAtEnabled: { type: Boolean, required: true }
+  lookAtEnabled: { type: Boolean, required: true },
+  showPhysicalBones: { type: Boolean, required: true },
+  showOtherBones: { type: Boolean, required: true },
+  boneDotSize: { type: Number, required: true },
+  boneLabelScale: { type: Number, required: true }
 })
 
 const emit = defineEmits([
@@ -57,9 +80,15 @@ const emit = defineEmits([
   'update:directionalIntensity',
   'update:springBoneEnabled',
   'update:lookAtEnabled',
+  'update:showPhysicalBones',
+  'update:showOtherBones',
+  'update:boneDotSize',
+  'update:boneLabelScale',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
+  'toggle-all-bones',
+  'toggle-all-bone-names',
   'remove-model',
   'hide'
 ])

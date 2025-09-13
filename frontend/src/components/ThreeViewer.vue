@@ -36,9 +36,15 @@
     v-model:marker-color="lightMarkerColor"
     v-model:spring-bone-enabled="springBoneEnabled"
     v-model:look-at-enabled="lookAtEnabled"
+    v-model:show-physical-bones="showPhysicalBones"
+    v-model:show-other-bones="showOtherBones"
+    v-model:bone-dot-size="boneDotSize"
+    v-model:bone-label-scale="boneLabelScale"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @toggle-bone-names="toggleBoneNameVisibility"
+  @toggle-all-bones="toggleAllBones"
+  @toggle-all-bone-names="toggleAllBoneNames"
   @remove-model="removeModel"
 />
 </template>
@@ -78,6 +84,11 @@ const renderer = shallowRef(null)
 const controls = shallowRef(null)
 const helper = shallowRef(null)
 const transformControls = shallowRef(null)
+// Display settings
+const showPhysicalBones = ref(false)
+const showOtherBones = ref(false)
+const boneDotSize = ref(0.02)
+const boneLabelScale = ref(1.0)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
@@ -109,7 +120,12 @@ const fileLoader = useFileLoader({
   menuOpen,
   logToServer,
   viewer,
-  transformControls
+  transformControls,
+  controls,
+  showPhysicalBones,
+  showOtherBones,
+  boneDotSize,
+  boneLabelScale
 })
 const {
   fileInput,
@@ -128,7 +144,8 @@ const {
   onDragOver,
   onDragLeave,
   onDrop,
-  restoreCachedModel
+  restoreCachedModel,
+  applyBoneSettingsAll
 } = fileLoader
 
 const { animate, initRenderer, cleanupRenderer } = useRenderer({
@@ -215,6 +232,26 @@ watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
     })
   } catch {}
 })
+
+// Apply display settings to all models
+watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones], () => {
+  try { applyBoneSettingsAll?.() } catch {}
+})
+
+function toggleAllBones(v) {
+  try {
+    const len = models?.value?.length || 0
+    for (let i = 0; i < len; i++) fileLoader.toggleBoneVisibility?.(i, v)
+    applyBoneSettingsAll?.()
+  } catch {}
+}
+function toggleAllBoneNames(v) {
+  try {
+    const len = models?.value?.length || 0
+    for (let i = 0; i < len; i++) fileLoader.toggleBoneNameVisibility?.(i, v)
+    applyBoneSettingsAll?.()
+  } catch {}
+}
 </script>
 
 

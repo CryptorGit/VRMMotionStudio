@@ -5,26 +5,11 @@
         <input type="checkbox" :checked="m.visible" @change="onToggle(i, $event.target.checked)" />
         {{ m.name }}
       </label>
-      <label>
-        <input
-          type="checkbox"
-          :checked="m.bonesVisible"
-          @change="onToggleBone(i, $event.target.checked)"
-        />
-        ボーン表示
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          :checked="m.boneNameVisible"
-          @change="onToggleBoneName(i, $event.target.checked)"
-        />
-        ボーン名表示
-      </label>
+      <span class="status">SB: {{ springBoneStatus(m) }}</span>
       <button @click="$emit('remove', i)">削除</button>
     </li>
   </ul>
-</template>
+  </template>
 
 <script setup>
 const props = defineProps({
@@ -32,18 +17,20 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'toggle',
-  'toggle-bone',
-  'toggle-bone-names',
   'remove'
 ])
 function onToggle(index, visible) {
   emit('toggle', index, visible)
 }
-function onToggleBone(index, visible) {
-  emit('toggle-bone', index, visible)
-}
-function onToggleBoneName(index, visible) {
-  emit('toggle-bone-names', index, visible)
+
+function springBoneStatus(m) {
+  try {
+    const mgr = m?.vrm?.springBoneManager
+    if (!mgr) return 'なし'
+    if (typeof mgr.enabled === 'boolean') return mgr.enabled ? '有効' : '無効'
+    if (typeof mgr.getEnabled === 'function') return mgr.getEnabled() ? '有効' : '無効'
+  } catch {}
+  return '不明'
 }
 </script>
 
@@ -58,8 +45,10 @@ function onToggleBoneName(index, visible) {
   align-items: center;
   margin-bottom: 4px;
 }
-.model-list label + label {
-  margin-left: 8px;
+.model-list .status {
+  margin: 0 8px;
+  font-size: 0.85em;
+  color: #555;
 }
 .model-list button {
   margin-left: auto;
