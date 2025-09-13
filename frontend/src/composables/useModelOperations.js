@@ -242,17 +242,20 @@ export function useModelOperations({
     const direct = [mgr.joints, mgr._joints, mgr.springJoints, mgr._springJoints, mgr._jointList]
     for (const a of direct) if (Array.isArray(a)) a.forEach(j => out.push(j))
     if (out.length === 0) {
-      try {
-        for (const k in mgr) {
-          const v = mgr[k]
-          if (Array.isArray(v) && v.length && typeof v[0] === 'object') {
-            const sample = v[0]
-            if (sample && (sample.node || sample.bone || sample.joint || sample.target)) {
-              v.forEach(j => out.push(j))
-            }
+      const visited = new Set()
+      function scan(obj, depth = 0) {
+        if (!obj || typeof obj !== 'object' || visited.has(obj) || depth > 5) return
+        visited.add(obj)
+        if (Array.isArray(obj)) {
+          for (const v of obj) {
+            if (v && (v.node || v.bone || v.target || v.joint)) out.push(v)
+            else scan(v, depth + 1)
           }
+          return
         }
-      } catch {}
+        for (const k in obj) scan(obj[k], depth + 1)
+      }
+      try { scan(mgr) } catch {}
     }
     return out
   }
@@ -333,9 +336,21 @@ export function useModelOperations({
     try {
       const joints = getRuntimeSpringJoints(vrm)
       if (Array.isArray(joints) && joints.length && parser) {
+        function resolveIdx(obj) {
+          let idx = getObjectNodeIndex(obj, parser)
+          if (typeof idx === 'number') return idx
+          if (!obj) return undefined
+          for (const [i, o] of indexToObj) if (o === obj) return i
+          if (obj.name) {
+            const matches = []
+            for (const [i, o] of indexToObj) if (o.name === obj.name) matches.push(i)
+            if (matches.length === 1) return matches[0]
+          }
+          return undefined
+        }
         for (const j of joints) {
           const obj = j?.node || j?.bone || j?.target || j?.joint
-          const idx = getObjectNodeIndex(obj, parser)
+          const idx = resolveIdx(obj)
           if (typeof idx === 'number') indices.add(idx)
         }
         usedRuntime = indices.size > 0
