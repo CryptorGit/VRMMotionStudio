@@ -524,8 +524,7 @@ export function useModelOperations({
     try { enumerateHumanoidBones(vrm).forEach(o => o && humanoidObjSet.add(o)) } catch {}
     // - Physical: add runtime spring joints' nodes directly (may be non-Bone)
     try {
-      const mgr = vrm?.springBoneManager
-      const joints = mgr?.joints
+      const joints = getRuntimeSpringJoints(vrm)
       if (Array.isArray(joints)) {
         for (const j of joints) {
           const o = j?.node || j?.bone || j?.target || j?.joint
@@ -533,9 +532,6 @@ export function useModelOperations({
         }
       }
     } catch {}
-
-    // Priority: Humanoid > Physical. Remove overlaps from physical.
-    for (const o of humanoidObjSet) physicalObjSet.delete(o)
 
     // Priority: Humanoid > Physical. Remove overlaps from physical.
     for (const o of humanoidObjSet) physicalObjSet.delete(o)
@@ -609,15 +605,11 @@ export function useModelOperations({
     // Prepare arrays for gizmo creation
     const humanoidBones = Array.from(humanoidObjSet)
     const physicalBones = Array.from(physicalObjSet)
-    // Other bones: based on index membership to keep sets disjoint even if objects differ
+    // Other bones: everything not recognized as humanoid or physical
     const otherBones = []
-    const humanoidIdxSet = collectHumanoidIndexSet(model)
-    const physicalIdxSet = collectPhysicalBoneIndexSet(model)
     for (const b of enumerateAllBones(vrm.scene)) {
-      const idx = getObjectNodeIndex(b, parser)
-      if (typeof idx !== 'number') { otherBones.push(b); continue }
-      if (humanoidIdxSet.has(idx)) continue
-      if (physicalIdxSet.has(idx)) continue
+      if (humanoidObjSet.has(b)) continue
+      if (physicalObjSet.has(b)) continue
       otherBones.push(b)
     }
     const geom = new THREE.SphereGeometry(0.02, 8, 8)
