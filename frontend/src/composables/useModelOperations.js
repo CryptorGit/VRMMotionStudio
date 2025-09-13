@@ -241,10 +241,16 @@ export function useModelOperations({
     if (!mgr) return out
     const direct = [mgr.joints, mgr._joints, mgr.springJoints, mgr._springJoints, mgr._jointList]
     for (const a of direct) if (Array.isArray(a)) a.forEach(j => out.push(j))
+    if (Array.isArray(mgr.springs)) {
+      for (const s of mgr.springs) {
+        const arr = s?.joints || s?.bones || s?.links
+        if (Array.isArray(arr)) arr.forEach(j => out.push(j))
+      }
+    }
     if (out.length === 0) {
       const visited = new Set()
       function scan(obj, depth = 0) {
-        if (!obj || typeof obj !== 'object' || visited.has(obj) || depth > 5) return
+        if (!obj || typeof obj !== 'object' || visited.has(obj) || depth > 10) return
         visited.add(obj)
         if (Array.isArray(obj)) {
           for (const v of obj) {
@@ -336,15 +342,31 @@ export function useModelOperations({
     try {
       const joints = getRuntimeSpringJoints(vrm)
       if (Array.isArray(joints) && joints.length && parser) {
+        function pathOf(o) {
+          const names = []
+          let cur = o
+          while (cur) {
+            names.unshift(cur.name || cur.uuid)
+            cur = cur.parent
+          }
+          return names.join('/')
+        }
         function resolveIdx(obj) {
           let idx = getObjectNodeIndex(obj, parser)
           if (typeof idx === 'number') return idx
           if (!obj) return undefined
-          for (const [i, o] of indexToObj) if (o === obj) return i
+          for (const [i, o] of indexToObj) {
+            if (o === obj || o.uuid === obj.uuid) return i
+          }
           if (obj.name) {
             const matches = []
-            for (const [i, o] of indexToObj) if (o.name === obj.name) matches.push(i)
-            if (matches.length === 1) return matches[0]
+            for (const [i, o] of indexToObj) if (o.name === obj.name) matches.push([i, o])
+            if (matches.length === 1) return matches[0][0]
+            if (matches.length > 1) {
+              const p = pathOf(obj)
+              const pm = matches.filter(([i, o]) => pathOf(o) === p)
+              if (pm.length === 1) return pm[0][0]
+            }
           }
           return undefined
         }
@@ -357,11 +379,13 @@ export function useModelOperations({
       }
     } catch {}
     // Fallback to JSON
-    if (!usedRuntime && json?.extensions?.VRMC_springBone?.joints) {
+    if (!usedRuntime && json?.extensions?.VRMC_springBone?.springs) {
       try {
-        for (const j of json.extensions.VRMC_springBone.joints) {
-          const n = j?.node
-          if (typeof n === 'number') indices.add(n)
+        for (const s of json.extensions.VRMC_springBone.springs) {
+          for (const j of s?.joints || []) {
+            const n = j?.node
+            if (typeof n === 'number') indices.add(n)
+          }
         }
       } catch {}
     }
