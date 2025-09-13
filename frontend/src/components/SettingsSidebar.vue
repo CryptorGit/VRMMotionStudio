@@ -35,6 +35,11 @@
       v-model:show-other-bones="showOtherBones"
       v-model:bone-dot-size="boneDotSize"
       v-model:bone-label-scale="boneLabelScale"
+  v-model:virtual-trackers-enabled="virtualTrackersEnabled"
+  v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
+  v-model:virtual-tracker-size="virtualTrackerSize"
+  v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
+  @reset-virtual-trackers="$emit('reset-virtual-trackers')"
       @toggle-model="toggleModel"
       @toggle-bone="toggleBone"
       @toggle-bone-names="toggleBoneNames"
@@ -70,6 +75,10 @@ const props = defineProps({
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true }
+  , virtualTrackersEnabled: { type: Boolean, default: false }
+  , showVirtualTrackerLabels: { type: Boolean, default: true }
+  , virtualTrackerSize: { type: Number, default: 0.08 }
+  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
 })
 const { ambient, directional, mesh, models } = toRefs(props)
 const emit = defineEmits([
@@ -86,12 +95,17 @@ const emit = defineEmits([
   'update:showOtherBones',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:virtualTrackersEnabled',
+  'update:showVirtualTrackerLabels',
+  'update:virtualTrackerSize',
+  'update:virtualTrackerLabelScale',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
   'toggle-all-bones',
   'toggle-all-bone-names',
-  'remove-model'
+  'remove-model',
+  'reset-virtual-trackers'
 ])
 const showLightMarker = computed({
   get: () => props.showLightMarker,
@@ -145,6 +159,22 @@ const boneLabelScale = computed({
   get: () => props.boneLabelScale,
   set: v => emit('update:boneLabelScale', v)
 })
+const virtualTrackersEnabled = computed({
+  get: () => props.virtualTrackersEnabled,
+  set: v => emit('update:virtualTrackersEnabled', v)
+})
+const showVirtualTrackerLabels = computed({
+  get: () => props.showVirtualTrackerLabels,
+  set: v => emit('update:showVirtualTrackerLabels', v)
+})
+const virtualTrackerSize = computed({
+  get: () => props.virtualTrackerSize,
+  set: v => emit('update:virtualTrackerSize', v)
+})
+const virtualTrackerLabelScale = computed({
+  get: () => props.virtualTrackerLabelScale,
+  set: v => emit('update:virtualTrackerLabelScale', v)
+})
 // IK/SpringBone UI は VRM最適化のため削除
 
 function toggleModel(i, v) {
@@ -188,7 +218,12 @@ const {
   boneLabelScale,
   markerColor,
   directionalIntensity,
-  directional
+  directional,
+  // Persist virtual tracker UI settings as well
+  virtualTrackersEnabled,
+  showVirtualTrackerLabels,
+  virtualTrackerSize,
+  virtualTrackerLabelScale
 })
 
 const headerRef = ref(null)
@@ -217,7 +252,11 @@ defineExpose({
   showPhysicalBones,
   showOtherBones,
   boneDotSize,
-  boneLabelScale
+  boneLabelScale,
+  virtualTrackersEnabled,
+  showVirtualTrackerLabels,
+  virtualTrackerSize,
+  virtualTrackerLabelScale
 })
 </script>
 

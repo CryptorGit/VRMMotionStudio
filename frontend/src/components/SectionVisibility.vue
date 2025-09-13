@@ -21,6 +21,10 @@
       :show-other-bones="showOtherBones"
       :bone-dot-size="boneDotSize"
       :bone-label-scale="boneLabelScale"
+  :virtual-trackers-enabled="virtualTrackersEnabled"
+  :show-virtual-tracker-labels="showVirtualTrackerLabels"
+  :virtual-tracker-size="virtualTrackerSize"
+  :virtual-tracker-label-scale="virtualTrackerLabelScale"
       @update:show-light-marker="v => emit('update:showLightMarker', v)"
       @update:marker-color="v => emit('update:markerColor', v)"
       @update:show-extended-bones="v => emit('update:showExtendedBones', v)"
@@ -31,8 +35,13 @@
       @update:show-other-bones="v => emit('update:showOtherBones', v)"
       @update:bone-dot-size="v => emit('update:boneDotSize', v)"
       @update:bone-label-scale="v => emit('update:boneLabelScale', v)"
+  @update:virtual-trackers-enabled="v => emit('update:virtualTrackersEnabled', v)"
+  @update:show-virtual-tracker-labels="v => emit('update:showVirtualTrackerLabels', v)"
+  @update:virtual-tracker-size="v => emit('update:virtualTrackerSize', v)"
+  @update:virtual-tracker-label-scale="v => emit('update:virtualTrackerLabelScale', v)"
       @toggle-all-bones="v => emit('toggle-all-bones', v)"
       @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
+  @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
       @hide="emit('hide', 'display')"
     />
     <MorphSection
@@ -83,7 +92,11 @@ defineProps({
   showPhysicalBones: { type: Boolean, required: true },
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
-  boneLabelScale: { type: Number, required: true }
+  boneLabelScale: { type: Number, required: true },
+  virtualTrackersEnabled: { type: Boolean, default: false }
+  , showVirtualTrackerLabels: { type: Boolean, default: true }
+  , virtualTrackerSize: { type: Number, default: 0.08 }
+  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
 })
 
 const emit = defineEmits([
@@ -100,12 +113,17 @@ const emit = defineEmits([
   'update:showOtherBones',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:virtualTrackersEnabled',
+  'update:showVirtualTrackerLabels',
+  'update:virtualTrackerSize',
+  'update:virtualTrackerLabelScale',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
   'toggle-all-bones',
   'toggle-all-bone-names',
   'remove-model',
+  'reset-virtual-trackers',
   'hide'
 ])
 </script>

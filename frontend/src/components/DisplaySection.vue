@@ -5,7 +5,7 @@
         class="toggle-icon"
         :class="expanded ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"
       ></i>
-      表示管理
+  表示とツール（仮）
       <span class="spacer"></span>
       <i class="fa-solid fa-times close-icon" @click.stop="$emit('hide')"></i>
     </h3>
@@ -68,20 +68,38 @@
       </div>
       <div class="row">
         <label class="stretch">
-          ボーン名表示（大きさ）
+          ボーン名表示サイズ（大きさ）
           <input
             type="range"
-            :min="boneLabelSmallRangeLocal ? 0.02 : 0.2"
-            :max="boneLabelSmallRangeLocal ? 0.2 : 2.0"
-            :step="boneLabelSmallRangeLocal ? 0.01 : 0.05"
+            min="0.05"
+            max="2.0"
+            step="0.05"
             v-model.number="boneLabelScaleLocal"
           />
         </label>
       </div>
+      <hr />
       <div class="row">
         <label>
-          小さいレンジ
-          <input type="checkbox" v-model="boneLabelSmallRangeLocal" />
+          バーチャルトラッカー
+          <input type="checkbox" v-model="virtualTrackersEnabledLocal" />
+        </label>
+        <button type="button" @click="$emit('reset-virtual-trackers')">位置リセット</button>
+      </div>
+      <div class="row">
+        <label>
+          トラッカー名表示
+          <input type="checkbox" v-model="showVirtualTrackerLabelsLocal" />
+        </label>
+        <label class="stretch">
+          トラッカーサイズ
+          <input type="range" min="0.02" max="0.25" step="0.005" v-model.number="virtualTrackerSizeLocal" />
+        </label>
+      </div>
+      <div class="row">
+        <label class="stretch">
+          トラッカー名表示サイズ
+          <input type="range" min="0.2" max="3.0" step="0.05" v-model.number="virtualTrackerLabelScaleLocal" />
         </label>
       </div>
     </div>
@@ -103,6 +121,10 @@ const props = defineProps({
   highlightConstraint: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true }
+  , virtualTrackersEnabled: { type: Boolean, default: false }
+  , showVirtualTrackerLabels: { type: Boolean, default: true }
+  , virtualTrackerSize: { type: Number, default: 0.08 }
+  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
 })
 const emit = defineEmits([
   'hide',
@@ -118,6 +140,11 @@ const emit = defineEmits([
   'update:boneLabelScale',
   'toggle-all-bones',
   'toggle-all-bone-names'
+  , 'update:virtualTrackersEnabled'
+  , 'reset-virtual-trackers'
+  , 'update:showVirtualTrackerLabels'
+  , 'update:virtualTrackerSize'
+  , 'update:virtualTrackerLabelScale'
 ])
 
 const expanded = ref(false)
@@ -162,18 +189,23 @@ const boneLabelScaleLocal = computed({
   get: () => props.boneLabelScale,
   set: v => emit('update:boneLabelScale', v)
 })
-// UI-only toggle for smaller label scale range
-const boneLabelSmallRangeLocal = ref(false)
-
-watch(boneLabelSmallRangeLocal, v => {
-  // Clamp current value into the active range boundary when toggled
-  if (v && boneLabelScaleLocal.value > 0.2) {
-    boneLabelScaleLocal.value = 0.2
-  }
-  if (!v && boneLabelScaleLocal.value < 0.2) {
-    boneLabelScaleLocal.value = 0.2
-  }
+const virtualTrackersEnabledLocal = computed({
+  get: () => props.virtualTrackersEnabled,
+  set: v => emit('update:virtualTrackersEnabled', v)
 })
+const showVirtualTrackerLabelsLocal = computed({
+  get: () => props.showVirtualTrackerLabels,
+  set: v => emit('update:showVirtualTrackerLabels', v)
+})
+const virtualTrackerSizeLocal = computed({
+  get: () => props.virtualTrackerSize,
+  set: v => emit('update:virtualTrackerSize', v)
+})
+const virtualTrackerLabelScaleLocal = computed({
+  get: () => props.virtualTrackerLabelScale,
+  set: v => emit('update:virtualTrackerLabelScale', v)
+})
+// ボーン名スライダーは単一レンジに統一
 
 function onToggleAllBones(v) {
   emit('toggle-all-bones', !!v)

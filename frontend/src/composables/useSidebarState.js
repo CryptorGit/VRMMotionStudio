@@ -16,7 +16,12 @@ export function useSidebarState({
   boneLabelScale,
   markerColor,
   directionalIntensity,
-  directional
+  directional,
+  // optional virtual tracker bindings
+  virtualTrackersEnabled,
+  showVirtualTrackerLabels,
+  virtualTrackerSize,
+  virtualTrackerLabelScale
 }) {
   const collapsed = ref(false)
   const visibleSections = reactive({
@@ -61,6 +66,10 @@ export function useSidebarState({
         showOtherBones: showOtherBones?.value,
         boneDotSize: boneDotSize?.value,
         boneLabelScale: boneLabelScale?.value,
+  virtualTrackersEnabled: virtualTrackersEnabled?.value,
+  showVirtualTrackerLabels: showVirtualTrackerLabels?.value,
+  virtualTrackerSize: virtualTrackerSize?.value,
+  virtualTrackerLabelScale: virtualTrackerLabelScale?.value,
         markerColor: markerColor?.value,
         directionalIntensity: directionalIntensity?.value,
         directional: directional
@@ -104,6 +113,11 @@ export function useSidebarState({
           showColliderNodes: savedShowColliderNodes,
           showNonDeformingBones: savedShowNonDeformingBones,
           highlightConstraint: savedHighlightConstraint,
+          // virtual tracker UI state
+          virtualTrackersEnabled: savedVirtualTrackersEnabled,
+          showVirtualTrackerLabels: savedShowVirtualTrackerLabels,
+          virtualTrackerSize: savedVirtualTrackerSize,
+          virtualTrackerLabelScale: savedVirtualTrackerLabelScale,
           showPhysicalBones: savedShowPhysicalBones,
           showOtherBones: savedShowOtherBones,
           boneDotSize: savedBoneDotSize,
@@ -138,6 +152,14 @@ export function useSidebarState({
           showNonDeformingBones.value = savedShowNonDeformingBones
         if (highlightConstraint && savedHighlightConstraint !== undefined)
           highlightConstraint.value = savedHighlightConstraint
+        if (virtualTrackersEnabled && savedVirtualTrackersEnabled !== undefined)
+          virtualTrackersEnabled.value = savedVirtualTrackersEnabled
+        if (showVirtualTrackerLabels && savedShowVirtualTrackerLabels !== undefined)
+          showVirtualTrackerLabels.value = savedShowVirtualTrackerLabels
+        if (virtualTrackerSize && savedVirtualTrackerSize !== undefined)
+          virtualTrackerSize.value = savedVirtualTrackerSize
+        if (virtualTrackerLabelScale && savedVirtualTrackerLabelScale !== undefined)
+          virtualTrackerLabelScale.value = savedVirtualTrackerLabelScale
         if (showPhysicalBones && savedShowPhysicalBones !== undefined)
           showPhysicalBones.value = savedShowPhysicalBones
         if (showOtherBones && savedShowOtherBones !== undefined)
@@ -182,6 +204,10 @@ export function useSidebarState({
   showColliderNodes && showColliderNodes.value
   showNonDeformingBones && showNonDeformingBones.value
   highlightConstraint && highlightConstraint.value
+  virtualTrackersEnabled && virtualTrackersEnabled.value
+  showVirtualTrackerLabels && showVirtualTrackerLabels.value
+  virtualTrackerSize && virtualTrackerSize.value
+  virtualTrackerLabelScale && virtualTrackerLabelScale.value
     showPhysicalBones && showPhysicalBones.value
     showOtherBones && showOtherBones.value
     boneDotSize && boneDotSize.value

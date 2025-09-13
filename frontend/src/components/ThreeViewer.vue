@@ -44,6 +44,11 @@
     v-model:show-other-bones="showOtherBones"
     v-model:bone-dot-size="boneDotSize"
     v-model:bone-label-scale="boneLabelScale"
+  v-model:virtual-trackers-enabled="virtualTrackersEnabled"
+  v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
+  v-model:virtual-tracker-size="virtualTrackerSize"
+  v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
+  @reset-virtual-trackers="resetVirtualTrackers"
   @toggle-model="toggleModelVisibility"
   @toggle-bone="toggleBoneVisibility"
   @toggle-bone-names="toggleBoneNameVisibility"
@@ -72,6 +77,7 @@ import { useMenu } from '../composables/useMenu.js'
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
+import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
 
 const viewer = ref(null)
 const menu = ref(null)
@@ -97,6 +103,11 @@ const showNonDeformingBones = ref(false)
 const highlightConstraint = ref(false)
 const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
+// Virtual trackers
+const virtualTrackersEnabled = ref(false)
+const showVirtualTrackerLabels = ref(true)
+const virtualTrackerSize = ref(0.08) // sphere base radius
+const virtualTrackerLabelScale = ref(1.0)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
@@ -178,13 +189,17 @@ const {
   applyBoneSettingsAll
 } = fileLoader
 
+// Hook that will call tracker update each frame
+let trackers = null
+const updateTrackers = () => { try { trackers && trackers.update() } catch {} }
+
 const { animate, initRenderer, cleanupRenderer } = useRenderer({
   clock,
   targetFps: TARGET_FPS,
   helper,
   scene,
   camera,
-  updateIKMarkers: () => {},
+  updateIKMarkers: updateTrackers,
   directionalLightHelper,
   renderer,
   viewer,
@@ -196,6 +211,27 @@ const { animate, initRenderer, cleanupRenderer } = useRenderer({
   onPointerDown,
   vrmGetter: () => (models?.value || []).map(m => m.vrm).filter(Boolean)
 })
+
+// Virtual trackers setup
+trackers = useVirtualTrackers({
+  scene,
+  camera,
+  renderer,
+  controls,
+  models,
+  logToServer,
+  trackerDotSize: virtualTrackerSize,
+  trackerLabelScale: virtualTrackerLabelScale,
+  showTrackerLabels: showVirtualTrackerLabels
+})
+
+watch(virtualTrackersEnabled, v => {
+  try { trackers.setEnabled(v) } catch {}
+})
+
+function resetVirtualTrackers() {
+  try { trackers.reset() } catch {}
+}
 
 function handleDocumentClick(e) {
   if (menuOpen.value && menu.value?.menu && !menu.value.menu.contains(e.target)) {
@@ -229,6 +265,8 @@ onMounted(async () => {
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
+  // init virtual trackers events and gizmos
+  try { trackers.init() } catch {}
   // Auto-restore models by default on reload to keep the user session.
   // Opt-out methods:
   //  - URL query: ?restore=0
@@ -266,6 +304,7 @@ onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   cleanupErrorHandlers()
   cleanupRenderer()
+  try { trackers.cleanup() } catch {}
 })
 
 // Sync VRM feature toggles to loaded models
@@ -283,6 +322,12 @@ watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
 // Apply display settings to all models
 watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones, showExtendedBones, showColliderNodes, showNonDeformingBones, highlightConstraint], () => {
   try { applyBoneSettingsAll?.() } catch {}
+})
+
+// Hook tracker update into render loop via requestAnimationFrame in utils/rendering
+watch(models, () => {
+  // re-layout when new models loaded
+  if (virtualTrackersEnabled.value) try { trackers.reset() } catch {}
 })
 
 function toggleAllBones(v) {
