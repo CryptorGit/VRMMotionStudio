@@ -36,6 +36,10 @@
     v-model:marker-color="lightMarkerColor"
     v-model:spring-bone-enabled="springBoneEnabled"
     v-model:look-at-enabled="lookAtEnabled"
+    v-model:show-extended-bones="showExtendedBones"
+    v-model:show-collider-nodes="showColliderNodes"
+    v-model:show-non-deforming-bones="showNonDeformingBones"
+    v-model:highlight-constraint="highlightConstraint"
     v-model:show-physical-bones="showPhysicalBones"
     v-model:show-other-bones="showOtherBones"
     v-model:bone-dot-size="boneDotSize"
@@ -87,19 +91,41 @@ const transformControls = shallowRef(null)
 // Display settings
 const showPhysicalBones = ref(false)
 const showOtherBones = ref(false)
+const showExtendedBones = ref(false)
+const showColliderNodes = ref(false)
+const showNonDeformingBones = ref(false)
+const highlightConstraint = ref(false)
 const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
 
-function logToServer(data) {
-  const url = import.meta.env.DEV ? '/__dev__/log' : `${API_BASE_URL}/log`
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).catch(() => {})
+async function logToServer(data) {
+  const payload = { ts: Date.now(), ...data }
+  // In dev, prefer Vite's terminal log endpoint so logs appear in FE terminal
+  if (import.meta.env.DEV) {
+    try {
+      const r = await fetch('/__dev__/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (r.ok) return
+    } catch {}
+  }
+  // Fallback to backend endpoint; if not available or 404, ignore silently
+  try {
+    const r2 = await fetch(`${API_BASE_URL}/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!r2.ok && import.meta.env.DEV) {
+      // Ensure FE terminal receives logs if BE endpoint missing
+      try { await fetch('/__dev__/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) } catch {}
+    }
+  } catch {}
 }
 
 const { menuOpen, toggleMenu, openSidebarSection } = useMenu({
@@ -124,6 +150,10 @@ const fileLoader = useFileLoader({
   controls,
   showPhysicalBones,
   showOtherBones,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint,
   boneDotSize,
   boneLabelScale
 })
@@ -234,7 +264,7 @@ watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
 })
 
 // Apply display settings to all models
-watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones], () => {
+watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones, showExtendedBones, showColliderNodes, showNonDeformingBones, highlightConstraint], () => {
   try { applyBoneSettingsAll?.() } catch {}
 })
 

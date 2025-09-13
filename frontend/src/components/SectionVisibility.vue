@@ -13,12 +13,20 @@
       :models="models"
       :show-light-marker="showLightMarker"
       :marker-color="markerColor"
+      :show-extended-bones="showExtendedBones"
+      :show-collider-nodes="showColliderNodes"
+      :show-non-deforming-bones="showNonDeformingBones"
+      :highlight-constraint="highlightConstraint"
       :show-physical-bones="showPhysicalBones"
       :show-other-bones="showOtherBones"
       :bone-dot-size="boneDotSize"
       :bone-label-scale="boneLabelScale"
       @update:show-light-marker="v => emit('update:showLightMarker', v)"
       @update:marker-color="v => emit('update:markerColor', v)"
+      @update:show-extended-bones="v => emit('update:showExtendedBones', v)"
+      @update:show-collider-nodes="v => emit('update:showColliderNodes', v)"
+      @update:show-non-deforming-bones="v => emit('update:showNonDeformingBones', v)"
+      @update:highlight-constraint="v => emit('update:highlightConstraint', v)"
       @update:show-physical-bones="v => emit('update:showPhysicalBones', v)"
       @update:show-other-bones="v => emit('update:showOtherBones', v)"
       @update:bone-dot-size="v => emit('update:boneDotSize', v)"
@@ -68,6 +76,10 @@ defineProps({
   directionalIntensity: { type: Number, required: true },
   springBoneEnabled: { type: Boolean, required: true },
   lookAtEnabled: { type: Boolean, required: true },
+  showExtendedBones: { type: Boolean, required: true },
+  showColliderNodes: { type: Boolean, required: true },
+  showNonDeformingBones: { type: Boolean, required: true },
+  highlightConstraint: { type: Boolean, required: true },
   showPhysicalBones: { type: Boolean, required: true },
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
@@ -80,6 +92,10 @@ const emit = defineEmits([
   'update:directionalIntensity',
   'update:springBoneEnabled',
   'update:lookAtEnabled',
+  'update:showExtendedBones',
+  'update:showColliderNodes',
+  'update:showNonDeformingBones',
+  'update:highlightConstraint',
   'update:showPhysicalBones',
   'update:showOtherBones',
   'update:boneDotSize',

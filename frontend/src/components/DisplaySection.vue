@@ -41,6 +41,26 @@
         </label>
       </div>
       <div class="row">
+        <label>
+          ボーン表示（拡張）
+          <input type="checkbox" v-model="showExtendedBonesLocal" />
+        </label>
+        <label>
+          ボーン表示（コライダー）
+          <input type="checkbox" v-model="showColliderNodesLocal" />
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          ボーン表示（非変形）
+          <input type="checkbox" v-model="showNonDeformingBonesLocal" />
+        </label>
+        <label>
+          制約ハイライト
+          <input type="checkbox" v-model="highlightConstraintLocal" />
+        </label>
+      </div>
+      <div class="row">
         <label class="stretch">
           ボーンサイズ（太さ）
           <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
@@ -77,6 +97,10 @@ const props = defineProps({
   markerColor: { type: String, required: true },
   showPhysicalBones: { type: Boolean, required: true },
   showOtherBones: { type: Boolean, required: true },
+  showExtendedBones: { type: Boolean, required: true },
+  showColliderNodes: { type: Boolean, required: true },
+  showNonDeformingBones: { type: Boolean, required: true },
+  highlightConstraint: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true }
 })
@@ -86,6 +110,10 @@ const emit = defineEmits([
   'update:markerColor',
   'update:showPhysicalBones',
   'update:showOtherBones',
+  'update:showExtendedBones',
+  'update:showColliderNodes',
+  'update:showNonDeformingBones',
+  'update:highlightConstraint',
   'update:boneDotSize',
   'update:boneLabelScale',
   'toggle-all-bones',
@@ -109,6 +137,22 @@ const showPhysicalBonesLocal = computed({
 const showOtherBonesLocal = computed({
   get: () => props.showOtherBones,
   set: v => emit('update:showOtherBones', v)
+})
+const showExtendedBonesLocal = computed({
+  get: () => props.showExtendedBones,
+  set: v => emit('update:showExtendedBones', v)
+})
+const showColliderNodesLocal = computed({
+  get: () => props.showColliderNodes,
+  set: v => emit('update:showColliderNodes', v)
+})
+const showNonDeformingBonesLocal = computed({
+  get: () => props.showNonDeformingBones,
+  set: v => emit('update:showNonDeformingBones', v)
+})
+const highlightConstraintLocal = computed({
+  get: () => props.highlightConstraint,
+  set: v => emit('update:highlightConstraint', v)
 })
 const boneDotSizeLocal = computed({
   get: () => props.boneDotSize,

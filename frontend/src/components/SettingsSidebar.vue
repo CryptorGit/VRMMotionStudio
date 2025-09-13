@@ -27,6 +27,10 @@
       v-model:directional-intensity="directionalIntensity"
       v-model:spring-bone-enabled="springBoneEnabled"
       v-model:look-at-enabled="lookAtEnabled"
+      v-model:show-extended-bones="showExtendedBones"
+      v-model:show-collider-nodes="showColliderNodes"
+      v-model:show-non-deforming-bones="showNonDeformingBones"
+      v-model:highlight-constraint="highlightConstraint"
       v-model:show-physical-bones="showPhysicalBones"
       v-model:show-other-bones="showOtherBones"
       v-model:bone-dot-size="boneDotSize"
@@ -58,6 +62,10 @@ const props = defineProps({
   directionalIntensity: { type: Number, required: true },
   springBoneEnabled: { type: Boolean, required: true },
   lookAtEnabled: { type: Boolean, required: true },
+  showExtendedBones: { type: Boolean, required: true },
+  showColliderNodes: { type: Boolean, required: true },
+  showNonDeformingBones: { type: Boolean, required: true },
+  highlightConstraint: { type: Boolean, required: true },
   showPhysicalBones: { type: Boolean, required: true },
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
@@ -70,6 +78,10 @@ const emit = defineEmits([
   'update:directionalIntensity',
   'update:springBoneEnabled',
   'update:lookAtEnabled',
+  'update:showExtendedBones',
+  'update:showColliderNodes',
+  'update:showNonDeformingBones',
+  'update:highlightConstraint',
   'update:showPhysicalBones',
   'update:showOtherBones',
   'update:boneDotSize',
@@ -108,6 +120,22 @@ const showPhysicalBones = computed({
 const showOtherBones = computed({
   get: () => props.showOtherBones,
   set: v => emit('update:showOtherBones', v)
+})
+const showExtendedBones = computed({
+  get: () => props.showExtendedBones,
+  set: v => emit('update:showExtendedBones', v)
+})
+const showColliderNodes = computed({
+  get: () => props.showColliderNodes,
+  set: v => emit('update:showColliderNodes', v)
+})
+const showNonDeformingBones = computed({
+  get: () => props.showNonDeformingBones,
+  set: v => emit('update:showNonDeformingBones', v)
+})
+const highlightConstraint = computed({
+  get: () => props.highlightConstraint,
+  set: v => emit('update:highlightConstraint', v)
 })
 const boneDotSize = computed({
   get: () => props.boneDotSize,
@@ -150,6 +178,10 @@ const {
   showLightMarker,
   springBoneEnabled,
   lookAtEnabled,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint,
   showPhysicalBones,
   showOtherBones,
   boneDotSize,

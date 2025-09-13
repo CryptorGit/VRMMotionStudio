@@ -10,6 +10,10 @@ export function useModelOperations({
   controls,
   showPhysicalBones,
   showOtherBones,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint,
   boneDotSize,
   boneLabelScale,
   currentMeshRef,
@@ -225,31 +229,46 @@ export function useModelOperations({
   function buildIndexToObjectMap(root, parser, extraRoot) {
     const map = new Map()
     if (!parser) return map
-    const uuidMap = new Map()
     const visited = new Set()
-    function traverse(o) {
+    // Track primary (root) separately from secondary (extraRoot)
+    const uuidPrimary = new Map()
+    const uuidAll = new Map()
+    const nameToPrimary = new Map()
+    const nameToAll = new Map()
+    function traverse(o, primary) {
       if (!o || visited.has(o)) return
       visited.add(o)
       try {
         const idx = getObjectNodeIndex(o, parser)
         if (typeof idx === 'number' && !map.has(idx)) map.set(idx, o)
       } catch {}
-      uuidMap.set(o.uuid, o)
-      for (const c of o.children || []) traverse(c)
+      uuidAll.set(o.uuid, o)
+      if (primary) uuidPrimary.set(o.uuid, o)
+      if (o.name) {
+        if (!nameToAll.has(o.name)) nameToAll.set(o.name, [])
+        nameToAll.get(o.name).push(o)
+        if (primary) {
+          if (!nameToPrimary.has(o.name)) nameToPrimary.set(o.name, [])
+          nameToPrimary.get(o.name).push(o)
+        }
+      }
+      for (const c of o.children || []) traverse(c, primary)
     }
-    if (root) traverse(root)
-    if (extraRoot && extraRoot !== root) traverse(extraRoot)
+    if (root) traverse(root, true)
+    if (extraRoot && extraRoot !== root) traverse(extraRoot, false)
     try {
       const nodes = parser?.json?.nodes
       if (Array.isArray(nodes)) {
         nodes.forEach((n, idx) => {
           if (map.has(idx)) return
           const u = n?.extras?.uuid
-          if (u && uuidMap.has(u)) map.set(idx, uuidMap.get(u))
+          if (u && uuidPrimary.has(u)) map.set(idx, uuidPrimary.get(u))
+          else if (u && uuidAll.has(u)) map.set(idx, uuidAll.get(u))
           else if (typeof n?.name === 'string') {
-            const matches = []
-            for (const o of uuidMap.values()) if (o.name === n.name) matches.push(o)
-            if (matches.length === 1) map.set(idx, matches[0])
+            const prim = nameToPrimary.get(n.name) || []
+            if (prim.length === 1) return map.set(idx, prim[0])
+            const all = nameToAll.get(n.name) || []
+            if (all.length === 1) return map.set(idx, all[0])
           }
         })
       }
@@ -264,6 +283,19 @@ export function useModelOperations({
     if (!mgr) return out
     const direct = [mgr.joints, mgr._joints, mgr.springJoints, mgr._springJoints, mgr._jointList]
     for (const a of direct) if (Array.isArray(a)) a.forEach(j => out.push(j))
+    // Common container structures across variants
+    const maybeGroups = [mgr.boneGroups, mgr._boneGroups, mgr.groups, mgr._groups]
+    for (const gArr of maybeGroups) {
+      if (!Array.isArray(gArr)) continue
+      for (const g of gArr) {
+        try {
+          const roots = [g?.root, g?.rootBone]
+          for (const r of roots) if (r) out.push({ node: r })
+          const arr = g?.joints || g?.bones || g?.links
+          if (Array.isArray(arr)) arr.forEach(j => out.push(j))
+        } catch {}
+      }
+    }
     if (Array.isArray(mgr.springs)) {
       for (const s of mgr.springs) {
         const arr = s?.joints || s?.bones || s?.links
@@ -352,12 +384,56 @@ export function useModelOperations({
     return set
   }
 
+  function collectConstraintIndexSet(json) {
+    const set = new Set()
+    try {
+      const nodes = json?.nodes || []
+      for (let i = 0; i < nodes.length; i++) {
+        const ex = nodes[i]?.extensions
+        if (ex && (ex.VRMC_node_constraint || ex['VRMC_node_constraint'])) set.add(i)
+      }
+    } catch {}
+    return set
+  }
+
+  function collectSkinJointIndexSet(json) {
+    const set = new Set()
+    try {
+      const skins = json?.skins || []
+      for (const s of skins) {
+        const joints = s?.joints || []
+        for (const j of joints) if (typeof j === 'number') set.add(j)
+      }
+    } catch {}
+    return set
+  }
+
   function collectPhysicalBoneIndexSet(model) {
     const indices = new Set()
     const parser = getParserFromModel(model)
     const json = parser?.json || null
     const vrm = model?.vrm
-    const indexToObj = buildIndexToObjectMap(vrm?.scene, parser, model?.gltf?.scene)
+    const indexToObj = buildIndexToObjectMap(model?.gltf?.scene, parser, vrm?.scene)
+    function addIndexMaybe(v) {
+      if (typeof v === 'number' && v >= 0) { indices.add(v); return true }
+      return false
+    }
+    function indexFromUnknownBoneRef(ref) {
+      if (typeof ref === 'number') return ref
+      if (!ref) return undefined
+      // common property names
+      const n = ref.node ?? ref.bone ?? ref.index ?? ref.id
+      if (typeof n === 'number') return n
+      // resolve by name if possible
+      try {
+        const name = (typeof ref === 'string') ? ref : (ref.name || ref.boneName || ref.nodeName)
+        if (name && parser?.json?.nodes) {
+          const idx = parser.json.nodes.findIndex(nd => nd?.name === name)
+          if (idx >= 0) return idx
+        }
+      } catch {}
+      return undefined
+    }
     // VRM1.0: runtime joints
     const unresolved = []
     try {
@@ -372,7 +448,7 @@ export function useModelOperations({
           }
           return names.join('/')
         }
-        function resolveIdx(obj) {
+        function getIndexForObject(obj) {
           let idx = getObjectNodeIndex(obj, parser)
           if (typeof idx === 'number') return idx
           if (!obj) return undefined
@@ -393,7 +469,7 @@ export function useModelOperations({
         }
         for (const j of joints) {
           const obj = j?.node || j?.bone || j?.target || j?.joint
-          const idx = resolveIdx(obj)
+          const idx = getIndexForObject(obj)
           if (typeof idx === 'number') indices.add(idx)
           else unresolved.push(obj?.name || obj?.uuid || 'unknown')
         }
@@ -410,23 +486,44 @@ export function useModelOperations({
             if (typeof n === 'number') indices.add(n)
           }
         }
-        for (const c of ext1.colliders || []) {
-          const n = c?.node
-          if (typeof n === 'number') indices.add(n)
-        }
+        // Note: colliders are NOT physical bones; do not add ext1.colliders[].node here
       } catch {}
     }
     // VRM0.x: expand single chains from boneGroups[].bones[] roots
-    if (indices.size === 0 && json?.extensions?.VRM?.secondaryAnimation?.boneGroups) {
+    // Note: Always union VRM0 definitions; do not gate on indices.size.
+    // Some loaders expose runtime spring joints that don't map back to bone nodes,
+    // which would otherwise block VRM0 JSON-based detection.
+    // Handle key variations: boneGroups/bonegroups/bone_groups, or object map
+    const sa = json?.extensions?.VRM?.secondaryAnimation
+    const rawGroups = sa?.boneGroups || sa?.bonegroups || sa?.bone_groups || sa?.BoneGroups || sa?.BONEGROUPS || null
+    if (rawGroups) {
       try {
-        const bg = json.extensions.VRM.secondaryAnimation.boneGroups
+        const bg = Array.isArray(rawGroups) ? rawGroups : (typeof rawGroups === 'object' ? Object.values(rawGroups) : [])
+        try { logToServer?.({ event: 'vrm0-boneGroups', groups: Array.isArray(bg) ? bg.length : 0 }) } catch {}
         function walkChain(rootIndex) {
           const rootObj = indexToObj.get(rootIndex)
-          if (!rootObj) return
+          if (!rootObj) {
+            // Fallback: at least include the root index itself
+            if (!indices.has(rootIndex) && rootIndex >= 0) indices.add(rootIndex)
+            try { logToServer?.({ event: 'vrm0-root-unresolved', rootIndex }) } catch {}
+            return
+          }
           const stack = [rootObj]
           while (stack.length) {
             const obj = stack.pop()
-            const idx = getObjectNodeIndex(obj, parser)
+            // Robust index resolution for gltf/vrm nodes
+            let idx = getObjectNodeIndex(obj, parser)
+            if (typeof idx !== 'number') {
+              // try to find by identity in indexToObj
+              for (const [i, o] of indexToObj) { if (o === obj || o?.uuid === obj?.uuid) { idx = i; break } }
+            }
+            if (typeof idx !== 'number' && obj?.name) {
+              // last resort: name-only unique match in json.nodes
+              try {
+                const cand = parser?.json?.nodes?.map((nd, i) => [i, nd?.name]).filter(([i, nm]) => nm === obj.name) || []
+                if (cand.length === 1) idx = cand[0][0]
+              } catch {}
+            }
             if (typeof idx === 'number' && !indices.has(idx)) indices.add(idx)
             // Follow bone children only (single chains; branches handled as parallel chains)
             for (const c of obj.children || []) {
@@ -435,16 +532,24 @@ export function useModelOperations({
           }
         }
         for (const g of bg) {
+          const center = g?.center
+          if (typeof center === 'number' && center >= 0) indices.add(center)
           const arr = g?.bones || []
           for (const b of arr) {
-            const r = typeof b === 'number' ? b : (typeof b?.node === 'number' ? b.node : undefined)
-            if (typeof r === 'number') walkChain(r)
+            const r = indexFromUnknownBoneRef(b)
+            if (typeof r === 'number' && r >= 0) walkChain(r)
+          }
+          // Some VRM0 files use explicit bone list without parent expansion; include them directly
+          const explicit = g?.explicitBones || g?.boneIndices
+          if (Array.isArray(explicit)) {
+            for (const e of explicit) addIndexMaybe(indexFromUnknownBoneRef(e))
           }
         }
       } catch {}
     }
     if (unresolved.length) {
       try { console.debug('unresolved spring joints', unresolved) } catch {}
+      try { logToServer?.({ event: 'spring-joints-unresolved', unresolved }) } catch {}
     }
     return indices
   }
@@ -488,7 +593,7 @@ export function useModelOperations({
         try {
           const vrm = model.vrm
           const parser = getParserFromModel(model)
-          const indexToObj = buildIndexToObjectMap(vrm.scene, parser, model?.gltf?.scene)
+          const indexToObj = buildIndexToObjectMap(model?.gltf?.scene, parser, vrm.scene)
           const json = parser?.json
           const colliderIdxSet = json ? collectColliderIndexSet(json) : new Set()
           const allBoneObjs = enumerateAllBones(vrm.scene)
@@ -544,26 +649,142 @@ export function useModelOperations({
             }
           }
           console.debug('BoneClassification', payload)
+          try { logToServer?.({ event: 'bone-debug', payload }) } catch {}
         } catch {}
       }
       return model.boneGizmos
     }
     const vrm = model.vrm
     const parser = getParserFromModel(model)
-    const indexToObj = buildIndexToObjectMap(vrm.scene, parser, model?.gltf?.scene)
+    const indexToObj = buildIndexToObjectMap(model?.gltf?.scene, parser, vrm.scene)
+
+    // Build JSON parent map to reconstruct name paths for fallback mapping
+    const jsonNodes = parser?.json?.nodes || []
+    const parentOf = (() => {
+      try {
+        const p = new Array(jsonNodes.length).fill(-1)
+        jsonNodes.forEach((n, i) => {
+          const ch = n?.children || []
+          ch.forEach(ci => { if (typeof ci === 'number' && p[ci] === -1) p[ci] = i })
+        })
+        return p
+      } catch { return [] }
+    })()
+    function jsonNamePath(idx) {
+      const path = []
+      let cur = idx
+      let guard = 0
+      while (typeof cur === 'number' && cur >= 0 && guard++ < 256) {
+        const name = jsonNodes[cur]?.name || `#${cur}`
+        path.unshift(name)
+        cur = parentOf[cur]
+      }
+      return path
+    }
+    // Helper: map objects coming from gltf.scene to their counterparts under vrm.scene
+    function isDescendantOf(node, root) {
+      let cur = node
+      while (cur) { if (cur === root) return true; cur = cur.parent }
+      return false
+    }
+    function namePath(node) {
+      const parts = []
+      let cur = node
+      while (cur) { parts.unshift(cur.name || '') ; cur = cur.parent }
+      return parts
+    }
+    function findInTreeByName(root, name) {
+      const matches = []
+      try { root.traverse(o => { if (o && o.name === name) matches.push(o) }) } catch {}
+      return matches
+    }
+    function bestPathMatch(target, candidates, root) {
+      if (!candidates || candidates.length === 0) return null
+      if (candidates.length === 1) return candidates[0]
+      try {
+        const t = namePath(target)
+        let best = null
+        let bestScore = -1
+        for (const c of candidates) {
+          const p = namePath(c)
+          // Compare from leaf upward (suffix match)
+          const n = Math.min(t.length, p.length)
+          let score = 0
+          for (let i = 1; i <= n; i++) {
+            if (t[t.length - i] === p[p.length - i]) score++
+            else break
+          }
+          // Prefer deeper matches
+          if (score > bestScore) { best = c; bestScore = score }
+        }
+        return best || candidates[0]
+      } catch { return candidates[0] }
+    }
+    function bestMatchByJsonPath(candidates, targetPath) {
+      if (!candidates || candidates.length === 0) return null
+      if (candidates.length === 1) return candidates[0]
+      try {
+        let best = null
+        let bestScore = -1
+        for (const c of candidates) {
+          const p = namePath(c)
+          const n = Math.min(targetPath.length, p.length)
+          let score = 0
+          for (let i = 1; i <= n; i++) {
+            if (targetPath[targetPath.length - i] === p[p.length - i]) score++
+            else break
+          }
+          if (score > bestScore) { best = c; bestScore = score }
+        }
+        return best || candidates[0]
+      } catch { return candidates[0] }
+    }
+    function resolveIndexToVrmObject(idx) {
+      let o = indexToObj.get(idx)
+      if (o) return remapToVrmScene(o)
+      try {
+        const name = jsonNodes[idx]?.name
+        if (!name) return null
+        const cands = findInTreeByName(vrm.scene, name)
+        if (cands.length === 0) return null
+        const targetPath = jsonNamePath(idx)
+        const chosen = bestMatchByJsonPath(cands, targetPath)
+        if (chosen) {
+          try { indexToObj.set(idx, chosen) } catch {}
+          return chosen
+        }
+      } catch {}
+      return null
+    }
+    function remapToVrmScene(obj) {
+      if (!obj) return obj
+      if (isDescendantOf(obj, vrm.scene)) return obj
+      const name = obj.name || ''
+      if (!name) return obj
+      const matches = findInTreeByName(vrm.scene, name)
+      return bestPathMatch(obj, matches, vrm.scene) || obj
+    }
     const physicalIndexSet = collectPhysicalBoneIndexSet(model)
+    try {
+      const dbg = {
+        event: 'phys-index-snapshot',
+        model: model.name,
+        counts: { physicalIndexCount: physicalIndexSet.size },
+      }
+      logToServer?.(dbg)
+    } catch {}
     const humanoidIndexSet = collectHumanoidIndexSet(model)
 
     // Build object sets from indices
     const humanoidObjSet = new Set()
     const physicalObjSet = new Set()
     for (const idx of humanoidIndexSet) {
-      const o = indexToObj.get(idx)
-      if (o) humanoidObjSet.add(o)
+      const v = resolveIndexToVrmObject(idx)
+      if (v) humanoidObjSet.add(v)
     }
     for (const idx of physicalIndexSet) {
-      const o = indexToObj.get(idx)
-      if (o) physicalObjSet.add(o)
+      const v = resolveIndexToVrmObject(idx)
+      if (v) physicalObjSet.add(v)
     }
 
     // Runtime fallback enrichment
@@ -646,6 +867,50 @@ export function useModelOperations({
           }
         }
         console.debug('BoneClassification', payload)
+        try { logToServer?.({ event: 'bone-debug', payload }) } catch {}
+        try {
+          function computeIndex(o) {
+            let idx = getObjectNodeIndex(o, parser)
+            if (typeof idx === 'number') return idx
+            try {
+              for (const [i, obj] of indexToObj) if (obj === o || obj?.uuid === o?.uuid) return i
+            } catch {}
+            try {
+              const name = o?.name
+              if (!name) return null
+              const candidates = []
+              for (let i = 0; i < (parser?.json?.nodes?.length || 0); i++) {
+                if (parser.json.nodes[i]?.name === name) candidates.push(i)
+              }
+              if (candidates.length === 1) return candidates[0]
+              if (candidates.length > 1) {
+                const pObj = namePath(o)
+                let best = candidates[0]
+                let bestScore = -1
+                for (const ci of candidates) {
+                  const pIdx = jsonNamePath(ci)
+                  const n = Math.min(pObj.length, pIdx.length)
+                  let score = 0
+                  for (let k = 1; k <= n; k++) {
+                    if (pObj[pObj.length - k] === pIdx[pIdx.length - k]) score++
+                    else break
+                  }
+                  if (score > bestScore) { best = ci; bestScore = score }
+                }
+                return best
+              }
+            } catch {}
+            return null
+          }
+          const listPayload = {
+            event: 'bone-debug-list',
+            model: model.name,
+            physical: Array.from(physicalObjSet).map(o => ({ name: o?.name || '(no-name)', idx: computeIndex(o) })).slice(0, 200),
+            humanoid: Array.from(humanoidObjSet).map(o => ({ name: o?.name || '(no-name)', idx: computeIndex(o) })).slice(0, 200),
+            unmappedPhysicalIndices
+          }
+          logToServer?.(listPayload)
+        } catch {}
       }
     } catch {}
 
@@ -731,6 +996,14 @@ export function useModelOperations({
       g.physicalLabels.forEach(s => (s.visible = vis && !!model.boneNameVisible && showPhys))
       g.otherMeshes.forEach(m => (m.visible = vis && showOther))
       g.otherLabels.forEach(s => (s.visible = vis && !!model.boneNameVisible && showOther))
+      try {
+        const counts = {
+          humanoidDots: g.humanoidMeshes.filter(x => x.visible).length,
+          physicalDots: g.physicalMeshes.filter(x => x.visible).length,
+          otherDots: g.otherMeshes.filter(x => x.visible).length
+        }
+        logToServer?.({ event: 'bone-visibility-update', model: model.name, counts, toggles: { vis, showPhys, showOther, bonesVisible: !!model.bonesVisible, boneNameVisible: !!model.boneNameVisible } })
+      } catch {}
     } catch {}
   }
 

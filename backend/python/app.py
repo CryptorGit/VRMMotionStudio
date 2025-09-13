@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +24,20 @@ else:
 def hello():
     """挨拶メッセージを返すサンプルエンドポイント"""
     return jsonify({"message": "Hello from Python"})
+
+
+@app.route("/api/log", methods=["POST"])
+def log_endpoint():
+    """フロントエンドからのログを受け取り、サーバの標準出力へ出力する"""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        # 重要なイベント名を先頭にして見やすく
+        event = data.get("event", "client-log")
+        logger.info("[FE] %s %s", event, data)
+        return ("", 204)
+    except Exception as e:
+        logger.exception("/api/log failed: %s", e)
+        return jsonify({"ok": False}), 500
 
 
 def run(port: int = 8000):
