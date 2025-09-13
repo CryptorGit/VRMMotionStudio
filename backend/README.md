@@ -1,52 +1,50 @@
 # バックエンド
 
-本ディレクトリは、Web アプリケーションのサーバサイド処理を担当するバックエンドです。
+サーバサイドは Java (Spring Boot) がメイン、`python/` は補助的なサンプル API です。
 
 ## 構成
-- `python/` : Python によるサービス（サンプルとして `app.py` を含みます）
-- `java/` : Java によるサービス（Maven モジュール）
-  - `src/main/java/com/mmd/App.java` : エントリーポイント
-  - `src/main/java/com/mmd/controller/` : コントローラ
-  - `src/main/java/com/mmd/service/` : サービス
-  - `src/main/java/com/mmd/security/` : セキュリティ
-  - `src/main/java/com/mmd/repository/` : リポジトリ
-  - `src/main/java/com/mmd/model/entity/` : エンティティ（model 配下に整理）
-  - `src/main/resources/` : リソース
-- `db/` : 今後実装予定のデータベース関連
+- `java/`
+  - `src/main/java/com/mmd/`（controller, service, repository, security, model/entity）
+  - `src/main/resources/`（`application.properties`, `schema.sql`, `data.sql`）
+- `python/`
+  - `app.py`（Flask + CORS）
+# バックエンド
+
+Web アプリのサーバサイド。Java (Spring Boot) がメイン、Python (Flask) は任意の補助サービスです。
+
+## 構成
+- `java/` … Spring Boot 3（Web, JPA, H2）
+  - `controller/`, `service/`, `security/`, `repository/`, `model/entity/`, `resources/`
+- `python/` … Flask サンプル API（`app.py`）
+
+## 環境変数（共通）
+`.env.example` を参考に設定してください。
+
+- `ALLOWED_ORIGINS`: CORS 許可オリジン（例: `http://localhost:5173`）
+- `JWT_SECRET`: JWT 署名用シークレット
+- `API_KEY`: 固定 API キー（Bearer でない場合はヘッダ値と比較）
+
+PowerShell 例:
+```powershell
+$env:ALLOWED_ORIGINS="http://localhost:5173"; $env:JWT_SECRET="dev-secret"; $env:API_KEY="dev-api-key"
+```
 
 ## 実行方法
-### 必須環境変数
-以下の環境変数が設定されていない場合、起動時に警告が表示され認証が機能しません。
-
-- `ALLOWED_ORIGINS`: CORS を許可するドメインのカンマ区切りリスト
-- `JWT_SECRET`: JWT 署名用の秘密鍵
-- `API_KEY`: 固定 API キー
-
-Linux/macOS の例:
-```bash
-export ALLOWED_ORIGINS=http://localhost:5173
-export JWT_SECRET=your-secret
-export API_KEY=your-api-key
-```
-
-Windows (PowerShell) の例:
+### Java (Spring Boot)
 ```powershell
-$env:ALLOWED_ORIGINS="http://localhost:5173"
-$env:JWT_SECRET="your-secret"
-$env:API_KEY="your-api-key"
+cd java
+mvn spring-boot:run
+# JAR
+mvn package; java -jar target/java-0.1.0.jar
 ```
 
-`.env` の例:
-```env
-ALLOWED_ORIGINS=http://localhost:5173
-JWT_SECRET=your-secret
-API_KEY=your-api-key
+### Python (Flask)
+```powershell
+cd python
+pip install -r requirements.txt
+python .\app.py --port 8000
 ```
 
-### 実行方法
-- Python サーバ: `cd python` して `python app.py`
-- Java サーバ (Spring Boot):
-  - 開発起動: `cd java && mvn spring-boot:run`
-  - JAR 実行: `cd backend && mvn package && java -jar java/target/java-0.1.0.jar`
-
-詳細な手順は今後各サブディレクトリに追加される README を参照してください。
+## メモ
+- 開発時、フロントは Vite 開発サーバが `/api` を `http://localhost:8080` にプロキシします。
+- H2 はメモリ DB。`schema.sql` / `data.sql` を `resources/` に配置済み。

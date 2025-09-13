@@ -25,6 +25,8 @@
           ボーン表示（人型）
           <input type="checkbox" v-model="allBonesVisible" />
         </label>
+      </div>
+      <div class="row">
         <label>
           ボーン名表示
           <input type="checkbox" v-model="allBoneNamesVisible" />
@@ -35,6 +37,8 @@
           ボーン表示（物理）
           <input type="checkbox" v-model="showPhysicalBonesLocal" />
         </label>
+      </div>
+      <div class="row">
         <label>
           ボーン表示（その他）
           <input type="checkbox" v-model="showOtherBonesLocal" />
@@ -45,6 +49,8 @@
           ボーン表示（拡張）
           <input type="checkbox" v-model="showExtendedBonesLocal" />
         </label>
+      </div>
+      <div class="row">
         <label>
           ボーン表示（コライダー）
           <input type="checkbox" v-model="showColliderNodesLocal" />
@@ -55,6 +61,8 @@
           ボーン表示（非変形）
           <input type="checkbox" v-model="showNonDeformingBonesLocal" />
         </label>
+      </div>
+      <div class="row">
         <label>
           制約ハイライト
           <input type="checkbox" v-model="highlightConstraintLocal" />
@@ -62,7 +70,7 @@
       </div>
       <div class="row">
         <label class="stretch">
-          ボーンサイズ（太さ）
+          ボーン表示サイズ
           <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
         </label>
       </div>
@@ -91,15 +99,17 @@
           トラッカー名表示
           <input type="checkbox" v-model="showVirtualTrackerLabelsLocal" />
         </label>
+      </div>
+      <div class="row">
         <label class="stretch">
-          トラッカーサイズ
-          <input type="range" min="0.02" max="0.25" step="0.005" v-model.number="virtualTrackerSizeLocal" />
+          トラッカー表示サイズ
+          <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="virtualTrackerSizeLocal" />
         </label>
       </div>
       <div class="row">
         <label class="stretch">
           トラッカー名表示サイズ
-          <input type="range" min="0.2" max="3.0" step="0.05" v-model.number="virtualTrackerLabelScaleLocal" />
+          <input type="range" min="0.05" max="2.0" step="0.05" v-model.number="virtualTrackerLabelScaleLocal" />
         </label>
       </div>
     </div>

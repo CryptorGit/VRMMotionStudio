@@ -1,22 +1,17 @@
-# Java バックエンド (Maven)
+# Java バックエンド (Spring Boot / Maven)
 
-標準的な Maven プロジェクト構成で、`src/main/java` 以下にソースコード、`src/main/resources` 以下にリソースを配置しています。
+標準的な Maven 構成です。Spring Boot 3、JPA、H2（メモリ）を使用しています。
 
-主なパッケージ構成:
-- `com.mmd.App` : エントリーポイント
-- `com.mmd.controller` : コントローラ
-- `com.mmd.service` : サービス
-- `com.mmd.security` : セキュリティ
-- `com.mmd.repository` : リポジトリ
-- `com.mmd.model.entity` : エンティティ（model 配下に整理）
+主なパッケージ:
+- `com.mmd.controller`
+- `com.mmd.service`
+- `com.mmd.security`
+- `com.mmd.repository`
+- `com.mmd.model.entity`
 
-## ビルド & 実行
-```bash
-# バックエンド直下から全体ビルド
-cd ../
-mvn package
-
-# 実行（Java モジュールの classes を指定）
-cd java
-java -cp target/classes com.mmd.App
+## 実行
+```powershell
+mvn spring-boot:run
+# または
+mvn package; java -jar target/java-0.1.0.jar
 ```

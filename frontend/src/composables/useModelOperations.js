@@ -1355,6 +1355,15 @@ export function useModelOperations({
     logToServer?.({ event: 'clear-cache' })
     renderer.value?.renderLists?.dispose?.()
     await cache.deleteCachedFiles()
+    // Also clear persisted UI/cache states so "キャッシュ削除" manages them too
+    try {
+      // Imported models visibility/state snapshot
+      localStorage.removeItem('importedModels')
+      // Settings sidebar (includes virtual tracker toggles & sizes)
+      localStorage.removeItem('settingsSidebar')
+      // Virtual tracker saved positions per model
+      localStorage.removeItem('vtPositions:v1')
+    } catch {}
     poses.value.forEach(p => URL.revokeObjectURL(p.url))
     poses.value = []
     selectedPose.value = null

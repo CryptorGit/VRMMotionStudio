@@ -13,7 +13,7 @@
     :open-file="openFile"
     :export-pose="exportPose"
     :open-sidebar-section="openSidebarSection"
-    :clear-cache="clearCache"
+  :clear-cache="clearAllCache"
   />
   
   
@@ -233,6 +233,31 @@ function resetVirtualTrackers() {
   try { trackers.reset() } catch {}
 }
 
+// Clear caches and also reset UI/checkbox states to defaults
+async function clearAllCache() {
+  try { await clearCache() } catch {}
+  try {
+    // Lighting/markers
+    showLightMarker.value = false
+    lightMarkerColor.value = '#ff0000'
+    directionalIntensity.value = 1
+    // Display toggles
+    showPhysicalBones.value = false
+    showOtherBones.value = false
+    showExtendedBones.value = false
+    showColliderNodes.value = false
+    showNonDeformingBones.value = false
+    highlightConstraint.value = false
+    boneDotSize.value = 0.02
+    boneLabelScale.value = 1.0
+    // Virtual trackers UI
+    virtualTrackersEnabled.value = false
+    showVirtualTrackerLabels.value = true
+    virtualTrackerSize.value = 0.08
+    virtualTrackerLabelScale.value = 1.0
+  } catch {}
+}
+
 function handleDocumentClick(e) {
   if (menuOpen.value && menu.value?.menu && !menu.value.menu.contains(e.target)) {
     menuOpen.value = false
@@ -265,7 +290,7 @@ onMounted(async () => {
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
-  // init virtual trackers events and gizmos
+  // init virtual trackers events and gizmos (will show if already enabled and model present)
   try { trackers.init() } catch {}
   // Auto-restore models by default on reload to keep the user session.
   // Opt-out methods:
@@ -286,7 +311,7 @@ onMounted(async () => {
   } else {
     try { await logToServer({ event: 'restore:skipped' }) } catch {}
   }
-  // Apply initial toggles to restored VRMs
+  // Apply initial toggles to restored VRMs and trackers
   try {
     const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
     list.forEach(vrm => {
@@ -294,6 +319,10 @@ onMounted(async () => {
       try { vrm.springBoneManager && (vrm.springBoneManager.enabled = springBoneEnabled.value) } catch {}
       try { vrm.lookAt && (vrm.lookAt.enabled = lookAtEnabled.value) } catch {}
     })
+    // If user had virtual trackers enabled from saved UI, ensure they are shown now that models are restored
+    if (virtualTrackersEnabled.value) {
+      try { trackers.setEnabled(true) } catch {}
+    }
   } catch {}
   document.addEventListener('click', handleDocumentClick)
   logToServer({ event: 'init' })

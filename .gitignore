@@ -4,3 +4,7 @@
 **/target/
 **/gradle-wrapper.jar
 **/.gradle/
+/.env
+**/.env
+**/.logs/
+temp_*.txt

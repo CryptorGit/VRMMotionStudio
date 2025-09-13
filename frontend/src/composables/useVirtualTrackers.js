@@ -528,9 +528,16 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   })
 
   function init() {
-    // Defer gizmo creation until a model exists
+    // Respect current enabled state and existing model on init
     attachEvents()
-    setVisibility(false)
+    const modelPresent = !!getActiveModel()?.vrm
+    if (enabled.value && modelPresent) {
+      createGizmos()
+      layoutDefaultPositions(true)
+      setVisibility(true)
+    } else {
+      setVisibility(false)
+    }
   }
 
   function cleanup() {

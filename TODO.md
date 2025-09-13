@@ -127,3 +127,7 @@
 - （削除/再設計）ボーン名表示から物理ボーンを除外する設定（MMD 物理の概念に依存）
 
 必要に応じて、VRM Humanoid ベースの最小限の骨可視化（SkeletonHelper）と、表情・SpringBone の操作 UI を優先実装する。
+
+---
+
+メモ: 旧 IK/Ammo/OutlineEffect のコード片は削除済み。`temp_*.txt` などの一時ファイルも掃除済み。`.env.example` を追加し、`.env` は ignore 済み。

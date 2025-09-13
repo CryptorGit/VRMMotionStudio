@@ -1,25 +1,29 @@
 # フロントエンド
 
-[Vite](https://vite.dev/) と [Vue 3](https://vuejs.org/) を用いて構築しています。
+[Vite](https://vite.dev/) + [Vue 3](https://vuejs.org/) 製。
 
-## 開発サーバの起動
-```bash
+## 開発
+```powershell
 npm install
 npm run dev
 ```
-ブラウザで [http://localhost:5173](http://localhost:5173) を開いてください。
+ブラウザで http://localhost:5173 を開いてください。
 
-## ビルド
-```bash
+バックエンド API は Vite 開発サーバが `http://localhost:8080` にプロキシします（`vite.config.js`）。
+
+## ビルド/プレビュー
+```powershell
 npm run build
+npm run preview
 ```
-`dist/` ディレクトリにビルド成果物が生成されます。
+出力は `dist/` に生成されます。
+
+## テスト
+```powershell
+npm test
+```
 
 ## 使い方（VRM）
-
-- 画面左上のメニューから「インポート」を選び、`.vrm` ファイルを読み込みます（ドラッグ&ドロップでも可）。
-- サイドバーの「設定」で以下を切り替え可能です。
-  - ライトマーカー表示/色、ディレクショナルライト強度
-  - SpringBone ON/OFF、LookAt ON/OFF
-  - モデルの可視/非可視、ボーン可視（最小限の SkeletonHelper）
-- 表情（Expressions）は「モーフ編集」からプリセット（A/I/U/E/O, Joy など）と検出されたカスタム表情をスライダで調整できます。
+- 画面左上のメニューから「インポート」で `.vrm` を読み込み（ドラッグ&ドロップ可）。
+- 「設定」でライト、SpringBone、LookAt、骨可視（SkeletonHelper）を切替。
+- 「モーフ編集」で Expressions（A/I/U/E/O, Joy 等）や検出されたカスタム表情を調整。
