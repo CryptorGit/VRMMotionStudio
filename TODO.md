@@ -127,3 +127,9 @@
 - （削除/再設計）ボーン名表示から物理ボーンを除外する設定（MMD 物理の概念に依存）
 
 必要に応じて、VRM Humanoid ベースの最小限の骨可視化（SkeletonHelper）と、表情・SpringBone の操作 UI を優先実装する。
+
+### 表示管理拡張 TODO
+
+- [ ] Extended ボーンのサブカテゴリ判別（Twist/Roll 等の分類強化）
+- [ ] Non-Deforming ボーン判定でスキンウェイトの閾値解析を導入
+- [ ] Constraint ボーンの可視化スタイル検討（現在は単色ドット）
