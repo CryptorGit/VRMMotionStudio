@@ -1,7 +1,5 @@
 # MokuMokuDanceWeb
 
-VRM を中心に 3D アバター制作・鑑賞体験を提供する Web アプリです。フロントエンドは Vite + Vue 3、バックエンドは Spring Boot (Java) と Flask (Python, 任意) で構成されています。
-
 ## リポジトリ構成
 - `frontend/` … Vite + Vue 3 クライアント
   - `src/`, `components/`, `composables/`, `utils/`
@@ -10,6 +8,35 @@ VRM を中心に 3D アバター制作・鑑賞体験を提供する Web アプ�
   - `java/` … Spring Boot（H2 メモリ DB、JPA）
   - `python/` … Flask サンプル（任意）
 
+VRM ビューアを中心としたフロントエンド（Vite + Vue 3）と、簡易な Java バックエンド（Spring Boot）を含むモノレポです。
+
+## ディレクトリ
+- `frontend/` Vite + Vue 3 アプリ。`/src` にコンポーネントやユーティリティ。
+- `backend/` サーバサイド。`java/` が Spring Boot 本体。`python/` は任意の補助 API サンプル。
+
+## 開発手順
+1. Java バックエンドを起動
+  ```powershell
+  cd backend/java
+  mvn spring-boot:run
+  ```
+2. フロントエンドを起動
+  ```powershell
+  cd frontend
+  npm install
+  npm run dev
+  ```
+  ブラウザで http://localhost:5173 を開きます。フロントから `/api` へのリクエストは `http://localhost:8080` へプロキシされます。
+
+## 環境変数
+`.env.example` を参考に環境変数を設定します。PowerShell 例:
+```powershell
+$env:ALLOWED_ORIGINS="http://localhost:5173"; $env:JWT_SECRET="dev-secret"; $env:API_KEY="dev-api-key"
+```
+
+## 付記
+- フロントからの開発用ログ送信先 `/api/log` を実装しています。存在しなくても動作に致命的影響はありません。
+- 生成物や一時ファイルは `.gitignore` 済みです。
 ## 必要要件
 - Node.js 20.19+ または 22.12+（`frontend/package.json#engines` 参照）
 - Java 17+

@@ -1,16 +1,6 @@
 # バックエンド
 
-サーバサイドは Java (Spring Boot) がメイン、`python/` は補助的なサンプル API です。
-
-## 構成
-- `java/`
-  - `src/main/java/com/mmd/`（controller, service, repository, security, model/entity）
-  - `src/main/resources/`（`application.properties`, `schema.sql`, `data.sql`）
-- `python/`
-  - `app.py`（Flask + CORS）
-# バックエンド
-
-Web アプリのサーバサイド。Java (Spring Boot) がメイン、Python (Flask) は任意の補助サービスです。
+Web アプリのサーバサイド。Java (Spring Boot) がメイン、`python/` は任意の補助サービスです。
 
 ## 構成
 - `java/` … Spring Boot 3（Web, JPA, H2）

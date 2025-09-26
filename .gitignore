@@ -8,3 +8,5 @@
 **/.env
 **/.logs/
 temp_*.txt
+temp_extract.txt
+temp_snippet.txt
