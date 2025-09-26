@@ -265,14 +265,14 @@ defineExpose({
   position: fixed;
   top: 0;
   right: 0;
-  height: auto;
-  max-height: 100vh;
+  bottom: var(--timeline-height, 0px);
   width: 300px;
   background: #f9f9f9;
   box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
+  max-height: calc(100vh - var(--timeline-height, 0px));
 }
 .settings-sidebar.resizing {
   user-select: none;

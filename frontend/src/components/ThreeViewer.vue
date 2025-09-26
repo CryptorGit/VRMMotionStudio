@@ -56,12 +56,30 @@
   @toggle-all-bone-names="toggleAllBoneNames"
   @remove-model="removeModel"
 />
+  <TimelinePanel
+    v-model:collapsed="timelineCollapsed"
+    :height="timelineExpandedHeight"
+    :trackers="trackerList"
+    :keyframes="timelineController.keyframes"
+    :duration="timelineDuration"
+    :current-time="timelineCurrentTime"
+    :is-playing="timelinePlaying"
+    @height-change="handleTimelineHeightChange"
+    @seek="handleTimelineSeek"
+    @play="handleTimelinePlay"
+    @pause="handleTimelinePause"
+    @stop="handleTimelineStop"
+    @add-all-keyframes="handleTimelineAddAll"
+    @add-keyframe="handleTimelineAddKey"
+    @remove-keyframe="handleTimelineRemoveKey"
+  />
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import MenuControls from './MenuControls.vue'
+import TimelinePanel from './TimelinePanel.vue'
 import * as THREE from 'three'
 import { API_BASE_URL } from '../config.js'
 import {
@@ -78,6 +96,7 @@ import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
+import { useTimeline } from '../composables/useTimeline.js'
 
 const viewer = ref(null)
 const menu = ref(null)
@@ -190,8 +209,29 @@ const {
 } = fileLoader
 
 // Hook that will call tracker update each frame
-let trackers = null
-const updateTrackers = () => { try { trackers && trackers.update() } catch {} }
+let trackerController = null
+let timelineController = null
+const updateTrackers = () => {
+  try {
+    timelineController?.step()
+    trackerController?.update()
+  } catch {}
+}
+
+const timelineCollapsed = ref(false)
+const timelineExpandedHeight = ref(280)
+const timelineHeight = ref(0)
+const trackerList = computed(() => trackerController?.trackers?.value || [])
+const timelineDuration = computed(() => timelineController?.duration?.value || 0)
+const timelineCurrentTime = computed(() => timelineController?.currentTime?.value || 0)
+const timelinePlaying = computed(() => timelineController?.isPlaying?.value || false)
+
+function setTimelineCssHeight(px) {
+  timelineHeight.value = Math.max(0, Number(px) || 0)
+  try {
+    document.documentElement.style.setProperty('--timeline-height', `${timelineHeight.value}px`)
+  } catch {}
+}
 
 const { animate, initRenderer, cleanupRenderer } = useRenderer({
   clock,
@@ -213,7 +253,7 @@ const { animate, initRenderer, cleanupRenderer } = useRenderer({
 })
 
 // Virtual trackers setup
-trackers = useVirtualTrackers({
+trackerController = useVirtualTrackers({
   scene,
   camera,
   renderer,
@@ -225,12 +265,76 @@ trackers = useVirtualTrackers({
   showTrackerLabels: showVirtualTrackerLabels
 })
 
+timelineController = useTimeline({ trackers: trackerController.trackers })
+
 watch(virtualTrackersEnabled, v => {
-  try { trackers.setEnabled(v) } catch {}
+  try { trackerController.setEnabled(v) } catch {}
+  if (v) {
+    try { timelineController.applyCurrentPose() } catch {}
+  }
 })
 
 function resetVirtualTrackers() {
-  try { trackers.reset() } catch {}
+  try { trackerController.reset() } catch {}
+}
+
+function handleTimelineHeightChange(height) {
+  setTimelineCssHeight(height)
+}
+
+function handleTimelineSeek(time) {
+  try {
+    timelineController.pause()
+    timelineController.setCurrentTime(time)
+  } catch {}
+}
+
+function handleTimelinePlay() {
+  try { timelineController.play() } catch {}
+}
+
+function handleTimelinePause() {
+  try { timelineController.pause() } catch {}
+}
+
+function handleTimelineStop() {
+  try { timelineController.stop() } catch {}
+}
+
+function getTrackerByKey(key) {
+  return trackerController?.trackers?.value?.find(t => t.key === key)
+}
+
+function handleTimelineAddAll() {
+  try {
+    const time = timelineController.currentTime.value
+    timelineController.addSnapshotAtTime(time)
+    timelineController.applyCurrentPose()
+  } catch {}
+}
+
+function handleTimelineAddKey(payload) {
+  if (!payload?.trackerKey) return
+  try {
+    const targetTime = Number.isFinite(payload.time) ? payload.time : timelineController.currentTime.value
+    if (Number.isFinite(payload.time)) timelineController.setCurrentTime(payload.time)
+    const tracker = getTrackerByKey(payload.trackerKey)
+    if (!tracker?.mesh) return
+    timelineController.addKeyframe({
+      trackerKey: payload.trackerKey,
+      time: targetTime,
+      position: tracker.mesh.position
+    })
+    timelineController.applyCurrentPose()
+  } catch {}
+}
+
+function handleTimelineRemoveKey(payload) {
+  if (!payload?.trackerKey || !payload?.keyframeId) return
+  try {
+    timelineController.removeKeyframe(payload.trackerKey, payload.keyframeId)
+    timelineController.applyCurrentPose()
+  } catch {}
 }
 
 // Clear caches and also reset UI/checkbox states to defaults
@@ -255,6 +359,8 @@ async function clearAllCache() {
     showVirtualTrackerLabels.value = true
     virtualTrackerSize.value = 0.08
     virtualTrackerLabelScale.value = 1.0
+    timelineController.clearAll()
+    timelineController.stop()
   } catch {}
 }
 
@@ -286,12 +392,13 @@ const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHan
 })
 
 onMounted(async () => {
+  setTimelineCssHeight(timelineHeight.value)
   loadLightingSettings({})
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
   // init virtual trackers events and gizmos (will show if already enabled and model present)
-  try { trackers.init() } catch {}
+  try { trackerController.init() } catch {}
   // Auto-restore models by default on reload to keep the user session.
   // Opt-out methods:
   //  - URL query: ?restore=0
@@ -321,7 +428,7 @@ onMounted(async () => {
     })
     // If user had virtual trackers enabled from saved UI, ensure they are shown now that models are restored
     if (virtualTrackersEnabled.value) {
-      try { trackers.setEnabled(true) } catch {}
+      try { trackerController.setEnabled(true) } catch {}
     }
   } catch {}
   document.addEventListener('click', handleDocumentClick)
@@ -333,7 +440,8 @@ onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   cleanupErrorHandlers()
   cleanupRenderer()
-  try { trackers.cleanup() } catch {}
+  try { trackerController.cleanup() } catch {}
+  setTimelineCssHeight(0)
 })
 
 // Sync VRM feature toggles to loaded models
@@ -356,7 +464,10 @@ watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones, showExten
 // Hook tracker update into render loop via requestAnimationFrame in utils/rendering
 watch(models, () => {
   // re-layout when new models loaded
-  if (virtualTrackersEnabled.value) try { trackers.reset() } catch {}
+  if (virtualTrackersEnabled.value) {
+    try { trackerController.reset() } catch {}
+    try { timelineController.applyCurrentPose() } catch {}
+  }
 })
 
 function toggleAllBones(v) {

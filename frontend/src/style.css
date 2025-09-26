@@ -1,3 +1,7 @@
+:root {
+  --timeline-height: 0px;
+}
+
 body {
   margin: 0;
   overflow: hidden;
@@ -6,7 +10,7 @@ body {
 
 #viewer {
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - var(--timeline-height, 0px));
 }
 
 #viewer.dragover {
