@@ -7,12 +7,7 @@
     </div>
     <div class="status-bar__right">
       <slot name="shortcuts">
-        <ul class="shortcut-list">
-          <li><kbd>Space</kbd> 再生/停止</li>
-          <li><kbd>Home</kbd> 範囲フィット</li>
-          <li><kbd>←</kbd>/<kbd>→</kbd> フレーム移動</li>
-          <li><kbd>M</kbd> マーカー追加</li>
-        </ul>
+        <span class="status-bar__placeholder">追加情報はここに表示されます</span>
       </slot>
     </div>
   </footer>
@@ -22,7 +17,7 @@
 const props = defineProps({
   message: {
     type: String,
-    default: 'Blenderスタイルレイアウトが有効です。'
+    default: ''
   }
 })
 </script>
@@ -44,22 +39,9 @@ const props = defineProps({
   font-size: 0.85rem;
 }
 
-.shortcut-list {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.status-bar__placeholder {
   font-size: 0.78rem;
-}
-
-kbd {
-  background: color-mix(in srgb, var(--accent, #2d8cff) 15%, transparent);
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  border: 1px solid color-mix(in srgb, var(--accent, #2d8cff) 40%, transparent);
-  font-size: 0.75rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  opacity: 0.65;
 }
 
 @media (max-width: 840px) {
@@ -69,10 +51,6 @@ kbd {
     gap: 0.25rem;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-  }
-
-  .shortcut-list {
-    flex-wrap: wrap;
   }
 }
 </style>

@@ -166,11 +166,11 @@ const directionalElevation = computed({
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  background: linear-gradient(155deg, rgba(38, 44, 62, 0.85), rgba(28, 32, 46, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 1rem 1.15rem;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0.35rem 0 0.5rem;
+  box-shadow: none;
 }
 
 .lighting-panel__ambient {

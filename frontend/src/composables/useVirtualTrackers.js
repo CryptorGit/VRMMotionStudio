@@ -122,7 +122,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
       mesh.add(sprite)
       group.value.add(mesh)
-    trackers.value.push({ key: def.key, mesh, label: sprite })
+  trackers.value.push({ key: def.key, name: def.label, mesh, labelSprite: sprite })
     }
   }
 
@@ -130,8 +130,8 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     if (!group.value) return
     try {
       for (const t of trackers.value) {
-        try { t.label.material.map.dispose() } catch {}
-        try { t.label.material.dispose() } catch {}
+          try { t.labelSprite?.material?.map?.dispose() } catch {}
+          try { t.labelSprite?.material?.dispose() } catch {}
         try { t.mesh.geometry.dispose() } catch {}
         try { t.mesh.material.dispose() } catch {}
       }
@@ -155,7 +155,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     const show = !!vis && !!getActiveModel()?.vrm
     for (const t of trackers.value) {
       t.mesh.visible = show
-      if (t.label) t.label.visible = show && labelsVisible()
+      if (t.labelSprite) t.labelSprite.visible = show && labelsVisible()
     }
   }
 
@@ -594,8 +594,8 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   watch(trackerLabelScale, () => {
     const sc = currentLabelScale()
     trackers.value.forEach(t => {
-      if (!t?.label) return
-      const l = t.label
+      if (!t?.labelSprite) return
+      const l = t.labelSprite
       const base = l.userData.baseScale || l.scale.clone().divideScalar(currentLabelScale())
       l.userData.baseScale = base
       l.scale.copy(base.clone().multiplyScalar(sc))
@@ -603,7 +603,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   })
   watch(showTrackerLabels, () => {
     const vis = labelsVisible()
-    trackers.value.forEach(t => { if (t.label) t.label.visible = vis && enabled.value })
+    trackers.value.forEach(t => { if (t.labelSprite) t.labelSprite.visible = vis && enabled.value })
   })
 
   return {

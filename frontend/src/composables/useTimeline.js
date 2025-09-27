@@ -3,6 +3,11 @@ import * as THREE from 'three'
 
 let nextKeyframeId = 1
 let nextMarkerId = 1
+const TIMELINE_SERIAL_VERSION = 1
+const STORAGE_KEY_STATE = 'timeline.state.v1'
+
+let saveTimer = null
+let restoringState = false
 
 function clonePosition(pos) {
   if (!pos) return [0, 0, 0]
@@ -34,6 +39,35 @@ export function useTimeline({ trackers }) {
 
   let lastStepTime = performance.now()
 
+  function scheduleSave() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
+    if (restoringState) return
+    if (saveTimer !== null) return
+    saveTimer = window.setTimeout(() => {
+      saveTimer = null
+      persistState()
+    }, 150)
+  }
+
+  function persistState() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
+    try {
+      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(serialize()))
+    } catch {}
+  }
+
+  function restoreState() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_STATE)
+      if (!raw) return false
+      const parsed = JSON.parse(raw)
+      return deserialize(parsed, { skipSave: true })
+    } catch {
+      return false
+    }
+  }
+
   const duration = computed(() => Math.max(0, endTime.value - startTime.value))
 
   function ensureTrackKey(key) {
@@ -50,6 +84,7 @@ export function useTimeline({ trackers }) {
     arr.push(entry)
     arr.sort((a, b) => a.time - b.time)
     lastAppliedValues[trackerKey] = safePos
+    scheduleSave()
     return entry
   }
 
@@ -71,25 +106,65 @@ export function useTimeline({ trackers }) {
     const idx = arr.findIndex(k => k.id === id)
     if (idx === -1) return
     arr.splice(idx, 1)
+    scheduleSave()
+    applyCurrentPose()
+  }
+
+  function updateKeyframe(trackerKey, id, payload = {}) {
+    const arr = keyframes[trackerKey]
+    if (!arr?.length) return null
+    const target = arr.find(k => k.id === id)
+    if (!target) return null
+    let changed = false
+
+    if (payload.time !== undefined && Number.isFinite(payload.time)) {
+      const next = Math.min(Math.max(payload.time, startTime.value), endTime.value)
+      if (Math.abs(next - target.time) > 1e-6) {
+        target.time = next
+        changed = true
+      }
+    }
+
+    if (payload.value && Array.isArray(payload.value)) {
+      const nextValue = clonePosition(payload.value)
+      if (
+        !target.value ||
+        target.value[0] !== nextValue[0] ||
+        target.value[1] !== nextValue[1] ||
+        target.value[2] !== nextValue[2]
+      ) {
+        target.value = nextValue
+        lastAppliedValues[trackerKey] = nextValue
+        changed = true
+      }
+    }
+
+    if (changed) {
+      arr.sort((a, b) => a.time - b.time)
+      scheduleSave()
+      applyCurrentPose()
+    }
+
+    return target
   }
 
   function updateKeyframeTime(trackerKey, id, nextTime) {
-    const arr = keyframes[trackerKey]
-    if (!arr?.length) return
-    const target = arr.find(k => k.id === id)
-    if (!target) return
     if (!Number.isFinite(nextTime)) return
-    target.time = Math.min(Math.max(nextTime, startTime.value), endTime.value)
-    arr.sort((a, b) => a.time - b.time)
+    updateKeyframe(trackerKey, id, { time: nextTime })
   }
 
   function clearTrack(trackerKey) {
-    if (keyframes[trackerKey]) keyframes[trackerKey] = []
+    if (!keyframes[trackerKey]) return
+    keyframes[trackerKey] = []
+    scheduleSave()
+    applyCurrentPose()
   }
 
   function clearAll() {
     for (const key of Object.keys(keyframes)) keyframes[key] = []
     markers.value = []
+    scheduleSave()
+    applyCurrentPose()
   }
 
   function getTrackAtTime(trackerKey, time) {
@@ -176,11 +251,13 @@ export function useTimeline({ trackers }) {
     if (!Number.isFinite(seconds) || seconds <= 0) return
     endTime.value = startTime.value + seconds
     if (currentTime.value > endTime.value) currentTime.value = endTime.value
+    scheduleSave()
   }
 
   function setFrameRate(fps) {
     if (!Number.isFinite(fps) || fps <= 0) return
     frameRate.value = fps
+    scheduleSave()
   }
 
   function setRange(start, end) {
@@ -192,6 +269,7 @@ export function useTimeline({ trackers }) {
     endTime.value = e
     if (currentTime.value < s) currentTime.value = s
     if (currentTime.value > e) currentTime.value = e
+    scheduleSave()
   }
 
   function setRangeFromFrames(startFrame, endFrame) {
@@ -219,29 +297,40 @@ export function useTimeline({ trackers }) {
 
   function addMarker({ time, label }) {
     if (!Number.isFinite(time)) return null
+    const safeLabel = typeof label === 'string' ? label.trim() : ''
     const entry = {
       id: nextMarkerId++,
       time: Math.min(Math.max(time, startTime.value), endTime.value),
-      label: label || `Marker ${nextMarkerId - 1}`
+      label: safeLabel
     }
     markers.value = [...markers.value, entry].sort((a, b) => a.time - b.time)
+    scheduleSave()
     return entry
   }
 
   function updateMarker(id, payload) {
+    let changed = false
     markers.value = markers.value.map(marker => {
       if (marker.id !== id) return marker
       const next = { ...marker }
       if (payload?.time !== undefined && Number.isFinite(payload.time)) {
         next.time = Math.min(Math.max(payload.time, startTime.value), endTime.value)
+        if (next.time !== marker.time) changed = true
       }
-      if (payload?.label !== undefined) next.label = payload.label
+      if (payload?.label !== undefined) {
+        next.label = typeof payload.label === 'string' ? payload.label.trim() : ''
+      }
+      if (next.label !== marker.label) changed = true
       return next
     }).sort((a, b) => a.time - b.time)
+    if (changed) scheduleSave()
   }
 
   function removeMarker(id) {
-    markers.value = markers.value.filter(marker => marker.id !== id)
+    const next = markers.value.filter(marker => marker.id !== id)
+    if (next.length === markers.value.length) return
+    markers.value = next
+    scheduleSave()
   }
 
   function importKeyframes(snapshot) {
@@ -255,6 +344,7 @@ export function useTimeline({ trackers }) {
       })).sort((a, b) => a.time - b.time)
     }
     applyCurrentPose()
+    scheduleSave()
   }
 
   function exportKeyframes() {
@@ -268,9 +358,156 @@ export function useTimeline({ trackers }) {
     return out
   }
 
+  function serialize() {
+    const tracks = {}
+    let maxKeyId = 0
+    for (const key of Object.keys(keyframes)) {
+      const frames = keyframes[key] || []
+      tracks[key] = frames.map(frame => {
+        const id = Number(frame.id) || 0
+        if (id > maxKeyId) maxKeyId = id
+        return {
+          id,
+          time: frame.time,
+          value: clonePosition(frame.value)
+        }
+      })
+    }
+
+    let maxMarkerId = 0
+    const markerList = markers.value.map(marker => {
+      const id = Number(marker.id) || 0
+      if (id > maxMarkerId) maxMarkerId = id
+      return {
+        id,
+        time: marker.time,
+        label: marker.label
+      }
+    })
+
+    return {
+      version: TIMELINE_SERIAL_VERSION,
+      frameRate: frameRate.value,
+      startTime: startTime.value,
+      endTime: endTime.value,
+      currentTime: currentTime.value,
+      loop: loopPlayback.value,
+      nextIds: {
+        keyframe: Math.max(nextKeyframeId, maxKeyId + 1),
+        marker: Math.max(nextMarkerId, maxMarkerId + 1)
+      },
+      markers: markerList,
+      tracks
+    }
+  }
+
+  function deserialize(snapshot, { skipSave = false } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false
+    restoringState = true
+    try {
+      const version = Number(snapshot.version) || TIMELINE_SERIAL_VERSION
+      if (version > TIMELINE_SERIAL_VERSION) {
+        // proceed but warn in dev
+        if (import.meta?.env?.DEV) {
+          console.warn('Timeline snapshot version is newer than supported:', version)
+        }
+      }
+
+      if (Number.isFinite(snapshot.frameRate) && snapshot.frameRate > 0) {
+        frameRate.value = snapshot.frameRate
+      }
+
+      let newStart = Number(snapshot.startTime)
+      let newEnd = Number(snapshot.endTime)
+      if (!Number.isFinite(newStart)) newStart = 0
+      if (!Number.isFinite(newEnd)) newEnd = newStart + 30
+      if (newEnd <= newStart) newEnd = newStart + 1
+      startTime.value = newStart
+      endTime.value = newEnd
+
+      loopPlayback.value = !!snapshot.loop
+
+      const trackEntries = snapshot.tracks && typeof snapshot.tracks === 'object' ? snapshot.tracks : {}
+      for (const key of Object.keys(keyframes)) keyframes[key] = []
+
+      let maxKeyId = 0
+      for (const [key, frames] of Object.entries(trackEntries)) {
+        if (!Array.isArray(frames)) continue
+        keyframes[key] = frames
+          .map(frame => {
+            let assignedId = Number(frame.id)
+            if (!Number.isFinite(assignedId) || assignedId <= 0) {
+              assignedId = ++maxKeyId
+            } else {
+              maxKeyId = Math.max(maxKeyId, assignedId)
+            }
+            const rawTime = Number(frame.time)
+            const time = Number.isFinite(rawTime) ? rawTime : startTime.value
+            return {
+              id: assignedId,
+              time: Math.min(Math.max(time, startTime.value), endTime.value),
+              value: clonePosition(frame.value)
+            }
+          })
+          .sort((a, b) => a.time - b.time)
+      }
+      nextKeyframeId = Math.max(
+        maxKeyId + 1,
+        Number(snapshot?.nextIds?.keyframe) || 1
+      )
+
+      const markerInput = Array.isArray(snapshot.markers) ? snapshot.markers : []
+      let maxMarkerId = 0
+      markers.value = markerInput
+        .map(marker => {
+          let assignedId = Number(marker.id)
+          if (!Number.isFinite(assignedId) || assignedId <= 0) {
+            assignedId = ++maxMarkerId
+          } else {
+            maxMarkerId = Math.max(maxMarkerId, assignedId)
+          }
+          const rawTime = Number(marker.time)
+          const time = Number.isFinite(rawTime) ? rawTime : startTime.value
+          return {
+            id: assignedId,
+            time: Math.min(Math.max(time, startTime.value), endTime.value),
+            label: typeof marker.label === 'string' ? marker.label : `Marker ${assignedId}`
+          }
+        })
+        .sort((a, b) => a.time - b.time)
+      nextMarkerId = Math.max(
+        maxMarkerId + 1,
+        Number(snapshot?.nextIds?.marker) || 1
+      )
+
+      if (Number.isFinite(snapshot.currentTime)) {
+        setCurrentTime(Math.min(Math.max(snapshot.currentTime, startTime.value), endTime.value))
+      } else {
+        setCurrentTime(startTime.value)
+      }
+    } catch (error) {
+      if (import.meta?.env?.DEV) {
+        console.error('Failed to deserialize timeline snapshot', error)
+      }
+      return false
+    } finally {
+      restoringState = false
+    }
+
+    applyCurrentPose()
+    if (!skipSave) scheduleSave()
+    return true
+  }
+
   watch(currentTime, () => {
     applyCurrentPose()
   })
+
+  watch(loopPlayback, () => {
+    scheduleSave()
+  })
+
+  restoreState()
 
   return {
     startTime,
@@ -299,12 +536,16 @@ export function useTimeline({ trackers }) {
     addKeyframe,
     addSnapshotAtTime,
     removeKeyframe,
-  updateKeyframeTime,
+    updateKeyframe,
+    updateKeyframeTime,
     clearTrack,
     clearAll,
     getTrackAtTime,
     applyCurrentPose,
     importKeyframes,
-    exportKeyframes
+    exportKeyframes,
+    serialize,
+    deserialize,
+    restoreState
   }
 }

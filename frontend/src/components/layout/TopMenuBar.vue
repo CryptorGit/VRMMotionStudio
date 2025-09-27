@@ -10,6 +10,7 @@
         class="top-menu__item"
         role="menuitem"
         @click="$emit('import')"
+        :title="tooltip('モデルを読み込みます')"
       >
         <Icon icon="mdi:file-import" />
         <span>インポート</span>
@@ -19,6 +20,7 @@
         class="top-menu__item"
         role="menuitem"
         @click="$emit('export')"
+        :title="tooltip('現在のポーズをエクスポートします')"
       >
         <Icon icon="mdi:file-export" />
         <span>エクスポート</span>
@@ -28,6 +30,7 @@
         class="top-menu__item"
         role="menuitem"
         @click="$emit('clear-cache')"
+        :title="tooltip('読み込んだモデルや設定をリセットします')"
       >
         <Icon icon="mdi:trash-can-outline" />
         <span>キャッシュ削除</span>
@@ -38,9 +41,21 @@
         role="menuitemcheckbox"
         :aria-checked="autoRestore"
         @click="$emit('toggle-auto-restore')"
+        :title="tooltip(`起動時に前回のモデルを${autoRestore ? '復元します' : '復元しません'}`)"
       >
         <Icon :icon="autoRestore ? 'mdi:backup-restore' : 'mdi:backup-restore'" />
         <span>自動復元 {{ autoRestore ? 'ON' : 'OFF' }}</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="switch"
+        :aria-checked="showCaptions"
+        @click="$emit('toggle-captions')"
+        :title="tooltip(showCaptions ? 'キャプション表示をOFFにします' : 'キャプション表示をONにします')"
+      >
+  <Icon :icon="showCaptions ? 'mdi:tooltip-text-outline' : 'mdi:tooltip-outline'" />
+        <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
       </button>
     </nav>
     <div class="top-menu__actions">
@@ -51,6 +66,7 @@
         role="switch"
         :aria-checked="theme === 'dark'"
         @click="$emit('toggle-theme')"
+        :title="tooltip(theme === 'dark' ? 'ライトテーマに切り替えます' : 'ダークテーマに切り替えます')"
       >
         <Icon :icon="theme === 'dark' ? 'mdi:weather-night' : 'mdi:white-balance-sunny'" />
       </button>
@@ -69,8 +85,14 @@ const props = defineProps({
   autoRestore: {
     type: Boolean,
     default: true
+  },
+  showCaptions: {
+    type: Boolean,
+    default: true
   }
 })
+
+const tooltip = message => (props.showCaptions ? message : '')
 </script>
 
 <style scoped>
@@ -116,7 +138,7 @@ const props = defineProps({
 .top-menu__nav {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   -webkit-app-region: no-drag;
   gap: 0.35rem;
 }

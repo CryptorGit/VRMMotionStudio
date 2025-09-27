@@ -12,7 +12,7 @@
           :aria-controls="`settings-pane-${tab.id}`"
           role="tab"
           @click="activeTab = tab.id"
-          :title="`${tab.label} - ${tab.description}`"
+          :title="tooltip(`${tab.label} - ${tab.description}`)"
         >
           <Icon :icon="tab.icon" class="tab-icon" aria-hidden="true" />
           <span class="tab-label">{{ tab.label }}</span>
@@ -77,6 +77,7 @@ import { ref, toRefs } from 'vue'
 import { Icon } from '@iconify/vue'
 import SectionVisibility from './SectionVisibility.vue'
 import { SECTION_TABS } from './settingsTabs.js'
+import { useCaptions } from '../composables/useCaptions.js'
 
 const props = defineProps({
   ambient: Object,
@@ -130,6 +131,8 @@ const emit = defineEmits([
 ])
 
 const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
+
+const { tooltip } = useCaptions()
 
 const {
   ambient,

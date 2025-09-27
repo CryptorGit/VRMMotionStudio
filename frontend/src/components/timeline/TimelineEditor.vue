@@ -7,6 +7,7 @@
           class="toolbar__button"
           :aria-pressed="props.loop"
           @click="emit('toggle-loop')"
+          :title="tooltip('ループ再生を切り替えます')"
         >
           <Icon icon="mdi:repeat" />
           <span>Loop</span>
@@ -16,11 +17,12 @@
           class="toolbar__button"
           :aria-pressed="snapToFrame"
           @click="toggleSnap"
+          :title="tooltip('フレームにスナップします')"
         >
           <Icon icon="mdi:ruler" />
           <span>Snap</span>
         </button>
-        <button type="button" class="toolbar__button" @click="fitRange">
+        <button type="button" class="toolbar__button" @click="fitRange" :title="tooltip('タイムラインの全範囲を表示します')">
           <Icon icon="mdi:magnify-scan" />
           <span>範囲フィット</span>
         </button>
@@ -29,49 +31,80 @@
           class="toolbar__button"
           @click="zoomToSelection"
           :disabled="!selectionRange"
+          :title="tooltip('選択範囲をズームします')"
         >
           <Icon icon="mdi:target" />
           <span>選択ズーム</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('add-all-keyframes')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('add-all-keyframes')"
+          :title="tooltip('現在のフレームに全トラッカーのキーを追加します')"
+        >
           <Icon icon="mdi:animation" />
           <span>全キー</span>
         </button>
       </div>
 
       <div class="toolbar__group toolbar__group--center">
-        <button type="button" class="toolbar__button" @click="emit('jump-start')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('jump-start')"
+          :title="tooltip('開始フレームに移動します')"
+        >
           <Icon icon="mdi:skip-backward" />
           <span>Start</span>
         </button>
-        <button type="button" class="toolbar__button" @click="stepFrames(-1)">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="stepFrames(-1)"
+          :title="tooltip('1フレーム戻ります')"
+        >
           <Icon icon="mdi:step-backward" />
           <span>-1</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('play')">
+        <button type="button" class="toolbar__button" @click="emit('play')" :title="tooltip('再生します')">
           <Icon icon="mdi:play" />
           <span>Play</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('pause')">
+        <button type="button" class="toolbar__button" @click="emit('pause')" :title="tooltip('一時停止します')">
           <Icon icon="mdi:pause" />
           <span>Pause</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('stop')">
+        <button type="button" class="toolbar__button" @click="emit('stop')" :title="tooltip('停止して開始位置へ戻ります')">
           <Icon icon="mdi:stop" />
           <span>Stop</span>
         </button>
-        <button type="button" class="toolbar__button" @click="stepFrames(1)">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="stepFrames(1)"
+          :title="tooltip('1フレーム進みます')"
+        >
           <Icon icon="mdi:step-forward" />
           <span>+1</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('jump-end')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('jump-end')"
+          :title="tooltip('終了フレームに移動します')"
+        >
           <Icon icon="mdi:skip-forward" />
           <span>End</span>
         </button>
       </div>
 
       <div class="toolbar__group toolbar__group--right">
-        <button type="button" class="toolbar__button" @click="toggleMode">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="toggleMode"
+          :title="tooltip(mode.value === 'time' ? 'フレーム表示に切り替えます' : '時間表示に切り替えます')"
+        >
           <Icon :icon="modeIcon" />
           <span>{{ modeLabel }}</span>
         </button>
@@ -93,6 +126,35 @@
             @keydown.enter.prevent="commitRange"
           />
         </label>
+        <button
+          type="button"
+          class="toolbar__button toolbar__button--secondary"
+          @click="emit('request-import')"
+          :title="tooltip('タイムラインをインポートします')"
+        >
+          <Icon icon="mdi:file-upload-outline" />
+          <span>インポート</span>
+        </button>
+        <button
+          type="button"
+          class="toolbar__button toolbar__button--secondary"
+          :disabled="!hasTimelineContent"
+          @click="emit('export-timeline')"
+          :title="tooltip('タイムラインをエクスポートします')"
+        >
+          <Icon icon="mdi:file-download-outline" />
+          <span>エクスポート</span>
+        </button>
+        <button
+          type="button"
+          class="toolbar__button toolbar__button--alert"
+          :disabled="!hasTimelineContent"
+          @click="emit('clear-timeline')"
+          :title="tooltip('タイムラインをクリアします')"
+        >
+          <Icon icon="mdi:trash-can-outline" />
+          <span>クリア</span>
+        </button>
       </div>
     </header>
 
@@ -125,6 +187,27 @@
         @wheel="handleTrackWheel"
       >
         <div class="timeline__tracks" :style="tracksStyle">
+          <div
+            v-if="(props.trackers?.length || 0) === 0"
+            class="timeline__empty-state"
+          >
+            <Icon icon="mdi:account-location-outline" class="timeline__empty-icon" />
+            <div>
+              <p>バーチャルトラッカーを有効にするとキーを編集できます。</p>
+              <p class="timeline__empty-sub">設定サイドバーの「バーチャルトラッカー」をONにしてください。</p>
+            </div>
+          </div>
+          <div
+            v-else-if="!hasTimelineContent"
+            class="timeline__empty-state"
+          >
+            <Icon icon="mdi:timeline-clock-outline" class="timeline__empty-icon" />
+            <div>
+              <p>まだキーがありません。</p>
+              <p class="timeline__empty-sub">タイムライン上をダブルクリックするか「全キー」ボタンでポーズを保存できます。</p>
+            </div>
+          </div>
+          <div class="timeline__memory" :style="memoryStyle"></div>
           <div class="timeline__grid" :style="gridStyle">
             <div class="timeline__channel timeline__channel--markers">
               <div class="timeline__channel-header">Markers</div>
@@ -135,9 +218,13 @@
                   class="timeline__marker"
                   :style="{ left: `${timeToX(marker.time)}px` }"
                   @pointerdown.stop.prevent="startMarkerDrag($event, marker)"
-                  :title="marker.label"
+                  @dblclick.stop.prevent="editMarker(marker)"
+                  :title="tooltip(marker.label || markerTitle(marker))"
                 >
-                  <span>{{ marker.label }}</span>
+                  <span>{{ marker.label || markerTitle(marker) }}</span>
+                </div>
+                <div v-if="visibleMarkers.length === 0" class="timeline__markers-empty">
+                  <span>ダブルクリックでマーカーを追加</span>
                 </div>
               </div>
             </div>
@@ -153,19 +240,20 @@
                   type="button"
                   class="channel__add"
                   @click.stop="emit('add-keyframe', { trackerKey: tracker.key, time: props.currentTime })"
+                  :title="tooltip('現在のフレームにキーを追加します')"
                 >
                   ＋
                 </button>
               </div>
-              <div class="timeline__channel-body">
+              <div class="timeline__channel-body" :data-tracker="tracker.key">
                 <template v-for="frame in visibleKeyframes(tracker.key)" :key="frame.id">
                   <div
                     class="timeline__keyframe"
                     :class="{ 'is-selected': selectedKeyframes.has(`${tracker.key}:${frame.id}`) }"
                     :style="{ left: `${timeToX(frame.time)}px`, background: keyColor(tracker.key) }"
                     @pointerdown.stop.prevent="startKeyframeDrag($event, tracker.key, frame)"
-                    @dblclick.stop.prevent="emit('remove-keyframe', { trackerKey: tracker.key, keyframeId: frame.id })"
-                    :title="keyTitle(frame)"
+                    @dblclick.stop.prevent="openInspector($event, tracker.key, frame)"
+                    :title="tooltip(keyTitle(frame))"
                   ></div>
                 </template>
               </div>
@@ -174,6 +262,88 @@
           <div class="timeline__playhead" :style="playheadStyle"></div>
           <div v-if="selectionRange" class="timeline__selection" :style="selectionStyle"></div>
         </div>
+        <transition name="inspector-pop">
+          <div
+            v-if="inspectorVisible"
+            ref="inspectorRef"
+            class="timeline__inspector-popover"
+            :class="`timeline__inspector-popover--${inspectorPosition.placement}`"
+            :style="inspectorStyle"
+            role="dialog"
+            aria-label="キーインスペクター"
+            @pointerdown.stop
+          >
+            <div class="inspector__header">
+              <div class="inspector__title">
+                <strong>{{ inspectorTrackerLabel }}</strong>
+                <span v-if="inspectorState.keyframeId">#{{ inspectorState.keyframeId }}</span>
+              </div>
+              <button type="button" class="inspector__close" @click="closeInspector" aria-label="インスペクターを閉じる">
+                <Icon icon="mdi:close" />
+              </button>
+            </div>
+            <div class="inspector__grid">
+              <label class="inspector__field">
+                <span>Frame</span>
+                <input
+                  type="number"
+                  v-model.number="inspectorState.frame"
+                  @change="commitInspectorFrame"
+                  @keydown.enter.prevent="commitInspectorFrame"
+                  @blur="commitInspectorFrame"
+                />
+              </label>
+              <label class="inspector__field">
+                <span>秒</span>
+                <input
+                  type="number"
+                  step="0.001"
+                  v-model.number="inspectorState.time"
+                  @change="commitInspectorTime"
+                  @keydown.enter.prevent="commitInspectorTime"
+                  @blur="commitInspectorTime"
+                />
+              </label>
+              <label class="inspector__field">
+                <span>X</span>
+                <input
+                  type="number"
+                  step="0.001"
+                  v-model.number="inspectorState.x"
+                  @change="commitInspectorValues"
+                  @keydown.enter.prevent="commitInspectorValues"
+                  @blur="commitInspectorValues"
+                />
+              </label>
+              <label class="inspector__field">
+                <span>Y</span>
+                <input
+                  type="number"
+                  step="0.001"
+                  v-model.number="inspectorState.y"
+                  @change="commitInspectorValues"
+                  @keydown.enter.prevent="commitInspectorValues"
+                  @blur="commitInspectorValues"
+                />
+              </label>
+              <label class="inspector__field">
+                <span>Z</span>
+                <input
+                  type="number"
+                  step="0.001"
+                  v-model.number="inspectorState.z"
+                  @change="commitInspectorValues"
+                  @keydown.enter.prevent="commitInspectorValues"
+                  @blur="commitInspectorValues"
+                />
+              </label>
+              <button type="button" class="inspector__delete" @click="deleteInspectorKeyframe">
+                <Icon icon="mdi:delete" />
+                <span>削除</span>
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
     </div>
 
@@ -192,7 +362,8 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useCaptions } from '../../composables/useCaptions.js'
 
 const LABEL_WIDTH = 180
 const MIN_VIEW_DURATION = 0.1
@@ -229,8 +400,14 @@ const emit = defineEmits([
   'add-all-keyframes',
   'update-range',
   'update:snap',
-  'select-keyframes'
+  'select-keyframes',
+  'update-keyframe',
+  'request-import',
+  'export-timeline',
+  'clear-timeline'
 ])
+
+const { tooltip } = useCaptions()
 
 const STORAGE_KEY_VIEW = 'timeline.view'
 const STORAGE_KEY_MODE = 'timeline.view.mode'
@@ -248,6 +425,59 @@ const selectionRange = ref(null)
 const selectedKeyframes = ref(new Set())
 const startFrameInput = ref(0)
 const endFrameInput = ref(0)
+
+const inspectorVisible = ref(false)
+const inspectorState = reactive({
+  trackerKey: '',
+  keyframeId: null,
+  time: 0,
+  frame: 0,
+  x: 0,
+  y: 0,
+  z: 0
+})
+
+const inspectorRef = ref(null)
+const inspectorAnchorTime = ref(0)
+const inspectorPosition = reactive({
+  left: 0,
+  top: 0,
+  placement: 'above'
+})
+
+const trackerLabelMap = computed(() => {
+  const map = {}
+  for (const tracker of props.trackers || []) {
+    if (!tracker?.key) continue
+    map[tracker.key] = tracker.label || tracker.key
+  }
+  return map
+})
+
+const inspectorFrame = computed(() => {
+  if (!inspectorVisible.value || !inspectorState.trackerKey || inspectorState.keyframeId == null) {
+    return null
+  }
+  const frames = props.keyframes?.[inspectorState.trackerKey] || []
+  return frames.find(item => item.id === inspectorState.keyframeId) || null
+})
+
+const inspectorTrackerLabel = computed(() => {
+  if (!inspectorVisible.value) return ''
+  return trackerLabelMap.value[inspectorState.trackerKey] || inspectorState.trackerKey
+})
+
+const inspectorStyle = computed(() => ({
+  left: `${inspectorPosition.left}px`,
+  top: `${inspectorPosition.top}px`
+}))
+
+const hasTimelineContent = computed(() => {
+  const tracks = props.keyframes || {}
+  const hasFrames = Object.values(tracks).some(list => Array.isArray(list) && list.length > 0)
+  const hasMarkers = Array.isArray(props.markers) && props.markers.length > 0
+  return hasFrames || hasMarkers
+})
 
 let resizeObserver
 let resizeRaf = null
@@ -296,6 +526,15 @@ const selectionStyle = computed(() => {
   return {
     left: `${LABEL_WIDTH + timeToX(start)}px`,
     width: `${Math.max(1, timeToX(end) - timeToX(start))}px`
+  }
+})
+
+const memoryStyle = computed(() => {
+  const clamped = clampTime(props.currentTime)
+  const width = Math.max(0, timeToX(clamped))
+  return {
+    left: `${LABEL_WIDTH}px`,
+    width: `${width}px`
   }
 })
 
@@ -389,13 +628,53 @@ watch(mode, value => {
   } catch {}
 })
 
+watch(inspectorFrame, frame => {
+  if (!inspectorVisible.value) return
+  if (!frame) {
+    closeInspector()
+    return
+  }
+  setInspectorFromFrame(inspectorState.trackerKey, frame)
+  scheduleInspectorLayout()
+})
+
+watch(
+  () => inspectorState.time,
+  value => {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      inspectorAnchorTime.value = clampTime(numeric)
+    }
+    scheduleInspectorLayout()
+  }
+)
+
+watch(selectedKeyframes, set => {
+  if (!inspectorVisible.value) return
+  if (!set || typeof set.has !== 'function') return
+  const currentId = `${inspectorState.trackerKey}:${inspectorState.keyframeId}`
+  if (!set.has(currentId)) closeInspector()
+})
+
+watch(
+  () => inspectorVisible.value,
+  value => {
+    if (value) scheduleInspectorLayout()
+  }
+)
+
+watch(() => visibleDuration.value, scheduleInspectorLayout)
+watch(() => viewStart.value, scheduleInspectorLayout)
+watch(() => widthPx.value, scheduleInspectorLayout)
+watch(() => props.startTime, scheduleInspectorLayout)
+watch(() => props.endTime, scheduleInspectorLayout)
+
 onMounted(() => {
   restoreViewState()
   try {
     const savedMode = localStorage.getItem(STORAGE_KEY_MODE)
     if (savedMode === 'time' || savedMode === 'frames') mode.value = savedMode
   } catch {}
-  window.addEventListener('keydown', handleKeydown)
   nextTick(() => syncScrollPositions())
 })
 
@@ -403,7 +682,6 @@ onUnmounted(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
   if (resizeRaf !== null) cancelAnimationFrame(resizeRaf)
-  window.removeEventListener('keydown', handleKeydown)
 })
 
 function clampView() {
@@ -485,12 +763,14 @@ function syncScrollPositions(source) {
   if (scrollbarWrapperRef.value && source !== 'scrollbar') {
     assignScroll(scrollbarWrapperRef.value)
   }
+  scheduleInspectorLayout()
   requestAnimationFrame(() => {
     syncingScroll = false
   })
 }
 
 function handleTracksScroll(event) {
+  scheduleInspectorLayout()
   if (syncingScroll) return
   const target = event.target
   const newStart = props.startTime + target.scrollLeft / pixelsPerSecond.value
@@ -548,11 +828,6 @@ function zoomAt(pivot, factor) {
   viewStart.value = pivot - nextDuration * ratio
   clampView()
   syncScrollPositions()
-}
-
-function togglePlay() {
-  if (props.isPlaying) emit('pause')
-  else emit('play')
 }
 
 function stepFrames(delta) {
@@ -640,6 +915,11 @@ function getPointerInfo(event) {
 }
 
 function handlePointerDown(event) {
+  if (inspectorVisible.value) {
+    const keyHit = event.target?.closest?.('.timeline__keyframe')
+    const markerHit = event.target?.closest?.('.timeline__marker')
+    if (!keyHit && !markerHit) closeInspector()
+  }
   if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
     startPan(event)
     return
@@ -744,11 +1024,217 @@ function clearSelection() {
   selectionRange.value = null
   selectedKeyframes.value = new Set()
   emit('select-keyframes', [])
+  if (inspectorVisible.value) closeInspector()
+}
+
+function closeInspector() {
+  inspectorVisible.value = false
+  inspectorState.trackerKey = ''
+  inspectorState.keyframeId = null
+}
+
+function setInspectorFromFrame(trackerKey, frame) {
+  inspectorState.trackerKey = trackerKey
+  inspectorState.keyframeId = frame.id
+  const time = clampTime(Number(frame.time) || props.startTime)
+  inspectorState.time = time
+  inspectorState.frame = Math.round(time * (props.frameRate || 60))
+  const value = Array.isArray(frame.value) ? frame.value : [0, 0, 0]
+  inspectorState.x = Number(value[0]) || 0
+  inspectorState.y = Number(value[1]) || 0
+  inspectorState.z = Number(value[2]) || 0
+  inspectorAnchorTime.value = time
+}
+
+function openInspector(event, trackerKey, frame) {
+  if (!frame) return
+  const id = `${trackerKey}:${frame.id}`
+  if (!selectedKeyframes.value.has(id)) {
+    selectedKeyframes.value = new Set([id])
+    emit('select-keyframes', [id])
+  }
+  setInspectorFromFrame(trackerKey, frame)
+  inspectorVisible.value = true
+  const anchorEl = event?.currentTarget || null
+  nextTick(() => {
+    updateInspectorPosition(anchorEl)
+    const firstField = inspectorRef.value?.querySelector('input')
+    if (firstField && typeof firstField.focus === 'function') {
+      try {
+        firstField.focus({ preventScroll: true })
+      } catch {
+        firstField.focus()
+      }
+    }
+  })
+}
+
+function scheduleInspectorLayout() {
+  if (!inspectorVisible.value) return
+  nextTick(() => updateInspectorPosition())
+}
+
+function updateInspectorPosition(anchorSource) {
+  if (!inspectorVisible.value) return
+  const scrollArea = tracksWrapperRef.value
+  if (!scrollArea) return
+
+  const inspectorEl = inspectorRef.value
+  const viewportWidth = scrollArea.clientWidth || 0
+  const viewportHeight = scrollArea.clientHeight || 0
+  const scrollLeft = scrollArea.scrollLeft || 0
+  const scrollTop = scrollArea.scrollTop || 0
+  const inspectorWidth = inspectorEl?.offsetWidth || 280
+  const inspectorHeight = inspectorEl?.offsetHeight || 200
+
+  const anchorTime = inspectorAnchorTime.value
+  const anchorX = LABEL_WIDTH + (anchorTime - props.startTime) * pixelsPerSecond.value
+  let left = anchorX - scrollLeft - inspectorWidth / 2
+  const minLeft = 12
+  const maxLeft = Math.max(minLeft, viewportWidth - inspectorWidth - 12)
+  if (left < minLeft) left = minLeft
+  if (left > maxLeft) left = maxLeft
+
+  const scrollRect = scrollArea.getBoundingClientRect()
+  let targetRect = null
+  if (anchorSource) {
+    if (typeof anchorSource.getBoundingClientRect === 'function') {
+      targetRect = anchorSource.getBoundingClientRect()
+    } else if (anchorSource?.currentTarget && typeof anchorSource.currentTarget.getBoundingClientRect === 'function') {
+      targetRect = anchorSource.currentTarget.getBoundingClientRect()
+    }
+  }
+  if (!targetRect && typeof window !== 'undefined') {
+    const trackerKey = inspectorState.trackerKey || ''
+    if (trackerKey) {
+      const escape = window.CSS?.escape || (value => String(value).replace(/(["\\])/g, '\\$1'))
+      const selector = `.timeline__channel-body[data-tracker="${escape(trackerKey)}"]`
+      const rowEl = scrollArea.querySelector(selector)
+      if (rowEl) targetRect = rowEl.getBoundingClientRect()
+    }
+  }
+
+  let rowCenter = viewportHeight / 2 + scrollTop
+  if (targetRect) {
+    rowCenter = targetRect.top - scrollRect.top + scrollTop + targetRect.height / 2
+  }
+
+  let top = rowCenter - scrollTop - inspectorHeight - 16
+  let placement = 'above'
+  if (top < 12) {
+    top = rowCenter - scrollTop + 16
+    placement = 'below'
+  }
+  const maxTop = Math.max(12, viewportHeight - inspectorHeight - 12)
+  if (top > maxTop) top = maxTop
+  if (top < 12) top = 12
+
+  inspectorPosition.left = left
+  inspectorPosition.top = top
+  inspectorPosition.placement = placement
+}
+
+function commitInspectorFrame() {
+  if (!inspectorVisible.value) return
+  const fps = props.frameRate || 60
+  const numeric = Number(inspectorState.frame)
+  const clampedFrame = Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0))
+  inspectorState.frame = clampedFrame
+  const time = clampTime(clampedFrame / fps)
+  inspectorState.time = time
+  emit('update-keyframe', {
+    trackerKey: inspectorState.trackerKey,
+    keyframeId: inspectorState.keyframeId,
+    time
+  })
+}
+
+function commitInspectorTime() {
+  if (!inspectorVisible.value) return
+  const numeric = Number(inspectorState.time)
+  const time = clampTime(Number.isFinite(numeric) ? numeric : props.startTime)
+  inspectorState.time = time
+  inspectorState.frame = Math.round(time * (props.frameRate || 60))
+  emit('update-keyframe', {
+    trackerKey: inspectorState.trackerKey,
+    keyframeId: inspectorState.keyframeId,
+    time
+  })
+}
+
+function commitInspectorValues() {
+  if (!inspectorVisible.value) return
+  const x = Number.isFinite(inspectorState.x) ? inspectorState.x : 0
+  const y = Number.isFinite(inspectorState.y) ? inspectorState.y : 0
+  const z = Number.isFinite(inspectorState.z) ? inspectorState.z : 0
+  inspectorState.x = x
+  inspectorState.y = y
+  inspectorState.z = z
+  emit('update-keyframe', {
+    trackerKey: inspectorState.trackerKey,
+    keyframeId: inspectorState.keyframeId,
+    value: [x, y, z]
+  })
+}
+
+function commitInspector(event) {
+  if (event?.preventDefault) event.preventDefault()
+  if (!inspectorVisible.value) return
+  const trackerKey = inspectorState.trackerKey
+  const keyframeId = inspectorState.keyframeId
+  if (!trackerKey || keyframeId == null) return
+
+  const fps = props.frameRate || 60
+  const frameNumeric = Number(inspectorState.frame)
+  const timeFromFrame = Number.isFinite(frameNumeric) ? clampTime(Math.max(0, frameNumeric) / fps) : null
+  const timeNumeric = Number(inspectorState.time)
+  let finalTime = Number.isFinite(timeNumeric) ? clampTime(timeNumeric) : null
+  if (finalTime == null && timeFromFrame != null) {
+    finalTime = timeFromFrame
+  } else if (finalTime != null && timeFromFrame != null && Math.abs(timeFromFrame - finalTime) > 1e-4) {
+    finalTime = timeFromFrame
+  }
+  if (finalTime == null) finalTime = clampTime(inspectorAnchorTime.value || props.startTime)
+
+  inspectorState.time = finalTime
+  inspectorState.frame = Math.round(finalTime * fps)
+  inspectorAnchorTime.value = finalTime
+
+  const x = Number.isFinite(inspectorState.x) ? inspectorState.x : 0
+  const y = Number.isFinite(inspectorState.y) ? inspectorState.y : 0
+  const z = Number.isFinite(inspectorState.z) ? inspectorState.z : 0
+  inspectorState.x = x
+  inspectorState.y = y
+  inspectorState.z = z
+
+  emit('update-keyframe', {
+    trackerKey,
+    keyframeId,
+    time: finalTime,
+    value: [x, y, z]
+  })
+}
+
+function deleteInspectorKeyframe() {
+  if (!inspectorVisible.value) return
+  emit('remove-keyframe', {
+    trackerKey: inspectorState.trackerKey,
+    keyframeId: inspectorState.keyframeId
+  })
+  clearSelection()
 }
 
 function addMarkerFromEvent(event) {
   const { time } = getPointerInfo(event)
   emit('add-marker', snapIfNeeded(time))
+}
+
+function editMarker(marker) {
+  const current = marker?.label ?? ''
+  const result = window.prompt('マーカー名を入力', current)
+  if (result === null) return
+  const next = result.trim()
+  emit('update-marker', { id: marker.id, label: next === '' ? current : next })
 }
 
 function startMarkerDrag(event, marker) {
@@ -778,54 +1264,6 @@ function startKeyframeDrag(event, trackerKey, frame) {
   event.preventDefault()
 }
 
-function handleKeydown(event) {
-  if (event.target && ['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
-  switch (event.key) {
-    case ' ': {
-      event.preventDefault()
-      togglePlay()
-      break
-    }
-    case 'Home': {
-      event.preventDefault()
-      fitRange()
-      break
-    }
-    case 'End': {
-      event.preventDefault()
-      emit('jump-end')
-      break
-    }
-    case 'ArrowRight': {
-      event.preventDefault()
-      stepFrames(event.shiftKey ? 10 : 1)
-      break
-    }
-    case 'ArrowLeft': {
-      event.preventDefault()
-      stepFrames(event.shiftKey ? -10 : -1)
-      break
-    }
-    case 'Delete':
-    case 'Backspace': {
-      if (selectedKeyframes.value.size === 0) return
-      selectedKeyframes.value.forEach(id => {
-        const [trackerKey, frameId] = id.split(':')
-        emit('remove-keyframe', { trackerKey, keyframeId: Number(frameId) })
-      })
-      selectedKeyframes.value = new Set()
-      break
-    }
-    case 'm':
-    case 'M': {
-      emit('add-marker', snapIfNeeded(props.currentTime))
-      break
-    }
-    default:
-      break
-  }
-}
-
 function keyColor(key) {
   const palette = ['#70A2FF', '#5AD8A6', '#FFD666', '#FF7A45', '#9A7AFF']
   let hash = 0
@@ -836,7 +1274,21 @@ function keyColor(key) {
 }
 
 function keyTitle(frame) {
-  return `t=${frame.time.toFixed(3)}s`
+  const value = Array.isArray(frame.value) ? frame.value : []
+  const [x, y, z] = [
+    Number(value[0]) || 0,
+    Number(value[1]) || 0,
+    Number(value[2]) || 0
+  ]
+  return `t=${frame.time.toFixed(3)}s\n(${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`
+}
+
+function markerTitle(marker) {
+  if (!marker) return ''
+  const time = Number(marker.time) || 0
+  const fps = props.frameRate || 60
+  const frame = Math.round((time - props.startTime) * fps)
+  return `t=${time.toFixed(3)}s • frame ${frame}`
 }
 </script>
 
@@ -909,6 +1361,20 @@ function keyTitle(frame) {
 .toolbar__button:disabled {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.toolbar__button--secondary {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.toolbar__button--alert {
+  background: rgba(255, 94, 94, 0.12);
+  border-color: rgba(255, 94, 94, 0.25);
+}
+
+.toolbar__button--alert:hover,
+.toolbar__button--alert:focus-visible {
+  background: rgba(255, 94, 94, 0.18);
 }
 
 .toolbar__field {
@@ -996,11 +1462,47 @@ function keyTitle(frame) {
   min-height: 100%;
 }
 
+.timeline__empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(180deg, rgba(18, 20, 28, 0.9), rgba(18, 20, 28, 0.95));
+  text-align: left;
+  padding: 1.5rem;
+  pointer-events: none;
+}
+
+.timeline__empty-icon {
+  font-size: 2rem;
+  opacity: 0.75;
+}
+
+.timeline__empty-sub {
+  font-size: 0.82rem;
+  opacity: 0.78;
+  margin-top: 0.2rem;
+}
+
 .timeline__grid {
   position: relative;
   display: grid;
   grid-template-columns: var(--timeline-label-width) 1fr;
   grid-auto-rows: minmax(48px, auto);
+  z-index: 1;
+}
+
+.timeline__memory {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #2d8cff) 14%, transparent), transparent 85%);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .timeline__channel {
@@ -1063,6 +1565,17 @@ function keyTitle(frame) {
   white-space: nowrap;
 }
 
+.timeline__markers-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+}
+
 .timeline__keyframe {
   position: absolute;
   top: 50%;
@@ -1116,5 +1629,144 @@ function keyTitle(frame) {
 
 .timeline__scrollbar-spacer {
   height: 100%;
+}
+
+.timeline__inspector-popover {
+  position: absolute;
+  z-index: 8;
+  min-width: 260px;
+  max-width: 320px;
+  background: rgba(12, 16, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.85rem 1rem 1rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.timeline__inspector-popover::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: rotate(45deg);
+  left: 50%;
+  margin-left: -7px;
+  box-shadow: inherit;
+}
+
+.timeline__inspector-popover--above::before {
+  bottom: -7px;
+}
+
+.timeline__inspector-popover--below::before {
+  top: -7px;
+}
+
+.inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 0.6rem;
+}
+
+.inspector__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.inspector__title span {
+  font-size: 0.74rem;
+  opacity: 0.65;
+}
+
+.inspector__close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.inspector__close:hover,
+.inspector__close:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.inspector__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.inspector__field {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.inspector__field input {
+  margin-top: 0.2rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0.34rem 0.5rem;
+  color: inherit;
+}
+
+.inspector__field input:focus-visible {
+  outline: none;
+  border-color: rgba(45, 140, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(45, 140, 255, 0.35);
+}
+
+.inspector__delete {
+  align-self: stretch;
+  background: rgba(255, 90, 90, 0.18);
+  border: 1px solid rgba(255, 90, 90, 0.3);
+  color: rgba(255, 210, 210, 0.94);
+  border-radius: 8px;
+  padding: 0.48rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border 0.15s ease;
+}
+
+.inspector__delete:hover,
+.inspector__delete:focus-visible {
+  background: rgba(255, 90, 90, 0.3);
+  border-color: rgba(255, 90, 90, 0.45);
+}
+
+.inspector-pop-enter-active,
+.inspector-pop-leave-active {
+  transition: opacity 0.15s ease, transform 0.18s ease;
+}
+
+.inspector-pop-enter-from,
+.inspector-pop-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@media (max-width: 1280px) {
+  .inspector__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

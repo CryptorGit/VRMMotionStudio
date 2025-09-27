@@ -3,11 +3,13 @@
     <TopMenuBar
       :theme="theme"
       :auto-restore="autoRestore"
+      :show-captions="showCaptions"
       @import="openFile"
       @export="exportPose"
       @clear-cache="clearAllCache"
       @toggle-auto-restore="toggleAutoRestore"
       @toggle-theme="toggleTheme"
+      @toggle-captions="toggleCaptions"
     />
     <div class="workspace-grid" role="presentation">
       <SplitPane
@@ -74,12 +76,16 @@
                     @add-keyframe="handleTimelineAddKey"
                     @remove-keyframe="handleTimelineRemoveKey"
                     @move-keyframe="handleTimelineMoveKey"
+                    @update-keyframe="handleTimelineUpdateKey"
                     @add-marker="handleAddMarker"
                     @update-marker="handleUpdateMarker"
                     @remove-marker="handleRemoveMarker"
                     @update-range="handleTimelineRange"
                     @update:snap="timelineSnap = $event"
                     @select-keyframes="handleSelectKeyframes"
+                    @request-import="handleTimelineRequestImport"
+                    @export-timeline="handleTimelineExport"
+                    @clear-timeline="handleTimelineClear"
                   />
                 </div>
               </section>
@@ -138,11 +144,18 @@
       style="display:none"
       @change="onFileChange"
     />
+    <input
+      type="file"
+      ref="timelineFileInput"
+      accept="application/json"
+      style="display:none"
+      @change="handleTimelineImportFile"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, provide } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import TimelineEditor from './timeline/TimelineEditor.vue'
 import TopMenuBar from './layout/TopMenuBar.vue'
@@ -166,6 +179,7 @@ import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useTheme } from '../composables/useTheme.js'
+import { captionInjectionKey } from '../composables/useCaptions.js'
 
 const viewer = ref(null)
 const currentMeshRef = ref(null)
@@ -197,6 +211,15 @@ const clock = new THREE.Clock()
 const TARGET_FPS = 30
 
 const { theme, toggleTheme } = useTheme()
+
+const CAPTION_STORAGE_KEY = 'ui.captions.enabled'
+const showCaptions = ref(true)
+const tooltip = message => (showCaptions.value && typeof message === 'string' ? message : '')
+
+provide(captionInjectionKey, {
+  showCaptions,
+  tooltip
+})
 
 const autoRestore = ref(true)
 const toasts = ref([])
@@ -237,6 +260,28 @@ function toggleAutoRestore() {
     }
   } catch {}
   pushToast(`モデル自動復元: ${autoRestore.value ? 'ON' : 'OFF'}`, '設定')
+}
+
+function loadCaptionPreference() {
+  try {
+    const stored = localStorage.getItem(CAPTION_STORAGE_KEY)
+    if (stored === null) return
+    showCaptions.value = stored !== '0'
+  } catch {
+    showCaptions.value = true
+  }
+}
+
+function toggleCaptions() {
+  showCaptions.value = !showCaptions.value
+  try {
+    if (showCaptions.value) {
+      localStorage.removeItem(CAPTION_STORAGE_KEY)
+    } else {
+      localStorage.setItem(CAPTION_STORAGE_KEY, '0')
+    }
+  } catch {}
+  pushToast(`ボタンキャプション: ${showCaptions.value ? '表示' : '非表示'}`, '設定')
 }
 
 async function logToServer(data) {
@@ -314,6 +359,8 @@ const {
   applyBoneSettingsAll
 } = fileLoader
 
+const timelineFileInput = ref(null)
+
 let trackerController = null
 let timelineController = null
 
@@ -324,7 +371,13 @@ const updateTrackers = () => {
   } catch {}
 }
 
-const trackerList = computed(() => trackerController?.trackers?.value || [])
+const trackerList = computed(() => {
+  const source = trackerController?.trackers?.value || []
+  return source.map(item => ({
+    key: item.key,
+    label: item.name || item.key
+  }))
+})
 
 const timelineSnap = ref(true)
 const selectedTimelineKeys = ref([])
@@ -393,6 +446,12 @@ trackerController = useVirtualTrackers({
 
 timelineController = useTimeline({ trackers: trackerController.trackers })
 
+if (timelineController) {
+  const tracks = timelineController.keyframes || {}
+  const hasExistingKeys = Object.values(tracks).some(list => Array.isArray(list) && list.length > 0)
+  if (hasExistingKeys) ensureVirtualTrackers()
+}
+
 watch(virtualTrackersEnabled, v => {
   try { trackerController.setEnabled(v) } catch {}
   if (v) {
@@ -408,11 +467,18 @@ function resetVirtualTrackers() {
 }
 
 function handleTimelineAddAll() {
+  ensureVirtualTrackers()
   try {
     const time = timelineController.currentTime.value
     timelineController.addSnapshotAtTime(time)
     timelineController.applyCurrentPose()
   } catch {}
+}
+
+function ensureVirtualTrackers() {
+  if (virtualTrackersEnabled.value) return
+  virtualTrackersEnabled.value = true
+  try { trackerController.setEnabled(true) } catch {}
 }
 
 function getTrackerByKey(key) {
@@ -421,6 +487,7 @@ function getTrackerByKey(key) {
 
 function handleTimelineAddKey(payload) {
   if (!payload?.trackerKey) return
+  ensureVirtualTrackers()
   try {
     const targetTime = Number.isFinite(payload.time) ? payload.time : timelineController.currentTime.value
     if (Number.isFinite(payload.time)) timelineController.setCurrentTime(payload.time)
@@ -445,8 +512,7 @@ function handleTimelineRemoveKey(payload) {
 
 function handleTimelineMoveKey({ trackerKey, keyframeId, time }) {
   try {
-    timelineController.updateKeyframeTime(trackerKey, keyframeId, time)
-    timelineController.applyCurrentPose()
+    timelineController.updateKeyframe(trackerKey, keyframeId, { time })
   } catch {}
 }
 
@@ -491,8 +557,12 @@ function handleTimelineRange({ startFrame, endFrame }) {
 
 function handleAddMarker(time) {
   try {
-    const marker = timelineController.addMarker({ time, label: `Marker ${timelineMarkers.value.length + 1}` })
-    if (marker) pushToast(`${marker.label} を追加`, 'タイムライン', 2400)
+    const marker = timelineController.addMarker({ time })
+    if (!marker) return
+    const fps = timelineFrameRate.value || 60
+    const frame = Math.round((marker.time - timelineStartTime.value) * fps)
+    const displayLabel = marker.label && marker.label.length > 0 ? marker.label : `t=${marker.time.toFixed(3)}s`
+    pushToast(`マーカーを追加: ${displayLabel} (frame ${frame})`, 'タイムライン', 2600)
   } catch {}
 }
 
@@ -506,6 +576,87 @@ function handleRemoveMarker(id) {
 
 function handleSelectKeyframes(ids) {
   selectedTimelineKeys.value = ids
+}
+
+function handleTimelineUpdateKey(payload) {
+  if (!payload || !payload.trackerKey || !payload.keyframeId) return
+  try {
+    const { trackerKey, keyframeId } = payload
+    const updatePayload = {}
+    if (Number.isFinite(payload.time)) updatePayload.time = payload.time
+    if (Array.isArray(payload.value)) updatePayload.value = payload.value
+    timelineController.updateKeyframe(trackerKey, keyframeId, updatePayload)
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Failed to update keyframe', error)
+  }
+}
+
+function handleTimelineRequestImport() {
+  const input = timelineFileInput.value
+  if (!input) {
+    pushToast('タイムラインの読み込みに失敗しました (input missing)', 'タイムライン', 4200)
+    return
+  }
+  input.value = ''
+  input.click()
+}
+
+async function handleTimelineImportFile(event) {
+  const input = event?.target
+  const file = input?.files?.[0]
+  if (!file) return
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    const ok = timelineController.deserialize(data)
+    if (!ok) {
+      pushToast('タイムラインの読み込みに失敗しました', 'タイムライン', 4800)
+      return
+    }
+    ensureVirtualTrackers()
+    try { timelineController.pause() } catch {}
+    try { timelineController.applyCurrentPose() } catch {}
+    pushToast(`${file.name} を読み込みました`, 'タイムライン', 3200)
+  } catch (error) {
+    pushToast('タイムラインJSONの解析に失敗しました', 'タイムライン', 5200)
+    if (import.meta.env.DEV) console.error('Timeline import failed', error)
+  } finally {
+    if (input) input.value = ''
+  }
+}
+
+function handleTimelineExport() {
+  try {
+    const snapshot = timelineController.serialize()
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const filename = `timeline-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(url)
+    pushToast('タイムラインをエクスポートしました', 'タイムライン', 2600)
+  } catch (error) {
+    pushToast('タイムラインのエクスポートに失敗しました', 'タイムライン', 4800)
+    if (import.meta.env.DEV) console.error('Timeline export failed', error)
+  }
+}
+
+function handleTimelineClear() {
+  if (!timelineController) return
+  const confirmed = window.confirm('タイムラインをすべて削除しますか？')
+  if (!confirmed) return
+  try {
+    timelineController.clearAll()
+    timelineController.stop()
+    pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
+  } catch (error) {
+    pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
+    if (import.meta.env.DEV) console.error('Timeline clear failed', error)
+  }
 }
 
 async function clearAllCache() {
@@ -606,6 +757,7 @@ function toggleAllBoneNames(v) {
 
 onMounted(async () => {
   loadAutoRestore()
+  loadCaptionPreference()
   loadLightingSettings({})
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
