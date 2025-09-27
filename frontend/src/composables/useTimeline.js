@@ -1,7 +1,8 @@
-import { ref, reactive, watch } from 'vue'
+import { computed, ref, reactive, watch } from 'vue'
 import * as THREE from 'three'
 
 let nextKeyframeId = 1
+let nextMarkerId = 1
 
 function clonePosition(pos) {
   if (!pos) return [0, 0, 0]
@@ -21,13 +22,19 @@ function lerpVector(a, b, t) {
 }
 
 export function useTimeline({ trackers }) {
-  const duration = ref(30) // seconds
+  const startTime = ref(0)
+  const endTime = ref(30)
   const currentTime = ref(0)
   const isPlaying = ref(false)
+  const loopPlayback = ref(false)
+  const frameRate = ref(60)
   const keyframes = reactive({})
   const lastAppliedValues = reactive({})
+  const markers = ref([])
 
   let lastStepTime = performance.now()
+
+  const duration = computed(() => Math.max(0, endTime.value - startTime.value))
 
   function ensureTrackKey(key) {
     if (!keyframes[key]) keyframes[key] = []
@@ -38,7 +45,8 @@ export function useTimeline({ trackers }) {
     if (!trackerKey || typeof time !== 'number') return null
     const arr = ensureTrackKey(trackerKey)
     const safePos = clonePosition(position)
-    const entry = { id: nextKeyframeId++, time: Math.max(0, time), value: safePos }
+    const clampedTime = Math.min(Math.max(time, startTime.value), endTime.value)
+    const entry = { id: nextKeyframeId++, time: clampedTime, value: safePos }
     arr.push(entry)
     arr.sort((a, b) => a.time - b.time)
     lastAppliedValues[trackerKey] = safePos
@@ -65,12 +73,23 @@ export function useTimeline({ trackers }) {
     arr.splice(idx, 1)
   }
 
+  function updateKeyframeTime(trackerKey, id, nextTime) {
+    const arr = keyframes[trackerKey]
+    if (!arr?.length) return
+    const target = arr.find(k => k.id === id)
+    if (!target) return
+    if (!Number.isFinite(nextTime)) return
+    target.time = Math.min(Math.max(nextTime, startTime.value), endTime.value)
+    arr.sort((a, b) => a.time - b.time)
+  }
+
   function clearTrack(trackerKey) {
     if (keyframes[trackerKey]) keyframes[trackerKey] = []
   }
 
   function clearAll() {
     for (const key of Object.keys(keyframes)) keyframes[key] = []
+    markers.value = []
   }
 
   function getTrackAtTime(trackerKey, time) {
@@ -113,26 +132,33 @@ export function useTimeline({ trackers }) {
     const delta = (now - lastStepTime) / 1000
     lastStepTime = now
     if (isPlaying.value) {
-      const next = currentTime.value + delta
-      if (next >= duration.value) {
-        currentTime.value = duration.value
+      let next = currentTime.value + delta
+      const rangeEnd = endTime.value
+      const rangeStart = startTime.value
+      if (loopPlayback.value && duration.value > 0) {
+        if (next > rangeEnd) {
+          const span = duration.value
+          const overflow = (next - rangeStart) % span
+          next = rangeStart + overflow
+        }
+      } else if (next >= rangeEnd) {
+        next = rangeEnd
         isPlaying.value = false
-      } else {
-        currentTime.value = next
       }
+      currentTime.value = Math.min(Math.max(next, rangeStart), rangeEnd)
     }
     applyCurrentPose()
   }
 
   function setCurrentTime(time) {
-    const clamped = Math.min(Math.max(time, 0), duration.value)
+    const clamped = Math.min(Math.max(time, startTime.value), endTime.value)
     currentTime.value = clamped
     applyCurrentPose()
     lastStepTime = performance.now()
   }
 
   function play() {
-    if (currentTime.value >= duration.value) currentTime.value = 0
+    if (currentTime.value >= endTime.value) currentTime.value = startTime.value
     isPlaying.value = true
     lastStepTime = performance.now()
   }
@@ -143,13 +169,79 @@ export function useTimeline({ trackers }) {
 
   function stop() {
     isPlaying.value = false
-    setCurrentTime(0)
+    setCurrentTime(startTime.value)
   }
 
   function setDuration(seconds) {
     if (!Number.isFinite(seconds) || seconds <= 0) return
-    duration.value = seconds
-    if (currentTime.value > duration.value) currentTime.value = duration.value
+    endTime.value = startTime.value + seconds
+    if (currentTime.value > endTime.value) currentTime.value = endTime.value
+  }
+
+  function setFrameRate(fps) {
+    if (!Number.isFinite(fps) || fps <= 0) return
+    frameRate.value = fps
+  }
+
+  function setRange(start, end) {
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return
+    const s = Math.min(start, end)
+    const e = Math.max(start, end)
+    if (e === s) return
+    startTime.value = s
+    endTime.value = e
+    if (currentTime.value < s) currentTime.value = s
+    if (currentTime.value > e) currentTime.value = e
+  }
+
+  function setRangeFromFrames(startFrame, endFrame) {
+    if (!Number.isFinite(startFrame) || !Number.isFinite(endFrame)) return
+    const s = Math.min(startFrame, endFrame)
+    const e = Math.max(startFrame, endFrame)
+    if (e === s) return
+    const fps = frameRate.value || 60
+    setRange(s / fps, e / fps)
+  }
+
+  function stepByFrames(deltaFrames) {
+    if (!Number.isFinite(deltaFrames)) return
+    const fps = frameRate.value || 60
+    const offset = deltaFrames / fps
+    setCurrentTime(currentTime.value + offset)
+  }
+
+  function jumpToFrame(frame) {
+    if (!Number.isFinite(frame)) return
+    const fps = frameRate.value || 60
+    const time = frame / fps
+    setCurrentTime(time)
+  }
+
+  function addMarker({ time, label }) {
+    if (!Number.isFinite(time)) return null
+    const entry = {
+      id: nextMarkerId++,
+      time: Math.min(Math.max(time, startTime.value), endTime.value),
+      label: label || `Marker ${nextMarkerId - 1}`
+    }
+    markers.value = [...markers.value, entry].sort((a, b) => a.time - b.time)
+    return entry
+  }
+
+  function updateMarker(id, payload) {
+    markers.value = markers.value.map(marker => {
+      if (marker.id !== id) return marker
+      const next = { ...marker }
+      if (payload?.time !== undefined && Number.isFinite(payload.time)) {
+        next.time = Math.min(Math.max(payload.time, startTime.value), endTime.value)
+      }
+      if (payload?.label !== undefined) next.label = payload.label
+      return next
+    }).sort((a, b) => a.time - b.time)
+  }
+
+  function removeMarker(id) {
+    markers.value = markers.value.filter(marker => marker.id !== id)
   }
 
   function importKeyframes(snapshot) {
@@ -181,19 +273,33 @@ export function useTimeline({ trackers }) {
   })
 
   return {
+    startTime,
+    endTime,
     duration,
+    frameRate,
     currentTime,
     isPlaying,
+    loopPlayback,
     keyframes,
+    markers,
     step,
     play,
     pause,
     stop,
     setCurrentTime,
     setDuration,
+    setFrameRate,
+    setRange,
+    setRangeFromFrames,
+    stepByFrames,
+    jumpToFrame,
+    addMarker,
+    updateMarker,
+    removeMarker,
     addKeyframe,
     addSnapshotAtTime,
     removeKeyframe,
+  updateKeyframeTime,
     clearTrack,
     clearAll,
     getTrackAtTime,

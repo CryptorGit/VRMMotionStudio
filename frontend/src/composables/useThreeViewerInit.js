@@ -16,23 +16,33 @@ export function useThreeViewerInit({
   onPointerDown,
   onWindowResize
 }) {
+  let resizeObserver = null
+
   function init() {
     const container = viewer.value
+    if (!container) return
 
-    renderer.value = markRaw(new THREE.WebGLRenderer({ antialias: true }))
-    renderer.value.setPixelRatio(window.devicePixelRatio)
-    renderer.value.setSize(container.clientWidth, container.clientHeight)
+  renderer.value = markRaw(new THREE.WebGLRenderer({ antialias: true, alpha: true }))
+  renderer.value.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  renderer.value.setClearColor(0x1d2028, 1)
+  renderer.value.setSize(container.clientWidth || 1, container.clientHeight || 1, false)
     container.appendChild(renderer.value.domElement)
 
     scene.value = markRaw(new THREE.Scene())
-    scene.value.background = new THREE.Color(0xeeeeee)
+    scene.value.background = new THREE.Color(0x20232b)
 
-    const grid = new THREE.GridHelper(40, 40)
+    const grid = new THREE.GridHelper(40, 40, 0x4a5162, 0x2d323f)
+    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material]
+    gridMaterials.forEach(mat => {
+      mat.opacity = 0.32
+      mat.transparent = true
+      mat.depthWrite = false
+    })
     scene.value.add(grid)
 
     const floorMesh = new THREE.Mesh(
       new THREE.BoxGeometry(40, 1, 40),
-      new THREE.MeshBasicMaterial({ color: 0xcccccc })
+      new THREE.MeshBasicMaterial({ color: 0x2c303a })
     )
     floorMesh.position.set(0, -0.5, 0)
     floorMesh.visible = false
@@ -61,6 +71,11 @@ export function useThreeViewerInit({
     renderer.value.domElement.addEventListener('pointerdown', onPointerDown)
 
     window.addEventListener('resize', onWindowResize)
+
+    resizeObserver = new ResizeObserver(() => onWindowResize())
+    resizeObserver.observe(container)
+
+    onWindowResize()
   }
 
   function cleanup() {
@@ -68,6 +83,8 @@ export function useThreeViewerInit({
     renderer.value?.domElement?.removeEventListener('pointerdown', onPointerDown)
     controls.value?.removeEventListener('start', onControlStart)
     controls.value?.removeEventListener('end', onControlEnd)
+    resizeObserver?.disconnect()
+    resizeObserver = null
   }
 
   return { init, cleanup }

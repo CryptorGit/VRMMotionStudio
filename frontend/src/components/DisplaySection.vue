@@ -1,15 +1,9 @@
 <template>
-  <div class="section">
-    <h3 @click="expanded = !expanded">
-      <i
-        class="toggle-icon"
-        :class="expanded ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"
-      ></i>
-  表示とツール（仮）
-      <span class="spacer"></span>
-      <i class="fa-solid fa-times close-icon" @click.stop="$emit('hide')"></i>
-    </h3>
-    <div v-show="expanded" class="section-content">
+  <section class="section">
+    <header class="section__header">
+      <h3>表示とツール</h3>
+    </header>
+    <div class="section__content">
       <div class="row">
         <label>
           ライトマーカー表示
@@ -113,11 +107,11 @@
         </label>
       </div>
     </div>
-  </div>
-  </template>
+  </section>
+</template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
@@ -130,14 +124,14 @@ const props = defineProps({
   showNonDeformingBones: { type: Boolean, required: true },
   highlightConstraint: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
-  boneLabelScale: { type: Number, required: true }
-  , virtualTrackersEnabled: { type: Boolean, default: false }
-  , showVirtualTrackerLabels: { type: Boolean, default: true }
-  , virtualTrackerSize: { type: Number, default: 0.08 }
-  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  boneLabelScale: { type: Number, required: true },
+  virtualTrackersEnabled: { type: Boolean, default: false },
+  showVirtualTrackerLabels: { type: Boolean, default: true },
+  virtualTrackerSize: { type: Number, default: 0.08 },
+  virtualTrackerLabelScale: { type: Number, default: 1.0 }
 })
+
 const emit = defineEmits([
-  'hide',
   'update:showLightMarker',
   'update:markerColor',
   'update:showPhysicalBones',
@@ -149,15 +143,13 @@ const emit = defineEmits([
   'update:boneDotSize',
   'update:boneLabelScale',
   'toggle-all-bones',
-  'toggle-all-bone-names'
-  , 'update:virtualTrackersEnabled'
-  , 'reset-virtual-trackers'
-  , 'update:showVirtualTrackerLabels'
-  , 'update:virtualTrackerSize'
-  , 'update:virtualTrackerLabelScale'
+  'toggle-all-bone-names',
+  'update:virtualTrackersEnabled',
+  'reset-virtual-trackers',
+  'update:showVirtualTrackerLabels',
+  'update:virtualTrackerSize',
+  'update:virtualTrackerLabelScale'
 ])
-
-const expanded = ref(false)
 
 const showLightMarkerLocal = computed({
   get: () => props.showLightMarker,
@@ -215,40 +207,85 @@ const virtualTrackerLabelScaleLocal = computed({
   get: () => props.virtualTrackerLabelScale,
   set: v => emit('update:virtualTrackerLabelScale', v)
 })
-// ボーン名スライダーは単一レンジに統一
 
-function onToggleAllBones(v) {
-  emit('toggle-all-bones', !!v)
-}
-function onToggleAllBoneNames(v) {
-  emit('toggle-all-bone-names', !!v)
-}
-
-// Reflect per-model state in master toggles so UI stays in sync after restore
 const allBonesVisible = computed({
-  get: () => (props.models?.length ? props.models.every(m => !!m.bonesVisible) : false),
+  get: () => (props.models?.length ? props.models.every(model => !!model.bonesVisible) : false),
   set: v => emit('toggle-all-bones', !!v)
 })
 const allBoneNamesVisible = computed({
-  get: () => (props.models?.length ? props.models.every(m => !!m.boneNameVisible) : false),
+  get: () => (props.models?.length ? props.models.every(model => !!model.boneNameVisible) : false),
   set: v => emit('toggle-all-bone-names', !!v)
 })
 </script>
 
 <style scoped>
-.section h3 {
+.section {
+  background: rgba(36, 40, 52, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.section__header {
+  padding: 0.75rem 0.85rem 0.4rem;
+}
+
+.section__header h3 {
   margin: 0;
-  padding: 0.5rem;
-  background: #ddd;
-  cursor: pointer;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+.section__content {
+  padding: 0 0.85rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.section h3 .toggle-icon { margin-right: 0.5rem; }
-.section h3 .spacer { flex: 1; }
-.section h3 .close-icon { margin-left: 0.5rem; cursor: pointer; }
-.section-content { padding: 0.5rem; }
-.row { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem; }
-.row label { display: flex; align-items: center; gap: 0.5rem; }
-.row .stretch { flex: 1; display: flex; justify-content: space-between; }
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-muted, rgba(240, 245, 255, 0.8));
+}
+
+label.stretch {
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+input[type='range'] {
+  width: 100%;
+}
+
+button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: inherit;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+button:hover,
+button:focus-visible {
+  background: color-mix(in srgb, var(--accent, #2d8cff) 25%, rgba(255, 255, 255, 0.1));
+  outline: none;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0.5rem 0;
+}
 </style>

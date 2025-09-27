@@ -1,0 +1,195 @@
+<template>
+  <header class="top-menu" role="menubar">
+    <div class="top-menu__brand">
+      <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
+      <span class="top-menu__title">MokuMokuDance Web</span>
+    </div>
+    <nav class="top-menu__nav" aria-label="メインメニュー">
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        @click="$emit('import')"
+      >
+        <Icon icon="mdi:file-import" />
+        <span>インポート</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        @click="$emit('export')"
+      >
+        <Icon icon="mdi:file-export" />
+        <span>エクスポート</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        @click="$emit('clear-cache')"
+      >
+        <Icon icon="mdi:trash-can-outline" />
+        <span>キャッシュ削除</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitemcheckbox"
+        :aria-checked="autoRestore"
+        @click="$emit('toggle-auto-restore')"
+      >
+        <Icon :icon="autoRestore ? 'mdi:backup-restore' : 'mdi:backup-restore'" />
+        <span>自動復元 {{ autoRestore ? 'ON' : 'OFF' }}</span>
+      </button>
+    </nav>
+    <div class="top-menu__actions">
+      <button
+        type="button"
+        class="top-menu__item top-menu__item--icon"
+        :aria-label="theme === 'dark' ? 'ライトテーマに切替' : 'ダークテーマに切替'"
+        role="switch"
+        :aria-checked="theme === 'dark'"
+        @click="$emit('toggle-theme')"
+      >
+        <Icon :icon="theme === 'dark' ? 'mdi:weather-night' : 'mdi:white-balance-sunny'" />
+      </button>
+    </div>
+  </header>
+</template>
+
+<script setup>
+import { Icon } from '@iconify/vue'
+
+const props = defineProps({
+  theme: {
+    type: String,
+    default: 'dark'
+  },
+  autoRestore: {
+    type: Boolean,
+    default: true
+  }
+})
+</script>
+
+<style scoped>
+.top-menu {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  height: var(--menubar-height, 48px);
+  background: var(--surface-strong, #1f2330);
+  color: var(--text-strong, #fdfcff);
+  border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.top-menu__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  -webkit-app-region: no-drag;
+  cursor: default;
+}
+
+.top-menu__logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent, #2d8cff);
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: var(--text-on-accent, #ffffff);
+}
+
+.top-menu__title {
+  font-size: 0.95rem;
+}
+
+.top-menu__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+  gap: 0.35rem;
+}
+
+.top-menu__actions {
+  display: flex;
+  -webkit-app-region: no-drag;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.top-menu__item {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.top-menu__item:hover,
+.top-menu__item:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent, #2d8cff) 18%, transparent);
+  color: var(--text-strong, #fdfcff);
+}
+
+.top-menu__item--icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+}
+
+.top-menu__item--icon span {
+  font-size: 1rem;
+}
+
+.top-menu__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-soft, rgba(255, 255, 255, 0.18));
+  margin: 0 0.5rem;
+}
+
+@media (max-width: 960px) {
+  .top-menu {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: auto;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .top-menu__nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .top-menu__item {
+    flex-direction: row;
+    gap: 0.4rem;
+  }
+
+  .top-menu__item small {
+    display: none;
+  }
+}
+</style>

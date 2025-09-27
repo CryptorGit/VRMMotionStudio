@@ -1,15 +1,14 @@
 <template>
   <div class="sections">
     <LightingSection
-      v-if="visibleSections.lighting"
+      v-if="active === 'lighting'"
       :ambient="ambient"
       :directional="directional"
       :directional-intensity="directionalIntensity"
       @update:directional-intensity="v => emit('update:directionalIntensity', v)"
-      @hide="emit('hide', 'lighting')"
     />
     <DisplaySection
-      v-if="visibleSections.display"
+      v-else-if="active === 'display'"
       :models="models"
       :show-light-marker="showLightMarker"
       :marker-color="markerColor"
@@ -21,10 +20,10 @@
       :show-other-bones="showOtherBones"
       :bone-dot-size="boneDotSize"
       :bone-label-scale="boneLabelScale"
-  :virtual-trackers-enabled="virtualTrackersEnabled"
-  :show-virtual-tracker-labels="showVirtualTrackerLabels"
-  :virtual-tracker-size="virtualTrackerSize"
-  :virtual-tracker-label-scale="virtualTrackerLabelScale"
+      :virtual-trackers-enabled="virtualTrackersEnabled"
+      :show-virtual-tracker-labels="showVirtualTrackerLabels"
+      :virtual-tracker-size="virtualTrackerSize"
+      :virtual-tracker-label-scale="virtualTrackerLabelScale"
       @update:show-light-marker="v => emit('update:showLightMarker', v)"
       @update:marker-color="v => emit('update:markerColor', v)"
       @update:show-extended-bones="v => emit('update:showExtendedBones', v)"
@@ -35,34 +34,27 @@
       @update:show-other-bones="v => emit('update:showOtherBones', v)"
       @update:bone-dot-size="v => emit('update:boneDotSize', v)"
       @update:bone-label-scale="v => emit('update:boneLabelScale', v)"
-  @update:virtual-trackers-enabled="v => emit('update:virtualTrackersEnabled', v)"
-  @update:show-virtual-tracker-labels="v => emit('update:showVirtualTrackerLabels', v)"
-  @update:virtual-tracker-size="v => emit('update:virtualTrackerSize', v)"
-  @update:virtual-tracker-label-scale="v => emit('update:virtualTrackerLabelScale', v)"
+      @update:virtual-trackers-enabled="v => emit('update:virtualTrackersEnabled', v)"
+      @update:show-virtual-tracker-labels="v => emit('update:showVirtualTrackerLabels', v)"
+      @update:virtual-tracker-size="v => emit('update:virtualTrackerSize', v)"
+      @update:virtual-tracker-label-scale="v => emit('update:virtualTrackerLabelScale', v)"
       @toggle-all-bones="v => emit('toggle-all-bones', v)"
       @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
-  @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
-      @hide="emit('hide', 'display')"
+      @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
     />
-    <MorphSection
-      v-if="visibleSections.morph"
-      :mesh="mesh"
-      @hide="emit('hide', 'morph')"
-    />
+    <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
     <ModelSection
-      v-if="visibleSections.models"
+      v-else-if="active === 'model'"
       :models="models"
       :look-at-enabled="lookAtEnabled"
       @update:look-at-enabled="v => emit('update:lookAtEnabled', v)"
       @toggle-model="(...args) => emit('toggle-model', ...args)"
       @remove-model="(...args) => emit('remove-model', ...args)"
-      @hide="emit('hide', 'models')"
     />
     <PhysicsSection
-      v-if="visibleSections.physics"
+      v-else-if="active === 'physics'"
       :spring-bone-enabled="springBoneEnabled"
       @update:spring-bone-enabled="v => emit('update:springBoneEnabled', v)"
-      @hide="emit('hide', 'physics')"
     />
   </div>
 </template>
@@ -79,7 +71,6 @@ defineProps({
   directional: Object,
   mesh: Object,
   models: { type: Array, required: true },
-  visibleSections: { type: Object, required: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
@@ -93,10 +84,11 @@ defineProps({
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true },
-  virtualTrackersEnabled: { type: Boolean, default: false }
-  , showVirtualTrackerLabels: { type: Boolean, default: true }
-  , virtualTrackerSize: { type: Number, default: 0.08 }
-  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  virtualTrackersEnabled: { type: Boolean, default: false },
+  showVirtualTrackerLabels: { type: Boolean, default: true },
+  virtualTrackerSize: { type: Number, default: 0.08 },
+  virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  active: { type: String, default: 'lighting' }
 })
 
 const emit = defineEmits([
@@ -123,14 +115,29 @@ const emit = defineEmits([
   'toggle-all-bones',
   'toggle-all-bone-names',
   'remove-model',
-  'reset-virtual-trackers',
-  'hide'
+  'reset-virtual-trackers'
 ])
 </script>
 
 <style scoped>
 .sections {
-  max-height: calc(100vh - var(--header-height));
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sections::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sections::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent, #2d8cff) 40%, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+}
+
+.sections::-webkit-scrollbar-track {
+  background: transparent;
 }
 </style>

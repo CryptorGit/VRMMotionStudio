@@ -1,44 +1,47 @@
 <template>
   <div class="lighting-panel">
-    <section>
-      <h3>Ambient Light</h3>
-      <label>
-        色
+    <div class="lighting-panel__ambient">
+      <label class="lighting-field">
+        <span>Ambient 色</span>
         <input type="color" v-model="ambientColor" />
       </label>
-      <label>
-        強さ
+      <label class="lighting-field lighting-field--range">
+        <span>Ambient 強さ</span>
         <input type="range" min="0" max="5" step="0.1" v-model.number="ambientIntensity" />
       </label>
-    </section>
-    <section>
-      <h3>Directional Light</h3>
-      <label>
-        色
-        <input type="color" v-model="directionalColor" />
-      </label>
-      <label>
-        強さ
-        <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensityProxy" />
-      </label>
-      <p class="section-description">位置と向きを角度で調整できます</p>
+    </div>
+    <div class="lighting-panel__directional">
+      <div class="lighting-panel__heading">
+        <span class="lighting-panel__title">Directional Light</span>
+        <span class="lighting-panel__description">位置と向きを角度で調整できます</span>
+      </div>
+      <div class="lighting-panel__fields">
+        <label class="lighting-field">
+          <span>色</span>
+          <input type="color" v-model="directionalColor" />
+        </label>
+        <label class="lighting-field lighting-field--range">
+          <span>強さ</span>
+          <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensityProxy" />
+        </label>
+      </div>
       <div class="position-inputs">
-        <label>
-          位置X
+        <label class="lighting-field">
+          <span>位置X</span>
           <input type="number" v-model.number="directionalX" />
         </label>
-        <label>
-          位置Y
+        <label class="lighting-field">
+          <span>位置Y</span>
           <input type="number" v-model.number="directionalY" />
         </label>
-        <label>
-          位置Z
+        <label class="lighting-field">
+          <span>位置Z</span>
           <input type="number" v-model.number="directionalZ" />
         </label>
       </div>
       <div class="position-inputs">
-        <label>
-          方位角(°)
+        <label class="lighting-field lighting-field--range">
+          <span>方位角(°)</span>
           <input
             type="range"
             min="0"
@@ -47,8 +50,8 @@
             v-model.number="directionalAzimuth"
           />
         </label>
-        <label>
-          仰角(°)
+        <label class="lighting-field lighting-field--range">
+          <span>仰角(°)</span>
           <input
             type="range"
             min="-90"
@@ -58,7 +61,7 @@
           />
         </label>
       </div>
-    </section>
+    </div>
   </div>
 </template>
 
@@ -160,28 +163,105 @@ const directionalElevation = computed({
 
 <style scoped>
 .lighting-panel {
-  background: #fff;
-  padding: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  background: linear-gradient(155deg, rgba(38, 44, 62, 0.85), rgba(28, 32, 46, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
-.lighting-panel section {
-  margin-bottom: 1rem;
+
+.lighting-panel__ambient {
+  display: grid;
+  gap: 0.7rem;
 }
+
+.lighting-panel__directional {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.lighting-panel__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.lighting-panel__title {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: rgba(240, 245, 255, 0.9);
+}
+
+.lighting-panel__description {
+  font-size: 0.78rem;
+  color: rgba(210, 220, 245, 0.65);
+}
+
+.lighting-panel__fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.lighting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, rgba(220, 230, 255, 0.72));
+}
+
+.lighting-field span {
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.lighting-field--range input[type='range'] {
+  margin-top: 0.1rem;
+}
+
+input[type='color'] {
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+input[type='range'] {
+  accent-color: var(--accent, #2d8cff);
+}
+
+input[type='number'] {
+  background: rgba(12, 16, 26, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  color: inherit;
+}
+
 .position-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  gap: 0.6rem;
 }
-.position-inputs label {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+
+.position-inputs .lighting-field {
+  gap: 0.3rem;
 }
-.section-description {
-  font-size: 0.9rem;
-  color: #555;
-  margin: 0.5rem 0;
+
+@media (min-width: 840px) {
+  .lighting-panel__ambient {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .lighting-panel__fields {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .position-inputs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

@@ -1,68 +1,148 @@
 :root {
-  --timeline-height: 0px;
+  color-scheme: dark;
+  --accent: #5c8cff;
+  --accent-weak: rgba(92, 140, 255, 0.32);
+  --accent-focus: #82a4ff;
+  --surface: #191c24;
+  --surface-strong: #212530;
+  --surface-raised: #2a2f3c;
+  --workspace-panel-bg: rgba(37, 41, 52, 0.98);
+  --workspace-panel-border: rgba(255, 255, 255, 0.06);
+  --workspace-panel-shadow: 0 22px 44px rgba(6, 9, 16, 0.48);
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --text-strong: #f5f7ff;
+  --text-muted: rgba(220, 226, 245, 0.72);
+  --text-weaker: rgba(188, 196, 216, 0.58);
+  --shadow-soft: 0 22px 44px rgba(8, 12, 20, 0.45);
+  --menubar-height: 56px;
+  --statusbar-height: 32px;
+  --viewport-padding: 0.9rem;
+  --workspace-gap: 1.1rem;
+  --workspace-radius: 16px;
+  --workspace-padding: 1.2rem;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --accent: #2d7de5;
+  --accent-weak: rgba(45, 125, 229, 0.2);
+  --accent-focus: #1f63c8;
+  --surface: #f3f5fb;
+  --surface-strong: #ffffff;
+  --surface-raised: #e7ebf7;
+  --workspace-panel-bg: rgba(246, 248, 255, 0.98);
+  --workspace-panel-border: rgba(27, 34, 51, 0.1);
+  --workspace-panel-shadow: 0 20px 40px rgba(14, 18, 26, 0.15);
+  --border-soft: rgba(27, 34, 51, 0.12);
+  --border-strong: rgba(27, 34, 51, 0.28);
+  --text-strong: #1b2233;
+  --text-muted: rgba(27, 34, 51, 0.72);
+  --text-weaker: rgba(27, 34, 51, 0.5);
+  --shadow-soft: 0 20px 36px rgba(12, 18, 30, 0.12);
+  --workspace-gap: 1.1rem;
+  --workspace-radius: 16px;
+  --workspace-padding: 1.2rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
   overflow: hidden;
-  font-family: sans-serif;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text-strong);
+  transition: background 200ms ease, color 200ms ease;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.app-frame {
+  display: grid;
+  grid-template-rows: var(--menubar-height) 1fr var(--statusbar-height);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
 }
 
 #viewer {
-  width: 100vw;
-  height: calc(100vh - var(--timeline-height, 0px));
-}
-
-#viewer.dragover {
-  outline: 2px dashed #ffffff;
-}
-
-#menu {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-}
-
-#menu-button {
-  background: rgba(255, 255, 255, 0.8);
-  border: none;
-  font-size: 24px;
-  padding: 8px;
-  cursor: pointer;
-}
-
-#menu-list {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-#menu-list li {
-  cursor: pointer;
-  padding: 4px 8px;
-}
-
-.hidden {
-  display: none;
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
 }
 
-.modal-content {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 4px;
+#viewer:active {
+  cursor: grabbing;
+}
+
+#viewer.dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+}
+
+.toast-stack {
+  position: fixed;
+  bottom: calc(var(--statusbar-height) + 12px);
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 8000;
+}
+
+.toast-item {
+  min-width: 240px;
+  max-width: 320px;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(22, 26, 36, 0.92);
+  color: #fff;
+  box-shadow: 0 16px 36px rgba(9, 12, 20, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+:root[data-theme='light'] .toast-item {
+  background: rgba(255, 255, 255, 0.92);
+  color: #1b2233;
+  border-color: rgba(27, 34, 51, 0.1);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }

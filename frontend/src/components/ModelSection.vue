@@ -1,16 +1,10 @@
 <template>
-  <div class="section">
-    <h3 @click="expanded = !expanded">
-      <i
-        class="toggle-icon"
-        :class="expanded ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"
-      ></i>
-      モデル管理
-      <span class="spacer"></span>
-      <i class="fa-solid fa-times close-icon" @click.stop="$emit('hide')"></i>
-    </h3>
-    <div v-show="expanded" class="section-content">
-      <label>
+  <section class="section">
+    <header class="section__header">
+      <h3>モデル管理</h3>
+    </header>
+    <div class="section__content">
+      <label class="lookat-toggle">
         <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
       </label>
       <ModelList
@@ -19,11 +13,11 @@
         @remove="i => emit('remove-model', i)"
       />
     </div>
-  </div>
-  </template>
+  </section>
+</template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import ModelList from './ModelList.vue'
 
 const props = defineProps({
@@ -32,13 +26,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'hide',
   'toggle-model',
   'remove-model',
   'update:lookAtEnabled'
 ])
-
-const expanded = ref(false)
 
 const lookAtEnabledLocal = computed({
   get: () => props.lookAtEnabled,
@@ -47,25 +38,35 @@ const lookAtEnabledLocal = computed({
 </script>
 
 <style scoped>
-.section h3 {
+.section {
+  background: rgba(36, 40, 52, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.section__header {
+  padding: 0.75rem 0.85rem 0.4rem;
+}
+
+.section__header h3 {
   margin: 0;
-  padding: 0.5rem;
-  background: #ddd;
-  cursor: pointer;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+.section__content {
+  padding: 0 0.85rem 0.85rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lookat-toggle {
+  display: inline-flex;
   align-items: center;
-}
-.section h3 .toggle-icon {
-  margin-right: 0.5rem;
-}
-.section h3 .spacer {
-  flex: 1;
-}
-.section h3 .close-icon {
-  margin-left: 0.5rem;
-  cursor: pointer;
-}
-.section-content {
-  padding: 0.5rem;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-muted, rgba(240, 245, 255, 0.8));
 }
 </style>

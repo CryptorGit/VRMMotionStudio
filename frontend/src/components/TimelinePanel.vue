@@ -102,6 +102,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 const PIXELS_PER_SECOND = 120
 const NAME_COLUMN_WIDTH = 200
 const MIN_DURATION_FOR_DISPLAY = 10
+const ROW_HEIGHT = 42
+const MIN_BODY_HEIGHT = 156
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -144,12 +146,20 @@ onUnmounted(() => {
 const displayDuration = computed(() => Math.max(props.duration, MIN_DURATION_FOR_DISPLAY))
 const timelineWidth = computed(() => displayDuration.value * PIXELS_PER_SECOND)
 const panelStyle = computed(() => ({ height: `${actualHeight.value}px` }))
-const bodyStyle = computed(() => ({ height: `${Math.max(actualHeight.value - headerHeight.value, 0)}px` }))
+const visibleTrackCount = computed(() => props.trackers?.length ?? 0)
+const naturalBodyHeight = computed(() => visibleTrackCount.value * ROW_HEIGHT)
+const requestedBodyHeight = computed(() => Math.max(props.height - headerHeight.value, 0))
+const bodyHeight = computed(() => {
+  if (props.collapsed) return 0
+  const minHeight = Math.min(requestedBodyHeight.value, Math.max(naturalBodyHeight.value, MIN_BODY_HEIGHT))
+  return Math.max(0, minHeight)
+})
+const bodyStyle = computed(() => ({ height: `${bodyHeight.value}px` }))
 const gridStyle = computed(() => ({ gridTemplateColumns: `${NAME_COLUMN_WIDTH}px ${timelineWidth.value}px` }))
 const timeScaleStyle = computed(() => ({ width: `${timelineWidth.value}px` }))
 const trackContentStyle = computed(() => ({ width: `${timelineWidth.value}px` }))
 
-const actualHeight = computed(() => (props.collapsed ? headerHeight.value : props.height))
+const actualHeight = computed(() => (props.collapsed ? headerHeight.value : headerHeight.value + bodyHeight.value))
 
 function notifyHeight() {
   emit('height-change', actualHeight.value)
@@ -158,6 +168,7 @@ function notifyHeight() {
 watch(() => props.collapsed, () => nextTick(() => notifyHeight()))
 watch(() => props.height, () => nextTick(() => notifyHeight()))
 watch(headerHeight, () => notifyHeight())
+watch(visibleTrackCount, () => nextTick(() => notifyHeight()))
 
 const timeTicks = computed(() => {
   const ticks = []
@@ -361,13 +372,14 @@ function tickStyle(time) {
 }
 .timeline-body {
   position: relative;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 .timeline-grid {
   position: relative;
   display: grid;
-  grid-auto-rows: 44px;
+  grid-auto-rows: 42px;
   box-sizing: border-box;
 }
 .name-header,
@@ -384,7 +396,7 @@ function tickStyle(time) {
 }
 .name-header {
   top: 0;
-  height: 44px;
+  height: 42px;
   font-weight: 600;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   z-index: 5;
@@ -396,7 +408,7 @@ function tickStyle(time) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  height: 44px;
+  height: 42px;
   box-sizing: border-box;
   z-index: 3;
   cursor: col-resize;

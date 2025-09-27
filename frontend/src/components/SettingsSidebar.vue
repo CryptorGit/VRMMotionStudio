@@ -1,61 +1,82 @@
 <template>
-  <div
-    class="settings-sidebar"
-    :class="{ collapsed, resizing: isResizing }"
-    :style="sidebarStyle"
-  >
-    <div
-      class="resize-handle"
-      v-if="!collapsed"
-      @mousedown="startResize"
-    ></div>
-    <div class="header" ref="headerRef">
-      <span>設定</span>
-      <button @click="collapsed = !collapsed">
-        <i :class="collapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
-      </button>
+  <aside class="properties-panel">
+    <div class="properties-body">
+      <nav class="tab-strip" role="tablist" aria-label="設定のカテゴリ">
+        <button
+          v-for="tab in SECTION_TABS"
+          :key="tab.id"
+          type="button"
+          class="tab-button"
+          :class="{ active: tab.id === activeTab }"
+          :aria-selected="tab.id === activeTab"
+          :aria-controls="`settings-pane-${tab.id}`"
+          role="tab"
+          @click="activeTab = tab.id"
+          :title="`${tab.label} - ${tab.description}`"
+        >
+          <Icon :icon="tab.icon" class="tab-icon" aria-hidden="true" />
+          <span class="tab-label">{{ tab.label }}</span>
+        </button>
+      </nav>
+      <div class="properties-scroll" :id="`settings-pane-${activeTab}`" role="tabpanel">
+        <SectionVisibility
+          :active="activeTab"
+          :ambient="ambient"
+          :directional="directional"
+          :mesh="mesh"
+          :models="models"
+          :show-light-marker="showLightMarker"
+          :marker-color="markerColor"
+          :directional-intensity="directionalIntensity"
+          :spring-bone-enabled="springBoneEnabled"
+          :look-at-enabled="lookAtEnabled"
+          :show-extended-bones="showExtendedBones"
+          :show-collider-nodes="showColliderNodes"
+          :show-non-deforming-bones="showNonDeformingBones"
+          :highlight-constraint="highlightConstraint"
+          :show-physical-bones="showPhysicalBones"
+          :show-other-bones="showOtherBones"
+          :bone-dot-size="boneDotSize"
+          :bone-label-scale="boneLabelScale"
+          :virtual-trackers-enabled="virtualTrackersEnabled"
+          :show-virtual-tracker-labels="showVirtualTrackerLabels"
+          :virtual-tracker-size="virtualTrackerSize"
+          :virtual-tracker-label-scale="virtualTrackerLabelScale"
+          @update:showLightMarker="v => emit('update:showLightMarker', v)"
+          @update:markerColor="v => emit('update:markerColor', v)"
+          @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
+          @update:springBoneEnabled="v => emit('update:springBoneEnabled', v)"
+          @update:lookAtEnabled="v => emit('update:lookAtEnabled', v)"
+          @update:showExtendedBones="v => emit('update:showExtendedBones', v)"
+          @update:showColliderNodes="v => emit('update:showColliderNodes', v)"
+          @update:showNonDeformingBones="v => emit('update:showNonDeformingBones', v)"
+          @update:highlightConstraint="v => emit('update:highlightConstraint', v)"
+          @update:showPhysicalBones="v => emit('update:showPhysicalBones', v)"
+          @update:showOtherBones="v => emit('update:showOtherBones', v)"
+          @update:boneDotSize="v => emit('update:boneDotSize', v)"
+          @update:boneLabelScale="v => emit('update:boneLabelScale', v)"
+          @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
+          @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
+          @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
+          @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
+          @toggle-model="(...args) => emit('toggle-model', ...args)"
+          @toggle-bone="(...args) => emit('toggle-bone', ...args)"
+          @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
+          @toggle-all-bones="(...args) => emit('toggle-all-bones', ...args)"
+          @toggle-all-bone-names="(...args) => emit('toggle-all-bone-names', ...args)"
+          @remove-model="(...args) => emit('remove-model', ...args)"
+          @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
+        />
+      </div>
     </div>
-    <SectionVisibility
-      v-if="!collapsed && hasSections"
-      :ambient="ambient"
-      :directional="directional"
-      :mesh="mesh"
-      :models="models"
-      :visible-sections="visibleSections"
-      v-model:show-light-marker="showLightMarker"
-      v-model:marker-color="markerColor"
-      v-model:directional-intensity="directionalIntensity"
-      v-model:spring-bone-enabled="springBoneEnabled"
-      v-model:look-at-enabled="lookAtEnabled"
-      v-model:show-extended-bones="showExtendedBones"
-      v-model:show-collider-nodes="showColliderNodes"
-      v-model:show-non-deforming-bones="showNonDeformingBones"
-      v-model:highlight-constraint="highlightConstraint"
-      v-model:show-physical-bones="showPhysicalBones"
-      v-model:show-other-bones="showOtherBones"
-      v-model:bone-dot-size="boneDotSize"
-      v-model:bone-label-scale="boneLabelScale"
-  v-model:virtual-trackers-enabled="virtualTrackersEnabled"
-  v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
-  v-model:virtual-tracker-size="virtualTrackerSize"
-  v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
-  @reset-virtual-trackers="$emit('reset-virtual-trackers')"
-      @toggle-model="toggleModel"
-      @toggle-bone="toggleBone"
-      @toggle-bone-names="toggleBoneNames"
-      @toggle-all-bones="toggleAllBones"
-      @toggle-all-bone-names="toggleAllBoneNames"
-      @remove-model="removeModel"
-      @hide="hideSection"
-    />
-  </div>
+  </aside>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick, toRefs } from 'vue'
+import { ref, toRefs } from 'vue'
+import { Icon } from '@iconify/vue'
 import SectionVisibility from './SectionVisibility.vue'
-import { useResizableSidebar } from '../composables/useResizableSidebar.js'
-import { useSidebarState } from '../composables/useSidebarState.js'
+import { SECTION_TABS } from './settingsTabs.js'
 
 const props = defineProps({
   ambient: Object,
@@ -74,13 +95,13 @@ const props = defineProps({
   showPhysicalBones: { type: Boolean, required: true },
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
-  boneLabelScale: { type: Number, required: true }
-  , virtualTrackersEnabled: { type: Boolean, default: false }
-  , showVirtualTrackerLabels: { type: Boolean, default: true }
-  , virtualTrackerSize: { type: Number, default: 0.08 }
-  , virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  boneLabelScale: { type: Number, required: true },
+  virtualTrackersEnabled: { type: Boolean, default: false },
+  showVirtualTrackerLabels: { type: Boolean, default: true },
+  virtualTrackerSize: { type: Number, default: 0.08 },
+  virtualTrackerLabelScale: { type: Number, default: 1.0 }
 })
-const { ambient, directional, mesh, models } = toRefs(props)
+
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
@@ -107,105 +128,17 @@ const emit = defineEmits([
   'remove-model',
   'reset-virtual-trackers'
 ])
-const showLightMarker = computed({
-  get: () => props.showLightMarker,
-  set: v => emit('update:showLightMarker', v)
-})
-const markerColor = computed({
-  get: () => props.markerColor,
-  set: v => emit('update:markerColor', v)
-})
-const directionalIntensity = computed({
-  get: () => props.directionalIntensity,
-  set: v => emit('update:directionalIntensity', v)
-})
-const springBoneEnabled = computed({
-  get: () => props.springBoneEnabled,
-  set: v => emit('update:springBoneEnabled', v)
-})
-const lookAtEnabled = computed({
-  get: () => props.lookAtEnabled,
-  set: v => emit('update:lookAtEnabled', v)
-})
-const showPhysicalBones = computed({
-  get: () => props.showPhysicalBones,
-  set: v => emit('update:showPhysicalBones', v)
-})
-const showOtherBones = computed({
-  get: () => props.showOtherBones,
-  set: v => emit('update:showOtherBones', v)
-})
-const showExtendedBones = computed({
-  get: () => props.showExtendedBones,
-  set: v => emit('update:showExtendedBones', v)
-})
-const showColliderNodes = computed({
-  get: () => props.showColliderNodes,
-  set: v => emit('update:showColliderNodes', v)
-})
-const showNonDeformingBones = computed({
-  get: () => props.showNonDeformingBones,
-  set: v => emit('update:showNonDeformingBones', v)
-})
-const highlightConstraint = computed({
-  get: () => props.highlightConstraint,
-  set: v => emit('update:highlightConstraint', v)
-})
-const boneDotSize = computed({
-  get: () => props.boneDotSize,
-  set: v => emit('update:boneDotSize', v)
-})
-const boneLabelScale = computed({
-  get: () => props.boneLabelScale,
-  set: v => emit('update:boneLabelScale', v)
-})
-const virtualTrackersEnabled = computed({
-  get: () => props.virtualTrackersEnabled,
-  set: v => emit('update:virtualTrackersEnabled', v)
-})
-const showVirtualTrackerLabels = computed({
-  get: () => props.showVirtualTrackerLabels,
-  set: v => emit('update:showVirtualTrackerLabels', v)
-})
-const virtualTrackerSize = computed({
-  get: () => props.virtualTrackerSize,
-  set: v => emit('update:virtualTrackerSize', v)
-})
-const virtualTrackerLabelScale = computed({
-  get: () => props.virtualTrackerLabelScale,
-  set: v => emit('update:virtualTrackerLabelScale', v)
-})
-// IK/SpringBone UI は VRM最適化のため削除
 
-function toggleModel(i, v) {
-  emit('toggle-model', i, v)
-}
-function toggleBone(i, v) {
-  emit('toggle-bone', i, v)
-}
-function toggleBoneNames(i, v) {
-  emit('toggle-bone-names', i, v)
-}
-function removeModel(i) {
-  emit('remove-model', i)
-}
+const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
 
-function toggleAllBones(v) {
-  emit('toggle-all-bones', v)
-}
-function toggleAllBoneNames(v) {
-  emit('toggle-all-bone-names', v)
-}
-
-const { width, isResizing, startResize } = useResizableSidebar(300)
 const {
-  collapsed,
-  visibleSections,
-  hideSection,
-  hasSections
-} = useSidebarState({
-  width,
+  ambient,
+  directional,
+  mesh,
+  models,
   showLightMarker,
+  markerColor,
+  directionalIntensity,
   springBoneEnabled,
   lookAtEnabled,
   showExtendedBones,
@@ -216,97 +149,107 @@ const {
   showOtherBones,
   boneDotSize,
   boneLabelScale,
-  markerColor,
-  directionalIntensity,
-  directional,
-  // Persist virtual tracker UI settings as well
   virtualTrackersEnabled,
   showVirtualTrackerLabels,
   virtualTrackerSize,
   virtualTrackerLabelScale
-})
-
-const headerRef = ref(null)
-const headerHeight = ref(0)
-
-onMounted(() => {
-  nextTick(() => {
-    headerHeight.value = headerRef.value?.offsetHeight ?? 0
-  })
-})
-
-const sidebarStyle = computed(() => {
-  const style = { '--header-height': headerHeight.value + 'px' }
-  if (!collapsed.value) {
-    style.width = width.value + 'px'
-  }
-  return style
-})
-
-defineExpose({
-  visibleSections,
-  showLightMarker,
-  springBoneEnabled,
-  lookAtEnabled,
-  markerColor,
-  showPhysicalBones,
-  showOtherBones,
-  boneDotSize,
-  boneLabelScale,
-  virtualTrackersEnabled,
-  showVirtualTrackerLabels,
-  virtualTrackerSize,
-  virtualTrackerLabelScale
-})
+} = toRefs(props)
 </script>
 
 <style scoped>
-.settings-sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: var(--timeline-height, 0px);
-  width: 300px;
-  background: #f9f9f9;
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+
+.properties-panel {
   display: flex;
   flex-direction: column;
-  transition: width 0.3s;
-  max-height: calc(100vh - var(--timeline-height, 0px));
+  width: 100%;
+  height: 100%;
+  color: var(--text-strong, #f4f6ff);
+  background: linear-gradient(180deg, rgba(37, 41, 52, 0.98) 0%, rgba(28, 31, 40, 0.98) 100%);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 18px 36px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  backdrop-filter: blur(6px);
 }
-.settings-sidebar.resizing {
-  user-select: none;
-}
-.settings-sidebar.collapsed {
-  width: 40px;
-}
- .settings-sidebar.collapsed .header span {
-  display: none;
-}
-.header {
-  padding: 0.5rem;
-  background: #ccc;
+
+.properties-body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  position: relative;
 }
-.header button {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  outline: none;
+
+.tab-strip {
+  width: 64px;
+  min-width: 64px;
+  padding: 0.95rem 0.45rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: linear-gradient(180deg, rgba(22, 25, 32, 0.95) 0%, rgba(16, 19, 26, 0.98) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tab-button {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
+  padding: 0.48rem 0.25rem;
+  border: none;
+  border-radius: 14px;
+  color: rgba(220, 228, 248, 0.6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  font-size: 0.64rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
-.resize-handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  cursor: ew-resize;
+
+.tab-button:hover,
+.tab-button:focus-visible {
+  color: rgba(245, 249, 255, 0.92);
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(120, 160, 255, 0.4), 0 12px 24px rgba(18, 24, 40, 0.35);
+  outline: none;
+}
+
+.tab-button.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(110, 160, 255, 0.9) 0%, rgba(70, 120, 235, 0.95) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 14px 28px rgba(42, 72, 140, 0.45);
+}
+
+.tab-icon {
+  font-size: 1.3rem;
+}
+
+.tab-label {
+  pointer-events: none;
+}
+
+.properties-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.75rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: linear-gradient(180deg, rgba(24, 26, 33, 0.92), rgba(20, 21, 28, 0.96));
+}
+
+.properties-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.properties-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent, #5c8cff) 45%, rgba(255, 255, 255, 0.16));
+  border-radius: 4px;
+}
+
+.properties-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 </style>

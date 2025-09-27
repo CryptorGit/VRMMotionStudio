@@ -185,7 +185,11 @@ export function createAnimator({
 }
 
 export function handleWindowResize(camera, renderer, container) {
-  camera.aspect = container.clientWidth / container.clientHeight
+  if (!camera || !renderer || !container) return
+  const width = Math.max(container.clientWidth || 0, 1)
+  const height = Math.max(container.clientHeight || 0, 1)
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return
+  camera.aspect = width / height
   camera.updateProjectionMatrix()
-  renderer.setSize(container.clientWidth, container.clientHeight)
+  renderer.setSize(width, height, false)
 }

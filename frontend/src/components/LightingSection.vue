@@ -1,26 +1,20 @@
 <template>
-  <div class="section">
-    <h3 @click="expanded = !expanded">
-      <i
-        class="toggle-icon"
-        :class="expanded ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"
-      ></i>
-      照明設定
-      <span class="spacer"></span>
-      <i class="fa-solid fa-times close-icon" @click.stop="$emit('hide')"></i>
-    </h3>
-    <div v-show="expanded" class="section-content">
+  <section class="section">
+    <header class="section__header">
+      <h3>照明設定</h3>
+    </header>
+    <div class="section__content">
       <LightingPanel
         :ambient="ambient"
         :directional="directional"
         v-model:directional-intensity="directionalIntensity"
       />
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import LightingPanel from './LightingPanel.vue'
 
 const props = defineProps({
@@ -30,11 +24,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'hide',
   'update:directionalIntensity'
 ])
-
-const expanded = ref(false)
 
 const directionalIntensity = computed({
   get: () => props.directionalIntensity,
@@ -43,25 +34,24 @@ const directionalIntensity = computed({
 </script>
 
 <style scoped>
-.section h3 {
+.section {
+  background: rgba(36, 40, 52, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.section__header {
+  padding: 0.75rem 0.85rem 0.4rem;
+}
+
+.section__header h3 {
   margin: 0;
-  padding: 0.5rem;
-  background: #ddd;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
 }
-.section h3 .toggle-icon {
-  margin-right: 0.5rem;
-}
-.section h3 .spacer {
-  flex: 1;
-}
-.section h3 .close-icon {
-  margin-left: 0.5rem;
-  cursor: pointer;
-}
-.section-content {
-  padding: 0.5rem;
+
+.section__content {
+  padding: 0 0.85rem 0.85rem;
 }
 </style>

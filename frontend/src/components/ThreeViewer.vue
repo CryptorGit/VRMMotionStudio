@@ -1,85 +1,154 @@
 <template>
-  <div
-    id="viewer"
-    ref="viewer"
-    @dragover.prevent="onDragOver"
-    @dragleave="onDragLeave"
-    @drop.prevent="onDrop"
-  ></div>
-  <MenuControls
-    ref="menu"
-    :menu-open="menuOpen"
-    :toggle-menu="toggleMenu"
-    :open-file="openFile"
-    :export-pose="exportPose"
-    :open-sidebar-section="openSidebarSection"
-  :clear-cache="clearAllCache"
-  />
-  
-  
-  <input
-    type="file"
-    ref="fileInput"
-    accept=".vrm"
-    multiple
-    style="display:none"
-    @change="onFileChange"
-  />
-  <SettingsSidebar
-    ref="settingsSidebar"
-    :ambient="ambientLight"
-    :directional="directionalLight"
-    :mesh="currentMeshRef"
-    :models="models"
-    v-model:directional-intensity="directionalIntensity"
-    v-model:show-light-marker="showLightMarker"
-    v-model:marker-color="lightMarkerColor"
-    v-model:spring-bone-enabled="springBoneEnabled"
-    v-model:look-at-enabled="lookAtEnabled"
-    v-model:show-extended-bones="showExtendedBones"
-    v-model:show-collider-nodes="showColliderNodes"
-    v-model:show-non-deforming-bones="showNonDeformingBones"
-    v-model:highlight-constraint="highlightConstraint"
-    v-model:show-physical-bones="showPhysicalBones"
-    v-model:show-other-bones="showOtherBones"
-    v-model:bone-dot-size="boneDotSize"
-    v-model:bone-label-scale="boneLabelScale"
-  v-model:virtual-trackers-enabled="virtualTrackersEnabled"
-  v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
-  v-model:virtual-tracker-size="virtualTrackerSize"
-  v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
-  @reset-virtual-trackers="resetVirtualTrackers"
-  @toggle-model="toggleModelVisibility"
-  @toggle-bone="toggleBoneVisibility"
-  @toggle-bone-names="toggleBoneNameVisibility"
-  @toggle-all-bones="toggleAllBones"
-  @toggle-all-bone-names="toggleAllBoneNames"
-  @remove-model="removeModel"
-/>
-  <TimelinePanel
-    v-model:collapsed="timelineCollapsed"
-    :height="timelineExpandedHeight"
-    :trackers="trackerList"
-    :keyframes="timelineController.keyframes"
-    :duration="timelineDuration"
-    :current-time="timelineCurrentTime"
-    :is-playing="timelinePlaying"
-    @height-change="handleTimelineHeightChange"
-    @seek="handleTimelineSeek"
-    @play="handleTimelinePlay"
-    @pause="handleTimelinePause"
-    @stop="handleTimelineStop"
-    @add-all-keyframes="handleTimelineAddAll"
-    @add-keyframe="handleTimelineAddKey"
-    @remove-keyframe="handleTimelineRemoveKey"
-  />
+  <div class="app-frame">
+    <TopMenuBar
+      :theme="theme"
+      :auto-restore="autoRestore"
+      @import="openFile"
+      @export="exportPose"
+      @clear-cache="clearAllCache"
+      @toggle-auto-restore="toggleAutoRestore"
+      @toggle-theme="toggleTheme"
+    />
+    <div class="workspace-grid" role="presentation">
+      <SplitPane
+        class="workspace-split workspace-split--main"
+        direction="horizontal"
+        storage-key="layout.split.main"
+        :initial-primary-ratio="0.68"
+        :min-primary-ratio="0.35"
+        :max-primary-ratio="0.9"
+        :primary-min-pixels="560"
+        :secondary-min-pixels="320"
+      >
+        <template #primary>
+          <SplitPane
+            class="workspace-split workspace-split--column"
+            direction="vertical"
+            storage-key="layout.split.column"
+            :initial-primary-ratio="0.68"
+            :min-primary-ratio="0.4"
+            :max-primary-ratio="0.92"
+            :primary-min-pixels="320"
+            :secondary-min-pixels="220"
+          >
+            <template #primary>
+              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポート領域">
+                <div class="workspace-panel__body workspace-panel__body--viewport">
+                  <div class="viewport-frame">
+                    <div
+                      id="viewer"
+                      ref="viewer"
+                      class="viewport-frame__canvas"
+                      @dragover.prevent="onDragOver"
+                      @dragleave="onDragLeave"
+                      @drop.prevent="onDrop"
+                    ></div>
+                  </div>
+                </div>
+              </section>
+            </template>
+            <template #secondary>
+              <section class="workspace-panel workspace-panel--timeline" aria-label="タイムライン領域">
+                <div class="workspace-panel__body workspace-panel__body--timeline">
+                  <TimelineEditor
+                    height="100%"
+                    :trackers="trackerList"
+                    :keyframes="timelineKeyframes"
+                    :markers="timelineMarkers"
+                    :current-time="timelineCurrentTime"
+                    :start-time="timelineStartTime"
+                    :end-time="timelineEndTime"
+                    :frame-rate="timelineFrameRate"
+                    :is-playing="timelinePlaying"
+                    :loop="timelineLoop"
+                    :snap="timelineSnap"
+                    @seek="handleTimelineSeek"
+                    @play="handleTimelinePlay"
+                    @pause="handleTimelinePause"
+                    @stop="handleTimelineStop"
+                    @step-frames="handleTimelineStepFrames"
+                    @jump-start="handleTimelineJumpStart"
+                    @jump-end="handleTimelineJumpEnd"
+                    @toggle-loop="handleTimelineToggleLoop"
+                    @add-all-keyframes="handleTimelineAddAll"
+                    @add-keyframe="handleTimelineAddKey"
+                    @remove-keyframe="handleTimelineRemoveKey"
+                    @move-keyframe="handleTimelineMoveKey"
+                    @add-marker="handleAddMarker"
+                    @update-marker="handleUpdateMarker"
+                    @remove-marker="handleRemoveMarker"
+                    @update-range="handleTimelineRange"
+                    @update:snap="timelineSnap = $event"
+                    @select-keyframes="handleSelectKeyframes"
+                  />
+                </div>
+              </section>
+            </template>
+          </SplitPane>
+        </template>
+        <template #secondary>
+          <aside class="workspace-panel workspace-panel--settings" aria-label="設定領域">
+            <div class="workspace-panel__body workspace-panel__body--settings">
+              <SettingsSidebar
+                :ambient="ambientLight"
+                :directional="directionalLight"
+                :mesh="currentMeshRef"
+                :models="models"
+                v-model:show-light-marker="showLightMarker"
+                v-model:marker-color="lightMarkerColor"
+                v-model:directional-intensity="directionalIntensity"
+                v-model:spring-bone-enabled="springBoneEnabled"
+                v-model:look-at-enabled="lookAtEnabled"
+                v-model:show-extended-bones="showExtendedBones"
+                v-model:show-collider-nodes="showColliderNodes"
+                v-model:show-non-deforming-bones="showNonDeformingBones"
+                v-model:highlight-constraint="highlightConstraint"
+                v-model:show-physical-bones="showPhysicalBones"
+                v-model:show-other-bones="showOtherBones"
+                v-model:bone-dot-size="boneDotSize"
+                v-model:bone-label-scale="boneLabelScale"
+                v-model:virtual-trackers-enabled="virtualTrackersEnabled"
+                v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
+                v-model:virtual-tracker-size="virtualTrackerSize"
+                v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
+                @reset-virtual-trackers="resetVirtualTrackers"
+                @toggle-model="toggleModelVisibility"
+                @toggle-bone="toggleBoneVisibility"
+                @toggle-bone-names="toggleBoneNameVisibility"
+                @toggle-all-bones="toggleAllBones"
+                @toggle-all-bone-names="toggleAllBoneNames"
+                @remove-model="removeModel"
+              />
+            </div>
+          </aside>
+        </template>
+      </SplitPane>
+    </div>
+    <StatusBar>
+      <template #message>
+        {{ statusMessage }}
+      </template>
+    </StatusBar>
+    <ToastHub :items="toasts" @dismiss="dismissToast" />
+    <input
+      type="file"
+      ref="fileInput"
+      accept=".vrm"
+      multiple
+      style="display:none"
+      @change="onFileChange"
+    />
+  </div>
 </template>
 
 <script setup>
 import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
-import MenuControls from './MenuControls.vue'
-import TimelinePanel from './TimelinePanel.vue'
+import TimelineEditor from './timeline/TimelineEditor.vue'
+import TopMenuBar from './layout/TopMenuBar.vue'
+import StatusBar from './layout/StatusBar.vue'
+import ToastHub from './ui/ToastHub.vue'
+import SplitPane from './layout/SplitPane.vue'
 import * as THREE from 'three'
 import { API_BASE_URL } from '../config.js'
 import {
@@ -91,21 +160,17 @@ import {
   showLightMarker,
   loadLightingSettings
 } from '../utils/lighting.js'
-import { useMenu } from '../composables/useMenu.js'
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
+import { useTheme } from '../composables/useTheme.js'
 
 const viewer = ref(null)
-const menu = ref(null)
-const settingsSidebar = ref(null)
 const currentMeshRef = ref(null)
-// VRM runtime feature toggles
 const springBoneEnabled = ref(true)
 const lookAtEnabled = ref(true)
-//
 
 const scene = shallowRef(null)
 const camera = shallowRef(null)
@@ -113,7 +178,7 @@ const renderer = shallowRef(null)
 const controls = shallowRef(null)
 const helper = shallowRef(null)
 const transformControls = shallowRef(null)
-// Display settings
+
 const showPhysicalBones = ref(false)
 const showOtherBones = ref(false)
 const showExtendedBones = ref(false)
@@ -122,18 +187,60 @@ const showNonDeformingBones = ref(false)
 const highlightConstraint = ref(false)
 const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
-// Virtual trackers
+
 const virtualTrackersEnabled = ref(false)
 const showVirtualTrackerLabels = ref(true)
-const virtualTrackerSize = ref(0.08) // sphere base radius
+const virtualTrackerSize = ref(0.08)
 const virtualTrackerLabelScale = ref(1.0)
 
 const clock = new THREE.Clock()
 const TARGET_FPS = 30
 
+const { theme, toggleTheme } = useTheme()
+
+const autoRestore = ref(true)
+const toasts = ref([])
+let toastSeed = 0
+
+function pushToast(message, title = '通知', timeout = 3200) {
+  const id = ++toastSeed
+  const toast = { id, title, message }
+  toasts.value = [...toasts.value, toast]
+  if (timeout > 0) {
+    toast._timer = window.setTimeout(() => dismissToast(id), timeout)
+  }
+  return id
+}
+
+function dismissToast(id) {
+  toasts.value = toasts.value.filter(item => {
+    if (item.id === id && item._timer) window.clearTimeout(item._timer)
+    return item.id !== id
+  })
+}
+
+function loadAutoRestore() {
+  try {
+    autoRestore.value = localStorage.getItem('autoRestore') !== '0'
+  } catch {
+    autoRestore.value = true
+  }
+}
+
+function toggleAutoRestore() {
+  autoRestore.value = !autoRestore.value
+  try {
+    if (autoRestore.value) {
+      localStorage.removeItem('autoRestore')
+    } else {
+      localStorage.setItem('autoRestore', '0')
+    }
+  } catch {}
+  pushToast(`モデル自動復元: ${autoRestore.value ? 'ON' : 'OFF'}`, '設定')
+}
+
 async function logToServer(data) {
   const payload = { ts: Date.now(), ...data }
-  // In dev, prefer Vite's terminal log endpoint so logs appear in FE terminal
   if (import.meta.env.DEV) {
     try {
       const r = await fetch('/__dev__/log', {
@@ -144,7 +251,6 @@ async function logToServer(data) {
       if (r.ok) return
     } catch {}
   }
-  // Fallback to backend endpoint; if not available or 404, ignore silently
   try {
     const r2 = await fetch(`${API_BASE_URL}/log`, {
       method: 'POST',
@@ -152,16 +258,16 @@ async function logToServer(data) {
       body: JSON.stringify(payload)
     })
     if (!r2.ok && import.meta.env.DEV) {
-      // Ensure FE terminal receives logs if BE endpoint missing
-      try { await fetch('/__dev__/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) } catch {}
+      try {
+        await fetch('/__dev__/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+      } catch {}
     }
   } catch {}
 }
-
-const { menuOpen, toggleMenu, openSidebarSection } = useMenu({
-  settingsSidebar,
-  logToServer
-})
 
 function onPointerDown() {}
 function onControlStart() {}
@@ -173,7 +279,6 @@ const fileLoader = useFileLoader({
   renderer,
   helper,
   currentMeshRef,
-  menuOpen,
   logToServer,
   viewer,
   transformControls,
@@ -187,6 +292,7 @@ const fileLoader = useFileLoader({
   boneDotSize,
   boneLabelScale
 })
+
 const {
   fileInput,
   poses,
@@ -208,9 +314,9 @@ const {
   applyBoneSettingsAll
 } = fileLoader
 
-// Hook that will call tracker update each frame
 let trackerController = null
 let timelineController = null
+
 const updateTrackers = () => {
   try {
     timelineController?.step()
@@ -218,20 +324,41 @@ const updateTrackers = () => {
   } catch {}
 }
 
-const timelineCollapsed = ref(false)
-const timelineExpandedHeight = ref(280)
-const timelineHeight = ref(0)
 const trackerList = computed(() => trackerController?.trackers?.value || [])
-const timelineDuration = computed(() => timelineController?.duration?.value || 0)
-const timelineCurrentTime = computed(() => timelineController?.currentTime?.value || 0)
-const timelinePlaying = computed(() => timelineController?.isPlaying?.value || false)
 
-function setTimelineCssHeight(px) {
-  timelineHeight.value = Math.max(0, Number(px) || 0)
+const timelineSnap = ref(true)
+const selectedTimelineKeys = ref([])
+
+const timelineKeyframes = computed(() => (timelineController ? timelineController.keyframes : {}))
+const timelineMarkers = computed(() => (timelineController ? timelineController.markers.value : []))
+const timelineDuration = computed(() => (timelineController ? timelineController.duration.value : 0))
+const timelineCurrentTime = computed(() => (timelineController ? timelineController.currentTime.value : 0))
+const timelinePlaying = computed(() => (timelineController ? timelineController.isPlaying.value : false))
+const timelineStartTime = computed(() => (timelineController ? timelineController.startTime.value : 0))
+const timelineEndTime = computed(() => (timelineController ? timelineController.endTime.value : 0))
+const timelineFrameRate = computed(() => (timelineController ? timelineController.frameRate.value : 60))
+const timelineLoop = computed(() => (timelineController ? timelineController.loopPlayback.value : false))
+
+const statusMessage = computed(() => {
+  const fps = timelineFrameRate.value || 60
+  const currentFrame = Math.round(timelineCurrentTime.value * fps)
+  const endFrame = Math.max(Math.round(timelineEndTime.value * fps), 0)
+  const markerCount = timelineMarkers.value.length
+  const selectionCount = selectedTimelineKeys.value.length
+  const selectionLabel = selectionCount ? ` • 選択 ${selectionCount}` : ''
+  return `フレーム ${currentFrame}/${endFrame} (${fps}fps) • マーカー ${markerCount}${selectionLabel}`
+})
+
+try {
+  const savedSnap = localStorage.getItem('timeline.snap')
+  if (savedSnap !== null) timelineSnap.value = savedSnap !== '0'
+} catch {}
+
+watch(timelineSnap, value => {
   try {
-    document.documentElement.style.setProperty('--timeline-height', `${timelineHeight.value}px`)
+    localStorage.setItem('timeline.snap', value ? '1' : '0')
   } catch {}
-}
+})
 
 const { animate, initRenderer, cleanupRenderer } = useRenderer({
   clock,
@@ -252,7 +379,6 @@ const { animate, initRenderer, cleanupRenderer } = useRenderer({
   vrmGetter: () => (models?.value || []).map(m => m.vrm).filter(Boolean)
 })
 
-// Virtual trackers setup
 trackerController = useVirtualTrackers({
   scene,
   camera,
@@ -275,34 +401,10 @@ watch(virtualTrackersEnabled, v => {
 })
 
 function resetVirtualTrackers() {
-  try { trackerController.reset() } catch {}
-}
-
-function handleTimelineHeightChange(height) {
-  setTimelineCssHeight(height)
-}
-
-function handleTimelineSeek(time) {
   try {
-    timelineController.pause()
-    timelineController.setCurrentTime(time)
+    trackerController.reset()
+    pushToast('バーチャルトラッカーをリセットしました', 'トラッカー')
   } catch {}
-}
-
-function handleTimelinePlay() {
-  try { timelineController.play() } catch {}
-}
-
-function handleTimelinePause() {
-  try { timelineController.pause() } catch {}
-}
-
-function handleTimelineStop() {
-  try { timelineController.stop() } catch {}
-}
-
-function getTrackerByKey(key) {
-  return trackerController?.trackers?.value?.find(t => t.key === key)
 }
 
 function handleTimelineAddAll() {
@@ -311,6 +413,10 @@ function handleTimelineAddAll() {
     timelineController.addSnapshotAtTime(time)
     timelineController.applyCurrentPose()
   } catch {}
+}
+
+function getTrackerByKey(key) {
+  return trackerController?.trackers?.value?.find(t => t.key === key)
 }
 
 function handleTimelineAddKey(payload) {
@@ -337,15 +443,77 @@ function handleTimelineRemoveKey(payload) {
   } catch {}
 }
 
-// Clear caches and also reset UI/checkbox states to defaults
+function handleTimelineMoveKey({ trackerKey, keyframeId, time }) {
+  try {
+    timelineController.updateKeyframeTime(trackerKey, keyframeId, time)
+    timelineController.applyCurrentPose()
+  } catch {}
+}
+
+function handleTimelineSeek(time) {
+  try {
+    timelineController.pause()
+    timelineController.setCurrentTime(time)
+  } catch {}
+}
+
+function handleTimelinePlay() {
+  try { timelineController.play() } catch {}
+}
+
+function handleTimelinePause() {
+  try { timelineController.pause() } catch {}
+}
+
+function handleTimelineStop() {
+  try { timelineController.stop() } catch {}
+}
+
+function handleTimelineStepFrames(delta) {
+  try { timelineController.stepByFrames(delta) } catch {}
+}
+
+function handleTimelineJumpStart() {
+  try { timelineController.setCurrentTime(timelineStartTime.value) } catch {}
+}
+
+function handleTimelineJumpEnd() {
+  try { timelineController.setCurrentTime(timelineEndTime.value) } catch {}
+}
+
+function handleTimelineToggleLoop() {
+  try { timelineController.loopPlayback.value = !timelineController.loopPlayback.value } catch {}
+}
+
+function handleTimelineRange({ startFrame, endFrame }) {
+  try { timelineController.setRangeFromFrames(startFrame, endFrame) } catch {}
+}
+
+function handleAddMarker(time) {
+  try {
+    const marker = timelineController.addMarker({ time, label: `Marker ${timelineMarkers.value.length + 1}` })
+    if (marker) pushToast(`${marker.label} を追加`, 'タイムライン', 2400)
+  } catch {}
+}
+
+function handleUpdateMarker({ id, time, label }) {
+  try { timelineController.updateMarker(id, { time, label }) } catch {}
+}
+
+function handleRemoveMarker(id) {
+  try { timelineController.removeMarker(id) } catch {}
+}
+
+function handleSelectKeyframes(ids) {
+  selectedTimelineKeys.value = ids
+}
+
 async function clearAllCache() {
   try { await clearCache() } catch {}
   try {
-    // Lighting/markers
     showLightMarker.value = false
     lightMarkerColor.value = '#ff0000'
     directionalIntensity.value = 1
-    // Display toggles
     showPhysicalBones.value = false
     showOtherBones.value = false
     showExtendedBones.value = false
@@ -354,23 +522,19 @@ async function clearAllCache() {
     highlightConstraint.value = false
     boneDotSize.value = 0.02
     boneLabelScale.value = 1.0
-    // Virtual trackers UI
     virtualTrackersEnabled.value = false
     showVirtualTrackerLabels.value = true
     virtualTrackerSize.value = 0.08
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
+    pushToast('キャッシュとタイムラインをリセットしました', 'キャッシュ')
   } catch {}
 }
 
-function handleDocumentClick(e) {
-  if (menuOpen.value && menu.value?.menu && !menu.value.menu.contains(e.target)) {
-    menuOpen.value = false
-  }
-}
-
 function handleError(e) {
+  const msg = e?.error?.message || e?.message || '不明なエラーが発生しました'
+  pushToast(msg, 'エラー', 5200)
   try {
     console.error('Unhandled error:', e.error || e.message)
   } catch (err) {
@@ -379,6 +543,8 @@ function handleError(e) {
 }
 
 function handleUnhandledRejection(e) {
+  const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
+  pushToast(msg, 'エラー', 5200)
   try {
     console.error('Unhandled rejection:', e.reason)
   } catch (err) {
@@ -391,60 +557,6 @@ const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHan
   handleUnhandledRejection
 })
 
-onMounted(async () => {
-  setTimelineCssHeight(timelineHeight.value)
-  loadLightingSettings({})
-  setupErrorHandlers()
-  const raw = localStorage.getItem('importedModels')
-  initRenderer()
-  // init virtual trackers events and gizmos (will show if already enabled and model present)
-  try { trackerController.init() } catch {}
-  // Auto-restore models by default on reload to keep the user session.
-  // Opt-out methods:
-  //  - URL query: ?restore=0
-  //  - LocalStorage flag: localStorage.setItem('autoRestore', '0')
-  let shouldRestore = true
-  try {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('restore') === '0') shouldRestore = false
-  } catch {}
-  try {
-    if (localStorage.getItem('autoRestore') === '0') shouldRestore = false
-  } catch {}
-
-  if (shouldRestore) {
-    // If saved UI state exists, pass it to the restore function
-    await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
-  } else {
-    try { await logToServer({ event: 'restore:skipped' }) } catch {}
-  }
-  // Apply initial toggles to restored VRMs and trackers
-  try {
-    const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
-    list.forEach(vrm => {
-      try { vrm.springBoneManager?.setEnabled?.(springBoneEnabled.value) } catch {}
-      try { vrm.springBoneManager && (vrm.springBoneManager.enabled = springBoneEnabled.value) } catch {}
-      try { vrm.lookAt && (vrm.lookAt.enabled = lookAtEnabled.value) } catch {}
-    })
-    // If user had virtual trackers enabled from saved UI, ensure they are shown now that models are restored
-    if (virtualTrackersEnabled.value) {
-      try { trackerController.setEnabled(true) } catch {}
-    }
-  } catch {}
-  document.addEventListener('click', handleDocumentClick)
-  logToServer({ event: 'init' })
-  animate(0)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick)
-  cleanupErrorHandlers()
-  cleanupRenderer()
-  try { trackerController.cleanup() } catch {}
-  setTimelineCssHeight(0)
-})
-
-// Sync VRM feature toggles to loaded models
 watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
   try {
     const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
@@ -456,14 +568,20 @@ watch([springBoneEnabled, lookAtEnabled], ([s, l]) => {
   } catch {}
 })
 
-// Apply display settings to all models
-watch([boneDotSize, boneLabelScale, showPhysicalBones, showOtherBones, showExtendedBones, showColliderNodes, showNonDeformingBones, highlightConstraint], () => {
+watch([
+  boneDotSize,
+  boneLabelScale,
+  showPhysicalBones,
+  showOtherBones,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint
+], () => {
   try { applyBoneSettingsAll?.() } catch {}
 })
 
-// Hook tracker update into render loop via requestAnimationFrame in utils/rendering
 watch(models, () => {
-  // re-layout when new models loaded
   if (virtualTrackersEnabled.value) {
     try { trackerController.reset() } catch {}
     try { timelineController.applyCurrentPose() } catch {}
@@ -477,6 +595,7 @@ function toggleAllBones(v) {
     applyBoneSettingsAll?.()
   } catch {}
 }
+
 function toggleAllBoneNames(v) {
   try {
     const len = models?.value?.length || 0
@@ -484,9 +603,190 @@ function toggleAllBoneNames(v) {
     applyBoneSettingsAll?.()
   } catch {}
 }
+
+onMounted(async () => {
+  loadAutoRestore()
+  loadLightingSettings({})
+  setupErrorHandlers()
+  const raw = localStorage.getItem('importedModels')
+  initRenderer()
+  try { trackerController.init?.() } catch {}
+
+  let shouldRestore = autoRestore.value
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('restore') === '0') shouldRestore = false
+  } catch {}
+
+  if (shouldRestore) {
+    await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
+  } else {
+    try { await logToServer({ event: 'restore:skipped' }) } catch {}
+  }
+
+  try {
+    const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
+    list.forEach(vrm => {
+      try { vrm.springBoneManager?.setEnabled?.(springBoneEnabled.value) } catch {}
+      try { vrm.springBoneManager && (vrm.springBoneManager.enabled = springBoneEnabled.value) } catch {}
+      try { vrm.lookAt && (vrm.lookAt.enabled = lookAtEnabled.value) } catch {}
+    })
+    if (virtualTrackersEnabled.value) {
+      try { trackerController.setEnabled(true) } catch {}
+    }
+  } catch {}
+
+  pushToast('Blender風レイアウトを読み込みました', 'UI', 2400)
+  logToServer({ event: 'init' })
+  animate(0)
+})
+
+onUnmounted(() => {
+  cleanupErrorHandlers()
+  cleanupRenderer()
+  try { trackerController.cleanup?.() } catch {}
+})
 </script>
 
 
 <style scoped>
-/* warning overlay removed */
+.workspace-grid {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at top left, rgba(120, 150, 255, 0.08), transparent 60%),
+    radial-gradient(circle at bottom right, rgba(40, 60, 120, 0.1), transparent 62%);
+}
+
+.workspace-grid > .split-pane {
+  flex: 1 1 auto;
+}
+
+.workspace-split {
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-panel {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 0;
+  background: var(--workspace-panel-bg, rgba(36, 40, 52, 0.96));
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.workspace-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  background: none;
+}
+
+.workspace-panel__body--viewport,
+.workspace-panel__body--timeline {
+  padding: 0;
+}
+
+.workspace-panel__body--settings {
+  padding: 0;
+}
+
+.workspace-panel__body--settings > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.viewport-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  background:
+    radial-gradient(circle at top, rgba(120, 160, 255, 0.18), transparent 60%),
+    radial-gradient(circle at bottom, rgba(40, 70, 140, 0.12), transparent 65%),
+    var(--surface-strong, #232730);
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.viewport-frame__canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewport-frame__canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  margin: 0;
+}
+
+.workspace-panel__body--timeline :deep(.timeline) {
+  flex: 1 1 auto;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+  background: linear-gradient(180deg, rgba(32, 36, 48, 0.95) 0%, rgba(24, 26, 34, 0.98) 100%);
+}
+
+.workspace-panel__body--timeline :deep(.timeline__scroll-area) {
+  background: linear-gradient(180deg, rgba(20, 24, 32, 0.92), rgba(16, 18, 24, 0.94));
+}
+
+.workspace-panel__body--timeline :deep(.timeline__channel-header) {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.workspace-panel__body--timeline :deep(.timeline__channel-body) {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.workspace-panel__body--timeline :deep(.timeline__playhead) {
+  background: linear-gradient(180deg, rgba(255, 96, 54, 0.95), rgba(255, 176, 98, 0.85));
+}
+
+.workspace-panel__body--timeline :deep(.timeline__marker) {
+  background: linear-gradient(180deg, rgba(90, 150, 255, 0.9), rgba(58, 110, 220, 0.95));
+}
+
+.workspace-panel__body--timeline :deep(.timeline__selection) {
+  background: rgba(90, 140, 250, 0.22);
+  border: 1px solid rgba(120, 170, 255, 0.45);
+}
+
+.workspace-panel--settings {
+  padding: 0;
+}
+
+@media (max-width: 1280px) {
+  .workspace-grid {
+    padding: 0.85rem;
+  }
+}
+
+@media (max-width: 960px) {
+  .workspace-grid {
+    padding: 0.6rem;
+  }
+
+  .workspace-panel__body--viewport {
+    padding: var(--viewport-padding, 0.75rem);
+  }
+}
 </style>
