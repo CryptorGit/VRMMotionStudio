@@ -1,4 +1,4 @@
-import { ref, markRaw } from 'vue'
+import { ref, markRaw, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { createLoader } from '../utils/createLoader.js'
 
@@ -23,7 +23,8 @@ export function useModelOperations({
   loader,
   cache,
   poses,
-  selectedPose
+  selectedPose,
+  onCachePersisted
 }) {
   const models = ref([])
   let nextModelId = 1
@@ -1224,6 +1225,78 @@ export function useModelOperations({
     }
   }
 
+  function reportCacheResult(ok, reason, error) {
+    if (!onCachePersisted) return
+    try {
+      onCachePersisted({ ok, reason, error: error || null })
+    } catch (notifyError) {
+      console.warn('onCachePersisted callback failed', notifyError)
+    }
+  }
+
+  async function persistModels(reason, targetModels = models.value) {
+    if (!cache?.cacheFiles) {
+      reportCacheResult(false, reason, new Error('cacheFiles unavailable'))
+      return false
+    }
+    const snapshot = (targetModels || [])
+      .map(model => model?.files || [])
+      .filter(list => Array.isArray(list) && list.length)
+    if (!snapshot.length) {
+      reportCacheResult(true, reason, null)
+      return true
+    }
+    let ok = false
+    let error = null
+    try {
+      ok = await cache.cacheFiles(snapshot)
+      if (!ok) error = new Error('cacheFiles returned false')
+    } catch (e) {
+      error = e
+    }
+    const summary = {
+      event: ok ? 'cache:persist' : 'cache:persist:error',
+      reason,
+      groups: snapshot.length,
+      counts: snapshot.map(list => list.length),
+      message: error ? String(error?.message || error) : undefined
+    }
+    try { logToServer?.(summary) } catch {}
+    reportCacheResult(ok, reason, error)
+    if (!ok && error) console.warn('Failed to persist model cache:', reason, error)
+    return ok
+  }
+
+  function fireAndForgetPersist(reason, targetModels = models.value) {
+    if (!cache?.cacheFiles) return
+    const snapshot = (targetModels || [])
+      .map(model => model?.files || [])
+      .filter(list => Array.isArray(list) && list.length)
+    if (!snapshot.length) return
+    try {
+      const promise = cache.cacheFiles(snapshot)
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then(ok => {
+            if (!ok) throw new Error('cacheFiles returned false')
+            reportCacheResult(true, reason, null)
+            logToServer?.({ event: 'cache:persist', reason, groups: snapshot.length, counts: snapshot.map(list => list.length) })
+          })
+          .catch(error => {
+            reportCacheResult(false, reason, error)
+            logToServer?.({ event: 'cache:persist:error', reason, groups: snapshot.length, counts: snapshot.map(list => list.length), message: String(error?.message || error) })
+            console.warn('Failed to persist model cache (fire-and-forget):', reason, error)
+          })
+      }
+    } catch (error) {
+      reportCacheResult(false, reason, error)
+      try {
+        logToServer?.({ event: 'cache:persist:error', reason, message: String(error?.message || error) })
+      } catch {}
+      console.warn('Failed to schedule cache persistence:', reason, error)
+    }
+  }
+
   function onFileChange(e) {
     const list = Array.from(e.target.files || [])
     e.target.value = ''
@@ -1331,6 +1404,7 @@ export function useModelOperations({
     const { mesh } = model
     renderer.value?.renderLists?.dispose?.()
     renderer.value?.info?.reset?.()
+    let persistenceHandled = false
     try {
       disposeModelResources(model)
       models.value.splice(index, 1)
@@ -1339,12 +1413,16 @@ export function useModelOperations({
       }
       if (models.value.length === 0) {
         await cache.deleteCachedFiles()
+        reportCacheResult(true, 'remove', null)
+        persistenceHandled = true
       } else {
         await cache.deleteCachedFiles(index)
-        await cache.cacheFiles(models.value.map(m => m.files || []))
+        await persistModels('remove')
+        persistenceHandled = true
       }
     } catch (e) {
       console.error('Failed to remove model:', e)
+      if (!persistenceHandled) reportCacheResult(false, 'remove', e)
     } finally {
       saveModelState()
       requestAnimationFrame(() => renderer.value?.render?.(scene.value, camera.value))
@@ -1354,7 +1432,13 @@ export function useModelOperations({
   async function clearCache() {
     logToServer?.({ event: 'clear-cache' })
     renderer.value?.renderLists?.dispose?.()
-    await cache.deleteCachedFiles()
+    try {
+      await cache.deleteCachedFiles()
+      reportCacheResult(true, 'clear', null)
+    } catch (error) {
+      console.warn('Failed to clear persisted cache', error)
+      reportCacheResult(false, 'clear', error)
+    }
     // Also clear persisted UI/cache states so "キャッシュ削除" manages them too
     try {
       // Imported models visibility/state snapshot
@@ -1456,13 +1540,8 @@ export function useModelOperations({
         )
       })
     }
-    let cached = false
     try { logToServer?.({ event: 'handleFiles:cache-input', counts: models.value.map(m => (m.files ? m.files.length : 0)) }) } catch {}
-    try {
-      cached = await cache.cacheFiles(models.value.map(m => m.files))
-    } catch (e) {
-      console.error('Failed to cache model files', e)
-    }
+    const cached = await persistModels('load')
     if (!cached) {
       console.error('Failed to cache model files')
       alert('モデルのキャッシュに失敗しました')
@@ -1541,6 +1620,42 @@ export function useModelOperations({
     const list = Array.from(e.dataTransfer?.files || [])
     handleFiles(list)
   }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined') return
+    if (document.visibilityState !== 'hidden') return
+    Promise.resolve(persistModels('visibilitychange')).catch(error => {
+      console.warn('visibilitychange cache persist failed', error)
+    })
+  }
+
+  function handlePageHide() {
+    Promise.resolve(persistModels('pagehide')).catch(error => {
+      console.warn('pagehide cache persist failed', error)
+    })
+  }
+
+  function handleBeforeUnload() {
+    try {
+      fireAndForgetPersist('beforeunload')
+    } catch (error) {
+      console.warn('beforeunload cache persist failed', error)
+    }
+  }
+
+  onMounted(() => {
+    if (typeof window === 'undefined') return
+    window.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+  })
+
+  onUnmounted(() => {
+    if (typeof window === 'undefined') return
+    window.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.removeEventListener('pagehide', handlePageHide)
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+  })
 
   return {
     models,

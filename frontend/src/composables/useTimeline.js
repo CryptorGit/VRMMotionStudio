@@ -537,7 +537,9 @@ export function useTimeline({ trackers }) {
     addKeyframe,
     addSnapshotAtTime,
     removeKeyframe,
+  removeKeyframes,
     updateKeyframe,
+  moveKeyframes,
     updateKeyframeTime,
     clearTrack,
     clearAll,
@@ -782,6 +784,17 @@ export function useTimeline({ trackers }) {
     applyCurrentPose()
   }
 
+  function removeKeyframes(ids) {
+    if (!Array.isArray(ids) || !ids.length) return
+    const targets = new Set(ids.map(id => Number(id)).filter(Number.isFinite))
+    if (!targets.size) return
+    const next = keyframes.value.filter(frame => !targets.has(frame.id))
+    if (next.length === keyframes.value.length) return
+    keyframes.value = next
+    scheduleSave()
+    applyCurrentPose()
+  }
+
   function updateKeyframe(id, payload = {}) {
     let changed = false
     const nextFrames = keyframes.value.map(frame => {
@@ -805,6 +818,30 @@ export function useTimeline({ trackers }) {
     scheduleSave()
     applyCurrentPose()
     return keyframes.value.find(frame => frame.id === id) || null
+  }
+
+  function moveKeyframes(updates) {
+    if (!Array.isArray(updates) || !updates.length) return
+    const map = new Map()
+    updates.forEach(update => {
+      const id = Number(update?.keyframeId ?? update?.id)
+      const time = Number(update?.time)
+      if (!Number.isFinite(id) || !Number.isFinite(time)) return
+      map.set(id, clampTime(time))
+    })
+    if (!map.size) return
+    let changed = false
+    const nextFrames = keyframes.value.map(frame => {
+      if (!map.has(frame.id)) return frame
+      const nextTime = map.get(frame.id)
+      if (Math.abs(nextTime - frame.time) <= 1e-6) return frame
+      changed = true
+      return { ...frame, time: nextTime }
+    })
+    if (!changed) return
+    keyframes.value = nextFrames.sort((a, b) => a.time - b.time)
+    scheduleSave()
+    applyCurrentPose()
   }
 
   function updateKeyframeTime(id, nextTime) {

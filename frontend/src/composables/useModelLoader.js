@@ -21,7 +21,8 @@ export default function useModelLoader(ctx) {
     loader,
     cache,
     poses: pose.poses,
-    selectedPose: pose.selectedPose
+    selectedPose: pose.selectedPose,
+    onCachePersisted: ctx.onCachePersisted
   })
   return { ...cache, ...pose, ...ops, getLoader: () => loader.value }
 }

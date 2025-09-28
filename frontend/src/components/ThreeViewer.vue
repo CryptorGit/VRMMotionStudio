@@ -72,7 +72,9 @@
                     @toggle-loop="handleTimelineToggleLoop"
                     @add-keyframe="handleTimelineAddKey"
                     @remove-keyframe="handleTimelineRemoveKey"
+                    @remove-keyframes="handleTimelineRemoveKeys"
                     @move-keyframe="handleTimelineMoveKey"
+                    @move-keyframes="handleTimelineMoveKeys"
                     @update-range="handleTimelineRange"
                     @update:snap="timelineSnap = $event"
                     @request-import="handleTimelineRequestImport"
@@ -172,6 +174,7 @@ import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useTheme } from '../composables/useTheme.js'
 import { captionInjectionKey } from '../composables/useCaptions.js'
+import { useStoragePersistence } from '../composables/useStoragePersistence.js'
 
 const viewer = ref(null)
 const currentMeshRef = ref(null)
@@ -216,6 +219,105 @@ provide(captionInjectionKey, {
 const autoRestore = ref(true)
 const toasts = ref([])
 let toastSeed = 0
+const STORAGE_PERSIST_TOAST_KEY = 'cache.persist.toast'
+const CACHE_SAVED_TOAST_KEY = 'cache.saved.toast'
+let cacheSavedToastShown = false
+let storagePersistToastState = 'unknown'
+let lastCacheErrorToastAt = 0
+
+try {
+  cacheSavedToastShown = sessionStorage.getItem(CACHE_SAVED_TOAST_KEY) === '1'
+} catch {}
+try {
+  storagePersistToastState = sessionStorage.getItem(STORAGE_PERSIST_TOAST_KEY) || 'unknown'
+} catch {}
+
+const storagePersistence = useStoragePersistence()
+const storageSupported = storagePersistence.supported
+const storagePersisted = storagePersistence.persisted
+const storageQuota = storagePersistence.quota
+const storageUsage = storagePersistence.usage
+const ensurePersistentStorage = storagePersistence.ensurePersistentStorage
+const updateStorageEstimate = storagePersistence.updateEstimate
+const DISPLAY_SETTINGS_KEY = 'ui.display.state.v1'
+let displaySettingsSaveTimer = null
+let restoringDisplaySettings = false
+
+function getDisplaySettingsSnapshot() {
+  return {
+    showLightMarker: showLightMarker.value,
+    lightMarkerColor: lightMarkerColor.value,
+    directionalIntensity: directionalIntensity.value,
+    springBoneEnabled: springBoneEnabled.value,
+    lookAtEnabled: lookAtEnabled.value,
+    showExtendedBones: showExtendedBones.value,
+    showColliderNodes: showColliderNodes.value,
+    showNonDeformingBones: showNonDeformingBones.value,
+    highlightConstraint: highlightConstraint.value,
+    showPhysicalBones: showPhysicalBones.value,
+    showOtherBones: showOtherBones.value,
+    boneDotSize: boneDotSize.value,
+    boneLabelScale: boneLabelScale.value,
+    virtualTrackersEnabled: virtualTrackersEnabled.value,
+    showVirtualTrackerLabels: showVirtualTrackerLabels.value,
+    virtualTrackerSize: virtualTrackerSize.value,
+    virtualTrackerLabelScale: virtualTrackerLabelScale.value
+  }
+}
+
+function saveDisplaySettings() {
+  if (restoringDisplaySettings || typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(DISPLAY_SETTINGS_KEY, JSON.stringify(getDisplaySettingsSnapshot()))
+  } catch {}
+}
+
+function scheduleDisplaySettingsSave() {
+  if (restoringDisplaySettings || typeof window === 'undefined') return
+  if (displaySettingsSaveTimer) window.clearTimeout(displaySettingsSaveTimer)
+  displaySettingsSaveTimer = window.setTimeout(() => {
+    displaySettingsSaveTimer = null
+    saveDisplaySettings()
+  }, 180)
+}
+
+function loadDisplaySettings() {
+  if (typeof localStorage === 'undefined') return
+  let raw
+  try {
+    raw = localStorage.getItem(DISPLAY_SETTINGS_KEY)
+  } catch {
+    return
+  }
+  if (!raw) return
+  try {
+    const data = JSON.parse(raw)
+    restoringDisplaySettings = true
+    if (typeof data.showLightMarker === 'boolean') showLightMarker.value = data.showLightMarker
+    if (typeof data.lightMarkerColor === 'string') lightMarkerColor.value = data.lightMarkerColor
+    if (Number.isFinite(data.directionalIntensity)) directionalIntensity.value = data.directionalIntensity
+    if (typeof data.springBoneEnabled === 'boolean') springBoneEnabled.value = data.springBoneEnabled
+    if (typeof data.lookAtEnabled === 'boolean') lookAtEnabled.value = data.lookAtEnabled
+    if (typeof data.showExtendedBones === 'boolean') showExtendedBones.value = data.showExtendedBones
+    if (typeof data.showColliderNodes === 'boolean') showColliderNodes.value = data.showColliderNodes
+    if (typeof data.showNonDeformingBones === 'boolean') showNonDeformingBones.value = data.showNonDeformingBones
+    if (typeof data.highlightConstraint === 'boolean') highlightConstraint.value = data.highlightConstraint
+    if (typeof data.showPhysicalBones === 'boolean') showPhysicalBones.value = data.showPhysicalBones
+    if (typeof data.showOtherBones === 'boolean') showOtherBones.value = data.showOtherBones
+    if (Number.isFinite(data.boneDotSize)) boneDotSize.value = data.boneDotSize
+    if (Number.isFinite(data.boneLabelScale)) boneLabelScale.value = data.boneLabelScale
+    if (typeof data.virtualTrackersEnabled === 'boolean') virtualTrackersEnabled.value = data.virtualTrackersEnabled
+    if (typeof data.showVirtualTrackerLabels === 'boolean') showVirtualTrackerLabels.value = data.showVirtualTrackerLabels
+    if (Number.isFinite(data.virtualTrackerSize)) virtualTrackerSize.value = data.virtualTrackerSize
+    if (Number.isFinite(data.virtualTrackerLabelScale)) virtualTrackerLabelScale.value = data.virtualTrackerLabelScale
+  } catch (error) {
+    if (import.meta?.env?.DEV) {
+      console.warn('Failed to load display settings', error)
+    }
+  } finally {
+    restoringDisplaySettings = false
+  }
+}
 
 function pushToast(message, title = '通知', timeout = 3200) {
   const id = ++toastSeed
@@ -310,6 +412,38 @@ function onPointerDown() {}
 function onControlStart() {}
 function onControlEnd() {}
 
+function handleCachePersisted(event = {}) {
+  Promise.resolve(updateStorageEstimate()).catch(() => {})
+  try {
+    logToServer?.({
+      event: event.ok ? 'cache:persist:reported' : 'cache:persist:failed-client',
+      reason: event.reason,
+      ok: !!event.ok,
+      persisted: storagePersisted.value,
+      supported: storageSupported.value,
+      message: event.error ? String(event.error?.message || event.error) : undefined
+    })
+  } catch {}
+
+  if (event.ok) {
+    const successReasons = ['load', 'restore', 'visibilitychange', 'pagehide', 'remove']
+    if (!cacheSavedToastShown && successReasons.includes(event.reason)) {
+      pushToast('キャッシュを保存しました', 'キャッシュ', 2800)
+      cacheSavedToastShown = true
+      try { sessionStorage.setItem(CACHE_SAVED_TOAST_KEY, '1') } catch {}
+    }
+  } else if (event.ok === false && event.reason !== 'clear') {
+    const now = Date.now()
+    if (!lastCacheErrorToastAt || now - lastCacheErrorToastAt > 10000) {
+      pushToast('キャッシュの保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      lastCacheErrorToastAt = now
+    }
+    if (import.meta.env.DEV && event.error) {
+      console.warn('Cache persistence failure', event.reason, event.error)
+    }
+  }
+}
+
 const fileLoader = useFileLoader({
   scene,
   camera,
@@ -327,7 +461,8 @@ const fileLoader = useFileLoader({
   showNonDeformingBones,
   highlightConstraint,
   boneDotSize,
-  boneLabelScale
+  boneLabelScale,
+  onCachePersisted: handleCachePersisted
 })
 
 const {
@@ -374,12 +509,34 @@ const timelineEndTime = computed(() => (timelineController ? timelineController.
 const timelineFrameRate = computed(() => (timelineController ? timelineController.frameRate.value : 60))
 const timelineLoop = computed(() => (timelineController ? timelineController.loopPlayback.value : false))
 
-const statusMessage = computed(() => {
+function formatStorage(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB'
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 100) return `${mb.toFixed(0)} MB`
+  if (mb >= 10) return `${mb.toFixed(1)} MB`
+  return `${mb.toFixed(2)} MB`
+}
+
+const frameStatus = computed(() => {
   const fps = timelineFrameRate.value || 60
   const currentFrame = Math.round(timelineCurrentTime.value * fps)
   const endFrame = Math.max(Math.round(timelineEndTime.value * fps), 0)
   return `フレーム ${currentFrame}/${endFrame} (${fps}fps)`
 })
+
+const storageStatus = computed(() => {
+  if (!storageSupported.value) return 'キャッシュ: 標準保存'
+  const usageBytes = storageUsage.value || 0
+  const quotaBytes = storageQuota.value || 0
+  const guard = storagePersisted.value ? '保護' : '未保護'
+  if (!quotaBytes) {
+    return `キャッシュ ${formatStorage(usageBytes)} (${guard})`
+  }
+  const percent = quotaBytes > 0 ? Math.min(100, Math.max(0, Math.round((usageBytes / quotaBytes) * 100))) : 0
+  return `キャッシュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
+})
+
+const statusMessage = computed(() => `${frameStatus.value} | ${storageStatus.value}`)
 
 try {
   const savedSnap = localStorage.getItem('timeline.snap')
@@ -390,6 +547,29 @@ watch(timelineSnap, value => {
   try {
     localStorage.setItem('timeline.snap', value ? '1' : '0')
   } catch {}
+})
+
+watch([
+  showLightMarker,
+  lightMarkerColor,
+  directionalIntensity,
+  springBoneEnabled,
+  lookAtEnabled,
+  showExtendedBones,
+  showColliderNodes,
+  showNonDeformingBones,
+  highlightConstraint,
+  showPhysicalBones,
+  showOtherBones,
+  boneDotSize,
+  boneLabelScale,
+  virtualTrackersEnabled,
+  showVirtualTrackerLabels,
+  virtualTrackerSize,
+  virtualTrackerLabelScale
+], () => {
+  if (restoringDisplaySettings) return
+  scheduleDisplaySettingsSave()
 })
 
 const { animate, initRenderer, cleanupRenderer } = useRenderer({
@@ -464,17 +644,48 @@ function handleTimelineAddKey(payload) {
 
 function handleTimelineRemoveKey(payload) {
   const keyId = payload && Number.isFinite(payload.keyframeId) ? payload.keyframeId : payload
-  if (!Number.isFinite(keyId)) return
+  handleTimelineRemoveKeys({ keyframeIds: [keyId] })
+}
+
+function handleTimelineRemoveKeys(payload) {
+  const raw = Array.isArray(payload?.keyframeIds) ? payload.keyframeIds : payload
+  const ids = (Array.isArray(raw) ? raw : [raw]).map(value => Number(value)).filter(Number.isFinite)
+  if (!ids.length || !timelineController) return
   try {
-    timelineController.removeKeyframe(keyId)
+    if (ids.length === 1) {
+      timelineController.removeKeyframe(ids[0])
+    } else if (timelineController.removeKeyframes) {
+      timelineController.removeKeyframes(ids)
+    } else {
+      ids.forEach(id => timelineController.removeKeyframe(id))
+    }
     timelineController.applyCurrentPose()
   } catch {}
 }
 
 function handleTimelineMoveKey({ keyframeId, time }) {
   if (!Number.isFinite(keyframeId)) return
+  handleTimelineMoveKeys({ updates: [{ keyframeId, time }] })
+}
+
+function handleTimelineMoveKeys(payload) {
+  const updates = Array.isArray(payload?.updates) ? payload.updates : []
+  const normalized = updates
+    .map(update => ({
+      keyframeId: Number(update.keyframeId ?? update.id),
+      time: Number(update.time)
+    }))
+    .filter(update => Number.isFinite(update.keyframeId) && Number.isFinite(update.time))
+  if (!normalized.length || !timelineController) return
   try {
-    timelineController.updateKeyframe(keyframeId, { time })
+    if (normalized.length === 1) {
+      const { keyframeId, time } = normalized[0]
+      timelineController.updateKeyframe(keyframeId, { time })
+    } else if (timelineController.moveKeyframes) {
+      timelineController.moveKeyframes(normalized)
+    } else {
+      normalized.forEach(({ keyframeId, time }) => timelineController.updateKeyframe(keyframeId, { time }))
+    }
   } catch {}
 }
 
@@ -543,6 +754,7 @@ async function handleTimelineImportFile(event) {
     try { timelineController.pause() } catch {}
     try { timelineController.applyCurrentPose() } catch {}
     pushToast(`${file.name} を読み込みました`, 'タイムライン', 3200)
+    Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch (error) {
     pushToast('タイムラインJSONの解析に失敗しました', 'タイムライン', 5200)
     if (import.meta.env.DEV) console.error('Timeline import failed', error)
@@ -579,6 +791,7 @@ function handleTimelineClear() {
     timelineController.clearAll()
     timelineController.stop()
     pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
+    Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch (error) {
     pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
     if (import.meta.env.DEV) console.error('Timeline clear failed', error)
@@ -606,6 +819,7 @@ async function clearAllCache() {
     timelineController.clearAll()
     timelineController.stop()
     pushToast('キャッシュとタイムラインをリセットしました', 'キャッシュ')
+    Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {}
 }
 
@@ -682,9 +896,36 @@ function toggleAllBoneNames(v) {
 }
 
 onMounted(async () => {
+  let persistedGranted = false
+  try {
+    persistedGranted = await ensurePersistentStorage()
+  } catch {
+    persistedGranted = false
+  }
+
+  if (storageSupported.value) {
+    if (persistedGranted) {
+      if (storagePersistToastState !== 'granted') {
+        pushToast('キャッシュの永続化が有効になりました', 'キャッシュ', 3600)
+        storagePersistToastState = 'granted'
+        try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'granted') } catch {}
+      }
+    } else if (storagePersistToastState !== 'denied') {
+      pushToast('キャッシュの永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      storagePersistToastState = 'denied'
+      try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'denied') } catch {}
+    }
+  } else if (storagePersistToastState !== 'unsupported') {
+    storagePersistToastState = 'unsupported'
+    try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'unsupported') } catch {}
+  }
+
+  Promise.resolve(updateStorageEstimate()).catch(() => {})
+
   loadAutoRestore()
   loadCaptionPreference()
   loadLightingSettings({})
+  loadDisplaySettings()
   setupErrorHandlers()
   const raw = localStorage.getItem('importedModels')
   initRenderer()
@@ -723,6 +964,10 @@ onUnmounted(() => {
   cleanupErrorHandlers()
   cleanupRenderer()
   try { trackerController.cleanup?.() } catch {}
+  if (typeof window !== 'undefined' && displaySettingsSaveTimer) {
+    window.clearTimeout(displaySettingsSaveTimer)
+    displaySettingsSaveTimer = null
+  }
 })
 </script>
 

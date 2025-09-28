@@ -5,61 +5,61 @@
     </header>
     <div class="section__content">
       <div class="row">
-        <label>
-          ライトマーカー表示
+        <label class="checkbox">
           <input type="checkbox" v-model="showLightMarkerLocal" />
+          <span>ライトマーカー表示</span>
         </label>
         <label>
-          マーカー色
+          <span>マーカー色</span>
           <input type="color" v-model="markerColorLocal" />
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（人型）
+        <label class="checkbox">
           <input type="checkbox" v-model="allBonesVisible" />
+          <span>ボーン表示（人型）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン名表示
+        <label class="checkbox">
           <input type="checkbox" v-model="allBoneNamesVisible" />
+          <span>ボーン名表示</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（物理）
+        <label class="checkbox">
           <input type="checkbox" v-model="showPhysicalBonesLocal" />
+          <span>ボーン表示（物理）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（その他）
+        <label class="checkbox">
           <input type="checkbox" v-model="showOtherBonesLocal" />
+          <span>ボーン表示（その他）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（拡張）
+        <label class="checkbox">
           <input type="checkbox" v-model="showExtendedBonesLocal" />
+          <span>ボーン表示（拡張）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（コライダー）
+        <label class="checkbox">
           <input type="checkbox" v-model="showColliderNodesLocal" />
+          <span>ボーン表示（コライダー）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          ボーン表示（非変形）
+        <label class="checkbox">
           <input type="checkbox" v-model="showNonDeformingBonesLocal" />
+          <span>ボーン表示（非変形）</span>
         </label>
       </div>
       <div class="row">
-        <label>
-          制約ハイライト
+        <label class="checkbox">
           <input type="checkbox" v-model="highlightConstraintLocal" />
+          <span>制約ハイライト</span>
         </label>
       </div>
       <div class="row">
@@ -82,16 +82,16 @@
       </div>
       <hr />
       <div class="row">
-        <label>
-          バーチャルトラッカー
+        <label class="checkbox">
           <input type="checkbox" v-model="virtualTrackersEnabledLocal" />
+          <span>バーチャルトラッカー</span>
         </label>
         <button type="button" @click="$emit('reset-virtual-trackers')">位置リセット</button>
       </div>
       <div class="row">
-        <label>
-          トラッカー名表示
+        <label class="checkbox">
           <input type="checkbox" v-model="showVirtualTrackerLabelsLocal" />
+          <span>トラッカー名表示</span>
         </label>
       </div>
       <div class="row">
@@ -256,6 +256,18 @@ label {
   gap: 0.45rem;
   font-size: 0.82rem;
   color: var(--text-muted, rgba(240, 245, 255, 0.8));
+}
+
+label.checkbox {
+  flex: 1 1 auto;
+}
+
+label.checkbox span {
+  flex: 1 1 auto;
+}
+
+label.checkbox input[type='checkbox'] {
+  margin: 0;
 }
 
 label.stretch {

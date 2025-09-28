@@ -15,16 +15,6 @@
         <button
           type="button"
           class="toolbar__button"
-          :aria-pressed="snapToFrame"
-          @click="toggleSnap"
-          :title="tooltip('フレームにスナップします')"
-        >
-          <Icon icon="mdi:ruler" />
-          <span>Snap</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
           @click="fitRange"
           :title="tooltip('タイムラインの全範囲を表示します')"
         >
@@ -34,21 +24,21 @@
         <button
           type="button"
           class="toolbar__button"
-          @click="zoomToSelection"
-          :disabled="!selectionRange"
-          :title="tooltip('選択範囲をズームします')"
-        >
-          <Icon icon="mdi:target" />
-          <span>選択ズーム</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
           @click="emit('add-keyframe', { time: props.currentTime })"
           :title="tooltip('現在のフレームにキーを追加します')"
         >
           <Icon icon="mdi:animation" />
           <span>キー追加</span>
+        </button>
+        <button
+          type="button"
+          class="toolbar__button toolbar__button--alert"
+          @click="removeSelectedKeyframes"
+          :disabled="!hasSelection"
+          :title="tooltip('選択したキーを削除します')"
+        >
+          <Icon icon="mdi:delete-forever" />
+          <span>キー削除</span>
         </button>
       </div>
 
@@ -61,15 +51,6 @@
         >
           <Icon icon="mdi:skip-backward" />
           <span>Start</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="stepFrames(-1)"
-          :title="tooltip('1フレーム戻ります')"
-        >
-          <Icon icon="mdi:step-backward" />
-          <span>-1</span>
         </button>
         <button
           type="button"
@@ -97,15 +78,6 @@
         >
           <Icon icon="mdi:stop" />
           <span>Stop</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="stepFrames(1)"
-          :title="tooltip('1フレーム進みます')"
-        >
-          <Icon icon="mdi:step-forward" />
-          <span>+1</span>
         </button>
         <button
           type="button"
@@ -185,7 +157,11 @@
         @scroll="handleTicksScroll"
         @wheel="handleHeaderWheel"
       >
-        <div class="timeline__ticks" :style="ticksStyle">
+        <div
+          class="timeline__ticks"
+          :style="ticksStyle"
+          @pointerdown="handleHeaderPointerDown"
+        >
           <div
             v-for="tick in ticks"
             :key="tick.id"
@@ -298,7 +274,9 @@ const emit = defineEmits([
   'toggle-loop',
   'add-keyframe',
   'remove-keyframe',
+  'remove-keyframes',
   'move-keyframe',
+  'move-keyframes',
   'update-range',
   'update:snap',
   'request-import',
@@ -320,6 +298,7 @@ const visibleDuration = ref(1)
 const snapToFrame = ref(props.snap !== false)
 const selectionRange = ref(null)
 const selectedKeyframes = ref(new Set())
+const hasSelection = computed(() => selectedKeyframes.value.size > 0)
 const startFrameInput = ref(0)
 const endFrameInput = ref(0)
 
@@ -691,31 +670,11 @@ function zoomAt(pivot, factor) {
   syncScrollPositions()
 }
 
-function stepFrames(delta) {
-  emit('step-frames', delta)
-}
-
 function fitRange() {
   visibleDuration.value = extendedDuration.value
   viewStart.value = extendedStart.value
   clampView()
   syncScrollPositions()
-}
-
-function zoomToSelection() {
-  if (!selectionRange.value) return
-  const start = Math.min(selectionRange.value.start, selectionRange.value.end)
-  const end = Math.max(selectionRange.value.start, selectionRange.value.end)
-  if (end <= start) return
-  viewStart.value = start
-  visibleDuration.value = Math.max(end - start, minViewDuration.value)
-  clampView()
-  syncScrollPositions()
-}
-
-function toggleSnap() {
-  snapToFrame.value = !snapToFrame.value
-  emit('update:snap', snapToFrame.value)
 }
 
 function toggleMode() {
@@ -751,6 +710,46 @@ function snapIfNeeded(time) {
   return snapTimeToFrame(time)
 }
 
+function handleHeaderPointerDown(event) {
+  if (event.button !== 0) return
+  startScrub(event, 'ticks')
+}
+
+function startScrub(event, source = 'tracks') {
+  const { time } = getPointerInfo(event, source)
+  emit('seek', snapIfNeeded(time))
+  dragState = { type: 'scrub', source }
+  window.addEventListener('pointermove', handlePointerMove)
+  window.addEventListener('pointerup', handlePointerUp)
+  event.preventDefault()
+}
+
+function removeSelectedKeyframes() {
+  if (!hasSelection.value) return
+  const ids = Array.from(selectedKeyframes.value)
+  if (ids.length === 1) {
+    emit('remove-keyframe', { keyframeId: ids[0] })
+  } else if (ids.length > 1) {
+    emit('remove-keyframes', { keyframeIds: ids })
+  }
+  selectionRange.value = null
+  selectedKeyframes.value = new Set()
+}
+
+function mergeSelection(newSelection, originalSelection, mode = 'replace') {
+  if (mode === 'add') {
+    const combined = new Set(originalSelection)
+    newSelection.forEach(id => combined.add(id))
+    return combined
+  }
+  if (mode === 'subtract') {
+    const reduced = new Set(originalSelection)
+    newSelection.forEach(id => reduced.delete(id))
+    return reduced
+  }
+  return newSelection
+}
+
 function formatTimeLabel(time) {
   if (!Number.isFinite(time)) return ''
   const relative = time - props.startTime
@@ -766,12 +765,13 @@ function formatFrameLabel(frameNumber) {
   return `F${frameNumber}`
 }
 
-function getPointerInfo(event) {
-  if (!tracksWrapperRef.value) {
+function getPointerInfo(event, source = 'tracks') {
+  const container = source === 'ticks' ? ticksWrapperRef.value : tracksWrapperRef.value
+  if (!container) {
     return { time: props.startTime, x: 0 }
   }
-  const rect = tracksWrapperRef.value.getBoundingClientRect()
-  const scrollLeft = tracksWrapperRef.value.scrollLeft
+  const rect = container.getBoundingClientRect()
+  const scrollLeft = container.scrollLeft
   let x = event.clientX - rect.left
   x = Math.max(0, x)
   const absoluteTime = extendedStart.value + (scrollLeft + x) / pixelsPerSecond.value
@@ -780,30 +780,21 @@ function getPointerInfo(event) {
 }
 
 function handlePointerDown(event) {
-  if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
+  const shouldPan = event.button === 1 || (event.button === 0 && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
+  if (shouldPan) {
     startPan(event)
     return
   }
   if (event.button !== 0) return
 
-  if (event.ctrlKey || event.metaKey || event.altKey) {
-    startSelection(event)
-    return
-  }
-
-  if (!event.shiftKey) clearSelection()
-
-  const { time } = getPointerInfo(event)
-  emit('seek', snapIfNeeded(time))
-  dragState = { type: 'scrub' }
-  window.addEventListener('pointermove', handlePointerMove)
-  window.addEventListener('pointerup', handlePointerUp)
+  const mode = event.altKey ? 'subtract' : (event.ctrlKey || event.metaKey ? 'add' : 'replace')
+  startSelection(event, mode)
 }
 
 function handlePointerMove(event) {
   if (!dragState) return
   if (dragState.type === 'scrub') {
-    const { time } = getPointerInfo(event)
+    const { time } = getPointerInfo(event, dragState.source || 'tracks')
     emit('seek', snapIfNeeded(time))
   } else if (dragState.type === 'select') {
     const { time } = getPointerInfo(event)
@@ -816,20 +807,33 @@ function handlePointerMove(event) {
   } else if (dragState.type === 'keyframe') {
     const { time } = getPointerInfo(event)
     const targetTime = clampTime(time - dragState.offset)
-    const snapped = snapIfNeeded(targetTime)
-    if (Math.abs(snapped - dragState.lastTime) > 1e-5) {
-      dragState.lastTime = snapped
+    const snappedAnchor = snapTimeToFrame(targetTime)
+    const delta = snappedAnchor - dragState.anchorOriginalTime
+    if (Math.abs(delta - (dragState.lastDelta ?? 0)) <= 1e-5) return
+    dragState.lastDelta = delta
+    if (!dragState.keyIds || dragState.keyIds.length <= 1) {
       emit('move-keyframe', {
-        keyframeId: dragState.keyId,
-        time: snapped
+        keyframeId: dragState.anchorId,
+        time: snappedAnchor
       })
+      return
     }
+    const updates = []
+    dragState.keyIds.forEach(id => {
+      const original = dragState.originalTimes?.get(id)
+      if (original === undefined) return
+      const nextTime = clampTime(snapTimeToFrame(original + delta))
+      updates.push({ keyframeId: id, time: nextTime })
+    })
+    if (!updates.length) return
+    if (updates.length === 1) emit('move-keyframe', updates[0])
+    else emit('move-keyframes', { updates })
   }
 }
 
 function handlePointerUp() {
   if (dragState?.type === 'select') {
-    finalizeSelection()
+    finalizeSelection(dragState)
   }
   dragState = null
   window.removeEventListener('pointermove', handlePointerMove)
@@ -843,50 +847,87 @@ function startPan(event) {
   event.preventDefault()
 }
 
-function startSelection(event) {
+function startSelection(event, mode = 'replace') {
   const { time } = getPointerInfo(event)
   selectionRange.value = { start: time, end: time }
-  dragState = { type: 'select', anchorTime: time }
+  dragState = {
+    type: 'select',
+    anchorTime: time,
+    mode,
+    originalSelection: new Set(selectedKeyframes.value)
+  }
   window.addEventListener('pointermove', handlePointerMove)
   window.addEventListener('pointerup', handlePointerUp)
   event.preventDefault()
 }
 
-function finalizeSelection() {
-  if (!selectionRange.value) return
-  const start = Math.min(selectionRange.value.start, selectionRange.value.end)
-  const end = Math.max(selectionRange.value.start, selectionRange.value.end)
-  if (end - start < 1 / (props.frameRate * 10)) {
-    selectionRange.value = null
-    selectedKeyframes.value = new Set()
+function finalizeSelection(state) {
+  const range = selectionRange.value
+  const original = state?.originalSelection || new Set(selectedKeyframes.value)
+  if (!range) {
+    if (state?.mode === 'replace') selectedKeyframes.value = new Set()
     return
   }
-  const collected = new Set()
-  keyframesList.value.forEach(frame => {
-    if (frame.time >= start && frame.time <= end) {
-      collected.add(frame.id)
-    }
-  })
-  selectedKeyframes.value = collected
-}
-
-function clearSelection() {
-  if (!selectionRange.value && selectedKeyframes.value.size === 0) return
+  const start = Math.min(range.start, range.end)
+  const end = Math.max(range.start, range.end)
+  const minSpan = Math.max(frameDuration.value * 0.25, minViewDuration.value / 200)
+  const isClick = Math.abs(end - start) < minSpan
+  let result
+  if (isClick) {
+    result = state?.mode === 'replace' ? new Set() : new Set(original)
+  } else {
+    const collected = new Set()
+    keyframesList.value.forEach(frame => {
+      if (frame.time >= start && frame.time <= end) {
+        collected.add(frame.id)
+      }
+    })
+    result = mergeSelection(collected, original, state?.mode || 'replace')
+  }
   selectionRange.value = null
-  selectedKeyframes.value = new Set()
+  selectedKeyframes.value = result
 }
 
 function startKeyframeDrag(event, frame) {
   const { time } = getPointerInfo(event)
   const offset = time - frame.time
-  if (!event.shiftKey && !selectedKeyframes.value.has(frame.id)) {
-    selectedKeyframes.value = new Set([frame.id])
+
+  if (event.ctrlKey || event.metaKey) {
+    const updated = new Set(selectedKeyframes.value)
+    if (updated.has(frame.id)) {
+      updated.delete(frame.id)
+      selectedKeyframes.value = updated
+      return
+    }
+    updated.add(frame.id)
+    selectedKeyframes.value = updated
+  } else {
+    if (!selectedKeyframes.value.has(frame.id)) {
+      selectedKeyframes.value = new Set([frame.id])
+    }
   }
+
+  const activeSelection = new Set(selectedKeyframes.value)
+  if (!activeSelection.size) {
+    activeSelection.add(frame.id)
+    selectedKeyframes.value = activeSelection
+  }
+
+  const originalTimes = new Map()
+  keyframesList.value.forEach(item => {
+    if (activeSelection.has(item.id)) {
+      originalTimes.set(item.id, item.time)
+    }
+  })
+
   dragState = {
     type: 'keyframe',
-    keyId: frame.id,
+    keyIds: Array.from(activeSelection),
+    anchorId: frame.id,
     offset,
-    lastTime: frame.time
+    anchorOriginalTime: frame.time,
+    originalTimes,
+    lastDelta: 0
   }
   window.addEventListener('pointermove', handlePointerMove)
   window.addEventListener('pointerup', handlePointerUp)
