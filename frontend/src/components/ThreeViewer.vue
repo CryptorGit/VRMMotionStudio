@@ -28,10 +28,10 @@
             direction="vertical"
             storage-key="layout.split.column"
             :initial-primary-ratio="0.68"
-            :min-primary-ratio="0.4"
-            :max-primary-ratio="0.92"
-            :primary-min-pixels="320"
-            :secondary-min-pixels="220"
+            :min-primary-ratio="0.2"
+            :max-primary-ratio="0.95"
+            :primary-min-pixels="220"
+            :secondary-min-pixels="160"
           >
             <template #primary>
               <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポート領域">
@@ -54,9 +54,7 @@
                 <div class="workspace-panel__body workspace-panel__body--timeline">
                   <TimelineEditor
                     height="100%"
-                    :trackers="trackerList"
                     :keyframes="timelineKeyframes"
-                    :markers="timelineMarkers"
                     :current-time="timelineCurrentTime"
                     :start-time="timelineStartTime"
                     :end-time="timelineEndTime"
@@ -72,17 +70,11 @@
                     @jump-start="handleTimelineJumpStart"
                     @jump-end="handleTimelineJumpEnd"
                     @toggle-loop="handleTimelineToggleLoop"
-                    @add-all-keyframes="handleTimelineAddAll"
                     @add-keyframe="handleTimelineAddKey"
                     @remove-keyframe="handleTimelineRemoveKey"
                     @move-keyframe="handleTimelineMoveKey"
-                    @update-keyframe="handleTimelineUpdateKey"
-                    @add-marker="handleAddMarker"
-                    @update-marker="handleUpdateMarker"
-                    @remove-marker="handleRemoveMarker"
                     @update-range="handleTimelineRange"
                     @update:snap="timelineSnap = $event"
-                    @select-keyframes="handleSelectKeyframes"
                     @request-import="handleTimelineRequestImport"
                     @export-timeline="handleTimelineExport"
                     @clear-timeline="handleTimelineClear"
@@ -371,19 +363,9 @@ const updateTrackers = () => {
   } catch {}
 }
 
-const trackerList = computed(() => {
-  const source = trackerController?.trackers?.value || []
-  return source.map(item => ({
-    key: item.key,
-    label: item.name || item.key
-  }))
-})
-
 const timelineSnap = ref(true)
-const selectedTimelineKeys = ref([])
 
-const timelineKeyframes = computed(() => (timelineController ? timelineController.keyframes : {}))
-const timelineMarkers = computed(() => (timelineController ? timelineController.markers.value : []))
+const timelineKeyframes = computed(() => (timelineController ? timelineController.keyframes.value : []))
 const timelineDuration = computed(() => (timelineController ? timelineController.duration.value : 0))
 const timelineCurrentTime = computed(() => (timelineController ? timelineController.currentTime.value : 0))
 const timelinePlaying = computed(() => (timelineController ? timelineController.isPlaying.value : false))
@@ -396,10 +378,7 @@ const statusMessage = computed(() => {
   const fps = timelineFrameRate.value || 60
   const currentFrame = Math.round(timelineCurrentTime.value * fps)
   const endFrame = Math.max(Math.round(timelineEndTime.value * fps), 0)
-  const markerCount = timelineMarkers.value.length
-  const selectionCount = selectedTimelineKeys.value.length
-  const selectionLabel = selectionCount ? ` • 選択 ${selectionCount}` : ''
-  return `フレーム ${currentFrame}/${endFrame} (${fps}fps) • マーカー ${markerCount}${selectionLabel}`
+  return `フレーム ${currentFrame}/${endFrame} (${fps}fps)`
 })
 
 try {
@@ -447,9 +426,8 @@ trackerController = useVirtualTrackers({
 timelineController = useTimeline({ trackers: trackerController.trackers })
 
 if (timelineController) {
-  const tracks = timelineController.keyframes || {}
-  const hasExistingKeys = Object.values(tracks).some(list => Array.isArray(list) && list.length > 0)
-  if (hasExistingKeys) ensureVirtualTrackers()
+  const existing = timelineController.keyframes?.value || []
+  if (Array.isArray(existing) && existing.length > 0) ensureVirtualTrackers()
 }
 
 watch(virtualTrackersEnabled, v => {
@@ -466,53 +444,37 @@ function resetVirtualTrackers() {
   } catch {}
 }
 
-function handleTimelineAddAll() {
-  ensureVirtualTrackers()
-  try {
-    const time = timelineController.currentTime.value
-    timelineController.addSnapshotAtTime(time)
-    timelineController.applyCurrentPose()
-  } catch {}
-}
-
 function ensureVirtualTrackers() {
   if (virtualTrackersEnabled.value) return
   virtualTrackersEnabled.value = true
   try { trackerController.setEnabled(true) } catch {}
 }
 
-function getTrackerByKey(key) {
-  return trackerController?.trackers?.value?.find(t => t.key === key)
-}
-
 function handleTimelineAddKey(payload) {
-  if (!payload?.trackerKey) return
   ensureVirtualTrackers()
   try {
-    const targetTime = Number.isFinite(payload.time) ? payload.time : timelineController.currentTime.value
-    if (Number.isFinite(payload.time)) timelineController.setCurrentTime(payload.time)
-    const tracker = getTrackerByKey(payload.trackerKey)
-    if (!tracker?.mesh) return
-    timelineController.addKeyframe({
-      trackerKey: payload.trackerKey,
-      time: targetTime,
-      position: tracker.mesh.position
-    })
+    const targetTime = payload && Number.isFinite(payload.time)
+      ? payload.time
+      : timelineController.currentTime.value
+    if (Number.isFinite(payload?.time)) timelineController.setCurrentTime(payload.time)
+    timelineController.addSnapshotAtTime(targetTime)
     timelineController.applyCurrentPose()
   } catch {}
 }
 
 function handleTimelineRemoveKey(payload) {
-  if (!payload?.trackerKey || !payload?.keyframeId) return
+  const keyId = payload && Number.isFinite(payload.keyframeId) ? payload.keyframeId : payload
+  if (!Number.isFinite(keyId)) return
   try {
-    timelineController.removeKeyframe(payload.trackerKey, payload.keyframeId)
+    timelineController.removeKeyframe(keyId)
     timelineController.applyCurrentPose()
   } catch {}
 }
 
-function handleTimelineMoveKey({ trackerKey, keyframeId, time }) {
+function handleTimelineMoveKey({ keyframeId, time }) {
+  if (!Number.isFinite(keyframeId)) return
   try {
-    timelineController.updateKeyframe(trackerKey, keyframeId, { time })
+    timelineController.updateKeyframe(keyframeId, { time })
   } catch {}
 }
 
@@ -553,42 +515,6 @@ function handleTimelineToggleLoop() {
 
 function handleTimelineRange({ startFrame, endFrame }) {
   try { timelineController.setRangeFromFrames(startFrame, endFrame) } catch {}
-}
-
-function handleAddMarker(time) {
-  try {
-    const marker = timelineController.addMarker({ time })
-    if (!marker) return
-    const fps = timelineFrameRate.value || 60
-    const frame = Math.round((marker.time - timelineStartTime.value) * fps)
-    const displayLabel = marker.label && marker.label.length > 0 ? marker.label : `t=${marker.time.toFixed(3)}s`
-    pushToast(`マーカーを追加: ${displayLabel} (frame ${frame})`, 'タイムライン', 2600)
-  } catch {}
-}
-
-function handleUpdateMarker({ id, time, label }) {
-  try { timelineController.updateMarker(id, { time, label }) } catch {}
-}
-
-function handleRemoveMarker(id) {
-  try { timelineController.removeMarker(id) } catch {}
-}
-
-function handleSelectKeyframes(ids) {
-  selectedTimelineKeys.value = ids
-}
-
-function handleTimelineUpdateKey(payload) {
-  if (!payload || !payload.trackerKey || !payload.keyframeId) return
-  try {
-    const { trackerKey, keyframeId } = payload
-    const updatePayload = {}
-    if (Number.isFinite(payload.time)) updatePayload.time = payload.time
-    if (Array.isArray(payload.value)) updatePayload.value = payload.value
-    timelineController.updateKeyframe(trackerKey, keyframeId, updatePayload)
-  } catch (error) {
-    if (import.meta.env.DEV) console.error('Failed to update keyframe', error)
-  }
 }
 
 function handleTimelineRequestImport() {
@@ -900,21 +826,8 @@ onUnmounted(() => {
   background: linear-gradient(180deg, rgba(20, 24, 32, 0.92), rgba(16, 18, 24, 0.94));
 }
 
-.workspace-panel__body--timeline :deep(.timeline__channel-header) {
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.workspace-panel__body--timeline :deep(.timeline__channel-body) {
-  background: rgba(0, 0, 0, 0.18);
-}
-
 .workspace-panel__body--timeline :deep(.timeline__playhead) {
   background: linear-gradient(180deg, rgba(255, 96, 54, 0.95), rgba(255, 176, 98, 0.85));
-}
-
-.workspace-panel__body--timeline :deep(.timeline__marker) {
-  background: linear-gradient(180deg, rgba(90, 150, 255, 0.9), rgba(58, 110, 220, 0.95));
 }
 
 .workspace-panel__body--timeline :deep(.timeline__selection) {

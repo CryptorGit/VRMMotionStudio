@@ -1,3 +1,4 @@
+/* legacy timeline implementation retained for reference.
 import { computed, ref, reactive, watch } from 'vue'
 import * as THREE from 'three'
 
@@ -539,6 +540,657 @@ export function useTimeline({ trackers }) {
     updateKeyframe,
     updateKeyframeTime,
     clearTrack,
+    clearAll,
+    getTrackAtTime,
+    applyCurrentPose,
+    importKeyframes,
+    exportKeyframes,
+    serialize,
+    deserialize,
+    restoreState
+  }
+}
+
+*/
+
+import { computed, reactive, ref, watch } from 'vue'
+import * as THREE from 'three'
+
+let nextKeyframeId = 1
+let nextMarkerId = 1
+const TIMELINE_SERIAL_VERSION = 2
+const STORAGE_KEY_STATE = 'timeline.state.v2'
+const LEGACY_STORAGE_KEYS = ['timeline.state.v1']
+
+let saveTimer = null
+let restoringState = false
+
+function clonePosition(pos) {
+  if (!pos) return [0, 0, 0]
+  if (Array.isArray(pos)) return pos.slice(0, 3)
+  if (pos.isVector3) return [pos.x, pos.y, pos.z]
+  if (pos instanceof THREE.Vector3) return [pos.x, pos.y, pos.z]
+  return [Number(pos?.x) || 0, Number(pos?.y) || 0, Number(pos?.z) || 0]
+}
+
+function lerpVector(a, b, t) {
+  const out = [0, 0, 0]
+  for (let i = 0; i < 3; i++) {
+    const av = Array.isArray(a) ? a[i] : a?.[i]
+    const bv = Array.isArray(b) ? b[i] : b?.[i]
+    out[i] = (av ?? 0) + ((bv ?? 0) - (av ?? 0)) * t
+  }
+  return out
+}
+
+function sanitizeSnapshotValues(values, trackers, lastAppliedValues) {
+  const result = {}
+  const source = values && typeof values === 'object' ? values : {}
+  const trackerList = trackers?.value || []
+  const knownKeys = new Set()
+
+  for (const tracker of trackerList) {
+    if (!tracker?.key) continue
+    const key = tracker.key
+    knownKeys.add(key)
+    if (source[key]) {
+      result[key] = clonePosition(source[key])
+      continue
+    }
+    if (tracker.mesh?.position) {
+      result[key] = clonePosition(tracker.mesh.position)
+      continue
+    }
+    if (lastAppliedValues[key]) {
+      result[key] = clonePosition(lastAppliedValues[key])
+      continue
+    }
+    result[key] = [0, 0, 0]
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (!knownKeys.has(key)) {
+      result[key] = clonePosition(value)
+    }
+  }
+
+  return result
+}
+
+function interpolateSnapshots(aValues, bValues, t, trackers) {
+  const result = {}
+  const trackerList = trackers?.value || []
+  const keys = new Set([
+    ...Object.keys(aValues || {}),
+    ...Object.keys(bValues || {}),
+    ...trackerList.map(item => item.key).filter(Boolean)
+  ])
+
+  for (const key of keys) {
+    const start = aValues?.[key]
+    const end = bValues?.[key]
+    if (!start && !end) continue
+    if (!start) {
+      result[key] = clonePosition(end)
+      continue
+    }
+    if (!end) {
+      result[key] = clonePosition(start)
+      continue
+    }
+    result[key] = lerpVector(start, end, t)
+  }
+
+  return result
+}
+
+function sampleLegacyTrack(frames, time) {
+  if (!Array.isArray(frames) || frames.length === 0) return null
+  const sorted = [...frames].sort((a, b) => (a.time || 0) - (b.time || 0))
+  if (time <= sorted[0].time) return clonePosition(sorted[0].value)
+  const last = sorted[sorted.length - 1]
+  if (time >= last.time) return clonePosition(last.value)
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i]
+    const b = sorted[i + 1]
+    if (time >= a.time && time <= b.time) {
+      const span = b.time - a.time || 1
+      const alpha = (time - a.time) / span
+      return lerpVector(a.value, b.value, alpha)
+    }
+  }
+  return clonePosition(last.value)
+}
+
+function convertLegacySnapshot(snapshot, trackers, lastAppliedValues) {
+  const tracks = snapshot?.tracks
+  if (!tracks || typeof tracks !== 'object') return []
+  const timelineKeys = new Set()
+  for (const list of Object.values(tracks)) {
+    if (!Array.isArray(list)) continue
+    for (const frame of list) {
+      if (!Number.isFinite(frame?.time)) continue
+      timelineKeys.add(Number(frame.time))
+    }
+  }
+  const times = Array.from(timelineKeys).sort((a, b) => a - b)
+  return times.map(time => {
+    const values = {}
+    for (const [key, frames] of Object.entries(tracks)) {
+      const sampled = sampleLegacyTrack(frames, time)
+      if (sampled) values[key] = sampled
+    }
+    return {
+      id: nextKeyframeId++,
+      time,
+      values: sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+    }
+  })
+}
+
+export function useTimeline({ trackers }) {
+  const startTime = ref(0)
+  const endTime = ref(30)
+  const currentTime = ref(0)
+  const isPlaying = ref(false)
+  const loopPlayback = ref(false)
+  const frameRate = ref(60)
+  const keyframes = ref([])
+  const lastAppliedValues = reactive({})
+  const markers = ref([])
+
+  let lastStepTime = performance.now()
+
+  function clampTime(time) {
+    if (!Number.isFinite(time)) return startTime.value
+    return Math.min(Math.max(time, startTime.value), endTime.value)
+  }
+
+  function scheduleSave() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
+    if (restoringState) return
+    if (saveTimer !== null) return
+    saveTimer = window.setTimeout(() => {
+      saveTimer = null
+      persistState()
+    }, 150)
+  }
+
+  function persistState() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
+    try {
+      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(serialize()))
+    } catch {}
+  }
+
+  function restoreState() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
+    const keys = [STORAGE_KEY_STATE, ...LEGACY_STORAGE_KEYS]
+    for (const key of keys) {
+      try {
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        const parsed = JSON.parse(raw)
+        const ok = deserialize(parsed, { skipSave: true })
+        if (ok) {
+          if (key !== STORAGE_KEY_STATE) scheduleSave()
+          return true
+        }
+      } catch (error) {
+        if (import.meta?.env?.DEV) {
+          console.warn('Failed to restore timeline state', error)
+        }
+      }
+    }
+    return false
+  }
+
+  const duration = computed(() => Math.max(0, endTime.value - startTime.value))
+
+  function captureCurrentSnapshot() {
+    const values = {}
+    const trackerList = trackers?.value || []
+    for (const tracker of trackerList) {
+      if (!tracker?.key) continue
+      values[tracker.key] = clonePosition(tracker.mesh?.position)
+    }
+    return sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+  }
+
+  function addKeyframe({ time, values }) {
+    const entry = {
+      id: nextKeyframeId++,
+      time: clampTime(time),
+      values: sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+    }
+    keyframes.value = [...keyframes.value, entry].sort((a, b) => a.time - b.time)
+    Object.assign(lastAppliedValues, entry.values)
+    scheduleSave()
+    return entry
+  }
+
+  function addSnapshotAtTime(time) {
+    const snapshot = captureCurrentSnapshot()
+    return addKeyframe({ time, values: snapshot })
+  }
+
+  function removeKeyframe(id) {
+    const next = keyframes.value.filter(frame => frame.id !== id)
+    if (next.length === keyframes.value.length) return
+    keyframes.value = next
+    scheduleSave()
+    applyCurrentPose()
+  }
+
+  function updateKeyframe(id, payload = {}) {
+    let changed = false
+    const nextFrames = keyframes.value.map(frame => {
+      if (frame.id !== id) return frame
+      const updated = { ...frame }
+      if (payload.time !== undefined && Number.isFinite(payload.time)) {
+        const clamped = clampTime(payload.time)
+        if (Math.abs(clamped - updated.time) > 1e-6) {
+          updated.time = clamped
+          changed = true
+        }
+      }
+      if (payload.values && typeof payload.values === 'object') {
+        updated.values = sanitizeSnapshotValues(payload.values, trackers, lastAppliedValues)
+        changed = true
+      }
+      return updated
+    })
+    if (!changed) return keyframes.value.find(frame => frame.id === id) || null
+    keyframes.value = nextFrames.sort((a, b) => a.time - b.time)
+    scheduleSave()
+    applyCurrentPose()
+    return keyframes.value.find(frame => frame.id === id) || null
+  }
+
+  function updateKeyframeTime(id, nextTime) {
+    if (!Number.isFinite(nextTime)) return
+    updateKeyframe(id, { time: nextTime })
+  }
+
+  function clearAll() {
+    keyframes.value = []
+    markers.value = []
+    scheduleSave()
+    applyCurrentPose()
+  }
+
+  function findFrameRange(time) {
+    const frames = keyframes.value
+    if (!frames.length) return { previous: null, next: null }
+    if (frames.length === 1) return { previous: frames[0], next: frames[0] }
+    const clamped = clampTime(time)
+    if (clamped <= frames[0].time) return { previous: frames[0], next: frames[0] }
+    const last = frames[frames.length - 1]
+    if (clamped >= last.time) return { previous: last, next: last }
+    for (let i = 1; i < frames.length; i++) {
+      const current = frames[i]
+      const previous = frames[i - 1]
+      if (clamped <= current.time) {
+        return { previous, next: current }
+      }
+    }
+    return { previous: last, next: last }
+  }
+
+  function cloneSnapshot(values) {
+    const result = {}
+    for (const [key, value] of Object.entries(values || {})) {
+      result[key] = clonePosition(value)
+    }
+    return result
+  }
+
+  function getSnapshotAtTime(time) {
+    const frames = keyframes.value
+    if (!frames.length) return null
+    const { previous, next } = findFrameRange(time)
+    if (!previous && !next) return null
+    if (!previous) return cloneSnapshot(next.values)
+    if (!next) return cloneSnapshot(previous.values)
+    if (previous === next || Math.abs(next.time - previous.time) < 1e-6) {
+      return cloneSnapshot(previous.values)
+    }
+    const span = next.time - previous.time || 1
+    const alpha = (clampTime(time) - previous.time) / span
+    return interpolateSnapshots(previous.values, next.values, alpha, trackers)
+  }
+
+  function getTrackAtTime(trackerKey, time) {
+    const snapshot = getSnapshotAtTime(time)
+    return snapshot?.[trackerKey] ? clonePosition(snapshot[trackerKey]) : null
+  }
+
+  function applyPoseAt(time) {
+    const snapshot = getSnapshotAtTime(time)
+    if (!snapshot) return
+    const trackerList = trackers?.value || []
+    for (const tracker of trackerList) {
+      if (!tracker?.key || !tracker?.mesh?.position) continue
+      const value = snapshot[tracker.key]
+      if (!value) continue
+      const cached = lastAppliedValues[tracker.key]
+      if (cached && cached[0] === value[0] && cached[1] === value[1] && cached[2] === value[2]) continue
+      tracker.mesh.position.set(value[0], value[1], value[2])
+      lastAppliedValues[tracker.key] = clonePosition(value)
+    }
+  }
+
+  function applyCurrentPose() {
+    applyPoseAt(currentTime.value)
+  }
+
+  function step() {
+    const now = performance.now()
+    const delta = (now - lastStepTime) / 1000
+    lastStepTime = now
+    if (isPlaying.value) {
+      let next = currentTime.value + delta
+      const rangeEnd = endTime.value
+      const rangeStart = startTime.value
+      if (loopPlayback.value && duration.value > 0) {
+        if (next > rangeEnd) {
+          const span = duration.value
+          const overflow = (next - rangeStart) % span
+          next = rangeStart + overflow
+        }
+      } else if (next >= rangeEnd) {
+        next = rangeEnd
+        isPlaying.value = false
+      }
+      currentTime.value = clampTime(next)
+    }
+    applyCurrentPose()
+  }
+
+  function setCurrentTime(time) {
+    currentTime.value = clampTime(time)
+    applyCurrentPose()
+    lastStepTime = performance.now()
+  }
+
+  function play() {
+    if (currentTime.value >= endTime.value) currentTime.value = startTime.value
+    isPlaying.value = true
+    lastStepTime = performance.now()
+  }
+
+  function pause() {
+    isPlaying.value = false
+  }
+
+  function stop() {
+    isPlaying.value = false
+    setCurrentTime(startTime.value)
+  }
+
+  function setDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return
+    endTime.value = startTime.value + seconds
+    if (currentTime.value > endTime.value) currentTime.value = endTime.value
+    scheduleSave()
+  }
+
+  function setFrameRate(fps) {
+    if (!Number.isFinite(fps) || fps <= 0) return
+    frameRate.value = fps
+    scheduleSave()
+  }
+
+  function setRange(start, end) {
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return
+    const s = Math.min(start, end)
+    const e = Math.max(start, end)
+    if (e === s) return
+    startTime.value = s
+    endTime.value = e
+    if (currentTime.value < s) currentTime.value = s
+    if (currentTime.value > e) currentTime.value = e
+    scheduleSave()
+  }
+
+  function setRangeFromFrames(startFrame, endFrame) {
+    if (!Number.isFinite(startFrame) || !Number.isFinite(endFrame)) return
+    const s = Math.min(startFrame, endFrame)
+    const e = Math.max(startFrame, endFrame)
+    if (e === s) return
+    const fps = frameRate.value || 60
+    setRange(s / fps, e / fps)
+  }
+
+  function stepByFrames(deltaFrames) {
+    if (!Number.isFinite(deltaFrames)) return
+    const fps = frameRate.value || 60
+    const offset = deltaFrames / fps
+    setCurrentTime(currentTime.value + offset)
+  }
+
+  function jumpToFrame(frame) {
+    if (!Number.isFinite(frame)) return
+    const fps = frameRate.value || 60
+    const time = frame / fps
+    setCurrentTime(time)
+  }
+
+  function addMarker({ time, label }) {
+    if (!Number.isFinite(time)) return null
+    const safeLabel = typeof label === 'string' ? label.trim() : ''
+    const entry = {
+      id: nextMarkerId++,
+      time: clampTime(time),
+      label: safeLabel
+    }
+    markers.value = [...markers.value, entry].sort((a, b) => a.time - b.time)
+    scheduleSave()
+    return entry
+  }
+
+  function updateMarker(id, payload) {
+    let changed = false
+    markers.value = markers.value
+      .map(marker => {
+        if (marker.id !== id) return marker
+        const next = { ...marker }
+        if (payload?.time !== undefined && Number.isFinite(payload.time)) {
+          const clamped = clampTime(payload.time)
+          if (clamped !== marker.time) {
+            next.time = clamped
+            changed = true
+          }
+        }
+        if (payload?.label !== undefined) {
+          const safe = typeof payload.label === 'string' ? payload.label.trim() : ''
+          if (safe !== marker.label) {
+            next.label = safe
+            changed = true
+          }
+        }
+        return next
+      })
+      .sort((a, b) => a.time - b.time)
+    if (changed) scheduleSave()
+  }
+
+  function removeMarker(id) {
+    const next = markers.value.filter(marker => marker.id !== id)
+    if (next.length === markers.value.length) return
+    markers.value = next
+    scheduleSave()
+  }
+
+  function importKeyframes(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return
+    let entries = Array.isArray(snapshot.keyframes) ? snapshot.keyframes : null
+    if (!entries && snapshot.tracks) {
+      entries = convertLegacySnapshot(snapshot, trackers, lastAppliedValues)
+    }
+    if (!Array.isArray(entries)) return
+    let maxId = 0
+    keyframes.value = entries
+      .map(entry => {
+        let id = Number(entry.id)
+        if (!Number.isFinite(id) || id <= 0) id = ++maxId
+        else maxId = Math.max(maxId, id)
+        const time = Number(entry.time)
+        return {
+          id,
+          time: Number.isFinite(time) ? clampTime(time) : startTime.value,
+          values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues)
+        }
+      })
+      .sort((a, b) => a.time - b.time)
+    nextKeyframeId = Math.max(maxId + 1, Number(snapshot?.nextIds?.keyframe) || maxId + 1)
+    scheduleSave()
+    applyCurrentPose()
+  }
+
+  function exportKeyframes() {
+    return keyframes.value.map(frame => ({
+      id: frame.id,
+      time: frame.time,
+      values: cloneSnapshot(frame.values)
+    }))
+  }
+
+  function serialize() {
+    const frames = exportKeyframes()
+    const markerList = markers.value.map(marker => ({
+      id: marker.id,
+      time: marker.time,
+      label: marker.label
+    }))
+
+    return {
+      version: TIMELINE_SERIAL_VERSION,
+      frameRate: frameRate.value,
+      startTime: startTime.value,
+      endTime: endTime.value,
+      currentTime: currentTime.value,
+      loop: loopPlayback.value,
+      nextIds: {
+        keyframe: Math.max(nextKeyframeId, frames.reduce((max, frame) => Math.max(max, frame.id), 0) + 1),
+        marker: Math.max(nextMarkerId, markerList.reduce((max, marker) => Math.max(max, marker.id), 0) + 1)
+      },
+      keyframes: frames,
+      markers: markerList
+    }
+  }
+
+  function deserialize(snapshot, { skipSave = false } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false
+    restoringState = true
+    try {
+      const version = Number(snapshot.version) || TIMELINE_SERIAL_VERSION
+      if (version > TIMELINE_SERIAL_VERSION && import.meta?.env?.DEV) {
+        console.warn('Timeline snapshot version is newer than supported:', version)
+      }
+
+      if (Number.isFinite(snapshot.frameRate) && snapshot.frameRate > 0) {
+        frameRate.value = snapshot.frameRate
+      }
+
+      let newStart = Number(snapshot.startTime)
+      let newEnd = Number(snapshot.endTime)
+      if (!Number.isFinite(newStart)) newStart = 0
+      if (!Number.isFinite(newEnd)) newEnd = newStart + 30
+      if (newEnd <= newStart) newEnd = newStart + 1
+      startTime.value = newStart
+      endTime.value = newEnd
+
+      loopPlayback.value = !!snapshot.loop
+
+      nextKeyframeId = Number(snapshot?.nextIds?.keyframe) || 1
+      nextMarkerId = Number(snapshot?.nextIds?.marker) || 1
+
+      if (Array.isArray(snapshot.keyframes) || snapshot.tracks) {
+        importKeyframes(snapshot)
+      } else {
+        keyframes.value = []
+      }
+
+      if (Array.isArray(snapshot.markers)) {
+        let maxMarkerId = 0
+        markers.value = snapshot.markers
+          .map(marker => {
+            let id = Number(marker.id)
+            if (!Number.isFinite(id) || id <= 0) id = ++maxMarkerId
+            else maxMarkerId = Math.max(maxMarkerId, id)
+            const rawTime = Number(marker.time)
+            const time = Number.isFinite(rawTime) ? rawTime : startTime.value
+            return {
+              id,
+              time: clampTime(time),
+              label: typeof marker.label === 'string' ? marker.label : `Marker ${id}`
+            }
+          })
+          .sort((a, b) => a.time - b.time)
+        nextMarkerId = Math.max(maxMarkerId + 1, nextMarkerId)
+      } else {
+        markers.value = []
+      }
+
+      if (Number.isFinite(snapshot.currentTime)) {
+        setCurrentTime(clampTime(snapshot.currentTime))
+      } else {
+        setCurrentTime(startTime.value)
+      }
+    } catch (error) {
+      if (import.meta?.env?.DEV) {
+        console.error('Failed to deserialize timeline snapshot', error)
+      }
+      return false
+    } finally {
+      restoringState = false
+    }
+
+    applyCurrentPose()
+    if (!skipSave) scheduleSave()
+    return true
+  }
+
+  watch(currentTime, () => {
+    applyCurrentPose()
+  })
+
+  watch(loopPlayback, () => {
+    scheduleSave()
+  })
+
+  restoreState()
+
+  return {
+    startTime,
+    endTime,
+    duration,
+    frameRate,
+    currentTime,
+    isPlaying,
+    loopPlayback,
+    keyframes,
+    markers,
+    step,
+    play,
+    pause,
+    stop,
+    setCurrentTime,
+    setDuration,
+    setFrameRate,
+    setRange,
+    setRangeFromFrames,
+    stepByFrames,
+    jumpToFrame,
+    addMarker,
+    updateMarker,
+    removeMarker,
+    addKeyframe,
+    addSnapshotAtTime,
+    removeKeyframe,
+    updateKeyframe,
+    updateKeyframeTime,
     clearAll,
     getTrackAtTime,
     applyCurrentPose,

@@ -22,7 +22,12 @@
           <Icon icon="mdi:ruler" />
           <span>Snap</span>
         </button>
-        <button type="button" class="toolbar__button" @click="fitRange" :title="tooltip('タイムラインの全範囲を表示します')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="fitRange"
+          :title="tooltip('タイムラインの全範囲を表示します')"
+        >
           <Icon icon="mdi:magnify-scan" />
           <span>範囲フィット</span>
         </button>
@@ -39,11 +44,11 @@
         <button
           type="button"
           class="toolbar__button"
-          @click="emit('add-all-keyframes')"
-          :title="tooltip('現在のフレームに全トラッカーのキーを追加します')"
+          @click="emit('add-keyframe', { time: props.currentTime })"
+          :title="tooltip('現在のフレームにキーを追加します')"
         >
           <Icon icon="mdi:animation" />
-          <span>全キー</span>
+          <span>キー追加</span>
         </button>
       </div>
 
@@ -66,15 +71,30 @@
           <Icon icon="mdi:step-backward" />
           <span>-1</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('play')" :title="tooltip('再生します')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('play')"
+          :title="tooltip('再生します')"
+        >
           <Icon icon="mdi:play" />
           <span>Play</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('pause')" :title="tooltip('一時停止します')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('pause')"
+          :title="tooltip('一時停止します')"
+        >
           <Icon icon="mdi:pause" />
           <span>Pause</span>
         </button>
-        <button type="button" class="toolbar__button" @click="emit('stop')" :title="tooltip('停止して開始位置へ戻ります')">
+        <button
+          type="button"
+          class="toolbar__button"
+          @click="emit('stop')"
+          :title="tooltip('停止して開始位置へ戻ります')"
+        >
           <Icon icon="mdi:stop" />
           <span>Stop</span>
         </button>
@@ -159,10 +179,10 @@
     </header>
 
     <div class="timeline__header">
-      <div class="timeline__label-placeholder"></div>
       <div
         class="timeline__ticks-wrapper"
         ref="ticksWrapperRef"
+        @scroll="handleTicksScroll"
         @wheel="handleHeaderWheel"
       >
         <div class="timeline__ticks" :style="ticksStyle">
@@ -170,9 +190,20 @@
             v-for="tick in ticks"
             :key="tick.id"
             class="timeline__tick"
+            :class="{ 'timeline__tick--major': tick.major }"
             :style="{ left: `${tick.x}px` }"
+            :title="tick.label"
           >
-            <span>{{ tick.label }}</span>
+            <div v-if="tick.showLabel" class="timeline__tick-label">
+              <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
+              <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
+            </div>
+          </div>
+          <div class="timeline__playhead timeline__playhead--header" :style="playheadStyle" aria-hidden="true"></div>
+          <div class="timeline__current-frame" :style="playheadStyle">
+            <div class="timeline__current-frame-indicator">
+              <span>{{ currentFrameLabel }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -184,171 +215,47 @@
         ref="tracksWrapperRef"
         @scroll="handleTracksScroll"
         @pointerdown="handlePointerDown"
-        @wheel="handleTrackWheel"
+        @wheel="handleWheel"
       >
-        <div class="timeline__tracks" :style="tracksStyle">
-          <div
-            v-if="(props.trackers?.length || 0) === 0"
-            class="timeline__empty-state"
-          >
-            <Icon icon="mdi:account-location-outline" class="timeline__empty-icon" />
-            <div>
-              <p>バーチャルトラッカーを有効にするとキーを編集できます。</p>
-              <p class="timeline__empty-sub">設定サイドバーの「バーチャルトラッカー」をONにしてください。</p>
-            </div>
-          </div>
-          <div
-            v-else-if="!hasTimelineContent"
-            class="timeline__empty-state"
-          >
-            <Icon icon="mdi:timeline-clock-outline" class="timeline__empty-icon" />
-            <div>
-              <p>まだキーがありません。</p>
-              <p class="timeline__empty-sub">タイムライン上をダブルクリックするか「全キー」ボタンでポーズを保存できます。</p>
-            </div>
-          </div>
-          <div class="timeline__memory" :style="memoryStyle"></div>
-          <div class="timeline__grid" :style="gridStyle">
-            <div class="timeline__channel timeline__channel--markers">
-              <div class="timeline__channel-header">Markers</div>
-              <div class="timeline__channel-body" @dblclick.stop="addMarkerFromEvent">
-                <div
-                  v-for="marker in visibleMarkers"
-                  :key="marker.id"
-                  class="timeline__marker"
-                  :style="{ left: `${timeToX(marker.time)}px` }"
-                  @pointerdown.stop.prevent="startMarkerDrag($event, marker)"
-                  @dblclick.stop.prevent="editMarker(marker)"
-                  :title="tooltip(marker.label || markerTitle(marker))"
-                >
-                  <span>{{ marker.label || markerTitle(marker) }}</span>
-                </div>
-                <div v-if="visibleMarkers.length === 0" class="timeline__markers-empty">
-                  <span>ダブルクリックでマーカーを追加</span>
-                </div>
-              </div>
-            </div>
-
+        <div class="timeline__content" :style="contentStyle">
+          <div class="timeline__gridlines" aria-hidden="true">
             <div
-              v-for="tracker in props.trackers"
-              :key="tracker.key"
-              class="timeline__channel"
-            >
-              <div class="timeline__channel-header">
-                <span>{{ tracker.label || tracker.key }}</span>
-                <button
-                  type="button"
-                  class="channel__add"
-                  @click.stop="emit('add-keyframe', { trackerKey: tracker.key, time: props.currentTime })"
-                  :title="tooltip('現在のフレームにキーを追加します')"
-                >
-                  ＋
-                </button>
-              </div>
-              <div class="timeline__channel-body" :data-tracker="tracker.key">
-                <template v-for="frame in visibleKeyframes(tracker.key)" :key="frame.id">
-                  <div
-                    class="timeline__keyframe"
-                    :class="{ 'is-selected': selectedKeyframes.has(`${tracker.key}:${frame.id}`) }"
-                    :style="{ left: `${timeToX(frame.time)}px`, background: keyColor(tracker.key) }"
-                    @pointerdown.stop.prevent="startKeyframeDrag($event, tracker.key, frame)"
-                    @dblclick.stop.prevent="openInspector($event, tracker.key, frame)"
-                    :title="tooltip(keyTitle(frame))"
-                  ></div>
-                </template>
-              </div>
-            </div>
+              v-for="tick in ticks"
+              :key="`grid-${tick.id}`"
+              class="timeline__gridline"
+              :class="{ 'timeline__gridline--major': tick.major }"
+              :style="{ left: `${tick.x}px` }"
+            ></div>
           </div>
-          <div class="timeline__playhead" :style="playheadStyle"></div>
+
+          <div class="timeline__memory" :style="memoryStyle"></div>
+
+          <div v-if="!hasTimelineContent" class="timeline__empty">
+            <Icon icon="mdi:timeline-clock-outline" class="timeline__empty-icon" />
+            <p class="timeline__empty-title">まだキーがありません</p>
+            <p class="timeline__empty-sub">時間軸上をダブルクリックするか「キー追加」で現在のポーズを保存できます。</p>
+          </div>
+
+          <div class="timeline__keys">
+            <div
+              v-for="frame in visibleFrames"
+              :key="frame.id"
+              class="timeline__keyframe"
+              :class="{ 'is-selected': selectedKeyframes.has(frame.id) }"
+              :style="{ left: `${timeToX(frame.time)}px` }"
+              @pointerdown.stop.prevent="startKeyframeDrag($event, frame)"
+              @contextmenu.prevent="emit('remove-keyframe', { keyframeId: frame.id })"
+              :title="tooltip(keyTitle(frame))"
+            ></div>
+          </div>
+
+          <div class="timeline__playhead timeline__playhead--body" :style="playheadStyle" aria-hidden="true"></div>
           <div v-if="selectionRange" class="timeline__selection" :style="selectionStyle"></div>
         </div>
-        <transition name="inspector-pop">
-          <div
-            v-if="inspectorVisible"
-            ref="inspectorRef"
-            class="timeline__inspector-popover"
-            :class="`timeline__inspector-popover--${inspectorPosition.placement}`"
-            :style="inspectorStyle"
-            role="dialog"
-            aria-label="キーインスペクター"
-            @pointerdown.stop
-          >
-            <div class="inspector__header">
-              <div class="inspector__title">
-                <strong>{{ inspectorTrackerLabel }}</strong>
-                <span v-if="inspectorState.keyframeId">#{{ inspectorState.keyframeId }}</span>
-              </div>
-              <button type="button" class="inspector__close" @click="closeInspector" aria-label="インスペクターを閉じる">
-                <Icon icon="mdi:close" />
-              </button>
-            </div>
-            <div class="inspector__grid">
-              <label class="inspector__field">
-                <span>Frame</span>
-                <input
-                  type="number"
-                  v-model.number="inspectorState.frame"
-                  @change="commitInspectorFrame"
-                  @keydown.enter.prevent="commitInspectorFrame"
-                  @blur="commitInspectorFrame"
-                />
-              </label>
-              <label class="inspector__field">
-                <span>秒</span>
-                <input
-                  type="number"
-                  step="0.001"
-                  v-model.number="inspectorState.time"
-                  @change="commitInspectorTime"
-                  @keydown.enter.prevent="commitInspectorTime"
-                  @blur="commitInspectorTime"
-                />
-              </label>
-              <label class="inspector__field">
-                <span>X</span>
-                <input
-                  type="number"
-                  step="0.001"
-                  v-model.number="inspectorState.x"
-                  @change="commitInspectorValues"
-                  @keydown.enter.prevent="commitInspectorValues"
-                  @blur="commitInspectorValues"
-                />
-              </label>
-              <label class="inspector__field">
-                <span>Y</span>
-                <input
-                  type="number"
-                  step="0.001"
-                  v-model.number="inspectorState.y"
-                  @change="commitInspectorValues"
-                  @keydown.enter.prevent="commitInspectorValues"
-                  @blur="commitInspectorValues"
-                />
-              </label>
-              <label class="inspector__field">
-                <span>Z</span>
-                <input
-                  type="number"
-                  step="0.001"
-                  v-model.number="inspectorState.z"
-                  @change="commitInspectorValues"
-                  @keydown.enter.prevent="commitInspectorValues"
-                  @blur="commitInspectorValues"
-                />
-              </label>
-              <button type="button" class="inspector__delete" @click="deleteInspectorKeyframe">
-                <Icon icon="mdi:delete" />
-                <span>削除</span>
-              </button>
-            </div>
-          </div>
-        </transition>
       </div>
     </div>
 
     <div class="timeline__scrollbar">
-      <div class="timeline__label-placeholder"></div>
       <div
         class="timeline__scrollbar-track"
         ref="scrollbarWrapperRef"
@@ -362,16 +269,14 @@
 
 <script setup>
 import { Icon } from '@iconify/vue'
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCaptions } from '../../composables/useCaptions.js'
 
-const LABEL_WIDTH = 180
-const MIN_VIEW_DURATION = 0.1
+const MIN_VIEW_DURATION_EPSILON = 1e-6
+const EDGE_MARGIN_RATIO = 0.05
 
 const props = defineProps({
-  trackers: { type: Array, default: () => [] },
-  keyframes: { type: Object, required: true },
-  markers: { type: Array, default: () => [] },
+  keyframes: { type: Array, default: () => [] },
   currentTime: { type: Number, required: true },
   startTime: { type: Number, required: true },
   endTime: { type: Number, required: true },
@@ -391,17 +296,11 @@ const emit = defineEmits([
   'jump-start',
   'jump-end',
   'toggle-loop',
-  'add-marker',
-  'update-marker',
-  'remove-marker',
   'add-keyframe',
   'remove-keyframe',
   'move-keyframe',
-  'add-all-keyframes',
   'update-range',
   'update:snap',
-  'select-keyframes',
-  'update-keyframe',
   'request-import',
   'export-timeline',
   'clear-timeline'
@@ -409,90 +308,42 @@ const emit = defineEmits([
 
 const { tooltip } = useCaptions()
 
-const STORAGE_KEY_VIEW = 'timeline.view'
-const STORAGE_KEY_MODE = 'timeline.view.mode'
-
 const timelineRef = ref(null)
 const tracksWrapperRef = ref(null)
 const ticksWrapperRef = ref(null)
 const scrollbarWrapperRef = ref(null)
+
 const widthPx = ref(1)
 const mode = ref('time')
 const viewStart = ref(0)
-const visibleDuration = ref(MIN_VIEW_DURATION)
-const snapToFrame = ref(props.snap)
+const visibleDuration = ref(1)
+const snapToFrame = ref(props.snap !== false)
 const selectionRange = ref(null)
 const selectedKeyframes = ref(new Set())
 const startFrameInput = ref(0)
 const endFrameInput = ref(0)
 
-const inspectorVisible = ref(false)
-const inspectorState = reactive({
-  trackerKey: '',
-  keyframeId: null,
-  time: 0,
-  frame: 0,
-  x: 0,
-  y: 0,
-  z: 0
-})
+const STORAGE_KEY_VIEW = 'timeline.view.v2'
+const STORAGE_KEY_MODE = 'timeline.view.mode'
 
-const inspectorRef = ref(null)
-const inspectorAnchorTime = ref(0)
-const inspectorPosition = reactive({
-  left: 0,
-  top: 0,
-  placement: 'above'
-})
+const keyframesList = computed(() => (Array.isArray(props.keyframes) ? props.keyframes : []))
+const hasTimelineContent = computed(() => keyframesList.value.length > 0)
 
-const trackerLabelMap = computed(() => {
-  const map = {}
-  for (const tracker of props.trackers || []) {
-    if (!tracker?.key) continue
-    map[tracker.key] = tracker.label || tracker.key
-  }
-  return map
-})
+const frameDuration = computed(() => 1 / Math.max(props.frameRate || 60, 1))
+const minViewDuration = computed(() => Math.max(frameDuration.value, MIN_VIEW_DURATION_EPSILON))
 
-const inspectorFrame = computed(() => {
-  if (!inspectorVisible.value || !inspectorState.trackerKey || inspectorState.keyframeId == null) {
-    return null
-  }
-  const frames = props.keyframes?.[inspectorState.trackerKey] || []
-  return frames.find(item => item.id === inspectorState.keyframeId) || null
-})
-
-const inspectorTrackerLabel = computed(() => {
-  if (!inspectorVisible.value) return ''
-  return trackerLabelMap.value[inspectorState.trackerKey] || inspectorState.trackerKey
-})
-
-const inspectorStyle = computed(() => ({
-  left: `${inspectorPosition.left}px`,
-  top: `${inspectorPosition.top}px`
-}))
-
-const hasTimelineContent = computed(() => {
-  const tracks = props.keyframes || {}
-  const hasFrames = Object.values(tracks).some(list => Array.isArray(list) && list.length > 0)
-  const hasMarkers = Array.isArray(props.markers) && props.markers.length > 0
-  return hasFrames || hasMarkers
-})
-
-let resizeObserver
-let resizeRaf = null
-let syncingScroll = false
-let dragState = null
-
-const totalDuration = computed(() => Math.max(props.endTime - props.startTime, MIN_VIEW_DURATION))
-const viewEnd = computed(() => Math.min(viewStart.value + visibleDuration.value, props.endTime))
-const pixelsPerSecond = computed(() => widthPx.value / visibleDuration.value)
-const contentWidth = computed(() => Math.max(totalDuration.value * pixelsPerSecond.value, widthPx.value))
+const baseDuration = computed(() => Math.max(props.endTime - props.startTime, minViewDuration.value))
+const marginSpan = computed(() => baseDuration.value * EDGE_MARGIN_RATIO)
+const extendedStart = computed(() => props.startTime - marginSpan.value)
+const extendedEnd = computed(() => props.endTime + marginSpan.value)
+const extendedDuration = computed(() => Math.max(extendedEnd.value - extendedStart.value, minViewDuration.value))
+const viewEnd = computed(() => viewStart.value + visibleDuration.value)
+const pixelsPerSecond = computed(() => widthPx.value / Math.max(visibleDuration.value, minViewDuration.value))
+const contentExtent = computed(() => Math.max(extendedDuration.value, visibleDuration.value))
+const contentWidth = computed(() => Math.max(contentExtent.value * pixelsPerSecond.value, widthPx.value + 1))
 
 const timelineStyle = computed(() => {
-  const style = {
-    '--timeline-label-width': `${LABEL_WIDTH}px`
-  }
+  const style = {}
   if (props.height === null || props.height === undefined) {
     style.height = '100%'
   } else if (typeof props.height === 'number') {
@@ -504,52 +355,59 @@ const timelineStyle = computed(() => {
 })
 
 const ticksStyle = computed(() => ({
+  width: `${contentWidth.value}px`,
+  minWidth: `${Math.max(widthPx.value + 1, 1)}px`
+}))
+
+const contentStyle = computed(() => ({
   width: `${contentWidth.value}px`
 }))
 
-const tracksStyle = computed(() => ({
-  width: `${LABEL_WIDTH + contentWidth.value}px`
-}))
-
-const gridStyle = computed(() => ({
-  width: `${LABEL_WIDTH + contentWidth.value}px`
-}))
-
 const playheadStyle = computed(() => ({
-  left: `${LABEL_WIDTH + timeToX(props.currentTime)}px`
+  left: `${timeToX(props.currentTime)}px`
 }))
+
+const currentFrameLabel = computed(() => {
+  const fps = props.frameRate || 60
+  const startFrame = Math.round(props.startTime * fps)
+  const frameNumber = startFrame + Math.round((props.currentTime - props.startTime) * fps)
+  return Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(frameNumber)
+})
 
 const selectionStyle = computed(() => {
   if (!selectionRange.value) return {}
   const start = Math.min(selectionRange.value.start, selectionRange.value.end)
   const end = Math.max(selectionRange.value.start, selectionRange.value.end)
   return {
-    left: `${LABEL_WIDTH + timeToX(start)}px`,
+    left: `${timeToX(start)}px`,
     width: `${Math.max(1, timeToX(end) - timeToX(start))}px`
   }
 })
 
 const memoryStyle = computed(() => {
   const clamped = clampTime(props.currentTime)
-  const width = Math.max(0, timeToX(clamped))
+  const startX = timeToX(props.startTime)
+  const endX = timeToX(clamped)
   return {
-    left: `${LABEL_WIDTH}px`,
-    width: `${width}px`
+    left: `${startX}px`,
+    width: `${Math.max(0, endX - startX)}px`
   }
 })
 
-const visibleMarkers = computed(() => {
-  const margin = Math.max(0.05, visibleDuration.value * 0.05)
-  return props.markers.filter(
-    marker => marker.time >= viewStart.value - margin && marker.time <= viewEnd.value + margin
-  )
+const visibleFrames = computed(() => {
+  const items = keyframesList.value
+  if (!items.length) return []
+  const margin = Math.max(minViewDuration.value, visibleDuration.value * 0.1)
+  return items.filter(frame => frame.time >= viewStart.value - margin && frame.time <= viewEnd.value + margin)
 })
 
 const ticks = computed(() => {
-  const approxTickPx = 80
-  const approxStep = approxTickPx / pixelsPerSecond.value
+  const approxTickPx = 60
+  const pxPerSecond = pixelsPerSecond.value || 1
+  const approxStep = approxTickPx / pxPerSecond
   const fps = props.frameRate || 60
-  const steps = [
+  const startFrame = Math.round(props.startTime * fps)
+  const stepCandidates = [
     1 / fps,
     2 / fps,
     5 / fps,
@@ -560,23 +418,51 @@ const ticks = computed(() => {
     5,
     10,
     20,
-    50,
-    100,
-    150,
+    30,
+    60,
+    120,
     300,
     600,
     1200,
     3600
   ]
-  let step = steps.find(s => s >= approxStep) || steps[steps.length - 1]
+  let step = stepCandidates.find(s => s >= approxStep) || stepCandidates[stepCandidates.length - 1]
   if (mode.value === 'frames' && step < 1 / fps) step = 1 / fps
+
+  const timeMajorSteps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
+  const frameMajorSteps = [1, 2, 5, 10, 20, 30, 60, 120, 240]
+
+  let majorStep
+  if (mode.value === 'frames') {
+    const frameStep = Math.max(1, Math.round(step * fps))
+    const chosenFrames = frameMajorSteps.find(opt => opt >= frameStep) || frameMajorSteps[frameMajorSteps.length - 1]
+    majorStep = chosenFrames / fps
+  } else {
+    const target = step * 4
+    const chosenSeconds = timeMajorSteps.find(opt => opt >= target) || timeMajorSteps[timeMajorSteps.length - 1]
+    majorStep = chosenSeconds
+  }
+  majorStep = Math.max(majorStep, step)
+
   const first = Math.floor(viewStart.value / step) * step
+  const firstMajor = Math.floor(viewStart.value / majorStep) * majorStep
+
   const arr = []
   for (let t = first; t <= viewEnd.value + step; t += step) {
+    const snapped = Math.round((t - firstMajor) / majorStep)
+    const nearestMajor = firstMajor + snapped * majorStep
+    const isMajor = Math.abs(nearestMajor - t) < step * 0.6
+    const frameNumber = startFrame + Math.round((t - props.startTime) * fps)
+    const timeLabel = formatTimeLabel(t)
+    const frameLabel = formatFrameLabel(frameNumber)
     arr.push({
       id: `tick-${t.toFixed(6)}`,
       x: timeToX(t),
-      label: formatTick(t)
+      label: `${timeLabel} | ${frameLabel}`,
+      timeLabel,
+      frameLabel,
+      major: isMajor,
+      showLabel: isMajor
     })
   }
   return arr
@@ -588,7 +474,7 @@ const modeIcon = computed(() => (mode.value === 'time' ? 'mdi:timeline-clock-out
 watch(
   () => props.snap,
   value => {
-    snapToFrame.value = value
+    snapToFrame.value = value !== false
   }
 )
 
@@ -612,15 +498,11 @@ watch(
   { immediate: true }
 )
 
-watch(
-  [viewStart, visibleDuration],
-  () => {
-    clampView()
-    saveViewState()
-    nextTick(() => syncScrollPositions())
-  },
-  { flush: 'post' }
-)
+watch([viewStart, visibleDuration], () => {
+  clampView()
+  saveViewState()
+  nextTick(() => syncScrollPositions())
+})
 
 watch(mode, value => {
   try {
@@ -628,46 +510,10 @@ watch(mode, value => {
   } catch {}
 })
 
-watch(inspectorFrame, frame => {
-  if (!inspectorVisible.value) return
-  if (!frame) {
-    closeInspector()
-    return
-  }
-  setInspectorFromFrame(inspectorState.trackerKey, frame)
-  scheduleInspectorLayout()
+watch(minViewDuration, () => {
+  clampView()
+  syncScrollPositions()
 })
-
-watch(
-  () => inspectorState.time,
-  value => {
-    const numeric = Number(value)
-    if (Number.isFinite(numeric)) {
-      inspectorAnchorTime.value = clampTime(numeric)
-    }
-    scheduleInspectorLayout()
-  }
-)
-
-watch(selectedKeyframes, set => {
-  if (!inspectorVisible.value) return
-  if (!set || typeof set.has !== 'function') return
-  const currentId = `${inspectorState.trackerKey}:${inspectorState.keyframeId}`
-  if (!set.has(currentId)) closeInspector()
-})
-
-watch(
-  () => inspectorVisible.value,
-  value => {
-    if (value) scheduleInspectorLayout()
-  }
-)
-
-watch(() => visibleDuration.value, scheduleInspectorLayout)
-watch(() => viewStart.value, scheduleInspectorLayout)
-watch(() => widthPx.value, scheduleInspectorLayout)
-watch(() => props.startTime, scheduleInspectorLayout)
-watch(() => props.endTime, scheduleInspectorLayout)
 
 onMounted(() => {
   restoreViewState()
@@ -675,6 +521,10 @@ onMounted(() => {
     const savedMode = localStorage.getItem(STORAGE_KEY_MODE)
     if (savedMode === 'time' || savedMode === 'frames') mode.value = savedMode
   } catch {}
+  if (!snapToFrame.value) {
+    snapToFrame.value = true
+    emit('update:snap', true)
+  }
   nextTick(() => syncScrollPositions())
 })
 
@@ -684,11 +534,19 @@ onUnmounted(() => {
   if (resizeRaf !== null) cancelAnimationFrame(resizeRaf)
 })
 
+let resizeObserver
+let resizeRaf = null
+let syncingScroll = false
+let dragState = null
+
 function clampView() {
-  const total = totalDuration.value
-  visibleDuration.value = Math.min(Math.max(visibleDuration.value, MIN_VIEW_DURATION), total)
-  const maxStart = props.endTime - visibleDuration.value
-  viewStart.value = Math.min(Math.max(viewStart.value, props.startTime), maxStart)
+  visibleDuration.value = Math.min(
+    Math.max(visibleDuration.value, minViewDuration.value),
+    extendedDuration.value
+  )
+  const minStart = extendedStart.value
+  const maxStart = Math.max(minStart, extendedEnd.value - visibleDuration.value)
+  viewStart.value = Math.min(Math.max(viewStart.value, minStart), maxStart)
 }
 
 function saveViewState() {
@@ -701,8 +559,8 @@ function saveViewState() {
 }
 
 function restoreViewState() {
-  viewStart.value = props.startTime
-  visibleDuration.value = Math.max(props.endTime - props.startTime, MIN_VIEW_DURATION)
+  viewStart.value = extendedStart.value
+  visibleDuration.value = extendedDuration.value
   try {
     const saved = localStorage.getItem(STORAGE_KEY_VIEW)
     if (!saved) return
@@ -746,7 +604,7 @@ watch(
 
 function syncScrollPositions(source) {
   if (!tracksWrapperRef.value) return
-  const offset = Math.max(0, (viewStart.value - props.startTime) * pixelsPerSecond.value)
+  const offset = Math.max(0, (viewStart.value - extendedStart.value) * pixelsPerSecond.value)
   const assignScroll = el => {
     if (!el) return
     if (Math.abs(el.scrollLeft - offset) > 0.5) {
@@ -754,26 +612,18 @@ function syncScrollPositions(source) {
     }
   }
   syncingScroll = true
-  if (source !== 'tracks') {
-    assignScroll(tracksWrapperRef.value)
-  }
-  if (ticksWrapperRef.value && source !== 'ticks') {
-    assignScroll(ticksWrapperRef.value)
-  }
-  if (scrollbarWrapperRef.value && source !== 'scrollbar') {
-    assignScroll(scrollbarWrapperRef.value)
-  }
-  scheduleInspectorLayout()
+  if (source !== 'tracks') assignScroll(tracksWrapperRef.value)
+  if (ticksWrapperRef.value && source !== 'ticks') assignScroll(ticksWrapperRef.value)
+  if (scrollbarWrapperRef.value && source !== 'scrollbar') assignScroll(scrollbarWrapperRef.value)
   requestAnimationFrame(() => {
     syncingScroll = false
   })
 }
 
 function handleTracksScroll(event) {
-  scheduleInspectorLayout()
   if (syncingScroll) return
   const target = event.target
-  const newStart = props.startTime + target.scrollLeft / pixelsPerSecond.value
+  const newStart = extendedStart.value + target.scrollLeft / pixelsPerSecond.value
   if (Math.abs(newStart - viewStart.value) < 1e-4) return
   viewStart.value = newStart
   clampView()
@@ -783,11 +633,21 @@ function handleTracksScroll(event) {
 function handleScrollbarScroll(event) {
   if (syncingScroll) return
   const target = event.target
-  const newStart = props.startTime + target.scrollLeft / pixelsPerSecond.value
+  const newStart = extendedStart.value + target.scrollLeft / pixelsPerSecond.value
   if (Math.abs(newStart - viewStart.value) < 1e-4) return
   viewStart.value = newStart
   clampView()
   syncScrollPositions('scrollbar')
+}
+
+function handleTicksScroll(event) {
+  if (syncingScroll) return
+  const target = event.target
+  const newStart = extendedStart.value + target.scrollLeft / pixelsPerSecond.value
+  if (Math.abs(newStart - viewStart.value) < 1e-4) return
+  viewStart.value = newStart
+  clampView()
+  syncScrollPositions('ticks')
 }
 
 function handleHeaderWheel(event) {
@@ -796,33 +656,34 @@ function handleHeaderWheel(event) {
   const rect = ticksWrapperRef.value?.getBoundingClientRect()
   const scrollLeft = tracksWrapperRef.value?.scrollLeft || 0
   const x = rect ? Math.max(0, event.clientX - rect.left) : widthPx.value / 2
-  const pivot = clampTime(props.startTime + (scrollLeft + x) / pixelsPerSecond.value)
+  const pivot = clampViewTime(extendedStart.value + (scrollLeft + x) / pixelsPerSecond.value)
   zoomAt(pivot, factor)
 }
 
-function handleTrackWheel(event) {
-  if (event.ctrlKey || event.metaKey) {
-    const rect = tracksWrapperRef.value?.getBoundingClientRect()
-    const scrollLeft = tracksWrapperRef.value?.scrollLeft || 0
-    const x = rect ? Math.max(0, event.clientX - rect.left - LABEL_WIDTH) : widthPx.value / 2
-    const pivot = clampTime(props.startTime + (scrollLeft + x) / pixelsPerSecond.value)
-    const factor = event.deltaY > 0 ? 1.1 : 0.9
-    zoomAt(pivot, factor)
+function handleWheel(event) {
+  if (!tracksWrapperRef.value) return
+  const rect = tracksWrapperRef.value.getBoundingClientRect()
+  const scrollLeft = tracksWrapperRef.value.scrollLeft
+  const x = Math.max(0, event.clientX - rect.left)
+
+  if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && Math.abs(event.deltaX) > 0) {
+    tracksWrapperRef.value.scrollLeft += event.deltaX
     event.preventDefault()
     return
   }
-  if (!tracksWrapperRef.value) return
-  const horizontalIntent = event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)
-  if (horizontalIntent) {
-    const delta = Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY
-    tracksWrapperRef.value.scrollLeft += delta
-    event.preventDefault()
-  }
+
+  const pivot = clampViewTime(extendedStart.value + (scrollLeft + x) / pixelsPerSecond.value)
+  const baseFactor = event.deltaY > 0 ? 1.1 : 0.9
+  const factor = event.shiftKey ? Math.pow(baseFactor, 2) : baseFactor
+  zoomAt(pivot, factor)
+  event.preventDefault()
 }
 
 function zoomAt(pivot, factor) {
-  const total = totalDuration.value
-  const nextDuration = Math.min(Math.max(visibleDuration.value * factor, MIN_VIEW_DURATION), total)
+  const nextDuration = Math.min(
+    Math.max(visibleDuration.value * factor, minViewDuration.value),
+    extendedDuration.value
+  )
   const ratio = (pivot - viewStart.value) / visibleDuration.value || 0
   visibleDuration.value = nextDuration
   viewStart.value = pivot - nextDuration * ratio
@@ -835,8 +696,8 @@ function stepFrames(delta) {
 }
 
 function fitRange() {
-  visibleDuration.value = totalDuration.value
-  viewStart.value = props.startTime
+  visibleDuration.value = extendedDuration.value
+  viewStart.value = extendedStart.value
   clampView()
   syncScrollPositions()
 }
@@ -847,7 +708,7 @@ function zoomToSelection() {
   const end = Math.max(selectionRange.value.start, selectionRange.value.end)
   if (end <= start) return
   viewStart.value = start
-  visibleDuration.value = Math.max(end - start, MIN_VIEW_DURATION)
+  visibleDuration.value = Math.max(end - start, minViewDuration.value)
   clampView()
   syncScrollPositions()
 }
@@ -868,38 +729,41 @@ function commitRange() {
 }
 
 function timeToX(time) {
-  return (time - props.startTime) * pixelsPerSecond.value
+  return (time - extendedStart.value) * pixelsPerSecond.value
+}
+
+function clampViewTime(time) {
+  return Math.min(Math.max(time, extendedStart.value), extendedEnd.value)
 }
 
 function clampTime(time) {
   return Math.min(Math.max(time, props.startTime), props.endTime)
 }
 
+function snapTimeToFrame(time) {
+  const duration = frameDuration.value
+  if (duration <= 0) return time
+  return Math.round(time / duration) * duration
+}
+
 function snapIfNeeded(time) {
   if (!snapToFrame.value) return time
-  const fps = props.frameRate || 60
-  const frame = Math.round(time * fps)
-  return frame / fps
+  return snapTimeToFrame(time)
 }
 
-function visibleKeyframes(trackerKey) {
-  const items = props.keyframes?.[trackerKey] || []
-  const margin = Math.max(0.05, visibleDuration.value * 0.1)
-  return items.filter(
-    frame => frame.time >= viewStart.value - margin && frame.time <= viewEnd.value + margin
-  )
+function formatTimeLabel(time) {
+  if (!Number.isFinite(time)) return ''
+  const relative = time - props.startTime
+  const sign = relative < 0 ? '-' : ''
+  const abs = Math.abs(relative)
+  let decimals = 2
+  if (abs >= 10) decimals = 1
+  if (abs >= 60) decimals = 0
+  return `${sign}${abs.toFixed(decimals)}s`
 }
 
-function formatTick(time) {
-  if (mode.value === 'frames') {
-    const relative = time - props.startTime
-    return Math.round(relative * props.frameRate)
-  }
-  const totalSeconds = Math.max(time - props.startTime, 0)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  const frames = Math.round((totalSeconds - Math.floor(totalSeconds)) * props.frameRate)
-  return `${minutes}:${seconds.toString().padStart(2, '0')}.${frames.toString().padStart(2, '0')}`
+function formatFrameLabel(frameNumber) {
+  return `F${frameNumber}`
 }
 
 function getPointerInfo(event) {
@@ -908,18 +772,14 @@ function getPointerInfo(event) {
   }
   const rect = tracksWrapperRef.value.getBoundingClientRect()
   const scrollLeft = tracksWrapperRef.value.scrollLeft
-  let x = event.clientX - rect.left - LABEL_WIDTH
+  let x = event.clientX - rect.left
   x = Math.max(0, x)
-  const time = clampTime(props.startTime + (scrollLeft + x) / pixelsPerSecond.value)
+  const absoluteTime = extendedStart.value + (scrollLeft + x) / pixelsPerSecond.value
+  const time = clampTime(absoluteTime)
   return { time, x }
 }
 
 function handlePointerDown(event) {
-  if (inspectorVisible.value) {
-    const keyHit = event.target?.closest?.('.timeline__keyframe')
-    const markerHit = event.target?.closest?.('.timeline__marker')
-    if (!keyHit && !markerHit) closeInspector()
-  }
   if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
     startPan(event)
     return
@@ -950,12 +810,9 @@ function handlePointerMove(event) {
     selectionRange.value = { start: dragState.anchorTime, end: time }
   } else if (dragState.type === 'pan') {
     const deltaSeconds = event.movementX / pixelsPerSecond.value
-    viewStart.value = clampTime(viewStart.value - deltaSeconds)
+    viewStart.value = clampViewTime(viewStart.value - deltaSeconds)
     clampView()
     syncScrollPositions()
-  } else if (dragState.type === 'marker') {
-    const { time } = getPointerInfo(event)
-    emit('update-marker', { id: dragState.marker.id, time: snapIfNeeded(time) })
   } else if (dragState.type === 'keyframe') {
     const { time } = getPointerInfo(event)
     const targetTime = clampTime(time - dragState.offset)
@@ -963,8 +820,7 @@ function handlePointerMove(event) {
     if (Math.abs(snapped - dragState.lastTime) > 1e-5) {
       dragState.lastTime = snapped
       emit('move-keyframe', {
-        trackerKey: dragState.trackerKey,
-        keyframeId: dragState.frameId,
+        keyframeId: dragState.keyId,
         time: snapped
       })
     }
@@ -1003,259 +859,32 @@ function finalizeSelection() {
   if (end - start < 1 / (props.frameRate * 10)) {
     selectionRange.value = null
     selectedKeyframes.value = new Set()
-    emit('select-keyframes', [])
     return
   }
   const collected = new Set()
-  for (const tracker of props.trackers) {
-    const frames = props.keyframes?.[tracker.key] || []
-    frames.forEach(frame => {
-      if (frame.time >= start && frame.time <= end) {
-        collected.add(`${tracker.key}:${frame.id}`)
-      }
-    })
-  }
+  keyframesList.value.forEach(frame => {
+    if (frame.time >= start && frame.time <= end) {
+      collected.add(frame.id)
+    }
+  })
   selectedKeyframes.value = collected
-  emit('select-keyframes', Array.from(collected))
 }
 
 function clearSelection() {
   if (!selectionRange.value && selectedKeyframes.value.size === 0) return
   selectionRange.value = null
   selectedKeyframes.value = new Set()
-  emit('select-keyframes', [])
-  if (inspectorVisible.value) closeInspector()
 }
 
-function closeInspector() {
-  inspectorVisible.value = false
-  inspectorState.trackerKey = ''
-  inspectorState.keyframeId = null
-}
-
-function setInspectorFromFrame(trackerKey, frame) {
-  inspectorState.trackerKey = trackerKey
-  inspectorState.keyframeId = frame.id
-  const time = clampTime(Number(frame.time) || props.startTime)
-  inspectorState.time = time
-  inspectorState.frame = Math.round(time * (props.frameRate || 60))
-  const value = Array.isArray(frame.value) ? frame.value : [0, 0, 0]
-  inspectorState.x = Number(value[0]) || 0
-  inspectorState.y = Number(value[1]) || 0
-  inspectorState.z = Number(value[2]) || 0
-  inspectorAnchorTime.value = time
-}
-
-function openInspector(event, trackerKey, frame) {
-  if (!frame) return
-  const id = `${trackerKey}:${frame.id}`
-  if (!selectedKeyframes.value.has(id)) {
-    selectedKeyframes.value = new Set([id])
-    emit('select-keyframes', [id])
-  }
-  setInspectorFromFrame(trackerKey, frame)
-  inspectorVisible.value = true
-  const anchorEl = event?.currentTarget || null
-  nextTick(() => {
-    updateInspectorPosition(anchorEl)
-    const firstField = inspectorRef.value?.querySelector('input')
-    if (firstField && typeof firstField.focus === 'function') {
-      try {
-        firstField.focus({ preventScroll: true })
-      } catch {
-        firstField.focus()
-      }
-    }
-  })
-}
-
-function scheduleInspectorLayout() {
-  if (!inspectorVisible.value) return
-  nextTick(() => updateInspectorPosition())
-}
-
-function updateInspectorPosition(anchorSource) {
-  if (!inspectorVisible.value) return
-  const scrollArea = tracksWrapperRef.value
-  if (!scrollArea) return
-
-  const inspectorEl = inspectorRef.value
-  const viewportWidth = scrollArea.clientWidth || 0
-  const viewportHeight = scrollArea.clientHeight || 0
-  const scrollLeft = scrollArea.scrollLeft || 0
-  const scrollTop = scrollArea.scrollTop || 0
-  const inspectorWidth = inspectorEl?.offsetWidth || 280
-  const inspectorHeight = inspectorEl?.offsetHeight || 200
-
-  const anchorTime = inspectorAnchorTime.value
-  const anchorX = LABEL_WIDTH + (anchorTime - props.startTime) * pixelsPerSecond.value
-  let left = anchorX - scrollLeft - inspectorWidth / 2
-  const minLeft = 12
-  const maxLeft = Math.max(minLeft, viewportWidth - inspectorWidth - 12)
-  if (left < minLeft) left = minLeft
-  if (left > maxLeft) left = maxLeft
-
-  const scrollRect = scrollArea.getBoundingClientRect()
-  let targetRect = null
-  if (anchorSource) {
-    if (typeof anchorSource.getBoundingClientRect === 'function') {
-      targetRect = anchorSource.getBoundingClientRect()
-    } else if (anchorSource?.currentTarget && typeof anchorSource.currentTarget.getBoundingClientRect === 'function') {
-      targetRect = anchorSource.currentTarget.getBoundingClientRect()
-    }
-  }
-  if (!targetRect && typeof window !== 'undefined') {
-    const trackerKey = inspectorState.trackerKey || ''
-    if (trackerKey) {
-      const escape = window.CSS?.escape || (value => String(value).replace(/(["\\])/g, '\\$1'))
-      const selector = `.timeline__channel-body[data-tracker="${escape(trackerKey)}"]`
-      const rowEl = scrollArea.querySelector(selector)
-      if (rowEl) targetRect = rowEl.getBoundingClientRect()
-    }
-  }
-
-  let rowCenter = viewportHeight / 2 + scrollTop
-  if (targetRect) {
-    rowCenter = targetRect.top - scrollRect.top + scrollTop + targetRect.height / 2
-  }
-
-  let top = rowCenter - scrollTop - inspectorHeight - 16
-  let placement = 'above'
-  if (top < 12) {
-    top = rowCenter - scrollTop + 16
-    placement = 'below'
-  }
-  const maxTop = Math.max(12, viewportHeight - inspectorHeight - 12)
-  if (top > maxTop) top = maxTop
-  if (top < 12) top = 12
-
-  inspectorPosition.left = left
-  inspectorPosition.top = top
-  inspectorPosition.placement = placement
-}
-
-function commitInspectorFrame() {
-  if (!inspectorVisible.value) return
-  const fps = props.frameRate || 60
-  const numeric = Number(inspectorState.frame)
-  const clampedFrame = Math.max(0, Math.round(Number.isFinite(numeric) ? numeric : 0))
-  inspectorState.frame = clampedFrame
-  const time = clampTime(clampedFrame / fps)
-  inspectorState.time = time
-  emit('update-keyframe', {
-    trackerKey: inspectorState.trackerKey,
-    keyframeId: inspectorState.keyframeId,
-    time
-  })
-}
-
-function commitInspectorTime() {
-  if (!inspectorVisible.value) return
-  const numeric = Number(inspectorState.time)
-  const time = clampTime(Number.isFinite(numeric) ? numeric : props.startTime)
-  inspectorState.time = time
-  inspectorState.frame = Math.round(time * (props.frameRate || 60))
-  emit('update-keyframe', {
-    trackerKey: inspectorState.trackerKey,
-    keyframeId: inspectorState.keyframeId,
-    time
-  })
-}
-
-function commitInspectorValues() {
-  if (!inspectorVisible.value) return
-  const x = Number.isFinite(inspectorState.x) ? inspectorState.x : 0
-  const y = Number.isFinite(inspectorState.y) ? inspectorState.y : 0
-  const z = Number.isFinite(inspectorState.z) ? inspectorState.z : 0
-  inspectorState.x = x
-  inspectorState.y = y
-  inspectorState.z = z
-  emit('update-keyframe', {
-    trackerKey: inspectorState.trackerKey,
-    keyframeId: inspectorState.keyframeId,
-    value: [x, y, z]
-  })
-}
-
-function commitInspector(event) {
-  if (event?.preventDefault) event.preventDefault()
-  if (!inspectorVisible.value) return
-  const trackerKey = inspectorState.trackerKey
-  const keyframeId = inspectorState.keyframeId
-  if (!trackerKey || keyframeId == null) return
-
-  const fps = props.frameRate || 60
-  const frameNumeric = Number(inspectorState.frame)
-  const timeFromFrame = Number.isFinite(frameNumeric) ? clampTime(Math.max(0, frameNumeric) / fps) : null
-  const timeNumeric = Number(inspectorState.time)
-  let finalTime = Number.isFinite(timeNumeric) ? clampTime(timeNumeric) : null
-  if (finalTime == null && timeFromFrame != null) {
-    finalTime = timeFromFrame
-  } else if (finalTime != null && timeFromFrame != null && Math.abs(timeFromFrame - finalTime) > 1e-4) {
-    finalTime = timeFromFrame
-  }
-  if (finalTime == null) finalTime = clampTime(inspectorAnchorTime.value || props.startTime)
-
-  inspectorState.time = finalTime
-  inspectorState.frame = Math.round(finalTime * fps)
-  inspectorAnchorTime.value = finalTime
-
-  const x = Number.isFinite(inspectorState.x) ? inspectorState.x : 0
-  const y = Number.isFinite(inspectorState.y) ? inspectorState.y : 0
-  const z = Number.isFinite(inspectorState.z) ? inspectorState.z : 0
-  inspectorState.x = x
-  inspectorState.y = y
-  inspectorState.z = z
-
-  emit('update-keyframe', {
-    trackerKey,
-    keyframeId,
-    time: finalTime,
-    value: [x, y, z]
-  })
-}
-
-function deleteInspectorKeyframe() {
-  if (!inspectorVisible.value) return
-  emit('remove-keyframe', {
-    trackerKey: inspectorState.trackerKey,
-    keyframeId: inspectorState.keyframeId
-  })
-  clearSelection()
-}
-
-function addMarkerFromEvent(event) {
-  const { time } = getPointerInfo(event)
-  emit('add-marker', snapIfNeeded(time))
-}
-
-function editMarker(marker) {
-  const current = marker?.label ?? ''
-  const result = window.prompt('マーカー名を入力', current)
-  if (result === null) return
-  const next = result.trim()
-  emit('update-marker', { id: marker.id, label: next === '' ? current : next })
-}
-
-function startMarkerDrag(event, marker) {
-  dragState = { type: 'marker', marker }
-  window.addEventListener('pointermove', handlePointerMove)
-  window.addEventListener('pointerup', handlePointerUp)
-  event.preventDefault()
-}
-
-function startKeyframeDrag(event, trackerKey, frame) {
+function startKeyframeDrag(event, frame) {
   const { time } = getPointerInfo(event)
   const offset = time - frame.time
-  const id = `${trackerKey}:${frame.id}`
-  if (!event.shiftKey && !selectedKeyframes.value.has(id)) {
-    selectedKeyframes.value = new Set([id])
-    emit('select-keyframes', [id])
+  if (!event.shiftKey && !selectedKeyframes.value.has(frame.id)) {
+    selectedKeyframes.value = new Set([frame.id])
   }
   dragState = {
     type: 'keyframe',
-    trackerKey,
-    frameId: frame.id,
+    keyId: frame.id,
     offset,
     lastTime: frame.time
   }
@@ -1264,90 +893,79 @@ function startKeyframeDrag(event, trackerKey, frame) {
   event.preventDefault()
 }
 
-function keyColor(key) {
-  const palette = ['#70A2FF', '#5AD8A6', '#FFD666', '#FF7A45', '#9A7AFF']
-  let hash = 0
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0
-  }
-  return palette[hash % palette.length]
-}
-
 function keyTitle(frame) {
-  const value = Array.isArray(frame.value) ? frame.value : []
-  const [x, y, z] = [
-    Number(value[0]) || 0,
-    Number(value[1]) || 0,
-    Number(value[2]) || 0
-  ]
-  return `t=${frame.time.toFixed(3)}s\n(${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`
-}
-
-function markerTitle(marker) {
-  if (!marker) return ''
-  const time = Number(marker.time) || 0
-  const fps = props.frameRate || 60
-  const frame = Math.round((time - props.startTime) * fps)
-  return `t=${time.toFixed(3)}s • frame ${frame}`
+  return `t=${frame.time.toFixed(3)}s`
 }
 </script>
 
 <style scoped>
 .timeline {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   min-height: 0;
-  background: var(--surface-strong, rgba(20, 24, 33, 0.98));
+  background: radial-gradient(circle at top, rgba(32, 38, 52, 0.85), rgba(12, 15, 24, 0.96));
   color: var(--text-strong, #ffffff);
   border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  user-select: none;
+  -webkit-user-select: none;
+  --timeline-ruler-height: 46px;
+  --timeline-key-lane-height: 36px;
+  --timeline-playhead-color: #ff615a;
+}
+
+.timeline input,
+.timeline button,
+.timeline textarea,
+.timeline select {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .timeline__toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.4rem 0.75rem;
+  padding: 0.45rem 0.75rem;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
   background: var(--surface, rgba(24, 28, 38, 0.95));
+  position: sticky;
+  top: 0;
+  z-index: 6;
 }
 
 .toolbar__group {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-}
-
-.toolbar__group--left {
   flex-wrap: wrap;
 }
 
 .toolbar__group--center {
-  flex-grow: 1;
-  display: flex;
+  flex: 1 1 auto;
   justify-content: center;
-  gap: 0.5rem;
 }
 
 .toolbar__group--right {
-  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .toolbar__button {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: inherit;
   border-radius: 6px;
   padding: 0.3rem 0.55rem;
-  display: flex;
+  min-width: 44px;
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.15rem;
   font-size: 0.82rem;
   cursor: pointer;
-  gap: 0.15rem;
-  min-width: 44px;
-  transition: background 120ms ease, border 120ms ease;
+  transition: background 120ms ease, border 120ms ease, transform 120ms ease;
 }
 
 .toolbar__button:hover,
@@ -1355,7 +973,8 @@ function markerTitle(marker) {
 .toolbar__button[aria-pressed='true'] {
   outline: none;
   background: color-mix(in srgb, var(--accent, #2d8cff) 35%, rgba(255, 255, 255, 0.08));
-  border-color: color-mix(in srgb, var(--accent, #2d8cff) 50%, rgba(255, 255, 255, 0.08));
+  border-color: color-mix(in srgb, var(--accent, #2d8cff) 55%, rgba(255, 255, 255, 0.08));
+  transform: translateY(-1px);
 }
 
 .toolbar__button:disabled {
@@ -1364,7 +983,7 @@ function markerTitle(marker) {
 }
 
 .toolbar__button--secondary {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .toolbar__button--alert {
@@ -1381,65 +1000,154 @@ function markerTitle(marker) {
   display: flex;
   flex-direction: column;
   font-size: 0.7rem;
-  color: var(--text-muted, rgba(255, 255, 255, 0.65));
+  color: var(--text-muted, rgba(255, 255, 255, 0.72));
 }
 
 .toolbar__field input {
   margin-top: 0.15rem;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
   color: inherit;
-  width: 90px;
+  width: 88px;
 }
-
 .timeline__header {
-  display: grid;
-  grid-template-columns: var(--timeline-label-width) 1fr;
   position: relative;
-  height: 48px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.timeline__label-placeholder {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  background: rgba(20, 24, 33, 0.95);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  height: var(--timeline-ruler-height);
+  border-bottom: none;
+  background: linear-gradient(180deg, rgba(47, 54, 70, 0.92), rgba(20, 24, 33, 0.98));
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+  z-index: 5;
+  display: flex;
+  align-items: stretch;
 }
 
 .timeline__ticks-wrapper {
   position: relative;
+  width: 100%;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  background: var(--surface-strong, rgba(15, 19, 28, 0.96));
+}
+
+.timeline__ticks-wrapper::-webkit-scrollbar {
+  height: 0;
+}
+
+.timeline__ticks-wrapper {
+  scrollbar-width: none;
 }
 
 .timeline__ticks {
   position: relative;
   height: 100%;
+  padding: 10px 0 0;
 }
+
+.timeline__ticks::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(90, 146, 255, 0.32), rgba(255, 255, 255, 0.1));
+  pointer-events: none;
+}
+
+
 
 .timeline__tick {
   position: absolute;
-  bottom: 0;
+  top: 8px;
+  bottom: 6px;
   width: 1px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.16);
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-direction: column;
+  pointer-events: none;
 }
 
-.timeline__tick span {
-  transform: translateY(100%);
+.timeline__tick-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 6px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(17, 21, 31, 0.88);
+  color: rgba(240, 244, 255, 0.96);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  min-width: 48px;
+}
+
+.timeline__tick-label-time {
   font-size: 0.68rem;
-  margin-left: 4px;
-  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.timeline__tick-label-frame {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.8;
+  letter-spacing: 0.01em;
+}
+
+.timeline__tick::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-100%);
+  opacity: 0.6;
+}
+
+.timeline__tick--major {
+  width: 2px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.timeline__tick--major::before {
+  height: 18px;
+  background: rgba(255, 255, 255, 0.45);
+  opacity: 0.9;
+}
+
+.timeline__current-frame {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
+  z-index: 6;
+}
+
+.timeline__current-frame-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--timeline-playhead-color);
+  color: #0e1018;
+  font-weight: 700;
+  font-size: 0.72rem;
+  box-shadow: 0 0 18px rgba(255, 97, 90, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.timeline__current-frame-indicator span {
+  transform: translateY(1px);
 }
 
 .timeline__body {
@@ -1447,133 +1155,83 @@ function markerTitle(marker) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  background: linear-gradient(180deg, rgba(12, 16, 24, 0.92), rgba(8, 11, 18, 0.96));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .timeline__scroll-area {
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
-.timeline__tracks {
+.timeline__content {
   position: relative;
   min-height: 100%;
+  padding: 0 0 10px;
 }
 
-.timeline__empty-state {
+.timeline__gridlines {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  color: rgba(255, 255, 255, 0.78);
-  background: linear-gradient(180deg, rgba(18, 20, 28, 0.9), rgba(18, 20, 28, 0.95));
-  text-align: left;
-  padding: 1.5rem;
   pointer-events: none;
+  z-index: 0;
 }
 
-.timeline__empty-icon {
-  font-size: 2rem;
-  opacity: 0.75;
+
+.timeline__gridline {
+  position: absolute;
+  top: 0;
+  bottom: 10px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(0.5px);
 }
 
-.timeline__empty-sub {
-  font-size: 0.82rem;
-  opacity: 0.78;
-  margin-top: 0.2rem;
-}
-
-.timeline__grid {
-  position: relative;
-  display: grid;
-  grid-template-columns: var(--timeline-label-width) 1fr;
-  grid-auto-rows: minmax(48px, auto);
-  z-index: 1;
+.timeline__gridline--major {
+  width: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.32);
 }
 
 .timeline__memory {
   position: absolute;
   top: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #2d8cff) 14%, transparent), transparent 85%);
+  bottom: 10px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #2d8cff) 20%, transparent), transparent 80%);
   opacity: 0.35;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
+  border-radius: 4px 0 0 4px;
 }
 
-.timeline__channel {
-  display: contents;
-}
 
-.timeline__channel-header {
-  position: sticky;
-  left: 0;
+ 
+.timeline__keys {
+  position: relative;
+  min-height: var(--timeline-key-lane-height);
+  height: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 0.6rem;
-  font-size: 0.85rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  z-index: 2;
-}
-
-.timeline__channel-body {
-  position: relative;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.timeline__channel--markers .timeline__channel-header {
-  background: rgba(34, 36, 48, 0.85);
-  font-weight: 600;
-}
-
-.channel__add {
-  background: transparent;
-  border: none;
-  color: var(--accent, #2d8cff);
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.timeline__marker {
-  position: absolute;
-  top: 8px;
-  width: 12px;
-  height: 24px;
-  transform: translateX(-50%);
-  background: var(--accent, #2d8cff);
-  border-radius: 3px 3px 0 0;
-  cursor: pointer;
-  box-shadow: 0 0 8px rgba(45, 140, 255, 0.6);
-}
-
-.timeline__marker span {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.7rem;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 0 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-.timeline__markers-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  justify-content: flex-start;
+  padding: 10px 0;
+  z-index: 3;
   pointer-events: none;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: center;
+}
+
+.timeline__keys::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
 }
 
 .timeline__keyframe {
@@ -1582,191 +1240,115 @@ function markerTitle(marker) {
   transform: translate(-50%, -50%) rotate(45deg);
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 2px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--accent, #2d8cff) 82%, rgba(255, 255, 255, 0.08));
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  pointer-events: auto;
 }
 
 .timeline__keyframe:hover,
 .timeline__keyframe.is-selected {
   transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
-  box-shadow: 0 0 8px var(--accent, #2d8cff);
+  box-shadow: 0 0 12px rgba(45, 140, 255, 0.85);
+  background: color-mix(in srgb, var(--accent, #2d8cff) 90%, rgba(255, 255, 255, 0.3));
 }
 
 .timeline__playhead {
   position: absolute;
   top: 0;
-  bottom: 0;
+  bottom: 10px;
   width: 2px;
-  background: var(--accent, #2d8cff);
+  background: var(--timeline-playhead-color);
   pointer-events: none;
-  box-shadow: 0 0 12px rgba(45, 140, 255, 0.8);
+  box-shadow: 0 0 18px rgba(255, 97, 90, 0.55);
+  z-index: 5;
+  transform: translateX(-50%);
+}
+
+.timeline__playhead--header {
+  top: 0;
+  bottom: 0;
+  box-shadow: 0 0 12px rgba(255, 97, 90, 0.4);
+}
+
+.timeline__playhead--header::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: var(--timeline-playhead-color);
+  border-radius: 2px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 12px rgba(255, 97, 90, 0.45);
+}
+
+.timeline__playhead--body {
+  top: 2px;
+  bottom: 12px;
+  box-shadow: 0 0 18px rgba(255, 97, 90, 0.55);
 }
 
 .timeline__selection {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  background: color-mix(in srgb, var(--accent, #2d8cff) 25%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--accent, #2d8cff) 40%, transparent);
+  top: 6px;
+  bottom: 12px;
+  background: color-mix(in srgb, var(--accent, #2d8cff) 20%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent, #2d8cff) 45%, transparent);
+  border-radius: 4px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .timeline__scrollbar {
-  display: grid;
-  grid-template-columns: var(--timeline-label-width) 1fr;
   position: relative;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 14px;
+  background: rgba(10, 12, 20, 0.25);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
 }
 
 .timeline__scrollbar-track {
-  position: relative;
+  width: 100%;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  background: rgba(12, 16, 24, 0.18);
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.timeline__scrollbar-track::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.timeline__scrollbar-track::-webkit-scrollbar {
+  height: 8px;
+}
+
+.timeline__scrollbar-track::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 100px;
+}
+
+.timeline__scrollbar-track::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.34);
 }
 
 .timeline__scrollbar-spacer {
   height: 100%;
 }
 
-.timeline__inspector-popover {
-  position: absolute;
-  z-index: 8;
-  min-width: 260px;
-  max-width: 320px;
-  background: rgba(12, 16, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 0.85rem 1rem 1rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(14px);
-  pointer-events: auto;
-}
+@media (max-width: 960px) {
+  .toolbar__group--center {
+    justify-content: flex-start;
+  }
 
-.timeline__inspector-popover::before {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  transform: rotate(45deg);
-  left: 50%;
-  margin-left: -7px;
-  box-shadow: inherit;
-}
-
-.timeline__inspector-popover--above::before {
-  bottom: -7px;
-}
-
-.timeline__inspector-popover--below::before {
-  top: -7px;
-}
-
-.inspector__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.88);
-  margin-bottom: 0.6rem;
-}
-
-.inspector__title {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.inspector__title span {
-  font-size: 0.74rem;
-  opacity: 0.65;
-}
-
-.inspector__close {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.inspector__close:hover,
-.inspector__close:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.inspector__grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
-  gap: 0.65rem;
-  align-items: end;
-}
-
-.inspector__field {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.inspector__field input {
-  margin-top: 0.2rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 0.34rem 0.5rem;
-  color: inherit;
-}
-
-.inspector__field input:focus-visible {
-  outline: none;
-  border-color: rgba(45, 140, 255, 0.55);
-  box-shadow: 0 0 0 1px rgba(45, 140, 255, 0.35);
-}
-
-.inspector__delete {
-  align-self: stretch;
-  background: rgba(255, 90, 90, 0.18);
-  border: 1px solid rgba(255, 90, 90, 0.3);
-  color: rgba(255, 210, 210, 0.94);
-  border-radius: 8px;
-  padding: 0.48rem 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
-  transition: background 0.15s ease, border 0.15s ease;
-}
-
-.inspector__delete:hover,
-.inspector__delete:focus-visible {
-  background: rgba(255, 90, 90, 0.3);
-  border-color: rgba(255, 90, 90, 0.45);
-}
-
-.inspector-pop-enter-active,
-.inspector-pop-leave-active {
-  transition: opacity 0.15s ease, transform 0.18s ease;
-}
-
-.inspector-pop-enter-from,
-.inspector-pop-leave-to {
-  opacity: 0;
-  transform: translateY(6px);
-}
-
-@media (max-width: 1280px) {
-  .inspector__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .toolbar__button {
+    min-width: 38px;
   }
 }
 </style>
