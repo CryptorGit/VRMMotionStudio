@@ -42,6 +42,23 @@
       @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
       @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
     />
+    <CameraSection
+      v-else-if="active === 'camera'"
+      :camera-fov="cameraFov"
+      :camera-near="cameraNear"
+      :camera-far="cameraFar"
+      :camera-resolution-width="cameraResolutionWidth"
+      :camera-resolution-height="cameraResolutionHeight"
+      :show-camera-helper="showCameraHelper"
+      :capture-busy="captureBusy"
+      @update:cameraFov="v => emit('update:cameraFov', v)"
+      @update:cameraNear="v => emit('update:cameraNear', v)"
+      @update:cameraFar="v => emit('update:cameraFar', v)"
+      @update:cameraResolutionWidth="v => emit('update:cameraResolutionWidth', v)"
+      @update:cameraResolutionHeight="v => emit('update:cameraResolutionHeight', v)"
+      @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
+      @capture="() => emit('capture-camera')"
+    />
     <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
     <ModelSection
       v-else-if="active === 'model'"
@@ -65,6 +82,7 @@ import MorphSection from './MorphSection.vue'
 import ModelSection from './ModelSection.vue'
 import DisplaySection from './DisplaySection.vue'
 import PhysicsSection from './PhysicsSection.vue'
+import CameraSection from './CameraSection.vue'
 
 defineProps({
   ambient: Object,
@@ -88,6 +106,13 @@ defineProps({
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  cameraFov: { type: Number, required: true },
+  cameraNear: { type: Number, required: true },
+  cameraFar: { type: Number, required: true },
+  cameraResolutionWidth: { type: Number, required: true },
+  cameraResolutionHeight: { type: Number, required: true },
+  showCameraHelper: { type: Boolean, default: false },
+  captureBusy: { type: Boolean, default: false },
   active: { type: String, default: 'lighting' }
 })
 
@@ -109,6 +134,13 @@ const emit = defineEmits([
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
+  'update:cameraFov',
+  'update:cameraNear',
+  'update:cameraFar',
+  'update:cameraResolutionWidth',
+  'update:cameraResolutionHeight',
+  'update:showCameraHelper',
+  'capture-camera',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',

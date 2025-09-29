@@ -42,6 +42,13 @@
           :show-virtual-tracker-labels="showVirtualTrackerLabels"
           :virtual-tracker-size="virtualTrackerSize"
           :virtual-tracker-label-scale="virtualTrackerLabelScale"
+          :camera-fov="cameraFov"
+          :camera-near="cameraNear"
+          :camera-far="cameraFar"
+          :camera-resolution-width="cameraResolutionWidth"
+          :camera-resolution-height="cameraResolutionHeight"
+          :show-camera-helper="showCameraHelper"
+          :capture-busy="captureBusy"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
@@ -58,6 +65,13 @@
           @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
           @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
           @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
+          @update:cameraFov="v => emit('update:cameraFov', v)"
+          @update:cameraNear="v => emit('update:cameraNear', v)"
+          @update:cameraFar="v => emit('update:cameraFar', v)"
+          @update:cameraResolutionWidth="v => emit('update:cameraResolutionWidth', v)"
+          @update:cameraResolutionHeight="v => emit('update:cameraResolutionHeight', v)"
+          @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
+          @capture-camera="() => emit('capture-render')"
           @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
           @toggle-model="(...args) => emit('toggle-model', ...args)"
           @toggle-bone="(...args) => emit('toggle-bone', ...args)"
@@ -100,7 +114,14 @@ const props = defineProps({
   virtualTrackersEnabled: { type: Boolean, default: false },
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
-  virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  cameraFov: { type: Number, required: true },
+  cameraNear: { type: Number, required: true },
+  cameraFar: { type: Number, required: true },
+  cameraResolutionWidth: { type: Number, required: true },
+  cameraResolutionHeight: { type: Number, required: true },
+  showCameraHelper: { type: Boolean, default: false },
+  captureBusy: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -121,6 +142,13 @@ const emit = defineEmits([
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
+  'update:cameraFov',
+  'update:cameraNear',
+  'update:cameraFar',
+  'update:cameraResolutionWidth',
+  'update:cameraResolutionHeight',
+  'update:showCameraHelper',
+  'capture-render',
   'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
@@ -155,7 +183,14 @@ const {
   virtualTrackersEnabled,
   showVirtualTrackerLabels,
   virtualTrackerSize,
-  virtualTrackerLabelScale
+  virtualTrackerLabelScale,
+  cameraFov,
+  cameraNear,
+  cameraFar,
+  cameraResolutionWidth,
+  cameraResolutionHeight,
+  showCameraHelper,
+  captureBusy
 } = toRefs(props)
 </script>
 

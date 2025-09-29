@@ -91,15 +91,6 @@
       </div>
 
       <div class="toolbar__group toolbar__group--right">
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="toggleMode"
-          :title="tooltip(mode.value === 'time' ? 'フレーム表示に切り替えます' : '時間表示に切り替えます')"
-        >
-          <Icon :icon="modeIcon" />
-          <span>{{ modeLabel }}</span>
-        </button>
         <label class="toolbar__field">
           <span>Start</span>
           <input
@@ -168,11 +159,11 @@
             class="timeline__tick"
             :class="{ 'timeline__tick--major': tick.major }"
             :style="{ left: `${tick.x}px` }"
-            :title="tick.label"
+            :title="tick.frameLabel"
           >
             <div v-if="tick.showLabel" class="timeline__tick-label">
-              <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
               <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
+              <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
             </div>
           </div>
           <div class="timeline__playhead timeline__playhead--header" :style="playheadStyle" aria-hidden="true"></div>
@@ -205,12 +196,6 @@
           </div>
 
           <div class="timeline__memory" :style="memoryStyle"></div>
-
-          <div v-if="!hasTimelineContent" class="timeline__empty">
-            <Icon icon="mdi:timeline-clock-outline" class="timeline__empty-icon" />
-            <p class="timeline__empty-title">まだキーがありません</p>
-            <p class="timeline__empty-sub">時間軸上をダブルクリックするか「キー追加」で現在のポーズを保存できます。</p>
-          </div>
 
           <div class="timeline__keys">
             <div
@@ -292,7 +277,8 @@ const ticksWrapperRef = ref(null)
 const scrollbarWrapperRef = ref(null)
 
 const widthPx = ref(1)
-const mode = ref('time')
+// Force frames mode
+const mode = ref('frames')
 const viewStart = ref(0)
 const visibleDuration = ref(1)
 const snapToFrame = ref(props.snap !== false)
@@ -437,7 +423,7 @@ const ticks = computed(() => {
     arr.push({
       id: `tick-${t.toFixed(6)}`,
       x: timeToX(t),
-      label: `${timeLabel} | ${frameLabel}`,
+      label: frameLabel,
       timeLabel,
       frameLabel,
       major: isMajor,
@@ -447,8 +433,8 @@ const ticks = computed(() => {
   return arr
 })
 
-const modeLabel = computed(() => (mode.value === 'time' ? 'Time' : 'Frames'))
-const modeIcon = computed(() => (mode.value === 'time' ? 'mdi:timeline-clock-outline' : 'mdi:filmstrip'))
+const modeLabel = computed(() => 'Frames')
+const modeIcon = computed(() => 'mdi:filmstrip')
 
 watch(
   () => props.snap,
@@ -483,11 +469,7 @@ watch([viewStart, visibleDuration], () => {
   nextTick(() => syncScrollPositions())
 })
 
-watch(mode, value => {
-  try {
-    localStorage.setItem(STORAGE_KEY_MODE, value)
-  } catch {}
-})
+// lock mode; no-op persistence
 
 watch(minViewDuration, () => {
   clampView()
@@ -496,10 +478,7 @@ watch(minViewDuration, () => {
 
 onMounted(() => {
   restoreViewState()
-  try {
-    const savedMode = localStorage.getItem(STORAGE_KEY_MODE)
-    if (savedMode === 'time' || savedMode === 'frames') mode.value = savedMode
-  } catch {}
+  mode.value = 'frames'
   if (!snapToFrame.value) {
     snapToFrame.value = true
     emit('update:snap', true)
@@ -677,9 +656,7 @@ function fitRange() {
   syncScrollPositions()
 }
 
-function toggleMode() {
-  mode.value = mode.value === 'time' ? 'frames' : 'time'
-}
+// removed toggle (frames only)
 
 function commitRange() {
   const startF = Math.min(startFrameInput.value, endFrameInput.value - 1)
@@ -1128,16 +1105,16 @@ function keyTitle(frame) {
   min-width: 48px;
 }
 
-.timeline__tick-label-time {
-  font-size: 0.68rem;
-  font-weight: 600;
+.timeline__tick-label-frame {
+  font-size: 0.72rem;
+  font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-.timeline__tick-label-frame {
-  font-size: 0.62rem;
+.timeline__tick-label-time {
+  font-size: 0.66rem;
   font-weight: 500;
-  opacity: 0.8;
+  opacity: 0.85;
   letter-spacing: 0.01em;
 }
 

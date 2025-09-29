@@ -12,6 +12,12 @@ export const SECTION_TABS = [
     icon: 'mdi:monitor-eye'
   },
   {
+    id: 'camera',
+    label: 'カメラ',
+    description: 'レンダーカメラと出力設定',
+    icon: 'mdi:video-outline'
+  },
+  {
     id: 'morph',
     label: 'モーフ',
     description: '表情/シェイプキーの制御',

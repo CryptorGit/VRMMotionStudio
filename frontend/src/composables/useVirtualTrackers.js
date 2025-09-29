@@ -14,10 +14,24 @@ const TRACKER_DEFS = [
   { key: 'leftFoot', label: 'L Foot', color: 0x009688 },
   { key: 'rightFoot', label: 'R Foot', color: 0x8d6e63 },
   { key: 'leftKnee', label: 'L Knee', color: 0x26a69a },
-  { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 }
+  { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 },
+  { key: 'renderCamera', label: 'Render Cam', color: 0xffc107, isCamera: true }
 ]
 
-export function useVirtualTrackers({ scene, camera, renderer, controls, models, logToServer, trackerDotSize, trackerLabelScale, showTrackerLabels }) {
+const CAMERA_TRACKER_KEY = 'renderCamera'
+const CAMERA_DEFAULT_POSITION = new THREE.Vector3(0, 10, 30)
+const CAMERA_DEFAULT_TARGET = new THREE.Vector3(0, 1.2, 0)
+const CAMERA_DEFAULT_QUATERNION = new THREE.Quaternion()
+const CAMERA_DEFAULT_UP = new THREE.Vector3(0, 1, 0)
+const __lookAtMatrix = new THREE.Matrix4().lookAt(
+  CAMERA_DEFAULT_POSITION,
+  CAMERA_DEFAULT_TARGET,
+  CAMERA_DEFAULT_UP
+)
+CAMERA_DEFAULT_QUATERNION.setFromRotationMatrix(__lookAtMatrix)
+const GLOBAL_CAMERA_STORAGE_KEY = '__renderCamera__'
+
+export function useVirtualTrackers({ scene, camera, renderer, controls, models, logToServer, trackerDotSize, trackerLabelScale, showTrackerLabels, onManipulateStart, onManipulateEnd }) {
   const enabled = ref(false)
   const trackers = ref([]) // { key, mesh, label, visible }
   const group = ref(null)
@@ -67,12 +81,25 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     saveAllSaved(all)
   }
 
+  function getSavedCameraTransform() {
+    const all = loadAllSaved()
+    return all[GLOBAL_CAMERA_STORAGE_KEY] || null
+  }
+
+  function setSavedCameraTransform(dataOrNull) {
+    const all = loadAllSaved()
+    if (!dataOrNull) delete all[GLOBAL_CAMERA_STORAGE_KEY]
+    else all[GLOBAL_CAMERA_STORAGE_KEY] = dataOrNull
+    saveAllSaved(all)
+  }
+
   function pruneSavedForMissingModels() {
     try {
       const all = loadAllSaved()
       const present = new Set((models?.value || []).map(m => modelKey(m)))
       let changed = false
       for (const k of Object.keys(all)) {
+        if (k === GLOBAL_CAMERA_STORAGE_KEY) continue
         if (!present.has(k)) { delete all[k]; changed = true }
       }
       if (changed) saveAllSaved(all)
@@ -103,25 +130,39 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   scene.value.add(group.value)
   const sphere = markRaw(new THREE.SphereGeometry(currentDotSize(), 16, 16))
     for (const def of TRACKER_DEFS) {
+      const isCamera = def.key === CAMERA_TRACKER_KEY
       const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
       // Always draw on top of the model
       mat.depthTest = false
       mat.depthWrite = false
-      // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
-      const mesh = markRaw(new THREE.Mesh(markRaw(sphere.clone()), mat))
+      let geometry
+      if (isCamera) {
+        const baseSize = currentDotSize()
+        geometry = markRaw(new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24))
+        geometry.rotateX(Math.PI / 2)
+      } else {
+        // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
+        geometry = markRaw(sphere.clone())
+      }
+      const mesh = markRaw(new THREE.Mesh(geometry, mat))
       mesh.renderOrder = 998 // labels use 999
       mesh.name = `vt:${def.key}`
       mesh.userData.__vt = true
+      mesh.userData.isCamera = isCamera
       // start hidden
       mesh.visible = false
   const sprite = markRaw(createLabelSprite(def.label))
-      sprite.position.set(0, 0.15, 0)
+      sprite.position.set(0, isCamera ? 0.45 : 0.15, 0)
   sprite.visible = labelsVisible()
   // capture base size to allow absolute scaling later
   sprite.userData.baseScale = sprite.scale.clone()
   sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
       mesh.add(sprite)
       group.value.add(mesh)
+      if (isCamera) {
+        mesh.position.copy(CAMERA_DEFAULT_POSITION)
+        mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+      }
   trackers.value.push({ key: def.key, name: def.label, mesh, labelSprite: sprite })
     }
   }
@@ -143,19 +184,21 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
 
   function setEnabled(v) {
     enabled.value = !!v
-    const modelPresent = !!getActiveModel()?.vrm
-    if (enabled.value && modelPresent) {
+    if (enabled.value) {
       createGizmos()
       layoutDefaultPositions()
     }
-    setVisibility(enabled.value && modelPresent)
+    setVisibility(enabled.value)
   }
 
   function setVisibility(vis) {
-    const show = !!vis && !!getActiveModel()?.vrm
+    const hasModel = !!getActiveModel()?.vrm
+    const enabledVis = !!vis
     for (const t of trackers.value) {
-      t.mesh.visible = show
-      if (t.labelSprite) t.labelSprite.visible = show && labelsVisible()
+      const isCamera = t.key === CAMERA_TRACKER_KEY
+      const meshVisible = isCamera ? enabledVis : (enabledVis && hasModel)
+      t.mesh.visible = meshVisible
+      if (t.labelSprite) t.labelSprite.visible = meshVisible && labelsVisible()
     }
   }
 
@@ -164,6 +207,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
       const model = getActiveModel()
       if (model) setSavedPositions(model, null)
     } catch {}
+    setSavedCameraTransform(null)
     layoutDefaultPositions(true)
   }
 
@@ -207,64 +251,132 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   function layoutDefaultPositions(force = false) {
     if (!group.value) return
     const model = getActiveModel()
-    if (!model || !model.vrm) return
-    const vrm = model?.vrm
-    const root = vrm?.scene || scene.value
-    const basis = new THREE.Matrix4()
-    root.updateWorldMatrix(true, false)
-    basis.copy(root.matrixWorld)
-    // Capture once per model so initial virtual trackers follow the imported pose, not current deformed state
-    captureInitialWorldPose(model)
-  // Prefer saved positions if available, but skip them on the very first layout
-  const saved = (!didInitialLayout && !force) ? null : (vrm ? getSavedPositions(model) : null)
-    const hips = getBone(vrm, 'hips')
-    const head = getBone(vrm, 'head') || getBone(vrm, 'neck')
-    const chest = getBone(vrm, 'chest') || getBone(vrm, 'spine')
-    const lHand = getBone(vrm, 'leftHand')
-    const rHand = getBone(vrm, 'rightHand')
-    const lElbow = getBone(vrm, 'leftLowerArm')
-    const rElbow = getBone(vrm, 'rightLowerArm')
-    const lFoot = getBone(vrm, 'leftFoot')
-    const rFoot = getBone(vrm, 'rightFoot')
-    const lKnee = getBone(vrm, 'leftLowerLeg')
-    const rKnee = getBone(vrm, 'rightLowerLeg')
-    const m = new THREE.Vector3()
-    const initMap = initialWorldPose.get(model)
-    const setFrom = (key, obj, off = new THREE.Vector3()) => {
-      const t = trackers.value.find(x => x.key === key)
-      if (!t) return
-      if (saved && saved[key] && Array.isArray(saved[key]) && saved[key].length === 3 && vrm) {
-        const lp = new THREE.Vector3().fromArray(saved[key])
-        const wp = vrm.scene.localToWorld(lp.clone())
-        m.copy(wp)
-      } else if (initMap && initMap.has(key)) {
-        m.copy(initMap.get(key))
-      } else if (obj) {
-        obj.updateWorldMatrix(true, false)
-        obj.getWorldPosition(m)
-      } else {
-        m.set(0, 1, 0).applyMatrix4(basis)
+    const vrm = model?.vrm || null
+    const savedAll = vrm ? getSavedPositions(model) : null
+    const saved = (!didInitialLayout && !force) ? null : savedAll
+
+    if (vrm) {
+      const root = vrm.scene || scene.value
+      const basis = new THREE.Matrix4()
+      root.updateWorldMatrix(true, false)
+      basis.copy(root.matrixWorld)
+      // Capture once per model so initial virtual trackers follow the imported pose, not current deformed state
+      captureInitialWorldPose(model)
+      const hips = getBone(vrm, 'hips')
+      const head = getBone(vrm, 'head') || getBone(vrm, 'neck')
+      const chest = getBone(vrm, 'chest') || getBone(vrm, 'spine')
+      const lHand = getBone(vrm, 'leftHand')
+      const rHand = getBone(vrm, 'rightHand')
+      const lElbow = getBone(vrm, 'leftLowerArm')
+      const rElbow = getBone(vrm, 'rightLowerArm')
+      const lFoot = getBone(vrm, 'leftFoot')
+      const rFoot = getBone(vrm, 'rightFoot')
+      const lKnee = getBone(vrm, 'leftLowerLeg')
+      const rKnee = getBone(vrm, 'rightLowerLeg')
+      const m = new THREE.Vector3()
+      const initMap = initialWorldPose.get(model)
+
+      const setFrom = (key, obj, off = new THREE.Vector3()) => {
+        const t = trackers.value.find(x => x.key === key)
+        if (!t) return
+        const savedEntry = saved?.[key]
+        let usedSaved = false
+        if (savedEntry && vrm) {
+          if (Array.isArray(savedEntry) && savedEntry.length === 3) {
+            const lp = new THREE.Vector3().fromArray(savedEntry)
+            const wp = vrm.scene.localToWorld(lp.clone())
+            m.copy(wp)
+            usedSaved = true
+          } else if (typeof savedEntry === 'object' && Array.isArray(savedEntry.position)) {
+            const pos = savedEntry.position
+            if (savedEntry.space === 'world') {
+              m.set(pos[0], pos[1], pos[2])
+            } else {
+              const lp = new THREE.Vector3().fromArray(pos)
+              m.copy(vrm.scene.localToWorld(lp.clone()))
+            }
+            if (Array.isArray(savedEntry.rotation) && savedEntry.rotation.length === 4) {
+              const [qx, qy, qz, qw] = savedEntry.rotation
+              t.mesh.quaternion.set(qx, qy, qz, qw)
+            }
+            usedSaved = true
+          }
+        }
+
+        if (!usedSaved) {
+          if (initMap && initMap.has(key)) {
+            m.copy(initMap.get(key))
+          } else if (obj) {
+            obj.updateWorldMatrix(true, false)
+            obj.getWorldPosition(m)
+          } else {
+            m.set(0, 1, 0).applyMatrix4(basis)
+          }
+        }
+
+        m.add(off)
+        if (force || !t.mesh.position.lengthSq()) t.mesh.position.copy(m)
       }
-      m.add(off)
-      if (force || !t.mesh.position.lengthSq()) t.mesh.position.copy(m)
+
+      setFrom('hips', hips)
+      setFrom('chest', chest)
+      setFrom('head', head, new THREE.Vector3(0, 0.1, 0))
+      setFrom('leftElbow', lElbow)
+      setFrom('rightElbow', rElbow)
+      setFrom('leftHand', lHand, new THREE.Vector3(0.05, 0, 0))
+      setFrom('rightHand', rHand, new THREE.Vector3(-0.05, 0, 0))
+      setFrom('leftKnee', lKnee)
+      setFrom('rightKnee', rKnee)
+      setFrom('leftFoot', lFoot)
+      setFrom('rightFoot', rFoot)
     }
-    setFrom('hips', hips)
-    setFrom('chest', chest)
-    setFrom('head', head, new THREE.Vector3(0, 0.1, 0))
-    setFrom('leftElbow', lElbow)
-    setFrom('rightElbow', rElbow)
-    setFrom('leftHand', lHand, new THREE.Vector3(0.05, 0, 0))
-    setFrom('rightHand', rHand, new THREE.Vector3(-0.05, 0, 0))
-    setFrom('leftKnee', lKnee)
-    setFrom('rightKnee', rKnee)
-    setFrom('leftFoot', lFoot)
-    setFrom('rightFoot', rFoot)
+
+    layoutCameraTracker({ savedAll, force })
+    if (vrm && !didInitialLayout) didInitialLayout = true
   }
-    // mark that we performed the first layout
-    if (!didInitialLayout) didInitialLayout = true
+
+  function layoutCameraTracker({ savedAll, force = false }) {
+    const tracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
+    if (!tracker?.mesh) return
+    const entry = savedAll?.[CAMERA_TRACKER_KEY] ?? getSavedCameraTransform()
+    let applied = false
+    if (entry) {
+      if (Array.isArray(entry) && entry.length === 3) {
+        tracker.mesh.position.set(entry[0], entry[1], entry[2])
+        tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+        applied = true
+      } else if (typeof entry === 'object' && Array.isArray(entry.position)) {
+        tracker.mesh.position.set(entry.position[0], entry.position[1], entry.position[2])
+        if (Array.isArray(entry.rotation) && entry.rotation.length === 4) {
+          const [qx, qy, qz, qw] = entry.rotation
+          tracker.mesh.quaternion.set(qx, qy, qz, qw)
+        }
+        applied = true
+      }
+    }
+
+    if (force || !applied) {
+      const activeCamera = camera?.value
+      if (activeCamera) {
+        tracker.mesh.position.copy(activeCamera.position)
+        tracker.mesh.quaternion.copy(activeCamera.quaternion)
+      } else {
+        tracker.mesh.position.copy(CAMERA_DEFAULT_POSITION)
+        tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+      }
+    }
+  }
+
+  function serializeCameraState(mesh) {
+    return {
+      space: 'world',
+      position: mesh.position.toArray([]),
+      rotation: mesh.quaternion.toArray([])
+    }
+  }
 
   function onPointerDown(e) {
-    if (!enabled.value || !getActiveModel()?.vrm) return
+    if (!enabled.value) return
     const dom = renderer.value?.domElement
     if (!dom || e.button !== 0) return // left only
     computeMouseNdc(e, dom)
@@ -275,6 +387,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
       const hit = picks[0].object.userData.__vt ? picks[0].object : picks[0].object.parent
       dragState.active = true
       dragState.target = hit
+      try { typeof onManipulateStart === 'function' && onManipulateStart({ type: 'tracker', key: hit?.name }) } catch {}
       // Drag plane parallel to screen through hit point
       const p = new THREE.Vector3().copy(hit.getWorldPosition(new THREE.Vector3()))
       dragState.plane.setFromNormalAndCoplanarPoint(camera.value.getWorldDirection(new THREE.Vector3()), p)
@@ -287,7 +400,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     }
   }
   function onPointerMove(e) {
-    if (!enabled.value || !getActiveModel()?.vrm || !dragState.active || !dragState.target) return
+    if (!enabled.value || !dragState.active || !dragState.target) return
     const dom = renderer.value?.domElement
     if (!dom) return
     computeMouseNdc(e, dom)
@@ -301,19 +414,28 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     }
   }
   function onPointerUp(e) {
-    if (!enabled.value || !getActiveModel()?.vrm) return
+    if (!enabled.value) return
     if (dragState.active) {
       dragState.active = false
       dragState.target = null
       controls.value && (controls.value.enabled = true)
       try { renderer.value?.domElement?.releasePointerCapture?.(e.pointerId) } catch {}
+      try { typeof onManipulateEnd === 'function' && onManipulateEnd({ type: 'tracker' }) } catch {}
       try {
+        const cameraTracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
+        const cameraState = cameraTracker ? serializeCameraState(cameraTracker.mesh) : null
+        if (cameraState) setSavedCameraTransform(cameraState)
         const model = getActiveModel()
         if (model?.vrm) {
           const data = {}
+          const vrm = model.vrm
           for (const t of trackers.value) {
             const wp = t.mesh.getWorldPosition(new THREE.Vector3())
-            const lp = model.vrm.scene.worldToLocal(wp.clone())
+            if (t.key === CAMERA_TRACKER_KEY) {
+              data[t.key] = cameraState || serializeCameraState(t.mesh)
+              continue
+            }
+            const lp = vrm.scene.worldToLocal(wp.clone())
             data[t.key] = [lp.x, lp.y, lp.z]
           }
           setSavedPositions(model, data)
@@ -513,18 +635,10 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
 
   watch(models, () => {
     pruneSavedForMissingModels()
-    const hasModel = !!getActiveModel()?.vrm
-    if (!hasModel) {
-      // hide and dispose gizmos when no models are loaded
-      setVisibility(false)
-      disposeGizmos()
-      return
-    }
-    if (enabled.value) {
-      createGizmos()
-      layoutDefaultPositions(true)
-      setVisibility(true)
-    }
+    if (!enabled.value) return
+    createGizmos()
+    layoutDefaultPositions(true)
+    setVisibility(true)
   })
 
   function init() {

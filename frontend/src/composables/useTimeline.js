@@ -27,6 +27,93 @@ function lerpVector(a, b, t) {
   return out
 }
 
+const tempQuatA = new THREE.Quaternion()
+const tempQuatB = new THREE.Quaternion()
+const tempQuatSlerp = new THREE.Quaternion()
+
+function cloneQuaternion(rot) {
+  if (!rot) return [0, 0, 0, 1]
+  if (Array.isArray(rot)) {
+    const [x = 0, y = 0, z = 0, w = 1] = rot
+    tempQuatA.set(x, y, z, w).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  if (rot.isQuaternion || rot instanceof THREE.Quaternion) {
+    tempQuatA.copy(rot).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  const x = Number(rot?.x) || 0
+  const y = Number(rot?.y) || 0
+  const z = Number(rot?.z) || 0
+  const w = Number(rot?.w) || 1
+  tempQuatA.set(x, y, z, w).normalize()
+  return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+}
+
+function normalizeTransform(value, { positionFallback, rotationFallback } = {}) {
+  let position = null
+  let rotation = null
+
+  if (value !== undefined && value !== null) {
+    if (Array.isArray(value)) {
+      position = clonePosition(value)
+    } else if (typeof value === 'object') {
+      if (Array.isArray(value.position) || value.position?.isVector3) {
+        position = clonePosition(value.position)
+      } else if (Array.isArray(value.value) || value.value?.isVector3) {
+        position = clonePosition(value.value)
+      }
+
+      if (Array.isArray(value.rotation) || value.rotation?.isQuaternion) {
+        rotation = cloneQuaternion(value.rotation)
+      } else if (Array.isArray(value.quaternion) || value.quaternion?.isQuaternion) {
+        rotation = cloneQuaternion(value.quaternion)
+      }
+    }
+  }
+
+  if (!position && positionFallback) {
+    position = clonePosition(positionFallback)
+  }
+  if (!rotation && rotationFallback) {
+    rotation = cloneQuaternion(rotationFallback)
+  }
+
+  if (!position) position = [0, 0, 0]
+  if (!rotation) rotation = [0, 0, 0, 1]
+
+  return { position, rotation }
+}
+
+function cloneSnapshotEntry(entry, options) {
+  return normalizeTransform(entry, options)
+}
+
+function transformsEqual(a, b, epsilon = 1e-5) {
+  if (!a || !b) return false
+  for (let i = 0; i < 3; i++) {
+    const av = a.position?.[i] ?? 0
+    const bv = b.position?.[i] ?? 0
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  for (let i = 0; i < 4; i++) {
+    const av = a.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    const bv = b.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  return true
+}
+
+function slerpQuaternionArrays(a, b, t) {
+  const alpha = THREE.MathUtils.clamp(t ?? 0, 0, 1)
+  const qa = cloneQuaternion(a)
+  const qb = cloneQuaternion(b)
+  tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
+  tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
+  THREE.Quaternion.slerp(tempQuatA, tempQuatB, tempQuatSlerp, alpha)
+  return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
+}
+
 export function useTimeline({ trackers }) {
   const startTime = ref(0)
   const endTime = ref(30)
@@ -595,25 +682,20 @@ function sanitizeSnapshotValues(values, trackers, lastAppliedValues) {
     if (!tracker?.key) continue
     const key = tracker.key
     knownKeys.add(key)
-    if (source[key]) {
-      result[key] = clonePosition(source[key])
-      continue
-    }
-    if (tracker.mesh?.position) {
-      result[key] = clonePosition(tracker.mesh.position)
-      continue
-    }
-    if (lastAppliedValues[key]) {
-      result[key] = clonePosition(lastAppliedValues[key])
-      continue
-    }
-    result[key] = [0, 0, 0]
+    const fallback = lastAppliedValues?.[key]
+    result[key] = normalizeTransform(source[key], {
+      positionFallback: fallback?.position ?? tracker.mesh?.position,
+      rotationFallback: fallback?.rotation ?? tracker.mesh?.quaternion
+    })
   }
 
-  for (const [key, value] of Object.entries(source)) {
-    if (!knownKeys.has(key)) {
-      result[key] = clonePosition(value)
-    }
+  for (const [key, raw] of Object.entries(source)) {
+    if (knownKeys.has(key)) continue
+    const fallback = lastAppliedValues?.[key]
+    result[key] = normalizeTransform(raw, {
+      positionFallback: fallback?.position,
+      rotationFallback: fallback?.rotation
+    })
   }
 
   return result
@@ -633,14 +715,22 @@ function interpolateSnapshots(aValues, bValues, t, trackers) {
     const end = bValues?.[key]
     if (!start && !end) continue
     if (!start) {
-      result[key] = clonePosition(end)
+      result[key] = normalizeTransform(end)
       continue
     }
     if (!end) {
-      result[key] = clonePosition(start)
+      result[key] = normalizeTransform(start)
       continue
     }
-    result[key] = lerpVector(start, end, t)
+    const startT = normalizeTransform(start)
+    const endT = normalizeTransform(end, {
+      positionFallback: startT.position,
+      rotationFallback: startT.rotation
+    })
+    result[key] = {
+      position: lerpVector(startT.position, endT.position, t),
+      rotation: slerpQuaternionArrays(startT.rotation, endT.rotation, t)
+    }
   }
 
   return result
@@ -754,19 +844,56 @@ export function useTimeline({ trackers }) {
     const trackerList = trackers?.value || []
     for (const tracker of trackerList) {
       if (!tracker?.key) continue
-      values[tracker.key] = clonePosition(tracker.mesh?.position)
+      values[tracker.key] = {
+        position: clonePosition(tracker.mesh?.position),
+        rotation: cloneQuaternion(tracker.mesh?.quaternion)
+      }
     }
     return sanitizeSnapshotValues(values, trackers, lastAppliedValues)
   }
 
+  function storeLastApplied(values) {
+    for (const [key, transform] of Object.entries(values || {})) {
+      const normalized = normalizeTransform(transform)
+      lastAppliedValues[key] = {
+        position: clonePosition(normalized.position),
+        rotation: cloneQuaternion(normalized.rotation)
+      }
+    }
+  }
+
+  function timeToFrame(time) {
+    const fps = frameRate.value || 60
+    return Math.round(clampTime(time) * fps)
+  }
+
   function addKeyframe({ time, values }) {
+    const clampedTime = clampTime(time)
+    const targetFrame = timeToFrame(clampedTime)
+    const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+
+    let updatedEntry = null
+    const nextFrames = keyframes.value.map(frame => {
+      if (timeToFrame(frame.time) !== targetFrame) return frame
+      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues }
+      return updatedEntry
+    })
+
+    if (updatedEntry) {
+      keyframes.value = nextFrames.sort((a, b) => a.time - b.time)
+      storeLastApplied(updatedEntry.values)
+      scheduleSave()
+      applyCurrentPose()
+      return updatedEntry
+    }
+
     const entry = {
       id: nextKeyframeId++,
-      time: clampTime(time),
-      values: sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+      time: clampedTime,
+      values: sanitizedValues
     }
-    keyframes.value = [...keyframes.value, entry].sort((a, b) => a.time - b.time)
-    Object.assign(lastAppliedValues, entry.values)
+    keyframes.value = [...nextFrames, entry].sort((a, b) => a.time - b.time)
+    storeLastApplied(entry.values)
     scheduleSave()
     return entry
   }
@@ -815,9 +942,11 @@ export function useTimeline({ trackers }) {
     })
     if (!changed) return keyframes.value.find(frame => frame.id === id) || null
     keyframes.value = nextFrames.sort((a, b) => a.time - b.time)
+    const updatedEntry = keyframes.value.find(frame => frame.id === id)
+    if (updatedEntry) storeLastApplied(updatedEntry.values)
     scheduleSave()
     applyCurrentPose()
-    return keyframes.value.find(frame => frame.id === id) || null
+    return updatedEntry || null
   }
 
   function moveKeyframes(updates) {
@@ -877,7 +1006,7 @@ export function useTimeline({ trackers }) {
   function cloneSnapshot(values) {
     const result = {}
     for (const [key, value] of Object.entries(values || {})) {
-      result[key] = clonePosition(value)
+      result[key] = normalizeTransform(value)
     }
     return result
   }
@@ -899,7 +1028,10 @@ export function useTimeline({ trackers }) {
 
   function getTrackAtTime(trackerKey, time) {
     const snapshot = getSnapshotAtTime(time)
-    return snapshot?.[trackerKey] ? clonePosition(snapshot[trackerKey]) : null
+    const value = snapshot?.[trackerKey]
+    if (!value) return null
+    const normalized = normalizeTransform(value)
+    return normalized.position
   }
 
   function applyPoseAt(time) {
@@ -907,13 +1039,26 @@ export function useTimeline({ trackers }) {
     if (!snapshot) return
     const trackerList = trackers?.value || []
     for (const tracker of trackerList) {
-      if (!tracker?.key || !tracker?.mesh?.position) continue
+      if (!tracker?.key || !tracker?.mesh?.position || !tracker.mesh?.quaternion) continue
       const value = snapshot[tracker.key]
       if (!value) continue
+      const transform = normalizeTransform(value, {
+        positionFallback: tracker.mesh.position,
+        rotationFallback: tracker.mesh.quaternion
+      })
       const cached = lastAppliedValues[tracker.key]
-      if (cached && cached[0] === value[0] && cached[1] === value[1] && cached[2] === value[2]) continue
-      tracker.mesh.position.set(value[0], value[1], value[2])
-      lastAppliedValues[tracker.key] = clonePosition(value)
+      if (cached && transformsEqual(cached, transform)) continue
+      tracker.mesh.position.set(transform.position[0], transform.position[1], transform.position[2])
+      tracker.mesh.quaternion.set(
+        transform.rotation[0],
+        transform.rotation[1],
+        transform.rotation[2],
+        transform.rotation[3]
+      ).normalize()
+      lastAppliedValues[tracker.key] = {
+        position: clonePosition(transform.position),
+        rotation: cloneQuaternion(transform.rotation)
+      }
     }
   }
 
