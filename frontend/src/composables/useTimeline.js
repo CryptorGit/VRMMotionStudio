@@ -110,11 +110,99 @@ function slerpQuaternionArrays(a, b, t) {
   const qb = cloneQuaternion(b)
   tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
   tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
-  THREE.Quaternion.slerp(tempQuatA, tempQuatB, tempQuatSlerp, alpha)
+  // Use instance slerp to avoid relying on static THREE.Quaternion.slerp
+  tempQuatSlerp.copy(tempQuatA).slerp(tempQuatB, alpha)
   return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
 }
 
-export function useTimeline({ trackers }) {
+const tempQuatA = new THREE.Quaternion()
+const tempQuatB = new THREE.Quaternion()
+const tempQuatSlerp = new THREE.Quaternion()
+
+function cloneQuaternion(rot) {
+  if (!rot) return [0, 0, 0, 1]
+  if (Array.isArray(rot)) {
+    const [x = 0, y = 0, z = 0, w = 1] = rot
+    tempQuatA.set(x, y, z, w).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  if (rot.isQuaternion || rot instanceof THREE.Quaternion) {
+    tempQuatA.copy(rot).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  const x = Number(rot?.x) || 0
+  const y = Number(rot?.y) || 0
+  const z = Number(rot?.z) || 0
+  const w = Number(rot?.w) || 1
+  tempQuatA.set(x, y, z, w).normalize()
+  return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+}
+
+function normalizeTransform(value, { positionFallback, rotationFallback } = {}) {
+  let position = null
+  let rotation = null
+
+  if (value !== undefined && value !== null) {
+    if (Array.isArray(value)) {
+      position = clonePosition(value)
+    } else if (typeof value === 'object') {
+      if (Array.isArray(value.position) || value.position?.isVector3) {
+        position = clonePosition(value.position)
+      } else if (Array.isArray(value.value) || value.value?.isVector3) {
+        position = clonePosition(value.value)
+      }
+
+      if (Array.isArray(value.rotation) || value.rotation?.isQuaternion) {
+        rotation = cloneQuaternion(value.rotation)
+      } else if (Array.isArray(value.quaternion) || value.quaternion?.isQuaternion) {
+        rotation = cloneQuaternion(value.quaternion)
+      }
+    }
+  }
+
+  if (!position && positionFallback) {
+    position = clonePosition(positionFallback)
+  }
+  if (!rotation && rotationFallback) {
+    rotation = cloneQuaternion(rotationFallback)
+  }
+
+  if (!position) position = [0, 0, 0]
+  if (!rotation) rotation = [0, 0, 0, 1]
+
+  return { position, rotation }
+}
+
+function cloneSnapshotEntry(entry, options) {
+  return normalizeTransform(entry, options)
+}
+
+function transformsEqual(a, b, epsilon = 1e-5) {
+  if (!a || !b) return false
+  for (let i = 0; i < 3; i++) {
+    const av = a.position?.[i] ?? 0
+    const bv = b.position?.[i] ?? 0
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  for (let i = 0; i < 4; i++) {
+    const av = a.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    const bv = b.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  return true
+}
+
+function slerpQuaternionArrays(a, b, t) {
+  const alpha = THREE.MathUtils.clamp(t ?? 0, 0, 1)
+  const qa = cloneQuaternion(a)
+  const qb = cloneQuaternion(b)
+  tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
+  tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
+  tempQuatSlerp.copy(tempQuatA).slerp(tempQuatB, alpha)
+  return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
+}
+
+export function useTimeline({ trackers, renderCamera }) {
   const startTime = ref(0)
   const endTime = ref(30)
   const currentTime = ref(0)
@@ -589,6 +677,7 @@ export function useTimeline({ trackers }) {
 
   watch(currentTime, () => {
     applyCurrentPose()
+    scheduleSave()
   })
 
   watch(loopPlayback, () => {
@@ -672,7 +761,95 @@ function lerpVector(a, b, t) {
   return out
 }
 
-function sanitizeSnapshotValues(values, trackers, lastAppliedValues) {
+// Quaternion/transform helpers for active implementation
+const tempQuatA = new THREE.Quaternion()
+const tempQuatB = new THREE.Quaternion()
+const tempQuatSlerp = new THREE.Quaternion()
+
+function cloneQuaternion(rot) {
+  if (!rot) return [0, 0, 0, 1]
+  if (Array.isArray(rot)) {
+    const [x = 0, y = 0, z = 0, w = 1] = rot
+    tempQuatA.set(x, y, z, w).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  if (rot.isQuaternion || rot instanceof THREE.Quaternion) {
+    tempQuatA.copy(rot).normalize()
+    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+  }
+  const x = Number(rot?.x) || 0
+  const y = Number(rot?.y) || 0
+  const z = Number(rot?.z) || 0
+  const w = Number(rot?.w) || 1
+  tempQuatA.set(x, y, z, w).normalize()
+  return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
+}
+
+function normalizeTransform(value, { positionFallback, rotationFallback } = {}) {
+  let position = null
+  let rotation = null
+
+  if (value !== undefined && value !== null) {
+    if (Array.isArray(value)) {
+      position = clonePosition(value)
+    } else if (typeof value === 'object') {
+      if (Array.isArray(value.position) || value.position?.isVector3) {
+        position = clonePosition(value.position)
+      } else if (Array.isArray(value.value) || value.value?.isVector3) {
+        position = clonePosition(value.value)
+      }
+
+      if (Array.isArray(value.rotation) || value.rotation?.isQuaternion) {
+        rotation = cloneQuaternion(value.rotation)
+      } else if (Array.isArray(value.quaternion) || value.quaternion?.isQuaternion) {
+        rotation = cloneQuaternion(value.quaternion)
+      }
+    }
+  }
+
+  if (!position && positionFallback) {
+    position = clonePosition(positionFallback)
+  }
+  if (!rotation && rotationFallback) {
+    rotation = cloneQuaternion(rotationFallback)
+  }
+
+  if (!position) position = [0, 0, 0]
+  if (!rotation) rotation = [0, 0, 0, 1]
+
+  return { position, rotation }
+}
+
+function cloneSnapshotEntry(entry, options) {
+  return normalizeTransform(entry, options)
+}
+
+function transformsEqual(a, b, epsilon = 1e-5) {
+  if (!a || !b) return false
+  for (let i = 0; i < 3; i++) {
+    const av = a.position?.[i] ?? 0
+    const bv = b.position?.[i] ?? 0
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  for (let i = 0; i < 4; i++) {
+    const av = a.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    const bv = b.rotation?.[i] ?? (i === 3 ? 1 : 0)
+    if (Math.abs(av - bv) > epsilon) return false
+  }
+  return true
+}
+
+function slerpQuaternionArrays(a, b, t) {
+  const alpha = THREE.MathUtils.clamp(t ?? 0, 0, 1)
+  const qa = cloneQuaternion(a)
+  const qb = cloneQuaternion(b)
+  tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
+  tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
+  tempQuatSlerp.copy(tempQuatA).slerp(tempQuatB, alpha)
+  return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
+}
+
+function sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera) {
   const result = {}
   const source = values && typeof values === 'object' ? values : {}
   const trackerList = trackers?.value || []
@@ -695,6 +872,17 @@ function sanitizeSnapshotValues(values, trackers, lastAppliedValues) {
     result[key] = normalizeTransform(raw, {
       positionFallback: fallback?.position,
       rotationFallback: fallback?.rotation
+    })
+  }
+
+  // Ensure camera track is normalized if present in source but not in trackers
+  if (source?.camera && !result.camera) {
+    const cam = renderCamera?.value
+    const fallbackPos = cam?.position
+    const fallbackRot = cam?.quaternion
+    result.camera = normalizeTransform(source.camera, {
+      positionFallback: fallbackPos,
+      rotationFallback: fallbackRot
     })
   }
 
@@ -754,7 +942,7 @@ function sampleLegacyTrack(frames, time) {
   return clonePosition(last.value)
 }
 
-function convertLegacySnapshot(snapshot, trackers, lastAppliedValues) {
+function convertLegacySnapshot(snapshot, trackers, lastAppliedValues, renderCamera) {
   const tracks = snapshot?.tracks
   if (!tracks || typeof tracks !== 'object') return []
   const timelineKeys = new Set()
@@ -775,12 +963,12 @@ function convertLegacySnapshot(snapshot, trackers, lastAppliedValues) {
     return {
       id: nextKeyframeId++,
       time,
-      values: sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+      values: sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
     }
   })
 }
 
-export function useTimeline({ trackers }) {
+export function useTimeline({ trackers, renderCamera }) {
   const startTime = ref(0)
   const endTime = ref(30)
   const currentTime = ref(0)
@@ -839,6 +1027,8 @@ export function useTimeline({ trackers }) {
 
   const duration = computed(() => Math.max(0, endTime.value - startTime.value))
 
+  const CAMERA_TRACK_KEY = 'camera'
+
   function captureCurrentSnapshot() {
     const values = {}
     const trackerList = trackers?.value || []
@@ -849,7 +1039,17 @@ export function useTimeline({ trackers }) {
         rotation: cloneQuaternion(tracker.mesh?.quaternion)
       }
     }
-    return sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+    // Also capture render camera transform if available
+    try {
+      const cam = renderCamera?.value
+      if (cam && cam.position && cam.quaternion) {
+        values[CAMERA_TRACK_KEY] = {
+          position: clonePosition(cam.position),
+          rotation: cloneQuaternion(cam.quaternion)
+        }
+      }
+    } catch {}
+  return sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
   }
 
   function storeLastApplied(values) {
@@ -870,7 +1070,7 @@ export function useTimeline({ trackers }) {
   function addKeyframe({ time, values }) {
     const clampedTime = clampTime(time)
     const targetFrame = timeToFrame(clampedTime)
-    const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues)
+  const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
 
     let updatedEntry = null
     const nextFrames = keyframes.value.map(frame => {
@@ -1060,6 +1260,28 @@ export function useTimeline({ trackers }) {
         rotation: cloneQuaternion(transform.rotation)
       }
     }
+
+    // Apply camera if present
+    try {
+      const cam = renderCamera?.value
+      const camValue = snapshot[CAMERA_TRACK_KEY]
+      if (cam && camValue) {
+        const t = normalizeTransform(camValue, {
+          positionFallback: cam.position,
+          rotationFallback: cam.quaternion
+        })
+        const cached = lastAppliedValues[CAMERA_TRACK_KEY]
+        if (!cached || !transformsEqual(cached, t)) {
+          cam.position.set(t.position[0], t.position[1], t.position[2])
+          cam.quaternion.set(t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3]).normalize()
+          try { cam.updateMatrixWorld(true) } catch {}
+          lastAppliedValues[CAMERA_TRACK_KEY] = {
+            position: clonePosition(t.position),
+            rotation: cloneQuaternion(t.rotation)
+          }
+        }
+      }
+    } catch {}
   }
 
   function applyCurrentPose() {
@@ -1208,7 +1430,7 @@ export function useTimeline({ trackers }) {
     if (!snapshot || typeof snapshot !== 'object') return
     let entries = Array.isArray(snapshot.keyframes) ? snapshot.keyframes : null
     if (!entries && snapshot.tracks) {
-      entries = convertLegacySnapshot(snapshot, trackers, lastAppliedValues)
+      entries = convertLegacySnapshot(snapshot, trackers, lastAppliedValues, renderCamera)
     }
     if (!Array.isArray(entries)) return
     let maxId = 0
@@ -1221,7 +1443,7 @@ export function useTimeline({ trackers }) {
         return {
           id,
           time: Number.isFinite(time) ? clampTime(time) : startTime.value,
-          values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues)
+          values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues, renderCamera)
         }
       })
       .sort((a, b) => a.time - b.time)

@@ -162,8 +162,8 @@
             :title="tick.frameLabel"
           >
             <div v-if="tick.showLabel" class="timeline__tick-label">
-              <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
               <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
+              <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
             </div>
           </div>
           <div class="timeline__playhead timeline__playhead--header" :style="playheadStyle" aria-hidden="true"></div>
@@ -1105,13 +1105,13 @@ function keyTitle(frame) {
   min-width: 48px;
 }
 
-.timeline__tick-label-frame {
+.timeline__tick-label-time {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-.timeline__tick-label-time {
+.timeline__tick-label-frame {
   font-size: 0.66rem;
   font-weight: 500;
   opacity: 0.85;

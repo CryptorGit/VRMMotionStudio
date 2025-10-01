@@ -59,7 +59,7 @@
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="camera-hint">
-                        左ドラッグ: 平行移動 ／ 右ドラッグ: パン・チルト ／ ホイール: ズーム
+                        左ドラッグ: 平行移動 ／ 右ドラッグ: パン・チルト ／ ホイール: 前後移動
                       </p>
                     </div>
                     <div class="viewport-overlay viewport-overlay--bottom-right">
@@ -81,6 +81,7 @@
                       @dragover.prevent="onDragOver"
                       @dragleave="onDragLeave"
                       @drop.prevent="onDrop"
+                      @contextmenu.prevent
                     ></div>
                   </div>
                 </div>
@@ -154,6 +155,9 @@
                 v-model:camera-resolution-width="renderCameraWidth"
                 v-model:camera-resolution-height="renderCameraHeight"
                 v-model:show-camera-helper="showRenderCameraHelper"
+                v-model:camera-wheel-sensitivity="cameraWheelSensitivity"
+                v-model:camera-translate-sensitivity="cameraTranslateSensitivity"
+                v-model:camera-rotate-sensitivity="cameraRotateSensitivity"
                 :capture-busy="captureBusy"
                 @reset-virtual-trackers="resetVirtualTrackers"
                 @toggle-model="toggleModelVisibility"
@@ -194,7 +198,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch, provide, reactive } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, watchEffect, provide, reactive } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import TimelineEditor from './timeline/TimelineEditor.vue'
 import TopMenuBar from './layout/TopMenuBar.vue'
@@ -264,6 +268,10 @@ const captureBusy = ref(false)
 
 const renderCameraRollDeg = ref(0)
 const cameraManipulating = ref(false)
+// Camera sensitivities (UI adjustable)
+const cameraWheelSensitivity = ref(1.0) // multiplier for wheel dolly
+const cameraTranslateSensitivity = ref(1.0) // multiplier for left-drag pan
+const cameraRotateSensitivity = ref(1.0) // multiplier for right-drag yaw/pitch
 
 const rollRingRef = ref(null)
 const viewportModes = [
@@ -338,6 +346,14 @@ const DISPLAY_SETTINGS_KEY = 'ui.display.state.v1'
 let displaySettingsSaveTimer = null
 let restoringDisplaySettings = false
 
+const TIMELINE_SNAPSHOT_STORAGE_KEY = 'timeline.snapshot.v3'
+let timelinePersistenceEnabled = false
+let timelineSnapshotRestored = false
+let timelineSnapshotRestoring = false
+let timelineSnapshotTimer = null
+let pendingTimelineSnapshotSerialized = ''
+let lastPersistedTimelineSerialized = ''
+
 function getDisplaySettingsSnapshot() {
   return {
     showLightMarker: showLightMarker.value,
@@ -362,7 +378,10 @@ function getDisplaySettingsSnapshot() {
     cameraFar: renderCameraFar.value,
     cameraResolutionWidth: renderCameraWidth.value,
     cameraResolutionHeight: renderCameraHeight.value,
-    showCameraHelper: showRenderCameraHelper.value
+    showCameraHelper: showRenderCameraHelper.value,
+    cameraWheelSensitivity: cameraWheelSensitivity.value,
+    cameraTranslateSensitivity: cameraTranslateSensitivity.value,
+    cameraRotateSensitivity: cameraRotateSensitivity.value
   }
 }
 
@@ -380,6 +399,111 @@ function scheduleDisplaySettingsSave() {
     displaySettingsSaveTimer = null
     saveDisplaySettings()
   }, 180)
+}
+
+function persistTimelineSnapshot(serialized) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(TIMELINE_SNAPSHOT_STORAGE_KEY, serialized)
+    lastPersistedTimelineSerialized = serialized
+  } catch (error) {
+    if (import.meta.env.DEV) console.warn('Timeline snapshot persist failed', error)
+  }
+}
+
+function scheduleTimelineSnapshotPersist(snapshot, reason = 'state') {
+  if (!timelinePersistenceEnabled || timelineSnapshotRestoring) return
+  if (!snapshot || typeof snapshot !== 'object') return
+  if (typeof window === 'undefined') return
+  let serialized
+  try {
+    serialized = JSON.stringify(snapshot)
+  } catch (error) {
+    if (import.meta.env.DEV) console.warn('Failed to stringify timeline snapshot', error)
+    return
+  }
+  if (serialized === lastPersistedTimelineSerialized) return
+  pendingTimelineSnapshotSerialized = serialized
+  if (timelineSnapshotTimer) return
+  const delay = reason === 'immediate' ? 0 : 160
+  timelineSnapshotTimer = window.setTimeout(() => {
+    timelineSnapshotTimer = null
+    if (!pendingTimelineSnapshotSerialized || timelineSnapshotRestoring || !timelinePersistenceEnabled) {
+      pendingTimelineSnapshotSerialized = ''
+      return
+    }
+    persistTimelineSnapshot(pendingTimelineSnapshotSerialized)
+    pendingTimelineSnapshotSerialized = ''
+    Promise.resolve(updateStorageEstimate()).catch(() => {})
+  }, delay)
+}
+
+function markTimelineDirty(reason = 'state', snapshot = null) {
+  if (!timelinePersistenceEnabled || timelineSnapshotRestoring) return
+  if (!timelineController?.serialize) return
+  let working = snapshot
+  if (!working) {
+    try {
+      working = timelineController.serialize()
+    } catch (error) {
+      if (import.meta.env.DEV) console.warn('Failed to capture timeline snapshot', error)
+      return
+    }
+  }
+  scheduleTimelineSnapshotPersist(working, reason)
+}
+
+function restoreTimelineSnapshot() {
+  if (timelineSnapshotRestored || timelineSnapshotRestoring) return false
+  if (!timelineController?.deserialize) {
+    timelineSnapshotRestored = true
+    return false
+  }
+  if (typeof localStorage === 'undefined') {
+    timelineSnapshotRestored = true
+    return false
+  }
+  let raw
+  try {
+    raw = localStorage.getItem(TIMELINE_SNAPSHOT_STORAGE_KEY)
+  } catch (error) {
+    timelineSnapshotRestored = true
+    return false
+  }
+  if (!raw) {
+    timelineSnapshotRestored = true
+    return false
+  }
+  let snapshot
+  try {
+    snapshot = JSON.parse(raw)
+  } catch (error) {
+    if (import.meta.env.DEV) console.warn('Failed to parse timeline snapshot', error)
+    timelineSnapshotRestored = true
+    return false
+  }
+  if (!snapshot || typeof snapshot !== 'object') {
+    timelineSnapshotRestored = true
+    return false
+  }
+  timelineSnapshotRestoring = true
+  let success = false
+  try {
+    const ok = timelineController.deserialize(snapshot)
+    if (ok) {
+      ensureVirtualTrackers()
+      applyTimelinePoseImmediate()
+      lastPersistedTimelineSerialized = raw
+      success = true
+    }
+  } catch (error) {
+    if (import.meta.env.DEV) console.warn('Timeline snapshot restore failed', error)
+    success = false
+  } finally {
+    timelineSnapshotRestoring = false
+    timelineSnapshotRestored = true
+  }
+  return success
 }
 
 function loadDisplaySettings() {
@@ -417,6 +541,9 @@ function loadDisplaySettings() {
     if (Number.isFinite(data.cameraResolutionWidth)) renderCameraWidth.value = data.cameraResolutionWidth
     if (Number.isFinite(data.cameraResolutionHeight)) renderCameraHeight.value = data.cameraResolutionHeight
     if (typeof data.showCameraHelper === 'boolean') showRenderCameraHelper.value = data.showCameraHelper
+    if (Number.isFinite(data.cameraWheelSensitivity)) cameraWheelSensitivity.value = clamp0to2(data.cameraWheelSensitivity)
+    if (Number.isFinite(data.cameraTranslateSensitivity)) cameraTranslateSensitivity.value = clamp0to2(data.cameraTranslateSensitivity)
+    if (Number.isFinite(data.cameraRotateSensitivity)) cameraRotateSensitivity.value = clamp0to2(data.cameraRotateSensitivity)
   } catch (error) {
     if (import.meta?.env?.DEV) {
       console.warn('Failed to load display settings', error)
@@ -424,6 +551,12 @@ function loadDisplaySettings() {
   } finally {
     restoringDisplaySettings = false
   }
+}
+
+function clamp0to2(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return 1
+  return Math.min(2, Math.max(0, n))
 }
 
 function pushToast(message, title = '通知', timeout = 3200) {
@@ -602,15 +735,12 @@ const updateTrackers = () => {
   try {
     timelineController?.step()
     trackerController?.update()
-    syncCameraFromTracker()
+  // tracker-based camera sync removed
     updateRenderCameraHelper()
   } catch {}
 }
 
-const cameraTracker = computed(() => {
-  const list = trackerController?.trackers?.value || []
-  return list.find(item => item?.key === 'renderCamera') || null
-})
+// camera tracker removed
 
 function updateCameraRollRef() {
   if (!renderCamera.value) return
@@ -629,32 +759,11 @@ function updateRenderCameraHelper() {
   try { renderCameraHelper.value.update() } catch {}
 }
 
-function updateCameraTrackerFromCamera() {
-  const tracker = cameraTracker.value
-  if (!tracker?.mesh || !renderCamera.value) return
-  tracker.mesh.position.copy(renderCamera.value.position)
-  tracker.mesh.quaternion.copy(renderCamera.value.quaternion)
-}
+function updateCameraTrackerFromCamera() {}
 
-function syncCameraFromTracker(force = false) {
-  const tracker = cameraTracker.value
-  if (!tracker?.mesh || !renderCamera.value) return
-  if (cameraManipulating.value && !force) {
-    updateCameraTrackerFromCamera()
-    return
-  }
-  renderCamera.value.position.copy(tracker.mesh.position)
-  renderCamera.value.quaternion.copy(tracker.mesh.quaternion)
-  renderCamera.value.updateMatrixWorld(true)
-  updateCameraRollRef()
-}
+function syncCameraFromTracker() {}
 
-watch(cameraTracker, tracker => {
-  if (!tracker?.mesh || !renderCamera.value) return
-  // When the camera tracker becomes available/changes, snap the render camera to it
-  // to ensure camera aligns with the orange virtual tracker.
-  try { syncCameraFromTracker(true) } catch {}
-})
+// removed cameraTracker watcher
 
 function ensureRenderCameraHelper() {
   if (!scene.value || !renderCamera.value) return
@@ -692,30 +801,38 @@ function setupRenderCamera() {
   if (controls.value?.target) {
     cameraTarget.copy(controls.value.target)
   }
-  // If camera tracker exists, prefer its transform; else fall back to current view camera
-  const tracker = cameraTracker.value
-  if (tracker?.mesh) {
-    renderCamera.value.position.copy(tracker.mesh.position)
-    renderCamera.value.quaternion.copy(tracker.mesh.quaternion)
-    renderCamera.value.up.set(0, 1, 0)
-  } else {
-    const referenceCamera = viewCamera.value || camera.value
-    if (referenceCamera) {
-      renderCamera.value.position.copy(referenceCamera.position)
-      renderCamera.value.quaternion.copy(referenceCamera.quaternion)
-      renderCamera.value.up.copy(referenceCamera.up)
+  renderCamera.value.up.set(0, 1, 0)
+  // Initial placement from current view target or default
+  const initialCameraState = null
+  if (initialCameraState) {
+    if (Array.isArray(initialCameraState.position) && initialCameraState.position.length >= 3) {
+      renderCamera.value.position.set(
+        initialCameraState.position[0],
+        initialCameraState.position[1],
+        initialCameraState.position[2]
+      )
+    }
+    if (Array.isArray(initialCameraState.rotation) && initialCameraState.rotation.length >= 4) {
+      renderCamera.value.quaternion.set(
+        initialCameraState.rotation[0],
+        initialCameraState.rotation[1],
+        initialCameraState.rotation[2],
+        initialCameraState.rotation[3]
+      ).normalize()
     } else {
-      renderCamera.value.position.set(0, 10, 30)
-      renderCamera.value.up.set(0, 1, 0)
       renderCamera.value.lookAt(cameraTarget)
     }
+  } else {
+    renderCamera.value.position.set(0, 10, 30)
+    renderCamera.value.lookAt(cameraTarget)
   }
   renderCamera.value.updateMatrixWorld(true)
   scene.value.add(renderCamera.value)
   updateCameraRollRef()
-  // Ensure final alignment prefers tracker -> camera if tracker is present later as well
-  syncCameraFromTracker(true)
+  // tracker-based sync removed
   if (showRenderCameraHelper.value) ensureRenderCameraHelper()
+  // If a model is already present, frame the avatar front unless the timeline defines camera
+  try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
 }
 
 function refreshCameraAspect() {
@@ -738,6 +855,67 @@ function refreshCameraAspect() {
   renderer.value.setScissorTest(false)
 }
 
+// Place the render camera to frame the avatar front based on model bounds and current FOV.
+function frameRenderCameraToAvatarFront({ force = false, respectTimeline = true } = {}) {
+  try {
+    if (!renderCamera.value || !scene.value) return
+    // If timeline defines a camera track and we should respect it, do not override
+    if (respectTimeline && timelineController) {
+      try {
+        const frames = timelineController.keyframes?.value || []
+        const hasCameraTrack = frames.some(f => f?.values && f.values.camera)
+        if (hasCameraTrack) return
+      } catch {}
+    }
+
+    const arr = models?.value || []
+    const active = arr.find(m => !!m?.vrm && m.visible !== false) || arr.find(m => !!m?.vrm)
+    const vrmRoot = active?.vrm?.scene
+    if (!vrmRoot) return
+
+    // Compute bounds
+    const bbox = new THREE.Box3().setFromObject(vrmRoot)
+    const center = bbox.getCenter(new THREE.Vector3())
+    const size = bbox.getSize(new THREE.Vector3())
+    if (!Number.isFinite(size.x + size.y + size.z)) return
+
+    // Distance to fit height with margin according to FOV
+    const fovDeg = Number(renderCameraFov.value) || 45
+    const fov = THREE.MathUtils.degToRad(fovDeg)
+    const height = Math.max(1.0, size.y || size.length() || 2.0)
+    const margin = 1.3
+    const dist = (height * 0.5) / Math.tan(fov * 0.5) * margin
+
+    // Model forward: world -Z
+    const forward = new THREE.Vector3()
+    try { vrmRoot.getWorldDirection(forward) } catch { forward.set(0, 0, -1) }
+    if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
+    forward.normalize()
+
+    // Choose front/back candidate closer to current view to avoid flips
+    const posA = center.clone().add(forward.clone().multiplyScalar(dist))
+    const posB = center.clone().sub(forward.clone().multiplyScalar(dist))
+    let chosen = posA
+    const refCam = viewCamera.value || camera.value
+    if (refCam) {
+      const sideDir = refCam.position.clone().sub(center).normalize()
+      const aDir = posA.clone().sub(center).normalize()
+      const bDir = posB.clone().sub(center).normalize()
+      const dotA = aDir.dot(sideDir)
+      const dotB = bDir.dot(sideDir)
+      chosen = dotB > dotA ? posB : posA
+    }
+
+    renderCamera.value.position.copy(chosen)
+    renderCamera.value.up.set(0, 1, 0)
+    renderCamera.value.lookAt(center)
+    try { renderCamera.value.updateMatrixWorld(true) } catch {}
+    cameraTarget.copy(center)
+    updateCameraRollRef()
+    updateRenderCameraHelper()
+  } catch {}
+}
+
 function pointerHitsTracker(event) {
   if (!trackerController?.trackers?.value?.length || !camera.value) return false
   const dom = renderer.value?.domElement
@@ -754,6 +932,8 @@ function handleCameraPointerDown(event) {
   if (!isCameraMode.value || !renderCamera.value) return
   if (event.button !== 0 && event.button !== 2) return
   if (pointerHitsTracker(event)) return
+  // Prevent context menu from appearing after right-drag
+  try { event.preventDefault() } catch {}
   // Take a history snapshot at the beginning of camera manipulation
   try { pushHistory('camera-manipulate') } catch {}
   cameraManipulating.value = true
@@ -774,7 +954,7 @@ function handleCameraPointerMove(event) {
     const deltaX = event.clientX - cameraInteraction.startX
     const deltaY = event.clientY - cameraInteraction.startY
     const distance = cameraInteraction.startPosition.distanceTo(cameraTarget)
-    const panSpeed = Math.max(distance * 0.0025, 0.02)
+  const panSpeed = Math.max(distance * 0.0025, 0.02) * clamp0to2(cameraTranslateSensitivity.value)
     tempVec3A.set(1, 0, 0).applyQuaternion(cameraInteraction.startQuaternion).multiplyScalar(-deltaX * panSpeed)
     tempVec3B.set(0, 1, 0).applyQuaternion(cameraInteraction.startQuaternion).multiplyScalar(deltaY * panSpeed)
     tempVec3C.copy(cameraInteraction.startPosition).add(tempVec3A).add(tempVec3B)
@@ -782,8 +962,9 @@ function handleCameraPointerMove(event) {
   } else {
     const deltaX = event.clientX - cameraInteraction.startX
     const deltaY = event.clientY - cameraInteraction.startY
-    const yawDelta = deltaX * 0.005
-    const pitchDelta = deltaY * 0.005
+  const rotMul = 0.005 * clamp0to2(cameraRotateSensitivity.value)
+    const yawDelta = deltaX * rotMul
+    const pitchDelta = deltaY * rotMul
     const startEuler = tempEuler.setFromQuaternion(cameraInteraction.startQuaternion, 'YXZ')
     const nextPitch = THREE.MathUtils.clamp(startEuler.x - pitchDelta, THREE.MathUtils.degToRad(-89), THREE.MathUtils.degToRad(89))
     const nextYaw = startEuler.y - yawDelta
@@ -801,6 +982,8 @@ function handleCameraPointerUp(event) {
   renderer.value?.domElement?.releasePointerCapture?.(event.pointerId)
   cameraManipulating.value = false
   cameraInteraction.pointerId = null
+  // Suppress context menu after right-drag
+  try { event.preventDefault() } catch {}
   updateCameraTrackerFromCamera()
   updateRenderCameraHelper()
 }
@@ -808,15 +991,17 @@ function handleCameraPointerUp(event) {
 function handleCameraWheel(event) {
   if (!isCameraMode.value || !renderCamera.value) return
   event.preventDefault()
-  // Snapshot before applying zoom for undo support
-  try { pushHistory('camera-zoom') } catch {}
+  // Snapshot before applying dolly (forward/back) for undo support
+  try { pushHistory('camera-wheel-dolly') } catch {}
   const delta = Math.sign(event.deltaY)
-  tempVec3A.copy(renderCamera.value.position).sub(cameraTarget)
-  const length = tempVec3A.length()
-  const zoomSpeed = Math.max(length * 0.12, 0.5)
-  const nextLength = THREE.MathUtils.clamp(length + delta * zoomSpeed * 0.05, 0.5, 400)
-  tempVec3A.normalize().multiplyScalar(nextLength)
-  renderCamera.value.position.copy(cameraTarget).add(tempVec3A)
+  const dist = Math.max(renderCamera.value.position.distanceTo(cameraTarget), 0.5)
+  // Distance-aware dolly speed with clamping to avoid large jumps
+  const baseSpeed = THREE.MathUtils.clamp(dist * 0.035, 0.02, 1.2) * clamp0to2(cameraWheelSensitivity.value)
+  // Invert so that wheel up (deltaY < 0) moves forward, wheel down moves backward
+  const amount = baseSpeed * -delta
+  // Move along camera forward/backward (negative Z in camera space)
+  tempVec3A.set(0, 0, -1).applyQuaternion(renderCamera.value.quaternion).multiplyScalar(amount)
+  renderCamera.value.position.add(tempVec3A)
   renderCamera.value.updateMatrixWorld(true)
   updateCameraRollRef()
   updateCameraTrackerFromCamera()
@@ -831,6 +1016,7 @@ function attachCameraModeEvents() {
   dom.addEventListener('pointerup', handleCameraPointerUp)
   dom.addEventListener('pointercancel', handleCameraPointerUp)
   dom.addEventListener('wheel', handleCameraWheel, { passive: false })
+  dom.addEventListener('contextmenu', e => { if (isCameraMode.value) e.preventDefault() })
   cameraEventsAttached = true
 }
 
@@ -842,6 +1028,7 @@ function detachCameraModeEvents() {
   dom.removeEventListener('pointerup', handleCameraPointerUp)
   dom.removeEventListener('pointercancel', handleCameraPointerUp)
   dom.removeEventListener('wheel', handleCameraWheel)
+  dom.removeEventListener('contextmenu', e => { if (isCameraMode.value) e.preventDefault() })
   cameraEventsAttached = false
 }
 
@@ -1010,16 +1197,21 @@ watch(viewportMode, mode => {
   if (mode === 'camera') {
     if (controls.value) {
       controls.value.enabled = false
+      try { controls.value.enableZoom = false } catch {}
       cameraTarget.copy(controls.value.target)
     }
     if (renderCamera.value) {
       camera.value = renderCamera.value
       renderCamera.value.updateProjectionMatrix()
-      syncCameraFromTracker(true)
       updateCameraRollRef()
+      // When entering camera mode, ensure we're framing the avatar front unless timeline camera exists
+      try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
     }
   } else {
-    if (controls.value) controls.value.enabled = true
+    if (controls.value) {
+      controls.value.enabled = true
+      try { controls.value.enableZoom = true } catch {}
+    }
     if (viewCamera.value) camera.value = viewCamera.value
   }
   refreshCameraAspect()
@@ -1057,36 +1249,89 @@ trackerController = useVirtualTrackers({
   onManipulateStart: () => pushHistory('tracker-drag')
 })
 
-timelineController = useTimeline({ trackers: trackerController.trackers })
+timelineController = useTimeline({ trackers: trackerController.trackers, renderCamera })
+let syncTimelineRefs = () => {}
 // Bridge timeline controller state into local refs for reliable reactivity
 if (timelineController) {
-  const syncTimelineRefs = () => {
-    try {
-      timelineKeyframes.value = Array.isArray(timelineController.keyframes?.value) ? timelineController.keyframes.value : []
-      timelineDuration.value = Number(timelineController.duration?.value ?? 0)
-      timelineCurrentTime.value = Number(timelineController.currentTime?.value ?? 0)
-      timelinePlaying.value = !!(timelineController.isPlaying?.value)
-      timelineStartTime.value = Number(timelineController.startTime?.value ?? 0)
-      timelineEndTime.value = Number(timelineController.endTime?.value ?? 0)
-      timelineFrameRate.value = Number(timelineController.frameRate?.value ?? 60)
-      timelineLoop.value = !!(timelineController.loopPlayback?.value)
-    } catch {}
+  const cloneTransform = source => {
+    if (!source || typeof source !== 'object') return { position: [0, 0, 0], rotation: [0, 0, 0, 1] }
+    const pos = Array.isArray(source.position)
+      ? source.position
+      : Array.isArray(source.value)
+        ? source.value
+        : [source?.x, source?.y, source?.z]
+    const rot = Array.isArray(source.rotation)
+      ? source.rotation
+      : Array.isArray(source.quaternion)
+        ? source.quaternion
+        : [source?.qx, source?.qy, source?.qz, source?.qw]
+    const clampPosition = (posArray = []) => [0, 1, 2].map(i => Number(posArray[i]) || 0)
+    const clampRotation = (rotArray = []) => {
+      const raw = [0, 1, 2, 3].map(i => Number(rotArray[i]) || (i === 3 ? 1 : 0))
+      const len = Math.hypot(raw[0], raw[1], raw[2], raw[3]) || 1
+      return raw.map(value => value / len)
+    }
+    return {
+      position: clampPosition(pos),
+      rotation: clampRotation(rot)
+    }
   }
-  syncTimelineRefs()
-  watch(
-    [
-      () => timelineController.keyframes?.value,
-      () => timelineController.duration?.value,
-      () => timelineController.currentTime?.value,
-      () => timelineController.isPlaying?.value,
-      () => timelineController.startTime?.value,
-      () => timelineController.endTime?.value,
-      () => timelineController.frameRate?.value,
-      () => timelineController.loopPlayback?.value
-    ],
-    () => syncTimelineRefs(),
-    { immediate: false }
-  )
+
+  const cloneKeyframes = frames => {
+    if (!Array.isArray(frames)) return []
+    return frames.map(frame => {
+      const values = {}
+      if (frame?.values && typeof frame.values === 'object') {
+        for (const [key, value] of Object.entries(frame.values)) {
+          values[key] = cloneTransform(value)
+        }
+      }
+      return {
+        id: Number(frame?.id) || 0,
+        time: Number(frame?.time) || 0,
+        values
+      }
+    })
+  }
+
+  const asNumber = (value, fallback = 0) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : fallback
+  }
+
+  syncTimelineRefs = (snapshot = null) => {
+    const framesSource = snapshot?.keyframes ?? timelineController.keyframes?.value ?? []
+    timelineKeyframes.value = cloneKeyframes(framesSource)
+
+    const startRaw = snapshot?.startTime ?? timelineController.startTime?.value
+    const start = asNumber(startRaw, 0)
+    timelineStartTime.value = start
+
+    const endRaw = snapshot?.endTime ?? timelineController.endTime?.value
+    const safeEnd = Math.max(start, asNumber(endRaw, start))
+    timelineEndTime.value = safeEnd
+    timelineDuration.value = Math.max(0, safeEnd - start)
+
+    const currentRaw = snapshot?.currentTime ?? timelineController.currentTime?.value
+    timelineCurrentTime.value = asNumber(currentRaw, start)
+
+    const frameRateRaw = snapshot?.frameRate ?? timelineController.frameRate?.value
+    const fps = asNumber(frameRateRaw, 60)
+    timelineFrameRate.value = fps > 0 ? fps : 60
+
+    const loopRaw = snapshot?.loop
+    timelineLoop.value = loopRaw != null ? !!loopRaw : !!timelineController.loopPlayback?.value
+
+    const playing = timelineController.isPlaying?.value
+    timelinePlaying.value = !!playing
+  }
+
+  watchEffect(() => {
+    if (!timelineController?.serialize) return
+    const snapshot = timelineController.serialize()
+    syncTimelineRefs(snapshot)
+    markTimelineDirty('reactive', snapshot)
+  })
 }
 // History (undo/redo)
 const history = useHistory({
@@ -1170,17 +1415,21 @@ function resetVirtualTrackers() {
 }
 
 function ensureVirtualTrackers() {
-  if (virtualTrackersEnabled.value) return
-  virtualTrackersEnabled.value = true
+  // Always force-enable controller to recover from any desync between UI flag and controller state
   try { trackerController.setEnabled(true) } catch {}
+  if (!virtualTrackersEnabled.value) virtualTrackersEnabled.value = true
 }
 
 function applyTimelinePoseImmediate() {
   try { timelineController?.applyCurrentPose() } catch {}
-  syncCameraFromTracker(true)
+  // Camera is applied by timeline when present; no tracker syncing
 }
 
 function handleTimelineAddKey(payload) {
+  if (!timelineController) {
+    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    return
+  }
   ensureVirtualTrackers()
   try {
     pushHistory('add-key')
@@ -1188,9 +1437,19 @@ function handleTimelineAddKey(payload) {
       ? payload.time
       : timelineController.currentTime.value
     if (Number.isFinite(payload?.time)) timelineController.setCurrentTime(payload.time)
-    timelineController.addSnapshotAtTime(targetTime)
+    const entry = timelineController.addSnapshotAtTime(targetTime)
+    if (!entry) {
+      pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
+      return
+    }
     applyTimelinePoseImmediate()
-  } catch {}
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('add-key')
+    pushToast('現在のポーズをキーに追加しました', 'タイムライン', 2200)
+  } catch (error) {
+    pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
+    if (import.meta.env.DEV) console.error('Timeline add key failed', error)
+  }
 }
 
 function handleTimelineRemoveKey(payload) {
@@ -1212,7 +1471,11 @@ function handleTimelineRemoveKeys(payload) {
       ids.forEach(id => timelineController.removeKeyframe(id))
     }
     applyTimelinePoseImmediate()
-  } catch {}
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('remove-keys')
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Timeline remove keys failed', error)
+  }
 }
 
 function handleTimelineMoveKey({ keyframeId, time }) {
@@ -1229,17 +1492,28 @@ function handleTimelineMoveKeys(payload) {
     }))
     .filter(update => Number.isFinite(update.keyframeId) && Number.isFinite(update.time))
   if (!normalized.length || !timelineController) return
+  let applied = false
   try {
     pushHistory('move-keys')
     if (normalized.length === 1) {
       const { keyframeId, time } = normalized[0]
       timelineController.updateKeyframe(keyframeId, { time })
+      applied = true
     } else if (timelineController.moveKeyframes) {
       timelineController.moveKeyframes(normalized)
+      applied = true
     } else {
       normalized.forEach(({ keyframeId, time }) => timelineController.updateKeyframe(keyframeId, { time }))
+      applied = true
     }
-  } catch {}
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Timeline move keys failed', error)
+  }
+  if (applied) {
+    applyTimelinePoseImmediate()
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('move-keys')
+  }
 }
 
 function handleTimelineSeek(time) {
@@ -1274,11 +1548,25 @@ function handleTimelineJumpEnd() {
 }
 
 function handleTimelineToggleLoop() {
-  try { timelineController.loopPlayback.value = !timelineController.loopPlayback.value } catch {}
+  if (!timelineController) return
+  try {
+    timelineController.loopPlayback.value = !timelineController.loopPlayback.value
+    markTimelineDirty('toggle-loop')
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Timeline toggle loop failed', error)
+  }
 }
 
 function handleTimelineRange({ startFrame, endFrame }) {
-  try { pushHistory('range'); timelineController.setRangeFromFrames(startFrame, endFrame) } catch {}
+  if (!timelineController) return
+  try {
+    pushHistory('range')
+    timelineController.setRangeFromFrames(startFrame, endFrame)
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('range')
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Timeline range update failed', error)
+  }
 }
 
 function handleTimelineRequestImport() {
@@ -1308,6 +1596,8 @@ async function handleTimelineImportFile(event) {
     try { timelineController.pause() } catch {}
   applyTimelinePoseImmediate()
     pushToast(`${file.name} を読み込みました`, 'タイムライン', 3200)
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('import')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch (error) {
     pushToast('タイムラインJSONの解析に失敗しました', 'タイムライン', 5200)
@@ -1346,6 +1636,8 @@ function handleTimelineClear() {
     timelineController.clearAll()
     timelineController.stop()
     pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch (error) {
     pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
@@ -1448,6 +1740,8 @@ async function clearAllCache() {
     timelineController.clearAll()
     timelineController.stop()
     pushToast('キャッシュとタイムラインをリセットしました', 'キャッシュ')
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {}
 }
@@ -1562,8 +1856,38 @@ onMounted(async () => {
   setupRenderCamera()
   refreshCameraAspect()
   attachCameraModeEvents()
-  updateCameraTrackerFromCamera()
   try { trackerController.init?.() } catch {}
+  // Sync controller enabled state with current UI flag after init
+  try { trackerController.setEnabled(!!virtualTrackersEnabled.value) } catch {}
+  // If enabled but no tracker meshes exist (edge case), force rebuild once
+  try {
+    const none = !Array.isArray(trackerController?.trackers?.value) || trackerController.trackers.value.length === 0
+    if (virtualTrackersEnabled.value && none && typeof trackerController.rebuild === 'function') {
+      trackerController.rebuild()
+    }
+  } catch {}
+  // Force relayout of camera tracker from the current view camera, ignoring saved state
+  try { trackerController.rebuild?.() } catch {}
+  // After trackers are initialized/enabled, snap camera to the camera tracker
+  try { syncCameraFromTracker(true) } catch {}
+
+  let timelineRestored = false
+  try {
+    timelineRestored = restoreTimelineSnapshot()
+  } catch {
+    timelineRestored = false
+  }
+  timelinePersistenceEnabled = true
+  try {
+    if (timelineRestored && typeof syncTimelineRefs === 'function') {
+      syncTimelineRefs()
+    }
+  } catch {}
+  if (timelineRestored) {
+    markTimelineDirty('restore')
+  } else {
+    markTimelineDirty('initial')
+  }
 
   let shouldRestore = autoRestore.value
   try {
@@ -1573,6 +1897,11 @@ onMounted(async () => {
 
   if (shouldRestore) {
     await restoreCachedModel(raw ? JSON.parse(raw) : undefined)
+    // Ensure virtual trackers are enabled and visible once a model is present
+    try { ensureVirtualTrackers() } catch {}
+    // After models are restored, rebuild trackers and frame camera to avatar front (unless timeline defines camera)
+    try { trackerController.rebuild?.() } catch {}
+    try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
   } else {
     try { await logToServer({ event: 'restore:skipped' }) } catch {}
   }
@@ -1594,6 +1923,20 @@ onMounted(async () => {
   animate(0)
 })
 
+// If models list becomes non-empty later, auto-enable virtual trackers so they appear
+watch(models, (arr) => {
+  try {
+    const hasModel = Array.isArray(arr) && arr.some(m => !!m?.vrm)
+    if (hasModel && !virtualTrackersEnabled.value) ensureVirtualTrackers()
+    // Whenever models appear or change, rebuild trackers to place camera in front of the model
+    if (hasModel) {
+      try { trackerController.rebuild?.() } catch {}
+      // Frame avatar front unless overridden by timeline camera track
+      try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
+    }
+  } catch {}
+})
+
 onUnmounted(() => {
   cleanupErrorHandlers()
   detachCameraModeEvents()
@@ -1603,6 +1946,15 @@ onUnmounted(() => {
   }
   cleanupRenderer()
   try { trackerController.cleanup?.() } catch {}
+  if (typeof window !== 'undefined' && timelineSnapshotTimer) {
+    window.clearTimeout(timelineSnapshotTimer)
+    timelineSnapshotTimer = null
+  }
+  if (pendingTimelineSnapshotSerialized && timelinePersistenceEnabled && !timelineSnapshotRestoring) {
+    persistTimelineSnapshot(pendingTimelineSnapshotSerialized)
+    pendingTimelineSnapshotSerialized = ''
+    Promise.resolve(updateStorageEstimate()).catch(() => {})
+  }
   if (typeof window !== 'undefined' && displaySettingsSaveTimer) {
     window.clearTimeout(displaySettingsSaveTimer)
     displaySettingsSaveTimer = null

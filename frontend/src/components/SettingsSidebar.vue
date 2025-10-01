@@ -48,6 +48,9 @@
           :camera-resolution-width="cameraResolutionWidth"
           :camera-resolution-height="cameraResolutionHeight"
           :show-camera-helper="showCameraHelper"
+          :camera-wheel-sensitivity="cameraWheelSensitivity"
+          :camera-translate-sensitivity="cameraTranslateSensitivity"
+          :camera-rotate-sensitivity="cameraRotateSensitivity"
           :capture-busy="captureBusy"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
@@ -71,6 +74,9 @@
           @update:cameraResolutionWidth="v => emit('update:cameraResolutionWidth', v)"
           @update:cameraResolutionHeight="v => emit('update:cameraResolutionHeight', v)"
           @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
+          @update:cameraWheelSensitivity="v => emit('update:cameraWheelSensitivity', v)"
+          @update:cameraTranslateSensitivity="v => emit('update:cameraTranslateSensitivity', v)"
+          @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
           @capture-camera="() => emit('capture-render')"
           @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
           @toggle-model="(...args) => emit('toggle-model', ...args)"
@@ -121,6 +127,9 @@ const props = defineProps({
   cameraResolutionWidth: { type: Number, required: true },
   cameraResolutionHeight: { type: Number, required: true },
   showCameraHelper: { type: Boolean, default: false },
+  cameraWheelSensitivity: { type: Number, default: 1.0 },
+  cameraTranslateSensitivity: { type: Number, default: 1.0 },
+  cameraRotateSensitivity: { type: Number, default: 1.0 },
   captureBusy: { type: Boolean, default: false }
 })
 
@@ -148,6 +157,9 @@ const emit = defineEmits([
   'update:cameraResolutionWidth',
   'update:cameraResolutionHeight',
   'update:showCameraHelper',
+  'update:cameraWheelSensitivity',
+  'update:cameraTranslateSensitivity',
+  'update:cameraRotateSensitivity',
   'capture-render',
   'toggle-model',
   'toggle-bone',
@@ -190,6 +202,9 @@ const {
   cameraResolutionWidth,
   cameraResolutionHeight,
   showCameraHelper,
+  cameraWheelSensitivity,
+  cameraTranslateSensitivity,
+  cameraRotateSensitivity,
   captureBusy
 } = toRefs(props)
 </script>

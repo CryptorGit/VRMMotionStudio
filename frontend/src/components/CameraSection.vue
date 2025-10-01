@@ -70,6 +70,27 @@
             <input type="number" min="1" max="10000" step="1" v-model.number="farLocal" />
           </label>
         </div>
+        <div class="field">
+          <label class="stretch">
+            ホイール移動感度
+            <input type="range" min="0" max="2" step="0.05" v-model.number="wheelSensLocal" />
+          </label>
+          <div class="field__value">× {{ wheelSensLocal.toFixed(1) }}</div>
+        </div>
+        <div class="field">
+          <label class="stretch">
+            左クリック移動感度
+            <input type="range" min="0" max="2" step="0.05" v-model.number="translateSensLocal" />
+          </label>
+          <div class="field__value">× {{ translateSensLocal.toFixed(1) }}</div>
+        </div>
+        <div class="field">
+          <label class="stretch">
+            右クリック回転感度
+            <input type="range" min="0" max="2" step="0.05" v-model.number="rotateSensLocal" />
+          </label>
+          <div class="field__value">× {{ rotateSensLocal.toFixed(1) }}</div>
+        </div>
         <label class="checkbox">
           <input type="checkbox" v-model="showHelperLocal" />
           <span>カメラフラスタムを表示</span>
@@ -100,6 +121,9 @@ const props = defineProps({
   cameraResolutionWidth: { type: Number, required: true },
   cameraResolutionHeight: { type: Number, required: true },
   showCameraHelper: { type: Boolean, default: false },
+  cameraWheelSensitivity: { type: Number, default: 1.0 },
+  cameraTranslateSensitivity: { type: Number, default: 1.0 },
+  cameraRotateSensitivity: { type: Number, default: 1.0 },
   captureBusy: { type: Boolean, default: false }
 })
 
@@ -110,6 +134,9 @@ const emit = defineEmits([
   'update:cameraResolutionWidth',
   'update:cameraResolutionHeight',
   'update:showCameraHelper',
+  'update:cameraWheelSensitivity',
+  'update:cameraTranslateSensitivity',
+  'update:cameraRotateSensitivity',
   'capture'
 ])
 
@@ -136,6 +163,19 @@ const heightLocal = computed({
 const showHelperLocal = computed({
   get: () => props.showCameraHelper,
   set: v => emit('update:showCameraHelper', !!v)
+})
+
+const wheelSensLocal = computed({
+  get: () => props.cameraWheelSensitivity,
+  set: v => emit('update:cameraWheelSensitivity', clampNumber(v, 0, 2))
+})
+const translateSensLocal = computed({
+  get: () => props.cameraTranslateSensitivity,
+  set: v => emit('update:cameraTranslateSensitivity', clampNumber(v, 0, 2))
+})
+const rotateSensLocal = computed({
+  get: () => props.cameraRotateSensitivity,
+  set: v => emit('update:cameraRotateSensitivity', clampNumber(v, 0, 2))
 })
 
 const presetLocal = computed({

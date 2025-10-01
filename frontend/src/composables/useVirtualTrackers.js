@@ -14,11 +14,10 @@ const TRACKER_DEFS = [
   { key: 'leftFoot', label: 'L Foot', color: 0x009688 },
   { key: 'rightFoot', label: 'R Foot', color: 0x8d6e63 },
   { key: 'leftKnee', label: 'L Knee', color: 0x26a69a },
-  { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 },
-  { key: 'renderCamera', label: 'Render Cam', color: 0xffc107, isCamera: true }
+  { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 }
 ]
 
-const CAMERA_TRACKER_KEY = 'renderCamera'
+const CAMERA_TRACKER_KEY = '__disabled_renderCamera'
 const CAMERA_DEFAULT_POSITION = new THREE.Vector3(0, 10, 30)
 const CAMERA_DEFAULT_TARGET = new THREE.Vector3(0, 1.2, 0)
 const CAMERA_DEFAULT_QUATERNION = new THREE.Quaternion()
@@ -30,6 +29,84 @@ const __lookAtMatrix = new THREE.Matrix4().lookAt(
 )
 CAMERA_DEFAULT_QUATERNION.setFromRotationMatrix(__lookAtMatrix)
 const GLOBAL_CAMERA_STORAGE_KEY = '__renderCamera__'
+
+function defaultCameraPositionArray() {
+  return CAMERA_DEFAULT_POSITION.toArray([])
+}
+
+function defaultCameraRotationArray() {
+  return CAMERA_DEFAULT_QUATERNION.toArray([])
+}
+
+function defaultCameraState() {
+  return {
+    space: 'world',
+    position: defaultCameraPositionArray(),
+    rotation: defaultCameraRotationArray()
+  }
+}
+
+function sanitizeNumericArray(source, length, fallback = 0) {
+  const result = new Array(length)
+  const fallbackIsArray = Array.isArray(fallback)
+  for (let i = 0; i < length; i++) {
+    const raw = Number(source?.[i])
+    const defaultValue = fallbackIsArray ? Number(fallback[i] ?? 0) : fallback
+    result[i] = Number.isFinite(raw) ? raw : defaultValue
+  }
+  return result
+}
+
+function toArrayLike(value, length) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    const keys = length === 3 ? ['x', 'y', 'z'] : ['x', 'y', 'z', 'w']
+    return keys.map(key => value?.[key])
+  }
+  return null
+}
+
+function normalizeCameraRecord(entry) {
+  if (!entry) return null
+  if (Array.isArray(entry)) {
+    if (entry.length < 3) return null
+    return {
+      space: 'world',
+      position: sanitizeNumericArray(entry, 3, 0),
+      rotation: defaultCameraRotationArray()
+    }
+  }
+  if (typeof entry === 'object') {
+    const rawPosition = toArrayLike(entry.position ?? entry.value, 3)
+    if (!rawPosition || rawPosition.length < 3) return null
+    const position = sanitizeNumericArray(rawPosition, 3, 0)
+    const rawRotation = toArrayLike(entry.rotation ?? entry.quaternion, 4)
+    let rotation
+    if (rawRotation && rawRotation.length >= 4) {
+      rotation = sanitizeNumericArray(rawRotation, 4, [0, 0, 0, 1])
+      const magnitude = Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3])
+      if (magnitude > 0) {
+        rotation = rotation.map(component => component / magnitude)
+      } else {
+        rotation = defaultCameraRotationArray()
+      }
+    } else {
+      rotation = defaultCameraRotationArray()
+    }
+    return { space: 'world', position, rotation }
+  }
+  return null
+}
+
+function applyCameraStateToMesh(mesh, state) {
+  if (!mesh || !state) return
+  if (Array.isArray(state.position) && state.position.length >= 3) {
+    mesh.position.set(state.position[0], state.position[1], state.position[2])
+  }
+  if (Array.isArray(state.rotation) && state.rotation.length >= 4) {
+    mesh.quaternion.set(state.rotation[0], state.rotation[1], state.rotation[2], state.rotation[3]).normalize()
+  }
+}
 
 export function useVirtualTrackers({ scene, camera, renderer, controls, models, logToServer, trackerDotSize, trackerLabelScale, showTrackerLabels, onManipulateStart, onManipulateEnd }) {
   const enabled = ref(false)
@@ -93,6 +170,40 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     saveAllSaved(all)
   }
 
+  function saveCameraState(state, { syncTracker = true } = {}) {
+    const normalized = normalizeCameraRecord(state)
+    if (!normalized) return null
+    setSavedCameraTransform(normalized)
+    if (syncTracker) {
+      const tracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
+      if (tracker?.mesh) applyCameraStateToMesh(tracker.mesh, normalized)
+    }
+    return normalized
+  }
+
+  function saveCameraStateFromObject(object, options = {}) {
+    if (!object?.position || !object?.quaternion) return null
+    return saveCameraState(serializeCameraState(object), options)
+  }
+
+  function getCameraState({ preferTracker = true, preferSaved = true, fallbackToCamera = true, fallbackToDefault = true } = {}) {
+    if (preferTracker) {
+      const tracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
+      if (tracker?.mesh) return serializeCameraState(tracker.mesh)
+    }
+    if (preferSaved) {
+      const saved = normalizeCameraRecord(getSavedCameraTransform())
+      if (saved) return saved
+    }
+    if (fallbackToCamera && camera?.value) {
+      return serializeCameraState(camera.value)
+    }
+    if (fallbackToDefault) {
+      return defaultCameraState()
+    }
+    return null
+  }
+
   function pruneSavedForMissingModels() {
     try {
       const all = loadAllSaved()
@@ -124,13 +235,20 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   }
 
   function createGizmos() {
-    if (group.value) return
-  group.value = markRaw(new THREE.Group())
+    // If a group exists but isn't in the scene or trackers list is incomplete, rebuild
+    if (group.value) {
+      const inScene = !!scene.value && scene.value.children.includes(group.value)
+      const complete = trackers.value.length === TRACKER_DEFS.length
+      if (inScene && complete) return
+      // stale or incomplete -> dispose and recreate
+      disposeGizmos()
+    }
+    group.value = markRaw(new THREE.Group())
     group.value.name = 'VirtualTrackers'
-  scene.value.add(group.value)
+    scene.value.add(group.value)
   const sphere = markRaw(new THREE.SphereGeometry(currentDotSize(), 16, 16))
     for (const def of TRACKER_DEFS) {
-      const isCamera = def.key === CAMERA_TRACKER_KEY
+  const isCamera = def.key === CAMERA_TRACKER_KEY
       const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
       // Always draw on top of the model
       mat.depthTest = false
@@ -159,10 +277,7 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
       mesh.add(sprite)
       group.value.add(mesh)
-      if (isCamera) {
-        mesh.position.copy(CAMERA_DEFAULT_POSITION)
-        mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
-      }
+      // camera tracker disabled
   trackers.value.push({ key: def.key, name: def.label, mesh, labelSprite: sprite })
     }
   }
@@ -192,11 +307,12 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
   }
 
   function setVisibility(vis) {
-    const hasModel = !!getActiveModel()?.vrm
+  const hasModel = Array.isArray(models?.value) && (models.value.some(m => !!m?.vrm))
     const enabledVis = !!vis
     for (const t of trackers.value) {
-      const isCamera = t.key === CAMERA_TRACKER_KEY
-      const meshVisible = isCamera ? enabledVis : (enabledVis && hasModel)
+  const isCamera = t.key === CAMERA_TRACKER_KEY
+  // Camera tracker is disabled/hidden; others show if enabled and a model is present
+  const meshVisible = isCamera ? false : (enabledVis && hasModel)
       t.mesh.visible = meshVisible
       if (t.labelSprite) t.labelSprite.visible = meshVisible && labelsVisible()
     }
@@ -252,8 +368,9 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     if (!group.value) return
     const model = getActiveModel()
     const vrm = model?.vrm || null
-    const savedAll = vrm ? getSavedPositions(model) : null
-    const saved = (!didInitialLayout && !force) ? null : savedAll
+    const rawSavedAll = (!force && vrm) ? getSavedPositions(model) : null
+    const hasSavedEntries = rawSavedAll && Object.keys(rawSavedAll).length > 0
+    const saved = hasSavedEntries ? rawSavedAll : null
 
     if (vrm) {
       const root = vrm.scene || scene.value
@@ -331,39 +448,79 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
       setFrom('rightFoot', rFoot)
     }
 
-    layoutCameraTracker({ savedAll, force })
+    layoutCameraTracker({ savedAll: saved, force })
     if (vrm && !didInitialLayout) didInitialLayout = true
   }
 
   function layoutCameraTracker({ savedAll, force = false }) {
-    const tracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
+  const tracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
     if (!tracker?.mesh) return
-    const entry = savedAll?.[CAMERA_TRACKER_KEY] ?? getSavedCameraTransform()
+    const stored = normalizeCameraRecord(savedAll?.[CAMERA_TRACKER_KEY] ?? getSavedCameraTransform())
     let applied = false
-    if (entry) {
-      if (Array.isArray(entry) && entry.length === 3) {
-        tracker.mesh.position.set(entry[0], entry[1], entry[2])
-        tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
-        applied = true
-      } else if (typeof entry === 'object' && Array.isArray(entry.position)) {
-        tracker.mesh.position.set(entry.position[0], entry.position[1], entry.position[2])
-        if (Array.isArray(entry.rotation) && entry.rotation.length === 4) {
-          const [qx, qy, qz, qw] = entry.rotation
-          tracker.mesh.quaternion.set(qx, qy, qz, qw)
-        }
-        applied = true
-      }
+    if (stored && !force) {
+      applyCameraStateToMesh(tracker.mesh, stored)
+      saveCameraState(stored, { syncTracker: false })
+      applied = true
     }
 
-    if (force || !applied) {
-      const activeCamera = camera?.value
-      if (activeCamera) {
-        tracker.mesh.position.copy(activeCamera.position)
-        tracker.mesh.quaternion.copy(activeCamera.quaternion)
+    if (!applied) {
+      // If a model is present, place camera tracker to show the model's front
+      const model = getActiveModel()
+      const vrmRoot = model?.vrm?.scene
+      if (vrmRoot) {
+        try {
+          // Compute model bounds
+          const bbox = new THREE.Box3().setFromObject(vrmRoot)
+          const center = bbox.getCenter(new THREE.Vector3())
+          const size = bbox.getSize(new THREE.Vector3())
+          // Estimate distance from vertical FOV to fit height with margin
+          const fovDeg = Number(camera?.value?.fov) || 45
+          const fov = THREE.MathUtils.degToRad(fovDeg)
+          const height = Math.max(1.0, size.y || size.length() || 2.0)
+          const margin = 1.25
+          const dist = (height * 0.5) / Math.tan(fov * 0.5) * margin
+          // Model forward: world-space -Z of vrm root
+          const forward = vrmRoot.getWorldDirection(new THREE.Vector3()).normalize()
+          // Two candidate positions: in front of the model (face side) and the opposite side.
+          const posA = center.clone().add(forward.clone().multiplyScalar(dist))
+          const posB = center.clone().sub(forward.clone().multiplyScalar(dist))
+          // Prefer the side closer to the current camera viewpoint to avoid flipping to the back.
+          let chosen = posA
+          const refCam = camera?.value
+          if (refCam) {
+            const sideDir = refCam.position.clone().sub(center).normalize()
+            const aDir = posA.clone().sub(center).normalize()
+            const bDir = posB.clone().sub(center).normalize()
+            const dotA = aDir.dot(sideDir)
+            const dotB = bDir.dot(sideDir)
+            chosen = dotB > dotA ? posB : posA
+          }
+          tracker.mesh.position.copy(chosen)
+          // Orient to look at the model center
+          const m = new THREE.Matrix4().lookAt(tracker.mesh.position, center, CAMERA_DEFAULT_UP)
+          const q = new THREE.Quaternion().setFromRotationMatrix(m)
+          tracker.mesh.quaternion.copy(q)
+        } catch {
+          // Fallback to default if bounds failed
+          tracker.mesh.position.copy(CAMERA_DEFAULT_POSITION)
+          tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+        }
       } else {
-        tracker.mesh.position.copy(CAMERA_DEFAULT_POSITION)
-        tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+        const activeCamera = camera?.value
+        if (activeCamera) {
+          const forward = new THREE.Vector3()
+          try { activeCamera.getWorldDirection(forward) } catch { forward.set(0, 0, -1) }
+          const offsetDist = 0.8
+          const pos = new THREE.Vector3().copy(activeCamera.position).add(forward.multiplyScalar(offsetDist))
+          tracker.mesh.position.copy(pos)
+          tracker.mesh.quaternion.copy(activeCamera.quaternion)
+        } else {
+          tracker.mesh.position.copy(CAMERA_DEFAULT_POSITION)
+          tracker.mesh.quaternion.copy(CAMERA_DEFAULT_QUATERNION)
+        }
       }
+      applied = true
+      saveCameraState(serializeCameraState(tracker.mesh), { syncTracker: false })
     }
   }
 
@@ -411,6 +568,15 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     if (dragState.plane.intersectLine(line, ip)) {
       const wp = ip.sub(dragState.planeOffset)
       dragState.target.position.copy(wp)
+      // If dragging the camera tracker, also move the active camera immediately (in camera mode this is the render camera)
+      if (dragState.target.userData?.isCamera && camera?.value) {
+        try {
+          camera.value.position.copy(dragState.target.position)
+          // Keep current orientation of the tracker (rotation may be adjusted elsewhere)
+          camera.value.quaternion.copy(dragState.target.quaternion)
+          camera.value.updateMatrixWorld(true)
+        } catch {}
+      }
     }
   }
   function onPointerUp(e) {
@@ -425,6 +591,14 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
         const cameraTracker = trackers.value.find(t => t.key === CAMERA_TRACKER_KEY)
         const cameraState = cameraTracker ? serializeCameraState(cameraTracker.mesh) : null
         if (cameraState) setSavedCameraTransform(cameraState)
+        // If the camera tracker moved, make sure the render camera snaps to it immediately
+        if (cameraTracker && camera?.value && cameraTracker.mesh?.userData?.isCamera) {
+          try {
+            camera.value.position.copy(cameraTracker.mesh.position)
+            camera.value.quaternion.copy(cameraTracker.mesh.quaternion)
+            camera.value.updateMatrixWorld(true)
+          } catch {}
+        }
         const model = getActiveModel()
         if (model?.vrm) {
           const data = {}
@@ -727,6 +901,11 @@ export function useVirtualTrackers({ scene, camera, renderer, controls, models, 
     cleanup,
     setEnabled,
     reset,
-    update
+    update,
+    getCameraState,
+    saveCameraState,
+    saveCameraStateFromObject,
+    // Force rebuild API for resilience
+    rebuild: () => { createGizmos(); layoutDefaultPositions(true); setVisibility(enabled.value) }
   }
 }

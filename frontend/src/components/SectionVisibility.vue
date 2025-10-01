@@ -50,6 +50,9 @@
       :camera-resolution-width="cameraResolutionWidth"
       :camera-resolution-height="cameraResolutionHeight"
       :show-camera-helper="showCameraHelper"
+  :camera-wheel-sensitivity="cameraWheelSensitivity"
+  :camera-translate-sensitivity="cameraTranslateSensitivity"
+  :camera-rotate-sensitivity="cameraRotateSensitivity"
       :capture-busy="captureBusy"
       @update:cameraFov="v => emit('update:cameraFov', v)"
       @update:cameraNear="v => emit('update:cameraNear', v)"
@@ -57,6 +60,9 @@
       @update:cameraResolutionWidth="v => emit('update:cameraResolutionWidth', v)"
       @update:cameraResolutionHeight="v => emit('update:cameraResolutionHeight', v)"
       @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
+  @update:cameraWheelSensitivity="v => emit('update:cameraWheelSensitivity', v)"
+  @update:cameraTranslateSensitivity="v => emit('update:cameraTranslateSensitivity', v)"
+  @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
       @capture="() => emit('capture-camera')"
     />
     <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
@@ -112,6 +118,9 @@ defineProps({
   cameraResolutionWidth: { type: Number, required: true },
   cameraResolutionHeight: { type: Number, required: true },
   showCameraHelper: { type: Boolean, default: false },
+  cameraWheelSensitivity: { type: Number, default: 1.0 },
+  cameraTranslateSensitivity: { type: Number, default: 1.0 },
+  cameraRotateSensitivity: { type: Number, default: 1.0 },
   captureBusy: { type: Boolean, default: false },
   active: { type: String, default: 'lighting' }
 })
@@ -140,6 +149,9 @@ const emit = defineEmits([
   'update:cameraResolutionWidth',
   'update:cameraResolutionHeight',
   'update:showCameraHelper',
+  'update:cameraWheelSensitivity',
+  'update:cameraTranslateSensitivity',
+  'update:cameraRotateSensitivity',
   'capture-camera',
   'toggle-model',
   'toggle-bone',
