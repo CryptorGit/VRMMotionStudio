@@ -1,19 +1,19 @@
 <template>
   <div class="curve-editor">
     <div class="curve-editor__header">
-      <h3>イージングカーブ</h3>
+      <h3>イージングカーチE/h3>
       <button
         type="button"
         class="curve-editor__reset"
         :disabled="!canReset"
         @click="resetCurves"
       >
-        リセット
+        リセチE��
       </button>
     </div>
 
     <div v-if="normalizedFrames.length < 2" class="curve-editor__empty">
-      <p>曲線を編集するには、2つ以上のキーを選択してください。</p>
+      <p>曲線を編雁E��るには、Eつ以上�Eキーを選択してください、E/p>
     </div>
 
     <svg
@@ -611,3 +611,5 @@ function endHandleDrag() {
   box-shadow: 0 0 0 2px rgba(45, 140, 255, 0.25);
 }
 </style>
+
+

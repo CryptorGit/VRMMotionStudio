@@ -1,7 +1,7 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>モーフ編集</h3>
+      <h3>モーフ編雁E/h3>
       <button type="button" class="action" @click="reloadMorphs">
         <Icon icon="mdi:refresh" />
         <span>更新</span>
@@ -72,3 +72,5 @@ function reloadMorphs() {
   outline: none;
 }
 </style>
+
+

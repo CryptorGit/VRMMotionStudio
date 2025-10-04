@@ -22,12 +22,12 @@
     "@iconify/vue": "^4.1.1",
     "@pixiv/three-vrm": "^2.0.7",
     "three": "^0.164.1",
+    "vite": "^7.1.9",
     "vue": "^3.5.18"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
-    "vite": "^7.1.2",
-    "vitest": "^1.1.0",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "vitest": "^1.1.0"
   }
 }

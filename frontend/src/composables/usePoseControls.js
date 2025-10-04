@@ -15,9 +15,11 @@ export function usePoseControls({
 
   function applyPose() {}
 
-  function exportPose() { /* VRM移行で未実装 */ }
+  function exportPose() { /* VRM移行で未実裁E*/ }
 
-  // IK 連動の変換イベントは VRM 最適化のため削除
+  // IK 連動�E変換イベント�E VRM 最適化�Eため削除
 
   return { poses, selectedPose, applyPose, exportPose }
 }
+
+

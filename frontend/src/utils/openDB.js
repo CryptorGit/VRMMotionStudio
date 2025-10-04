@@ -8,3 +8,5 @@ export function openDB(name, store) {
     req.onerror = () => reject(req.error)
   })
 }
+
+

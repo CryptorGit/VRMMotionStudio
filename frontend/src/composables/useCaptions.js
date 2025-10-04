@@ -14,3 +14,5 @@ export function useCaptions() {
 
   return context
 }
+
+

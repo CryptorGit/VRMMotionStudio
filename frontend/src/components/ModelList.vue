@@ -26,11 +26,11 @@ function onToggle(index, visible) {
 function springBoneStatus(m) {
   try {
     const mgr = m?.vrm?.springBoneManager
-    if (!mgr) return 'なし'
+    if (!mgr) return 'なぁE
     if (typeof mgr.enabled === 'boolean') return mgr.enabled ? '有効' : '無効'
     if (typeof mgr.getEnabled === 'function') return mgr.getEnabled() ? '有効' : '無効'
   } catch {}
-  return '不明'
+  return '不�E'
 }
 </script>
 
@@ -54,3 +54,5 @@ function springBoneStatus(m) {
   margin-left: auto;
 }
 </style>
+
+

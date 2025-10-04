@@ -228,3 +228,5 @@ export function useSidebarState({
 
   return { collapsed, visibleSections, hideSection, hasSections }
 }
+
+

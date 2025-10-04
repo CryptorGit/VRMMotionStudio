@@ -6,14 +6,14 @@
         <input type="color" v-model="ambientColor" />
       </label>
       <label class="lighting-field lighting-field--range">
-        <span>Ambient 強さ</span>
+        <span>Ambient 強ぁE/span>
         <input type="range" min="0" max="5" step="0.1" v-model.number="ambientIntensity" />
       </label>
     </div>
     <div class="lighting-panel__directional">
       <div class="lighting-panel__heading">
         <span class="lighting-panel__title">Directional Light</span>
-        <span class="lighting-panel__description">位置と向きを角度で調整できます</span>
+        <span class="lighting-panel__description">位置と向きを角度で調整できまぁE/span>
       </div>
       <div class="lighting-panel__fields">
         <label class="lighting-field">
@@ -21,7 +21,7 @@
           <input type="color" v-model="directionalColor" />
         </label>
         <label class="lighting-field lighting-field--range">
-          <span>強さ</span>
+          <span>強ぁE/span>
           <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensityProxy" />
         </label>
       </div>
@@ -41,7 +41,7 @@
       </div>
       <div class="position-inputs">
         <label class="lighting-field lighting-field--range">
-          <span>方位角(°)</span>
+          <span>方位见E°)</span>
           <input
             type="range"
             min="0"
@@ -51,7 +51,7 @@
           />
         </label>
         <label class="lighting-field lighting-field--range">
-          <span>仰角(°)</span>
+          <span>仰见E°)</span>
           <input
             type="range"
             min="-90"
@@ -265,3 +265,5 @@ input[type='number'] {
   }
 }
 </style>
+
+

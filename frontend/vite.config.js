@@ -48,11 +48,11 @@ function devLogPlugin() {
           try {
             const data = body ? JSON.parse(body) : {}
             // eslint-disable-next-line no-console
-            console.log('[frontend]', data)
+
             append(JSON.stringify({ ts: Date.now(), ...data }))
           } catch (e) {
             // eslint-disable-next-line no-console
-            console.log('[frontend] raw:', body)
+
             append(JSON.stringify({ ts: Date.now(), raw: body }))
           }
           res.statusCode = 200
@@ -74,3 +74,4 @@ export default defineConfig({
     }
   }
 })
+

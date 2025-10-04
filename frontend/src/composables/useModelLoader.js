@@ -26,3 +26,5 @@ export default function useModelLoader(ctx) {
   })
   return { ...cache, ...pose, ...ops, getLoader: () => loader.value }
 }
+
+

@@ -1,15 +1,15 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>カメラ設定</h3>
-      <p class="section__caption">レンダーカメラと出力を調整します</p>
+      <h3>カメラ設宁E/h3>
+      <p class="section__caption">レンダーカメラと出力を調整しまぁE/p>
     </header>
     <div class="section__content">
       <fieldset class="group">
         <legend>出力解像度</legend>
         <div class="resolution">
           <div class="resolution__field">
-            <label for="camera-resolution-width">幅</label>
+            <label for="camera-resolution-width">幁E/label>
             <input
               id="camera-resolution-width"
               type="number"
@@ -17,7 +17,7 @@
               max="16384"
               step="1"
               v-model.number="widthLocal"
-              aria-label="出力幅"
+              aria-label="出力幁E
             />
           </div>
           <div class="resolution__field">
@@ -33,14 +33,14 @@
             />
           </div>
           <div class="resolution__presets">
-            <label>プリセット</label>
+            <label>プリセチE��</label>
             <select v-model="presetLocal">
               <option value="custom">カスタム</option>
-              <option value="1920x1080">1920 × 1080 (FHD)</option>
-              <option value="2560x1440">2560 × 1440 (QHD)</option>
-              <option value="3840x2160">3840 × 2160 (4K UHD)</option>
-              <option value="1080x1080">1080 × 1080 (Square)</option>
-              <option value="1280x720">1280 × 720 (HD)</option>
+              <option value="1920x1080">1920 ÁE1080 (FHD)</option>
+              <option value="2560x1440">2560 ÁE1440 (QHD)</option>
+              <option value="3840x2160">3840 ÁE2160 (4K UHD)</option>
+              <option value="1080x1080">1080 ÁE1080 (Square)</option>
+              <option value="1280x720">1280 ÁE720 (HD)</option>
             </select>
           </div>
         </div>
@@ -50,7 +50,7 @@
         <legend>撮影パラメータ</legend>
         <div class="field">
           <label class="stretch">
-            視野角 (垂直)
+            視野见E(垂直)
             <input
               type="range"
               min="20"
@@ -63,11 +63,11 @@
         </div>
         <div class="field">
           <label>
-            近クリップ
+            近クリチE�E
             <input type="number" min="0.001" max="10" step="0.001" v-model.number="nearLocal" />
           </label>
           <label>
-            遠クリップ
+            遠クリチE�E
             <input type="number" min="1" max="10000" step="1" v-model.number="farLocal" />
           </label>
         </div>
@@ -76,21 +76,21 @@
             ホイール移動感度
             <input type="range" min="0" max="2" step="0.05" v-model.number="wheelSensLocal" />
           </label>
-          <div class="field__value">× {{ wheelSensLocal.toFixed(1) }}</div>
+          <div class="field__value">ÁE{{ wheelSensLocal.toFixed(1) }}</div>
         </div>
         <div class="field">
           <label class="stretch">
-            左クリック移動感度
+            左クリチE��移動感度
             <input type="range" min="0" max="2" step="0.05" v-model.number="translateSensLocal" />
           </label>
-          <div class="field__value">× {{ translateSensLocal.toFixed(1) }}</div>
+          <div class="field__value">ÁE{{ translateSensLocal.toFixed(1) }}</div>
         </div>
         <div class="field">
           <label class="stretch">
-            右クリック回転感度
+            右クリチE��回転感度
             <input type="range" min="0" max="2" step="0.05" v-model.number="rotateSensLocal" />
           </label>
-          <div class="field__value">× {{ rotateSensLocal.toFixed(1) }}</div>
+          <div class="field__value">ÁE{{ rotateSensLocal.toFixed(1) }}</div>
         </div>
         <label class="checkbox">
           <input type="checkbox" v-model="showHelperLocal" />
@@ -103,8 +103,8 @@
             :disabled="captureBusy"
             @click="emit('capture')"
           >
-            <span v-if="!captureBusy">レンダー画像を書き出し</span>
-            <span v-else>書き出し中…</span>
+            <span v-if="!captureBusy">レンダー画像を書き�EぁE/span>
+            <span v-else>書き�Eし中…</span>
           </button>
         </div>
       </fieldset>
@@ -385,3 +385,5 @@ function clampNumber(value, min, max) {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 </style>
+
+

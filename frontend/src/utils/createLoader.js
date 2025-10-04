@@ -7,3 +7,5 @@ export function createLoader(manager) {
   loader.register(parser => new VRMLoaderPlugin(parser))
   return loader
 }
+
+

@@ -1,7 +1,7 @@
 <template>
   <aside class="properties-panel">
     <div class="properties-body">
-      <nav class="tab-strip" role="tablist" aria-label="設定のカテゴリ">
+      <nav class="tab-strip" role="tablist" aria-label="設定�EカチE��リ">
         <button
           v-for="tab in SECTION_TABS"
           :key="tab.id"
@@ -341,3 +341,5 @@ const {
   background: transparent;
 }
 </style>
+
+

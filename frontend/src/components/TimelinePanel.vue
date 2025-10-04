@@ -43,7 +43,7 @@
         class="timeline-grid"
         :style="gridStyle"
       >
-        <div class="name-header">トラッカー</div>
+        <div class="name-header">トラチE��ー</div>
         <div class="time-header" @mousedown="startSeek">
           <div class="time-scale" :style="timeScaleStyle">
             <div
@@ -507,3 +507,5 @@ function tickStyle(time) {
   z-index: 7;
 }
 </style>
+
+

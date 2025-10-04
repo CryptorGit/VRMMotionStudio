@@ -1,22 +1,22 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>バーチャルトラッカー</h3>
+      <h3>バ�EチャルトラチE��ー</h3>
     </header>
     <div class="section__content">
       <div class="row row--header">
         <label class="checkbox">
           <input type="checkbox" :checked="virtualTrackersEnabled" @change="onEnabledChange($event.target.checked)">
-          <span>トラッカーを有効化</span>
+          <span>トラチE��ーを有効匁E/span>
         </label>
         <div class="actions">
-          <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">位置リセット</button>
+          <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">位置リセチE��</button>
         </div>
       </div>
       <div class="row row--toggles">
         <label class="checkbox">
           <input type="checkbox" :checked="virtualTrackerDisplayVisible" @change="onDisplayToggle($event.target.checked)">
-          <span>トラッカー表示</span>
+          <span>トラチE��ー表示</span>
         </label>
         <label class="checkbox">
           <input type="checkbox" :checked="showVirtualTrackerLabels" @change="emit('update:showVirtualTrackerLabels', $event.target.checked)">
@@ -25,7 +25,7 @@
       </div>
       <div class="row">
         <label class="stretch">
-          トラッカー表示サイズ
+          トラチE��ー表示サイズ
           <input
             type="range"
             min="0.005"
@@ -49,7 +49,7 @@
           >
         </label>
       </div>
-      <p class="tracker-note">ビューポート上で直接ドラッグして調整してください。</p>
+      <p class="tracker-note">ビューポ�Eト上で直接ドラチE��して調整してください、E/p>
     </div>
   </section>
 </template>
@@ -185,3 +185,5 @@ label.stretch {
   opacity: 0.7;
 }
 </style>
+
+

@@ -37,12 +37,12 @@
             :secondary-min-pixels="160"
           >
             <template #primary>
-              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポート領域">
+              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポ�Eト領域">
                 <div class="workspace-panel__body workspace-panel__body--viewport">
                   <div class="viewport-frame">
                     <div class="viewport-overlay viewport-overlay--top-left top-left-controls">
-                      <label class="mode-switch" aria-label="ビューモード切替">
-                        <span>モード</span>
+                      <label class="mode-switch" aria-label="ビューモード�E替">
+                        <span>モーチE/span>
                         <select v-model="viewportMode">
                           <option v-for="mode in viewportModes" :key="mode.value" :value="mode.value">
                             {{ mode.label }}
@@ -50,24 +50,24 @@
                         </select>
                       </label>
                       <div class="round-buttons">
-                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip('元に戻す (Undo)')">⟲</button>
-                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip('やり直し (Redo)')">⟳</button>
+                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip('允E��戻ぁE(Undo)')">⟲</button>
+                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip('めE��直ぁE(Redo)')">⟳</button>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--top-right">
                       <div class="camera-status">
                         <span class="camera-status__label">RenderCam</span>
-                        <span class="camera-status__resolution">{{ renderCameraWidth }} × {{ renderCameraHeight }}</span>
+                        <span class="camera-status__resolution">{{ renderCameraWidth }} ÁE{{ renderCameraHeight }}</span>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="camera-hint">
-                        左ドラッグ: 平行移動 ／ 右ドラッグ: パン・チルト ／ ホイール: 前後移動
+                        左ドラチE��: 平行移勁E�E�E右ドラチE��: パン・チルチE�E�Eホイール: 前後移勁E
                       </p>
                     </div>
                     <div v-else-if="virtualTrackersEnabled" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="tracker-hint">
-                        左ドラッグ: 位置移動 ／ Shift: 微調整
+                        左ドラチE��: 位置移勁E�E�EShift: 微調整
                       </p>
                     </div>
                     <div class="viewport-overlay viewport-overlay--bottom-right">
@@ -281,7 +281,7 @@ const highlightConstraint = ref(false)
 const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
 
-// VRMアウトライン設定
+// VRMアウトライン設宁E
 const outlineWidth = ref(0.002)
 const outlineColor = ref('#000000')
 
@@ -325,8 +325,8 @@ const cameraRotateSensitivity = ref(1.0) // multiplier for right-drag yaw/pitch
 
 const rollRingRef = ref(null)
 const viewportModes = [
-  { value: 'view', label: 'ビューモード' },
-  { value: 'camera', label: 'カメラモード' }
+  { value: 'view', label: 'ビューモーチE },
+  { value: 'camera', label: 'カメラモーチE }
 ]
 
 const cameraInteraction = reactive({
@@ -711,7 +711,7 @@ function toggleAutoRestore() {
       localStorage.setItem('autoRestore', '0')
     }
   } catch {}
-  pushToast(`モデル自動復元: ${autoRestore.value ? 'ON' : 'OFF'}`, '設定')
+  pushToast(`モチE��自動復允E ${autoRestore.value ? 'ON' : 'OFF'}`, '設宁E)
 }
 
 function loadCaptionPreference() {
@@ -733,7 +733,7 @@ function toggleCaptions() {
       localStorage.setItem(CAPTION_STORAGE_KEY, '0')
     }
   } catch {}
-  pushToast(`ボタンキャプション: ${showCaptions.value ? '表示' : '非表示'}`, '設定')
+  pushToast(`ボタンキャプション: ${showCaptions.value ? '表示' : '非表示'}`, '設宁E)
 }
 
 async function logToServer(data) {
@@ -786,14 +786,14 @@ function handleCachePersisted(event = {}) {
   if (event.ok) {
     const successReasons = ['load', 'restore', 'visibilitychange', 'pagehide', 'remove']
     if (!cacheSavedToastShown && successReasons.includes(event.reason)) {
-      pushToast('キャッシュを保存しました', 'キャッシュ', 2800)
+      pushToast('キャチE��ュを保存しました', 'キャチE��ュ', 2800)
       cacheSavedToastShown = true
       try { sessionStorage.setItem(CACHE_SAVED_TOAST_KEY, '1') } catch {}
     }
   } else if (event.ok === false && event.reason !== 'clear') {
     const now = Date.now()
     if (!lastCacheErrorToastAt || now - lastCacheErrorToastAt > 10000) {
-      pushToast('キャッシュの保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      pushToast('キャチE��ュの保存に失敗しました。ブラウザのストレージ設定をご確認ください、E, 'キャチE��ュ', 5600)
       lastCacheErrorToastAt = now
     }
   }
@@ -1330,15 +1330,15 @@ const frameStatus = computed(() => {
 })
 
 const storageStatus = computed(() => {
-  if (!storageSupported.value) return 'キャッシュ: 標準保存'
+  if (!storageSupported.value) return 'キャチE��ュ: 標準保孁E
   const usageBytes = storageUsage.value || 0
   const quotaBytes = storageQuota.value || 0
   const guard = storagePersisted.value ? '保護' : '未保護'
   if (!quotaBytes) {
-    return `キャッシュ ${formatStorage(usageBytes)} (${guard})`
+    return `キャチE��ュ ${formatStorage(usageBytes)} (${guard})`
   }
   const percent = quotaBytes > 0 ? Math.min(100, Math.max(0, Math.round((usageBytes / quotaBytes) * 100))) : 0
-  return `キャッシュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
+  return `キャチE��ュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
 })
 
 const statusMessage = computed(() => `${frameStatus.value} | ${storageStatus.value}`)
@@ -1728,7 +1728,7 @@ watch(lastTrackerKey, key => {
 function resetVirtualTrackers() {
   try {
     trackerController.reset()
-    pushToast('バーチャルトラッカーをリセットしました', 'トラッカー')
+    pushToast('バ�EチャルトラチE��ーをリセチE��しました', 'トラチE��ー')
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
   } catch {}
@@ -1747,7 +1747,7 @@ function applyTimelinePoseImmediate() {
 
 function handleTimelineAddKey(payload) {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    pushToast('タイムラインが�E期化されてぁE��せん', 'タイムライン', 4200)
     return
   }
   ensureVirtualTrackers()
@@ -1765,7 +1765,7 @@ function handleTimelineAddKey(payload) {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('add-key')
-    pushToast('現在のポーズをキーに追加しました', 'タイムライン', 2200)
+    pushToast('現在のポ�Eズをキーに追加しました', 'タイムライン', 2200)
   } catch (error) {
     pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
   }
@@ -1908,32 +1908,32 @@ function pasteClipboardFallback(clipboard, anchorTime) {
 
 function handleTimelineCopyKeyframes() {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    pushToast('タイムラインが�E期化されてぁE��せん', 'タイムライン', 4200)
     return
   }
   const ids = Array.isArray(timelineSelection.selectedIds) && timelineSelection.selectedIds.length
     ? timelineSelection.selectedIds
     : timelineSelection.frames.map(frame => frame.id)
   if (!ids.length) {
-    pushToast('コピーするキーを選択してください', 'タイムライン', 3200)
+    pushToast('コピ�Eするキーを選択してください', 'タイムライン', 3200)
     return
   }
   try {
     const clipboardPayload = captureTimelineClipboard(ids)
     if (!clipboardPayload) {
-      pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+      pushToast('キーのコピ�Eに失敗しました', 'タイムライン', 4200)
       return
     }
     timelineClipboard.value = clipboardPayload
-    pushToast(`${clipboardPayload.frames.length}個のキーをコピーしました`, 'タイムライン', 2200)
+    pushToast(`${clipboardPayload.frames.length}個�Eキーをコピ�Eしました`, 'タイムライン', 2200)
   } catch {
-    pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+    pushToast('キーのコピ�Eに失敗しました', 'タイムライン', 4200)
   }
 }
 
 function handleTimelinePasteKeyframes() {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    pushToast('タイムラインが�E期化されてぁE��せん', 'タイムライン', 4200)
     return
   }
   const normalizedClipboard = normalizeClipboardPayload(timelineClipboard.value, timelineFrameRate.value || 60)
@@ -1956,7 +1956,7 @@ function handleTimelinePasteKeyframes() {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('paste-keys')
-    pushToast(`${pasted.length}個のキーを貼り付けました`, 'タイムライン', 2200)
+    pushToast(`${pasted.length}個�Eキーを貼り付けました`, 'タイムライン', 2200)
   } catch {
     pushToast('キーの貼り付けに失敗しました', 'タイムライン', 4200)
   }
@@ -2155,34 +2155,34 @@ function handleTimelineExport() {
     anchor.click()
     document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
-    pushToast('タイムラインをエクスポートしました', 'タイムライン', 2600)
+    pushToast('タイムラインをエクスポ�Eトしました', 'タイムライン', 2600)
   } catch {
-    pushToast('タイムラインのエクスポートに失敗しました', 'タイムライン', 4800)
+    pushToast('タイムラインのエクスポ�Eトに失敗しました', 'タイムライン', 4800)
   }
 }
 
 function handleTimelineClear() {
   if (!timelineController) return
-  const confirmed = window.confirm('タイムラインをすべて削除しますか？')
+  const confirmed = window.confirm('タイムラインをすべて削除しますか�E�E)
   if (!confirmed) return
   try {
     pushHistory('clear')
     timelineController.clearAll()
     timelineController.stop()
     timelineClipboard.value = null
-    pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
+    pushToast('タイムラインをリセチE��しました', 'タイムライン', 2600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
+    pushToast('タイムラインのリセチE��に失敗しました', 'タイムライン', 4800)
   }
 }
 
 function captureRenderImage() {
   if (captureBusy.value) return
   if (!renderer.value || !scene.value || !renderCamera.value) {
-    pushToast('レンダーカメラがまだ準備できていません', 'カメラ', 4200)
+    pushToast('レンダーカメラがまだ準備できてぁE��せん', 'カメラ', 4200)
     return
   }
 
@@ -2225,7 +2225,7 @@ function captureRenderImage() {
     document.body.removeChild(anchor)
     pushToast(`${filename} を保存しました`, 'カメラ', 2800)
   } catch {
-    pushToast('レンダー画像の書き出しに失敗しました', 'カメラ', 5200)
+    pushToast('レンダー画像�E書き�Eしに失敗しました', 'カメラ', 5200)
   } finally {
     try {
       if (renderCamera.value) {
@@ -2272,7 +2272,7 @@ async function clearAllCache() {
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
-    pushToast('キャッシュとタイムラインをリセットしました', 'キャッシュ')
+    pushToast('キャチE��ュとタイムラインをリセチE��しました', 'キャチE��ュ')
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
@@ -2280,12 +2280,12 @@ async function clearAllCache() {
 }
 
 function handleError(e) {
-  const msg = e?.error?.message || e?.message || '不明なエラーが発生しました'
+  const msg = e?.error?.message || e?.message || '不�Eなエラーが発生しました'
   pushToast(msg, 'エラー', 5200)
 }
 
 function handleUnhandledRejection(e) {
-  const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
+  const msg = e?.reason?.message || e?.reason || '未処琁E�EPromise拒否が発生しました'
   pushToast(msg, 'エラー', 5200)
 }
 
@@ -2352,12 +2352,12 @@ onMounted(async () => {
   if (storageSupported.value) {
     if (persistedGranted) {
       if (storagePersistToastState !== 'granted') {
-        pushToast('キャッシュの永続化が有効になりました', 'キャッシュ', 3600)
+        pushToast('キャチE��ュの永続化が有効になりました', 'キャチE��ュ', 3600)
         storagePersistToastState = 'granted'
         try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'granted') } catch {}
       }
     } else if (storagePersistToastState !== 'denied') {
-      pushToast('キャッシュの永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      pushToast('キャチE��ュの永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください、E, 'キャチE��ュ', 5600)
       storagePersistToastState = 'denied'
       try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'denied') } catch {}
     }
@@ -2469,7 +2469,7 @@ watch(models, (arr) => {
   } catch {}
 })
 
-// アウトライン設定の変更を監視
+// アウトライン設定�E変更を監要E
 watch([outlineWidth, outlineColor], () => {
   updateOutlineSettings()
 })
@@ -2482,7 +2482,7 @@ function updateOutlineSettings() {
         if (obj.isMesh && obj.material) {
           const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
           materials.forEach(mat => {
-            // MToonMaterialの場合のみアウトライン設定を適用
+            // MToonMaterialの場合�Eみアウトライン設定を適用
             if (mat.isMToonMaterial || mat.type === 'MToonMaterial') {
               const color = new THREE.Color(outlineColor.value)
               if (typeof mat.outlineWidthFactor === 'number' || mat.uniforms?.outlineWidthFactor) {
@@ -2996,3 +2996,5 @@ onUnmounted(() => {
   }
 }
 </style>
+
+
