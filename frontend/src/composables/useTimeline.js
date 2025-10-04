@@ -583,10 +583,7 @@ export function useTimeline({ trackers, renderCamera }) {
     try {
       const version = Number(snapshot.version) || TIMELINE_SERIAL_VERSION
       if (version > TIMELINE_SERIAL_VERSION) {
-        // proceed but warn in dev
-        if (import.meta?.env?.DEV) {
-          console.warn('Timeline snapshot version is newer than supported:', version)
-        }
+        // proceed but warn in dev (silently)
       }
 
       if (Number.isFinite(snapshot.frameRate) && snapshot.frameRate > 0) {
@@ -736,9 +733,10 @@ import * as THREE from 'three'
 
 let nextKeyframeId = 1
 let nextMarkerId = 1
-const TIMELINE_SERIAL_VERSION = 2
-const STORAGE_KEY_STATE = 'timeline.state.v2'
-const LEGACY_STORAGE_KEYS = ['timeline.state.v1']
+const TIMELINE_SERIAL_VERSION = 3
+const TIMELINE_CLIPBOARD_VERSION = 1
+const STORAGE_KEY_STATE = 'timeline.state.v3'
+const LEGACY_STORAGE_KEYS = ['timeline.state.v2', 'timeline.state.v1']
 
 let saveTimer = null
 let restoringState = false
@@ -765,6 +763,42 @@ function lerpVector(a, b, t) {
 const tempQuatA = new THREE.Quaternion()
 const tempQuatB = new THREE.Quaternion()
 const tempQuatSlerp = new THREE.Quaternion()
+
+const DEFAULT_CURVE = Object.freeze({
+  in: { x: 2 / 3, y: 2 / 3 },
+  out: { x: 1 / 3, y: 1 / 3 }
+})
+
+function clamp01(value) {
+  if (!Number.isFinite(value)) return 0
+  if (value < 0) return 0
+  if (value > 1) return 1
+  return value
+}
+
+function sanitizeHandle(handle, fallback) {
+  const fb = fallback || { x: 0.5, y: 0.5 }
+  return {
+    x: clamp01(handle?.x ?? fb.x ?? 0.5),
+    y: clamp01(handle?.y ?? fb.y ?? 0.5)
+  }
+}
+
+function sanitizeCurve(curve, fallback = DEFAULT_CURVE) {
+  const fb = fallback || DEFAULT_CURVE
+  return {
+    in: sanitizeHandle(curve?.in, fb.in || DEFAULT_CURVE.in),
+    out: sanitizeHandle(curve?.out, fb.out || DEFAULT_CURVE.out)
+  }
+}
+
+function cloneCurve(curve) {
+  if (!curve) return sanitizeCurve(DEFAULT_CURVE)
+  return {
+    in: { ...sanitizeHandle(curve.in, DEFAULT_CURVE.in) },
+    out: { ...sanitizeHandle(curve.out, DEFAULT_CURVE.out) }
+  }
+}
 
 function cloneQuaternion(rot) {
   if (!rot) return [0, 0, 0, 1]
@@ -1017,9 +1051,7 @@ export function useTimeline({ trackers, renderCamera }) {
           return true
         }
       } catch (error) {
-        if (import.meta?.env?.DEV) {
-          console.warn('Failed to restore timeline state', error)
-        }
+        // Failed to restore timeline state
       }
     }
     return false
@@ -1067,15 +1099,16 @@ export function useTimeline({ trackers, renderCamera }) {
     return Math.round(clampTime(time) * fps)
   }
 
-  function addKeyframe({ time, values }) {
+  function addKeyframe({ time, values, curve }) {
     const clampedTime = clampTime(time)
     const targetFrame = timeToFrame(clampedTime)
-  const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
+    const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
 
     let updatedEntry = null
     const nextFrames = keyframes.value.map(frame => {
       if (timeToFrame(frame.time) !== targetFrame) return frame
-      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues }
+      const nextCurve = curve ? sanitizeCurve(curve, frame.curve || DEFAULT_CURVE) : cloneCurve(frame.curve || DEFAULT_CURVE)
+      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curve: nextCurve }
       return updatedEntry
     })
 
@@ -1090,7 +1123,8 @@ export function useTimeline({ trackers, renderCamera }) {
     const entry = {
       id: nextKeyframeId++,
       time: clampedTime,
-      values: sanitizedValues
+      values: sanitizedValues,
+      curve: sanitizeCurve(curve, DEFAULT_CURVE)
     }
     keyframes.value = [...nextFrames, entry].sort((a, b) => a.time - b.time)
     storeLastApplied(entry.values)
@@ -1138,6 +1172,22 @@ export function useTimeline({ trackers, renderCamera }) {
         updated.values = sanitizeSnapshotValues(payload.values, trackers, lastAppliedValues)
         changed = true
       }
+      if (payload.curve && typeof payload.curve === 'object') {
+        const nextCurve = sanitizeCurve(payload.curve, updated.curve || DEFAULT_CURVE)
+        if (
+          !updated.curve ||
+          updated.curve.in.x !== nextCurve.in.x ||
+          updated.curve.in.y !== nextCurve.in.y ||
+          updated.curve.out.x !== nextCurve.out.x ||
+          updated.curve.out.y !== nextCurve.out.y
+        ) {
+          updated.curve = nextCurve
+          changed = true
+        }
+      }
+      if (!updated.curve) {
+        updated.curve = cloneCurve(DEFAULT_CURVE)
+      }
       return updated
     })
     if (!changed) return keyframes.value.find(frame => frame.id === id) || null
@@ -1173,6 +1223,63 @@ export function useTimeline({ trackers, renderCamera }) {
     applyCurrentPose()
   }
 
+  function copyKeyframes(ids) {
+    const sourceIds = Array.isArray(ids) ? ids : []
+    if (!sourceIds.length) return null
+    const targets = new Set(sourceIds.map(value => Number(value)).filter(Number.isFinite))
+    if (!targets.size) return null
+    const frames = keyframes.value
+      .filter(frame => targets.has(frame.id))
+      .map(frame => ({
+        time: Number(frame.time) || 0,
+        values: cloneSnapshot(frame.values),
+        curve: cloneCurve(frame.curve || DEFAULT_CURVE)
+      }))
+      .sort((a, b) => a.time - b.time)
+    if (!frames.length) return null
+    const baseTime = frames[0].time || 0
+    const sanitizedFrames = frames.map(frame => ({
+      timeOffset: Number(frame.time) - baseTime || 0,
+      values: cloneSnapshot(frame.values),
+      curve: cloneCurve(frame.curve || DEFAULT_CURVE)
+    }))
+    return {
+      version: TIMELINE_CLIPBOARD_VERSION,
+      frameRate: frameRate.value || 60,
+      createdAt: Date.now(),
+      frames: sanitizedFrames
+    }
+  }
+
+  function pasteKeyframes(clipboard, { time } = {}) {
+    if (!clipboard || typeof clipboard !== 'object') return []
+    const framesSource = Array.isArray(clipboard.frames) ? clipboard.frames : []
+    if (!framesSource.length) return []
+    const normalized = framesSource
+      .map(frame => {
+        const offset = Number(frame?.timeOffset ?? frame?.offset ?? frame?.time)
+        if (!Number.isFinite(offset)) return null
+        const values = cloneSnapshot(frame?.values)
+        const curve = cloneCurve(frame?.curve || DEFAULT_CURVE)
+        return { offset, values, curve }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.offset - b.offset)
+    if (!normalized.length) return []
+
+    const firstOffset = normalized[0].offset || 0
+    const anchorTime = Number.isFinite(time) ? time : currentTime.value || 0
+    const baseTime = anchorTime - firstOffset
+    const created = []
+    normalized.forEach(entry => {
+      const targetTime = baseTime + entry.offset
+      const keyframe = addKeyframe({ time: targetTime, values: entry.values, curve: entry.curve })
+      if (keyframe) created.push(keyframe)
+    })
+    applyCurrentPose()
+    return created
+  }
+
   function updateKeyframeTime(id, nextTime) {
     if (!Number.isFinite(nextTime)) return
     updateKeyframe(id, { time: nextTime })
@@ -1203,6 +1310,57 @@ export function useTimeline({ trackers, renderCamera }) {
     return { previous: last, next: last }
   }
 
+  function bezierCoord(t, p0, p1, p2, p3) {
+    const inv = 1 - t
+    return inv * inv * inv * p0 + 3 * inv * inv * t * p1 + 3 * inv * t * t * p2 + t * t * t * p3
+  }
+
+  function bezierDerivative(t, p0, p1, p2, p3) {
+    const inv = 1 - t
+    return 3 * inv * inv * (p1 - p0) + 6 * inv * t * (p2 - p1) + 3 * t * t * (p3 - p2)
+  }
+
+  function cubicBezierYFromX(x, handleOut, handleIn) {
+    const targetX = clamp01(x)
+    const p1 = sanitizeHandle(handleOut, DEFAULT_CURVE.out)
+    const p2 = sanitizeHandle(handleIn, DEFAULT_CURVE.in)
+    let guess = targetX
+
+    for (let i = 0; i < 5; i++) {
+      const currentX = bezierCoord(guess, 0, p1.x, p2.x, 1)
+      const error = currentX - targetX
+      if (Math.abs(error) < 1e-5) break
+      const slope = bezierDerivative(guess, 0, p1.x, p2.x, 1)
+      if (Math.abs(slope) < 1e-6) break
+      guess -= error / slope
+      if (guess < 0) guess = 0
+      else if (guess > 1) guess = 1
+    }
+
+    let lower = 0
+    let upper = 1
+    for (let i = 0; i < 6; i++) {
+      const currentX = bezierCoord(guess, 0, p1.x, p2.x, 1)
+      if (currentX < targetX) {
+        lower = guess
+      } else {
+        upper = guess
+      }
+      guess = (lower + upper) / 2
+    }
+
+    const y = bezierCoord(guess, 0, p1.y, p2.y, 1)
+    return clamp01(y)
+  }
+
+  function applyCurveAlpha(previous, next, t) {
+    if (!previous || !next) return clamp01(t)
+    const normalized = clamp01(t)
+    const prevCurve = sanitizeCurve(previous.curve, DEFAULT_CURVE)
+    const nextCurve = sanitizeCurve(next.curve, DEFAULT_CURVE)
+    return cubicBezierYFromX(normalized, prevCurve.out, nextCurve.in)
+  }
+
   function cloneSnapshot(values) {
     const result = {}
     for (const [key, value] of Object.entries(values || {})) {
@@ -1222,8 +1380,9 @@ export function useTimeline({ trackers, renderCamera }) {
       return cloneSnapshot(previous.values)
     }
     const span = next.time - previous.time || 1
-    const alpha = (clampTime(time) - previous.time) / span
-    return interpolateSnapshots(previous.values, next.values, alpha, trackers)
+    const rawAlpha = (clampTime(time) - previous.time) / span
+    const easedAlpha = applyCurveAlpha(previous, next, rawAlpha)
+    return interpolateSnapshots(previous.values, next.values, easedAlpha, trackers)
   }
 
   function getTrackAtTime(trackerKey, time) {
@@ -1443,7 +1602,8 @@ export function useTimeline({ trackers, renderCamera }) {
         return {
           id,
           time: Number.isFinite(time) ? clampTime(time) : startTime.value,
-          values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues, renderCamera)
+          values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues, renderCamera),
+          curve: sanitizeCurve(entry.curve, DEFAULT_CURVE)
         }
       })
       .sort((a, b) => a.time - b.time)
@@ -1456,7 +1616,8 @@ export function useTimeline({ trackers, renderCamera }) {
     return keyframes.value.map(frame => ({
       id: frame.id,
       time: frame.time,
-      values: cloneSnapshot(frame.values)
+      values: cloneSnapshot(frame.values),
+      curve: cloneCurve(frame.curve || DEFAULT_CURVE)
     }))
   }
 
@@ -1593,13 +1754,17 @@ export function useTimeline({ trackers, renderCamera }) {
     addKeyframe,
     addSnapshotAtTime,
     removeKeyframe,
+    removeKeyframes,
     updateKeyframe,
+    moveKeyframes,
     updateKeyframeTime,
     clearAll,
     getTrackAtTime,
     applyCurrentPose,
     importKeyframes,
     exportKeyframes,
+    copyKeyframes,
+    pasteKeyframes,
     serialize,
     deserialize,
     restoreState

@@ -4,12 +4,15 @@
       :theme="theme"
       :auto-restore="autoRestore"
       :show-captions="showCaptions"
+      :timeline-export-enabled="timelineHasContent"
       @import="openFile"
       @export="exportPose"
       @clear-cache="clearAllCache"
       @toggle-auto-restore="toggleAutoRestore"
       @toggle-theme="toggleTheme"
       @toggle-captions="toggleCaptions"
+      @timeline-import="handleTimelineRequestImport"
+      @timeline-export="handleTimelineExport"
     />
     <div class="workspace-grid" role="presentation">
       <SplitPane
@@ -62,6 +65,11 @@
                         左ドラッグ: 平行移動 ／ 右ドラッグ: パン・チルト ／ ホイール: 前後移動
                       </p>
                     </div>
+                    <div v-else-if="virtualTrackersEnabled" class="viewport-overlay viewport-overlay--bottom-left">
+                      <p class="tracker-hint">
+                        左ドラッグ: 位置移動 ／ Shift: 微調整
+                      </p>
+                    </div>
                     <div class="viewport-overlay viewport-overlay--bottom-right">
                       <div
                         class="yaw-ring"
@@ -100,6 +108,9 @@
                     :is-playing="timelinePlaying"
                     :loop="timelineLoop"
                     :snap="timelineSnap"
+                    :can-paste="timelineClipboardReady"
+                    @import-timeline="handleTimelineRequestImport"
+                    @export-timeline="handleTimelineExport"
                     @seek="handleTimelineSeek"
                     @play="handleTimelinePlay"
                     @pause="handleTimelinePause"
@@ -115,9 +126,10 @@
                     @move-keyframes="handleTimelineMoveKeys"
                     @update-range="handleTimelineRange"
                     @update:snap="timelineSnap = $event"
-                    @request-import="handleTimelineRequestImport"
-                    @export-timeline="handleTimelineExport"
                     @clear-timeline="handleTimelineClear"
+                    @copy-keyframes="handleTimelineCopyKeyframes"
+                    @paste-keyframes="handleTimelinePasteKeyframes"
+                    @update-keyframe-selection="handleTimelineSelectionChange"
                   />
                 </div>
               </section>
@@ -145,10 +157,22 @@
                 v-model:show-other-bones="showOtherBones"
                 v-model:bone-dot-size="boneDotSize"
                 v-model:bone-label-scale="boneLabelScale"
+                v-model:outline-width="outlineWidth"
+                v-model:outline-color="outlineColor"
                 v-model:virtual-trackers-enabled="virtualTrackersEnabled"
+                v-model:virtual-tracker-display-visible="virtualTrackerDisplayVisible"
                 v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
                 v-model:virtual-tracker-size="virtualTrackerSize"
                 v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
+                :tracker-states="trackerStatesView"
+                :tracker-rotation-orders="trackerRotationOrders"
+                :active-tracker-key="lastTrackerKey"
+                :tracker-adjust-state="trackerAdjustState"
+                :tracker-axes="trackerAxes"
+                :tracker-position-range="trackerPositionRange"
+                :tracker-rotation-range="trackerRotationRange"
+                :tracker-position-step="trackerPositionStep"
+                :tracker-rotation-step="trackerRotationStep"
                 v-model:camera-fov="renderCameraFov"
                 v-model:camera-near="renderCameraNear"
                 v-model:camera-far="renderCameraFar"
@@ -159,6 +183,13 @@
                 v-model:camera-translate-sensitivity="cameraTranslateSensitivity"
                 v-model:camera-rotate-sensitivity="cameraRotateSensitivity"
                 :capture-busy="captureBusy"
+                :timeline-selection="timelineSelection"
+                :timeline-snap="timelineSnap"
+                :timeline-loop="timelineLoop"
+                @update-timeline-snap="handleTimelineSnapSetting"
+                @update-timeline-loop="handleTimelineLoopSetting"
+                @remove-selected-keyframes="handleSettingsRemoveSelectedKeyframes"
+                @update-keyframe-curves="handleTimelineCurveUpdate"
                 @reset-virtual-trackers="resetVirtualTrackers"
                 @toggle-model="toggleModelVisibility"
                 @toggle-bone="toggleBoneVisibility"
@@ -219,7 +250,7 @@ import {
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
-import { useVirtualTrackers } from '../composables/useVirtualTrackers.js'
+import { useVirtualTrackers, TRACKER_ROTATION_ORDERS } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useHistory } from '../composables/useHistory.js'
 import { useTheme } from '../composables/useTheme.js'
@@ -250,10 +281,29 @@ const highlightConstraint = ref(false)
 const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
 
+// VRMアウトライン設定
+const outlineWidth = ref(0.002)
+const outlineColor = ref('#000000')
+
 const virtualTrackersEnabled = ref(false)
+const virtualTrackerDisplayVisible = ref(true)
 const showVirtualTrackerLabels = ref(true)
 const virtualTrackerSize = ref(0.08)
 const virtualTrackerLabelScale = ref(1.0)
+
+const trackerAxes = ['x', 'y', 'z']
+const trackerPositionRange = { min: -2.5, max: 2.5 }
+const trackerRotationRange = { min: -180, max: 180 }
+const trackerPositionStep = 0.01
+const trackerRotationStep = 0.5
+
+const lastTrackerKey = ref(null)
+const trackerAdjustState = reactive({
+  label: '',
+  position: { x: 0, y: 0, z: 0 },
+  rotation: { x: 0, y: 0, z: 0 },
+  order: TRACKER_ROTATION_ORDERS[0] || 'XYZ'
+})
 
 const viewportMode = ref('view')
 const isCameraMode = computed(() => viewportMode.value === 'camera')
@@ -345,6 +395,8 @@ const updateStorageEstimate = storagePersistence.updateEstimate
 const DISPLAY_SETTINGS_KEY = 'ui.display.state.v1'
 let displaySettingsSaveTimer = null
 let restoringDisplaySettings = false
+let pendingTrackerStateSnapshot = null
+let pendingLastTrackerKey = null
 
 const TIMELINE_SNAPSHOT_STORAGE_KEY = 'timeline.snapshot.v3'
 let timelinePersistenceEnabled = false
@@ -370,9 +422,12 @@ function getDisplaySettingsSnapshot() {
     boneDotSize: boneDotSize.value,
     boneLabelScale: boneLabelScale.value,
     virtualTrackersEnabled: virtualTrackersEnabled.value,
+    virtualTrackerDisplayVisible: virtualTrackerDisplayVisible.value,
     showVirtualTrackerLabels: showVirtualTrackerLabels.value,
     virtualTrackerSize: virtualTrackerSize.value,
     virtualTrackerLabelScale: virtualTrackerLabelScale.value,
+    virtualTrackerStates: serializeTrackerStates(),
+    lastTrackerKey: lastTrackerKey.value,
     cameraFov: renderCameraFov.value,
     cameraNear: renderCameraNear.value,
     cameraFar: renderCameraFar.value,
@@ -383,6 +438,58 @@ function getDisplaySettingsSnapshot() {
     cameraTranslateSensitivity: cameraTranslateSensitivity.value,
     cameraRotateSensitivity: cameraRotateSensitivity.value
   }
+}
+
+function serializeTrackerStates() {
+  const source = trackerController?.trackerStates || {}
+  const snapshot = {}
+  for (const [key, state] of Object.entries(source)) {
+    if (!state) continue
+    const angles = state.angles || {}
+    snapshot[key] = {
+      order: typeof state.order === 'string' ? state.order : undefined,
+      angles: {
+        x: Number(angles.x) || 0,
+        y: Number(angles.y) || 0,
+        z: Number(angles.z) || 0
+      }
+    }
+    const tracker = trackerController?.trackers?.value?.find(t => t.key === key)
+    if (tracker?.mesh) {
+      try { tracker.mesh.updateMatrixWorld(true) } catch {}
+      snapshot[key].position = tracker.mesh.position.toArray([])
+      snapshot[key].rotation = tracker.mesh.quaternion.toArray([])
+    }
+  }
+  return snapshot
+}
+
+function restoreTrackerStateSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || !trackerController) return
+  for (const [key, state] of Object.entries(snapshot)) {
+    if (!state) continue
+    if (state.order) {
+      try { trackerController.setTrackerRotationOrder(key, state.order, { persist: false }) } catch {}
+    }
+    if (state.angles) {
+      try { trackerController.setTrackerRotationDegrees(key, state.angles, { persist: false }) } catch {}
+    }
+    const tracker = trackerController?.trackers?.value?.find(t => t.key === key)
+    if (tracker?.mesh) {
+      if (Array.isArray(state.position) && state.position.length === 3) {
+        tracker.mesh.position.fromArray(state.position)
+      }
+      if (Array.isArray(state.rotation) && state.rotation.length === 4) {
+        tracker.mesh.quaternion.fromArray(state.rotation).normalize()
+      }
+      try { tracker.mesh.updateMatrixWorld(true) } catch {}
+      try { trackerController.syncTrackerStateFromMesh?.(key) } catch {}
+    }
+  }
+  try { trackerController.persistTrackerTransforms({ includeCamera: false }) } catch {}
+  try { trackerController.setDisplayVisible(virtualTrackerDisplayVisible.value) } catch {}
+  refreshTrackerAdjustState()
+  applyPendingLastTrackerKey()
 }
 
 function saveDisplaySettings() {
@@ -406,8 +513,8 @@ function persistTimelineSnapshot(serialized) {
   try {
     localStorage.setItem(TIMELINE_SNAPSHOT_STORAGE_KEY, serialized)
     lastPersistedTimelineSerialized = serialized
-  } catch (error) {
-    if (import.meta.env.DEV) console.warn('Timeline snapshot persist failed', error)
+  } catch {
+    // Timeline snapshot persist failed
   }
 }
 
@@ -418,8 +525,8 @@ function scheduleTimelineSnapshotPersist(snapshot, reason = 'state') {
   let serialized
   try {
     serialized = JSON.stringify(snapshot)
-  } catch (error) {
-    if (import.meta.env.DEV) console.warn('Failed to stringify timeline snapshot', error)
+  } catch {
+    // Failed to stringify timeline snapshot
     return
   }
   if (serialized === lastPersistedTimelineSerialized) return
@@ -445,8 +552,8 @@ function markTimelineDirty(reason = 'state', snapshot = null) {
   if (!working) {
     try {
       working = timelineController.serialize()
-    } catch (error) {
-      if (import.meta.env.DEV) console.warn('Failed to capture timeline snapshot', error)
+    } catch {
+      // Failed to capture timeline snapshot
       return
     }
   }
@@ -477,8 +584,8 @@ function restoreTimelineSnapshot() {
   let snapshot
   try {
     snapshot = JSON.parse(raw)
-  } catch (error) {
-    if (import.meta.env.DEV) console.warn('Failed to parse timeline snapshot', error)
+  } catch {
+    // Failed to parse timeline snapshot
     timelineSnapshotRestored = true
     return false
   }
@@ -496,8 +603,8 @@ function restoreTimelineSnapshot() {
       lastPersistedTimelineSerialized = raw
       success = true
     }
-  } catch (error) {
-    if (import.meta.env.DEV) console.warn('Timeline snapshot restore failed', error)
+  } catch {
+    // Timeline snapshot restore failed
     success = false
   } finally {
     timelineSnapshotRestoring = false
@@ -532,9 +639,22 @@ function loadDisplaySettings() {
     if (Number.isFinite(data.boneDotSize)) boneDotSize.value = data.boneDotSize
     if (Number.isFinite(data.boneLabelScale)) boneLabelScale.value = data.boneLabelScale
     if (typeof data.virtualTrackersEnabled === 'boolean') virtualTrackersEnabled.value = data.virtualTrackersEnabled
+    if (typeof data.virtualTrackerDisplayVisible === 'boolean') virtualTrackerDisplayVisible.value = data.virtualTrackerDisplayVisible
     if (typeof data.showVirtualTrackerLabels === 'boolean') showVirtualTrackerLabels.value = data.showVirtualTrackerLabels
     if (Number.isFinite(data.virtualTrackerSize)) virtualTrackerSize.value = data.virtualTrackerSize
     if (Number.isFinite(data.virtualTrackerLabelScale)) virtualTrackerLabelScale.value = data.virtualTrackerLabelScale
+    if (data.virtualTrackerStates && typeof data.virtualTrackerStates === 'object') {
+      pendingTrackerStateSnapshot = data.virtualTrackerStates
+      if (trackerController) {
+        restoreTrackerStateSnapshot(pendingTrackerStateSnapshot)
+        pendingTrackerStateSnapshot = null
+      }
+    }
+    if (typeof data.lastTrackerKey === 'string' && data.lastTrackerKey) {
+      pendingLastTrackerKey = data.lastTrackerKey
+      lastTrackerKey.value = data.lastTrackerKey
+      applyPendingLastTrackerKey()
+    }
     if (Number.isFinite(data.cameraFov)) renderCameraFov.value = data.cameraFov
     if (Number.isFinite(data.cameraNear)) renderCameraNear.value = data.cameraNear
     if (Number.isFinite(data.cameraFar)) renderCameraFar.value = data.cameraFar
@@ -544,10 +664,8 @@ function loadDisplaySettings() {
     if (Number.isFinite(data.cameraWheelSensitivity)) cameraWheelSensitivity.value = clamp0to2(data.cameraWheelSensitivity)
     if (Number.isFinite(data.cameraTranslateSensitivity)) cameraTranslateSensitivity.value = clamp0to2(data.cameraTranslateSensitivity)
     if (Number.isFinite(data.cameraRotateSensitivity)) cameraRotateSensitivity.value = clamp0to2(data.cameraRotateSensitivity)
-  } catch (error) {
-    if (import.meta?.env?.DEV) {
-      console.warn('Failed to load display settings', error)
-    }
+  } catch {
+    // Failed to load display settings
   } finally {
     restoringDisplaySettings = false
   }
@@ -678,9 +796,6 @@ function handleCachePersisted(event = {}) {
       pushToast('キャッシュの保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
       lastCacheErrorToastAt = now
     }
-    if (import.meta.env.DEV && event.error) {
-      console.warn('Cache persistence failure', event.reason, event.error)
-    }
   }
 }
 
@@ -730,6 +845,86 @@ const timelineFileInput = ref(null)
 
 let trackerController = null
 let timelineController = null
+
+function roundTo(value, decimals = 3) {
+  const factor = Math.pow(10, decimals)
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 0
+  return Math.round(num * factor) / factor
+}
+
+function clampValue(value, range) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return Number(range?.min ?? 0)
+  let result = num
+  if (range?.min !== undefined && result < range.min) result = range.min
+  if (range?.max !== undefined && result > range.max) result = range.max
+  return result
+}
+
+let trackerAdjustHistoryTimer = null
+function ensureTrackerAdjustHistory() {
+  if (!trackerAdjustHistoryTimer) {
+    try { pushHistory('tracker-adjust') } catch {}
+  }
+  if (trackerAdjustHistoryTimer && typeof window !== 'undefined') {
+    window.clearTimeout(trackerAdjustHistoryTimer)
+  }
+  if (typeof window !== 'undefined') {
+    trackerAdjustHistoryTimer = window.setTimeout(() => {
+      trackerAdjustHistoryTimer = null
+    }, 420)
+  }
+}
+
+function refreshTrackerAdjustState(targetKey = lastTrackerKey.value) {
+  if (!trackerController?.getTrackerSnapshot) return
+  let resolvedKey = targetKey
+  if (!resolvedKey) {
+    resolvedKey = trackerController?.lastActiveTrackerKey?.value
+      || trackerController?.trackers?.value?.[0]?.key
+      || Object.keys(trackerController?.trackerStates || {})[0]
+  }
+  if (!resolvedKey) return
+  const snapshot = trackerController.getTrackerSnapshot(resolvedKey)
+  if (!snapshot) return
+  lastTrackerKey.value = snapshot.key
+  if (trackerController?.lastActiveTrackerKey) {
+    trackerController.lastActiveTrackerKey.value = snapshot.key
+  }
+  trackerAdjustState.label = snapshot.label || snapshot.key
+  trackerAdjustState.order = snapshot.order || trackerAdjustState.order
+  if (Array.isArray(snapshot.position)) {
+    trackerAdjustState.position.x = roundTo(snapshot.position[0], 3)
+    trackerAdjustState.position.y = roundTo(snapshot.position[1], 3)
+    trackerAdjustState.position.z = roundTo(snapshot.position[2], 3)
+  }
+  if (snapshot.angles) {
+    trackerAdjustState.rotation.x = roundTo(snapshot.angles.x ?? 0, 2)
+    trackerAdjustState.rotation.y = roundTo(snapshot.angles.y ?? 0, 2)
+    trackerAdjustState.rotation.z = roundTo(snapshot.angles.z ?? 0, 2)
+  }
+}
+
+function applyPendingLastTrackerKey() {
+  if (!pendingLastTrackerKey) return
+  if (!trackerController?.getTrackerSnapshot) return
+  const snapshot = trackerController.getTrackerSnapshot(pendingLastTrackerKey)
+  if (!snapshot) return
+  pendingLastTrackerKey = null
+  lastTrackerKey.value = snapshot.key
+  refreshTrackerAdjustState(snapshot.key)
+}
+
+function handleTrackerTransformEvent(event = {}) {
+  if (event.persisted !== false) scheduleDisplaySettingsSave()
+  if (event.key && event.key !== 'all') {
+    lastTrackerKey.value = event.key
+    refreshTrackerAdjustState(event.key)
+  } else if (!event.key && lastTrackerKey.value) {
+    refreshTrackerAdjustState(lastTrackerKey.value)
+  }
+}
 
 const updateTrackers = () => {
   try {
@@ -1094,6 +1289,7 @@ const timelineSnap = ref(true)
 
 // Mirror timeline state into refs to avoid stale computed dependencies before controller is created
 const timelineKeyframes = ref([])
+const timelineClipboard = ref(null)
 const timelineDuration = ref(0)
 const timelineCurrentTime = ref(0)
 const timelinePlaying = ref(false)
@@ -1101,6 +1297,22 @@ const timelineStartTime = ref(0)
 const timelineEndTime = ref(0)
 const timelineFrameRate = ref(60)
 const timelineLoop = ref(false)
+const timelineSelection = reactive({
+  frames: [],
+  selectedIds: [],
+  hasSelection: false,
+  hasMultiple: false,
+  startTime: null,
+  endTime: null,
+  duration: 0
+})
+
+const timelineClipboardReady = computed(() => {
+  const frames = timelineClipboard.value?.frames
+  return Array.isArray(frames) && frames.length > 0
+})
+
+const timelineHasContent = computed(() => Array.isArray(timelineKeyframes.value) && timelineKeyframes.value.length > 0)
 
 function formatStorage(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB'
@@ -1246,50 +1458,135 @@ trackerController = useVirtualTrackers({
   trackerDotSize: virtualTrackerSize,
   trackerLabelScale: virtualTrackerLabelScale,
   showTrackerLabels: showVirtualTrackerLabels,
-  onManipulateStart: () => pushHistory('tracker-drag')
+  onManipulateStart: payload => {
+    if (payload?.key) {
+      lastTrackerKey.value = payload.key
+      refreshTrackerAdjustState(payload.key)
+    }
+    pushHistory('tracker-drag')
+  },
+  onManipulateEnd: () => {
+    refreshTrackerAdjustState()
+  },
+  onTrackerTransform: handleTrackerTransformEvent
 })
+
+refreshTrackerAdjustState()
+
+const trackerStatesView = computed(() => trackerController?.trackerStates || {})
+const trackerRotationOrders = computed(() => trackerController?.rotationOrders || TRACKER_ROTATION_ORDERS)
 
 timelineController = useTimeline({ trackers: trackerController.trackers, renderCamera })
 let syncTimelineRefs = () => {}
-// Bridge timeline controller state into local refs for reliable reactivity
-if (timelineController) {
-  const cloneTransform = source => {
-    if (!source || typeof source !== 'object') return { position: [0, 0, 0], rotation: [0, 0, 0, 1] }
-    const pos = Array.isArray(source.position)
-      ? source.position
-      : Array.isArray(source.value)
-        ? source.value
-        : [source?.x, source?.y, source?.z]
-    const rot = Array.isArray(source.rotation)
-      ? source.rotation
-      : Array.isArray(source.quaternion)
-        ? source.quaternion
-        : [source?.qx, source?.qy, source?.qz, source?.qw]
-    const clampPosition = (posArray = []) => [0, 1, 2].map(i => Number(posArray[i]) || 0)
-    const clampRotation = (rotArray = []) => {
-      const raw = [0, 1, 2, 3].map(i => Number(rotArray[i]) || (i === 3 ? 1 : 0))
-      const len = Math.hypot(raw[0], raw[1], raw[2], raw[3]) || 1
-      return raw.map(value => value / len)
-    }
-    return {
-      position: clampPosition(pos),
-      rotation: clampRotation(rot)
-    }
+const DEFAULT_TIMELINE_CURVE = Object.freeze({
+  in: { x: 2 / 3, y: 2 / 3 },
+  out: { x: 1 / 3, y: 1 / 3 }
+})
+
+const TIMELINE_CLIPBOARD_VERSION = 1
+
+const clampCurveUnit = value => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 0
+  if (num <= 0) return 0
+  if (num >= 1) return 1
+  return num
+}
+
+const cloneTimelineCurve = curve => ({
+  in: {
+    x: clampCurveUnit(curve?.in?.x ?? DEFAULT_TIMELINE_CURVE.in.x),
+    y: clampCurveUnit(curve?.in?.y ?? DEFAULT_TIMELINE_CURVE.in.y)
+  },
+  out: {
+    x: clampCurveUnit(curve?.out?.x ?? DEFAULT_TIMELINE_CURVE.out.x),
+    y: clampCurveUnit(curve?.out?.y ?? DEFAULT_TIMELINE_CURVE.out.y)
+  }
+})
+
+const normalizeTimelineTransform = source => {
+  if (!source || typeof source !== 'object') {
+    return { position: [0, 0, 0], rotation: [0, 0, 0, 1] }
+  }
+  const clampPosition = (posArray = []) => [0, 1, 2].map(i => Number(posArray[i]) || 0)
+  const clampRotation = (rotArray = []) => {
+    const raw = [0, 1, 2, 3].map(i => Number(rotArray[i]) || (i === 3 ? 1 : 0))
+    const len = Math.hypot(raw[0], raw[1], raw[2], raw[3]) || 1
+    return raw.map(value => value / len)
   }
 
+  const extractPosition = () => {
+    if (Array.isArray(source.position)) return source.position
+    if (Array.isArray(source.value)) return source.value
+    if (Array.isArray(source) && source.length >= 3) return source
+    if (source.position?.isVector3) return source.position.toArray([])
+    if (source.value?.isVector3) return source.value.toArray([])
+    if (source.isVector3) return source.toArray([])
+    return [source?.x, source?.y, source?.z]
+  }
+
+  const extractRotation = () => {
+    if (Array.isArray(source.rotation)) return source.rotation
+    if (Array.isArray(source.quaternion)) return source.quaternion
+    if (source.rotation?.isQuaternion) return source.rotation.toArray([])
+    if (source.quaternion?.isQuaternion) return source.quaternion.toArray([])
+    if (source.isQuaternion) return source.toArray([])
+    return [source?.qx, source?.qy, source?.qz, source?.qw]
+  }
+
+  return {
+    position: clampPosition(extractPosition()),
+    rotation: clampRotation(extractRotation())
+  }
+}
+
+const normalizeClipboardPayload = (clipboard, fallbackFps = 60) => {
+  const frames = Array.isArray(clipboard?.frames) ? clipboard.frames : []
+  if (!frames.length) return null
+  const normalizedFrames = frames
+    .map(frame => {
+      const offset = Number(frame?.timeOffset ?? frame?.offset ?? frame?.time)
+      if (!Number.isFinite(offset)) return null
+      const values = {}
+      if (frame?.values && typeof frame.values === 'object') {
+        for (const [key, value] of Object.entries(frame.values)) {
+          values[key] = normalizeTimelineTransform(value)
+        }
+      }
+      return {
+        timeOffset: offset,
+        values,
+        curve: cloneTimelineCurve(frame?.curve)
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.timeOffset - b.timeOffset)
+
+  if (!normalizedFrames.length) return null
+
+  return {
+    version: Number(clipboard?.version) || TIMELINE_CLIPBOARD_VERSION,
+    frameRate: Number(clipboard?.frameRate) || fallbackFps,
+    createdAt: Date.now(),
+    frames: normalizedFrames
+  }
+}
+// Bridge timeline controller state into local refs for reliable reactivity
+if (timelineController) {
   const cloneKeyframes = frames => {
     if (!Array.isArray(frames)) return []
     return frames.map(frame => {
       const values = {}
       if (frame?.values && typeof frame.values === 'object') {
         for (const [key, value] of Object.entries(frame.values)) {
-          values[key] = cloneTransform(value)
+          values[key] = normalizeTimelineTransform(value)
         }
       }
       return {
         id: Number(frame?.id) || 0,
         time: Number(frame?.time) || 0,
-        values
+        values,
+        curve: cloneTimelineCurve(frame?.curve)
       }
     })
   }
@@ -1405,12 +1702,35 @@ watch(virtualTrackersEnabled, v => {
   if (v) {
     applyTimelinePoseImmediate()
   }
+  refreshTrackerAdjustState()
+  scheduleDisplaySettingsSave()
+})
+
+watch(virtualTrackerDisplayVisible, v => {
+  try { trackerController.setDisplayVisible(v) } catch {}
+  scheduleDisplaySettingsSave()
+})
+
+watch(
+  () => trackerController?.lastActiveTrackerKey?.value,
+  key => {
+    if (key && key !== lastTrackerKey.value) {
+      lastTrackerKey.value = key
+      refreshTrackerAdjustState(key)
+    }
+  }
+)
+
+watch(lastTrackerKey, key => {
+  if (key) refreshTrackerAdjustState(key)
 })
 
 function resetVirtualTrackers() {
   try {
     trackerController.reset()
     pushToast('バーチャルトラッカーをリセットしました', 'トラッカー')
+    refreshTrackerAdjustState()
+    scheduleDisplaySettingsSave()
   } catch {}
 }
 
@@ -1448,7 +1768,6 @@ function handleTimelineAddKey(payload) {
     pushToast('現在のポーズをキーに追加しました', 'タイムライン', 2200)
   } catch (error) {
     pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
-    if (import.meta.env.DEV) console.error('Timeline add key failed', error)
   }
 }
 
@@ -1473,8 +1792,8 @@ function handleTimelineRemoveKeys(payload) {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('remove-keys')
-  } catch (error) {
-    if (import.meta.env.DEV) console.error('Timeline remove keys failed', error)
+  } catch {
+    // Timeline remove keys failed
   }
 }
 
@@ -1506,14 +1825,231 @@ function handleTimelineMoveKeys(payload) {
       normalized.forEach(({ keyframeId, time }) => timelineController.updateKeyframe(keyframeId, { time }))
       applied = true
     }
-  } catch (error) {
-    if (import.meta.env.DEV) console.error('Timeline move keys failed', error)
+  } catch {
+    // Timeline move keys failed
   }
   if (applied) {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('move-keys')
   }
+}
+
+function buildClipboardFromSerialize(ids) {
+  if (!timelineController?.serialize) return null
+  try {
+    const snapshot = timelineController.serialize()
+    const frames = Array.isArray(snapshot?.keyframes) ? snapshot.keyframes : []
+    const idSet = new Set(ids.map(value => Number(value)).filter(Number.isFinite))
+    if (!idSet.size) return null
+    const selected = frames
+      .filter(frame => idSet.has(Number(frame?.id)))
+      .map(frame => ({
+        id: Number(frame?.id) || 0,
+        time: Number(frame?.time) || 0,
+        values: frame?.values || {},
+        curve: frame?.curve || DEFAULT_TIMELINE_CURVE
+      }))
+      .sort((a, b) => a.time - b.time)
+    if (!selected.length) return null
+    const baseTime = selected[0].time || 0
+    const framesPayload = selected.map(frame => ({
+      timeOffset: frame.time - baseTime,
+      values: frame.values,
+      curve: frame.curve
+    }))
+    return {
+      version: TIMELINE_CLIPBOARD_VERSION,
+      frameRate: Number(snapshot?.frameRate) || timelineFrameRate.value || 60,
+      frames: framesPayload
+    }
+  } catch {
+    return null
+  }
+}
+
+function captureTimelineClipboard(ids) {
+  if (!Array.isArray(ids) || !ids.length) return null
+  let raw = null
+  if (timelineController?.copyKeyframes) {
+    try {
+      raw = timelineController.copyKeyframes(ids)
+    } catch {
+      // Timeline copyKeyframes failed, falling back
+    }
+  }
+  if (!raw) raw = buildClipboardFromSerialize(ids)
+  if (!raw) return null
+  return normalizeClipboardPayload(raw, timelineFrameRate.value || 60)
+}
+
+function pasteClipboardFallback(clipboard, anchorTime) {
+  const frames = Array.isArray(clipboard?.frames) ? clipboard.frames : []
+  if (!frames.length) return []
+  const firstOffset = Number(frames[0]?.timeOffset) || 0
+  const baseTime = (Number(anchorTime) || 0) - firstOffset
+  const created = []
+  frames.forEach(entry => {
+    const offset = Number(entry?.timeOffset)
+    if (!Number.isFinite(offset)) return
+    const targetTime = baseTime + offset
+    const values = {}
+    if (entry?.values && typeof entry.values === 'object') {
+      for (const [key, value] of Object.entries(entry.values)) {
+        values[key] = normalizeTimelineTransform(value)
+      }
+    }
+    const curve = cloneTimelineCurve(entry?.curve)
+    const keyframe = timelineController.addKeyframe({ time: targetTime, values, curve })
+    if (keyframe) created.push(keyframe)
+  })
+  return created
+}
+
+function handleTimelineCopyKeyframes() {
+  if (!timelineController) {
+    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    return
+  }
+  const ids = Array.isArray(timelineSelection.selectedIds) && timelineSelection.selectedIds.length
+    ? timelineSelection.selectedIds
+    : timelineSelection.frames.map(frame => frame.id)
+  if (!ids.length) {
+    pushToast('コピーするキーを選択してください', 'タイムライン', 3200)
+    return
+  }
+  try {
+    const clipboardPayload = captureTimelineClipboard(ids)
+    if (!clipboardPayload) {
+      pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+      return
+    }
+    timelineClipboard.value = clipboardPayload
+    pushToast(`${clipboardPayload.frames.length}個のキーをコピーしました`, 'タイムライン', 2200)
+  } catch {
+    pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+  }
+}
+
+function handleTimelinePasteKeyframes() {
+  if (!timelineController) {
+    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    return
+  }
+  const normalizedClipboard = normalizeClipboardPayload(timelineClipboard.value, timelineFrameRate.value || 60)
+  if (!normalizedClipboard) {
+    pushToast('貼り付けるキーがありません', 'タイムライン', 3200)
+    return
+  }
+  timelineClipboard.value = normalizedClipboard
+  ensureVirtualTrackers()
+  try {
+    pushHistory('paste-keys')
+    const anchorTime = timelineController.currentTime?.value ?? timelineCurrentTime.value ?? 0
+    const pasted = timelineController.pasteKeyframes
+      ? timelineController.pasteKeyframes(normalizedClipboard, { time: anchorTime })
+      : pasteClipboardFallback(normalizedClipboard, anchorTime)
+    if (!Array.isArray(pasted) || !pasted.length) {
+      pushToast('キーの貼り付けに失敗しました', 'タイムライン', 4200)
+      return
+    }
+    applyTimelinePoseImmediate()
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('paste-keys')
+    pushToast(`${pasted.length}個のキーを貼り付けました`, 'タイムライン', 2200)
+  } catch {
+    pushToast('キーの貼り付けに失敗しました', 'タイムライン', 4200)
+  }
+}
+
+function handleTimelineSelectionChange(payload) {
+  const framesSource = Array.isArray(payload?.frames) ? payload.frames : []
+  const sanitizedFrames = framesSource
+    .map(frame => {
+      const id = Number(frame?.id ?? frame?.keyframeId)
+      if (!Number.isFinite(id)) return null
+      const time = Number(frame?.time)
+      const frameLabel = typeof frame?.frameLabel === 'string' ? frame.frameLabel : ''
+      const timeLabel = typeof frame?.timeLabel === 'string' ? frame.timeLabel : ''
+      return {
+        id,
+        time: Number.isFinite(time) ? time : 0,
+        frameLabel,
+        timeLabel,
+        curve: cloneTimelineCurve(frame?.curve),
+        isFirst: !!frame?.isFirst,
+        isLast: !!frame?.isLast
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.time - b.time)
+
+  const idsSource = Array.isArray(payload?.selectedIds) ? payload.selectedIds : sanitizedFrames.map(entry => entry.id)
+  const normalizedIds = Array.from(
+    new Set(idsSource.map(value => Number(value)).filter(Number.isFinite))
+  )
+
+  timelineSelection.frames = sanitizedFrames
+  timelineSelection.selectedIds = normalizedIds
+  timelineSelection.hasSelection = sanitizedFrames.length > 0
+  timelineSelection.hasMultiple = sanitizedFrames.length > 1
+  const first = sanitizedFrames[0]
+  const last = sanitizedFrames[sanitizedFrames.length - 1]
+  timelineSelection.startTime = first ? first.time : null
+  timelineSelection.endTime = last ? last.time : null
+  timelineSelection.duration =
+    sanitizedFrames.length >= 2 && Number.isFinite(timelineSelection.startTime) && Number.isFinite(timelineSelection.endTime)
+      ? timelineSelection.endTime - timelineSelection.startTime
+      : 0
+}
+
+function handleTimelineCurveUpdate(payload) {
+  const updatesSource = Array.isArray(payload?.updates) ? payload.updates : []
+  if (!updatesSource.length || !timelineController) return
+  const updates = updatesSource
+    .map(entry => {
+      const keyframeId = Number(entry?.keyframeId ?? entry?.id)
+      if (!Number.isFinite(keyframeId)) return null
+      const curve = cloneTimelineCurve(entry?.curve)
+      return { keyframeId, curve }
+    })
+    .filter(Boolean)
+  if (!updates.length) return
+  try {
+    pushHistory('curve')
+    updates.forEach(({ keyframeId, curve }) => {
+      timelineController.updateKeyframe(keyframeId, { curve })
+    })
+    applyTimelinePoseImmediate()
+    if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+    markTimelineDirty('curve')
+  } catch {
+    // Timeline curve update failed
+  }
+}
+
+function handleTimelineSnapSetting(value) {
+  timelineSnap.value = value !== false
+}
+
+function handleTimelineLoopSetting(value) {
+  const next = !!value
+  timelineLoop.value = next
+  if (!timelineController) return
+  try {
+    timelineController.loopPlayback.value = next
+    markTimelineDirty('loop-setting')
+  } catch {
+    // Timeline loop toggle failed
+  }
+}
+
+function handleSettingsRemoveSelectedKeyframes() {
+  const targets = Array.isArray(timelineSelection.selectedIds)
+    ? timelineSelection.selectedIds
+    : timelineSelection.frames.map(frame => frame.id)
+  if (!targets.length) return
+  handleTimelineRemoveKeys({ keyframeIds: targets })
 }
 
 function handleTimelineSeek(time) {
@@ -1552,8 +2088,8 @@ function handleTimelineToggleLoop() {
   try {
     timelineController.loopPlayback.value = !timelineController.loopPlayback.value
     markTimelineDirty('toggle-loop')
-  } catch (error) {
-    if (import.meta.env.DEV) console.error('Timeline toggle loop failed', error)
+  } catch {
+    // Timeline toggle loop failed
   }
 }
 
@@ -1564,8 +2100,8 @@ function handleTimelineRange({ startFrame, endFrame }) {
     timelineController.setRangeFromFrames(startFrame, endFrame)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('range')
-  } catch (error) {
-    if (import.meta.env.DEV) console.error('Timeline range update failed', error)
+  } catch {
+    // Timeline range update failed
   }
 }
 
@@ -1599,9 +2135,8 @@ async function handleTimelineImportFile(event) {
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('import')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
-  } catch (error) {
+  } catch {
     pushToast('タイムラインJSONの解析に失敗しました', 'タイムライン', 5200)
-    if (import.meta.env.DEV) console.error('Timeline import failed', error)
   } finally {
     if (input) input.value = ''
   }
@@ -1621,9 +2156,8 @@ function handleTimelineExport() {
     document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
     pushToast('タイムラインをエクスポートしました', 'タイムライン', 2600)
-  } catch (error) {
+  } catch {
     pushToast('タイムラインのエクスポートに失敗しました', 'タイムライン', 4800)
-    if (import.meta.env.DEV) console.error('Timeline export failed', error)
   }
 }
 
@@ -1635,13 +2169,13 @@ function handleTimelineClear() {
     pushHistory('clear')
     timelineController.clearAll()
     timelineController.stop()
+    timelineClipboard.value = null
     pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
-  } catch (error) {
+  } catch {
     pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
-    if (import.meta.env.DEV) console.error('Timeline clear failed', error)
   }
 }
 
@@ -1690,9 +2224,8 @@ function captureRenderImage() {
     anchor.click()
     document.body.removeChild(anchor)
     pushToast(`${filename} を保存しました`, 'カメラ', 2800)
-  } catch (error) {
+  } catch {
     pushToast('レンダー画像の書き出しに失敗しました', 'カメラ', 5200)
-    if (import.meta.env.DEV) console.error('Render capture failed', error)
   } finally {
     try {
       if (renderCamera.value) {
@@ -1749,21 +2282,11 @@ async function clearAllCache() {
 function handleError(e) {
   const msg = e?.error?.message || e?.message || '不明なエラーが発生しました'
   pushToast(msg, 'エラー', 5200)
-  try {
-    console.error('Unhandled error:', e.error || e.message)
-  } catch (err) {
-    console.error('Error handler failed:', err)
-  }
 }
 
 function handleUnhandledRejection(e) {
   const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
   pushToast(msg, 'エラー', 5200)
-  try {
-    console.error('Unhandled rejection:', e.reason)
-  } catch (err) {
-    console.error('Unhandledrejection handler failed:', err)
-  }
 }
 
 const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHandlers({
@@ -1859,6 +2382,13 @@ onMounted(async () => {
   try { trackerController.init?.() } catch {}
   // Sync controller enabled state with current UI flag after init
   try { trackerController.setEnabled(!!virtualTrackersEnabled.value) } catch {}
+  if (pendingTrackerStateSnapshot) {
+    restoreTrackerStateSnapshot(pendingTrackerStateSnapshot)
+    pendingTrackerStateSnapshot = null
+  } else {
+    try { trackerController.setDisplayVisible(virtualTrackerDisplayVisible.value) } catch {}
+  }
+  applyPendingLastTrackerKey()
   // If enabled but no tracker meshes exist (edge case), force rebuild once
   try {
     const none = !Array.isArray(trackerController?.trackers?.value) || trackerController.trackers.value.length === 0
@@ -1934,8 +2464,44 @@ watch(models, (arr) => {
       // Frame avatar front unless overridden by timeline camera track
       try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
     }
+    // アウトライン設定を適用
+    updateOutlineSettings()
   } catch {}
 })
+
+// アウトライン設定の変更を監視
+watch([outlineWidth, outlineColor], () => {
+  updateOutlineSettings()
+})
+
+function updateOutlineSettings() {
+  try {
+    models.value.forEach(model => {
+      if (!model?.vrm?.scene) return
+      model.vrm.scene.traverse(obj => {
+        if (obj.isMesh && obj.material) {
+          const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+          materials.forEach(mat => {
+            // MToonMaterialの場合のみアウトライン設定を適用
+            if (mat.isMToonMaterial || mat.type === 'MToonMaterial') {
+              const color = new THREE.Color(outlineColor.value)
+              if (typeof mat.outlineWidthFactor === 'number' || mat.uniforms?.outlineWidthFactor) {
+                try { mat.outlineWidthFactor = outlineWidth.value } catch {}
+              }
+              if (mat.uniforms?.outlineColorFactor !== undefined) {
+                try { mat.outlineColorFactor = color } catch {
+                  mat.uniforms.outlineColorFactor.value.set(color.r, color.g, color.b)
+                }
+              }
+              mat.uniformsNeedUpdate = true
+              mat.needsUpdate = true
+            }
+          })
+        }
+      })
+    })
+  } catch {}
+}
 
 onUnmounted(() => {
   cleanupErrorHandlers()
@@ -2080,6 +2646,181 @@ onUnmounted(() => {
 .viewport-overlay--bottom-right {
   bottom: 14px;
   right: 14px;
+}
+
+.tracker-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(216, 224, 248, 0.78);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.viewport-overlay--mid-right {
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.tracker-adjust__container {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.tracker-adjust__container.is-collapsed .tracker-adjust__panel {
+  display: none;
+}
+
+.tracker-adjust__container.is-collapsed .tracker-adjust__toggle {
+  border-radius: 18px;
+}
+
+.tracker-adjust__toggle {
+  writing-mode: vertical-rl;
+  padding: 0.65rem 0.4rem;
+  border-radius: 18px 0 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(16, 20, 30, 0.9);
+  color: rgba(226, 232, 255, 0.9);
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.tracker-adjust__toggle:hover,
+.tracker-adjust__toggle:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent, #5c8cff) 28%, rgba(16, 20, 30, 0.9));
+  color: var(--text-strong, #fdfcff);
+}
+
+.tracker-adjust__toggle-icon {
+  font-size: 0.9rem;
+}
+
+.tracker-adjust__panel {
+  width: 280px;
+  padding: 0.95rem;
+  border-radius: 18px;
+  background: rgba(18, 22, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.tracker-adjust__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tracker-adjust__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(235, 240, 255, 0.95);
+}
+
+.tracker-adjust__subtitle {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: rgba(200, 210, 235, 0.75);
+}
+
+.tracker-adjust__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tracker-adjust__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tracker-adjust__section h4 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: rgba(205, 215, 240, 0.84);
+}
+
+.tracker-adjust__row {
+  display: grid;
+  grid-template-columns: 32px 1fr 70px;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.tracker-adjust__axis {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(195, 205, 235, 0.85);
+}
+
+.tracker-adjust__row input[type='range'] {
+  width: 100%;
+}
+
+.tracker-adjust__number {
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 16, 24, 0.92);
+  color: inherit;
+  font-size: 0.75rem;
+}
+
+.tracker-adjust__section--order {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.tracker-adjust__section--order select {
+  padding: 0.25rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(12, 16, 24, 0.92);
+  color: inherit;
+  font-size: 0.8rem;
+}
+
+.tracker-adjust__reset {
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.tracker-adjust__reset:hover,
+.tracker-adjust__reset:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent, #5c8cff) 32%, rgba(255, 255, 255, 0.12));
+}
+
+.tracker-adjust__empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(200, 210, 235, 0.75);
 }
 
 .mode-switch {

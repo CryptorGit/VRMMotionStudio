@@ -38,7 +38,10 @@
           :show-other-bones="showOtherBones"
           :bone-dot-size="boneDotSize"
           :bone-label-scale="boneLabelScale"
+          :outline-width="outlineWidth"
+          :outline-color="outlineColor"
           :virtual-trackers-enabled="virtualTrackersEnabled"
+          :virtual-tracker-display-visible="virtualTrackerDisplayVisible"
           :show-virtual-tracker-labels="showVirtualTrackerLabels"
           :virtual-tracker-size="virtualTrackerSize"
           :virtual-tracker-label-scale="virtualTrackerLabelScale"
@@ -52,6 +55,9 @@
           :camera-translate-sensitivity="cameraTranslateSensitivity"
           :camera-rotate-sensitivity="cameraRotateSensitivity"
           :capture-busy="captureBusy"
+          :timeline-selection="timelineSelection"
+          :timeline-snap="timelineSnap"
+          :timeline-loop="timelineLoop"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
@@ -65,9 +71,13 @@
           @update:showOtherBones="v => emit('update:showOtherBones', v)"
           @update:boneDotSize="v => emit('update:boneDotSize', v)"
           @update:boneLabelScale="v => emit('update:boneLabelScale', v)"
+          @update:outlineWidth="v => emit('update:outlineWidth', v)"
+          @update:outlineColor="v => emit('update:outlineColor', v)"
           @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
+          @update:virtualTrackerDisplayVisible="v => emit('update:virtualTrackerDisplayVisible', v)"
           @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
           @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
+          @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
           @update:cameraFov="v => emit('update:cameraFov', v)"
           @update:cameraNear="v => emit('update:cameraNear', v)"
           @update:cameraFar="v => emit('update:cameraFar', v)"
@@ -78,7 +88,10 @@
           @update:cameraTranslateSensitivity="v => emit('update:cameraTranslateSensitivity', v)"
           @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
           @capture-camera="() => emit('capture-render')"
-          @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
+          @update:timelineSnap="v => emit('update-timeline-snap', v)"
+          @update:timelineLoop="v => emit('update-timeline-loop', v)"
+          @remove-selected-keyframes="() => emit('remove-selected-keyframes')"
+          @update-keyframe-curves="payload => emit('update-keyframe-curves', payload)"
           @toggle-model="(...args) => emit('toggle-model', ...args)"
           @toggle-bone="(...args) => emit('toggle-bone', ...args)"
           @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
@@ -86,6 +99,7 @@
           @toggle-all-bone-names="(...args) => emit('toggle-all-bone-names', ...args)"
           @remove-model="(...args) => emit('remove-model', ...args)"
           @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
+          @reset-all-tracker-orientations="() => emit('reset-all-tracker-orientations')"
         />
       </div>
     </div>
@@ -117,7 +131,10 @@ const props = defineProps({
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true },
+  outlineWidth: { type: Number, default: 0.002 },
+  outlineColor: { type: String, default: '#000000' },
   virtualTrackersEnabled: { type: Boolean, default: false },
+  virtualTrackerDisplayVisible: { type: Boolean, default: true },
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
@@ -130,7 +147,10 @@ const props = defineProps({
   cameraWheelSensitivity: { type: Number, default: 1.0 },
   cameraTranslateSensitivity: { type: Number, default: 1.0 },
   cameraRotateSensitivity: { type: Number, default: 1.0 },
-  captureBusy: { type: Boolean, default: false }
+  captureBusy: { type: Boolean, default: false },
+  timelineSelection: { type: Object, default: () => ({}) },
+  timelineSnap: { type: Boolean, default: true },
+  timelineLoop: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -147,7 +167,10 @@ const emit = defineEmits([
   'update:showOtherBones',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:outlineWidth',
+  'update:outlineColor',
   'update:virtualTrackersEnabled',
+  'update:virtualTrackerDisplayVisible',
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
@@ -167,7 +190,11 @@ const emit = defineEmits([
   'toggle-all-bones',
   'toggle-all-bone-names',
   'remove-model',
-  'reset-virtual-trackers'
+  'reset-virtual-trackers',
+  'update-timeline-snap',
+  'update-timeline-loop',
+  'remove-selected-keyframes',
+  'update-keyframe-curves'
 ])
 
 const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
@@ -193,6 +220,7 @@ const {
   boneDotSize,
   boneLabelScale,
   virtualTrackersEnabled,
+  virtualTrackerDisplayVisible,
   showVirtualTrackerLabels,
   virtualTrackerSize,
   virtualTrackerLabelScale,
@@ -205,7 +233,10 @@ const {
   cameraWheelSensitivity,
   cameraTranslateSensitivity,
   cameraRotateSensitivity,
-  captureBusy
+  captureBusy,
+  timelineSelection,
+  timelineSnap,
+  timelineLoop
 } = toRefs(props)
 </script>
 
@@ -228,7 +259,9 @@ const {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
+  flex-direction: row;
   position: relative;
+  overflow: hidden;
 }
 
 .tab-strip {
@@ -285,7 +318,9 @@ const {
 .properties-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem 1.1rem 1.1rem;
   display: flex;
   flex-direction: column;

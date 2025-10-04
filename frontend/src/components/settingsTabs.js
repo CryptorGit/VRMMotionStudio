@@ -12,6 +12,18 @@ export const SECTION_TABS = [
     icon: 'mdi:monitor-eye'
   },
   {
+    id: 'trackers',
+    label: 'トラッカー',
+    description: 'バーチャルトラッカーの設定',
+    icon: 'mdi:axis-arrow'
+  },
+  {
+    id: 'keys',
+    label: 'キー',
+    description: 'キーの詳細設定とイージング',
+    icon: 'mdi:vector-curve'
+  },
+  {
     id: 'camera',
     label: 'カメラ',
     description: 'レンダーカメラと出力設定',

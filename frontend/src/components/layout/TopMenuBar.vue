@@ -29,6 +29,28 @@
         type="button"
         class="top-menu__item"
         role="menuitem"
+        @click="$emit('timeline-import')"
+        :title="tooltip('タイムラインを読み込みます')"
+      >
+        <Icon icon="mdi:timeline-clock-outline" />
+        <span>TL 読込</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        :disabled="!timelineExportEnabled"
+        :aria-disabled="!timelineExportEnabled"
+        @click="$emit('timeline-export')"
+        :title="tooltip(timelineExportEnabled ? 'タイムラインを保存します' : '保存できるタイムラインがありません')"
+      >
+        <Icon icon="mdi:timeline-text-outline" />
+        <span>TL 保存</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
         @click="$emit('clear-cache')"
         :title="tooltip('読み込んだモデルや設定をリセットします')"
       >
@@ -89,6 +111,10 @@ const props = defineProps({
   showCaptions: {
     type: Boolean,
     default: true
+  },
+  timelineExportEnabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -182,6 +208,11 @@ const tooltip = message => (props.showCaptions ? message : '')
 
 .top-menu__item--icon span {
   font-size: 1rem;
+}
+
+.top-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .top-menu__divider {

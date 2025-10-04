@@ -1,6 +1,7 @@
 import { ref, markRaw, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { createLoader } from '../utils/createLoader.js'
+import { ensureShapeKeyOverrides, clearShapeKeyCache } from '../utils/shapekeys.js'
 
 export function useModelOperations({
   scene,
@@ -1498,6 +1499,10 @@ export function useModelOperations({
                 return resolve()
               }
               vrm.scene.userData.vrm = vrm
+              try {
+                ensureShapeKeyOverrides(vrm.scene)
+                clearShapeKeyCache(vrm.scene)
+              } catch {}
               vrm.scene.name = modelFile.name.replace(/\.(vrm)$/i, '')
               scene.value.add(vrm.scene)
               // Minimal skeleton helper for bone visibility UI

@@ -39,14 +39,49 @@
           />
         </div>
       </template>
+      <template v-if="hasShapeKeys">
+        <div class="section-title">シェイプキー</div>
+        <div
+          v-for="group in shapeKeyGroups"
+          :key="group.key"
+          class="shape-group"
+        >
+          <h4 class="shape-group__title">{{ group.label }}</h4>
+          <div
+            v-for="item in group.items"
+            :key="`shape-${item.name}`"
+            class="morph-row morph-row--shape"
+          >
+            <label :for="`shape-${item.name}`">
+              <span class="shape-label-main">{{ item.label }}</span>
+            </label>
+            <input
+              type="range"
+              :id="`shape-${item.name}`"
+              min="-1"
+              max="1"
+              step="0.01"
+              :value="getShapeKeyVal(item.name)"
+              @input="setShapeKeyVal(item.name, $event)"
+            />
+          </div>
+        </div>
+      </template>
     </div>
     <div v-else>VRM が読み込まれていません</div>
   </div>
   </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { VRMExpressionPresetName } from '@pixiv/three-vrm'
+import {
+  describeShapeKeys,
+  getShapeKeyValue,
+  setShapeKeyValue,
+  ensureShapeKeyOverrides,
+  clearShapeKeyCache
+} from '../utils/shapekeys.js'
 
 const props = defineProps({
   mesh: Object
@@ -92,6 +127,8 @@ const presetLabels = {
 
 const presetNameSet = computed(() => new Set(Object.values(VRMExpressionPresetName).map(String)))
 
+const expressionNameSet = computed(() => new Set(expressionNames.value.map(name => String(name).toLowerCase())))
+
 // VRMに存在するプリセットのみ
 const presentPresets = computed(() =>
   expressionNames.value
@@ -102,6 +139,19 @@ const presentPresets = computed(() =>
 // VRMに存在するカスタム名のみ
 const customNames = computed(() =>
   expressionNames.value.filter(n => !presetNameSet.value.has(String(n)))
+)
+
+const shapeKeyGroups = computed(() => {
+  refreshTick.value
+  const root = vrm.value?.scene || props.mesh || null
+  if (!root) return []
+  ensureShapeKeyOverrides(root)
+  const exclude = Array.from(expressionNameSet.value.values())
+  return describeShapeKeys(root, { includeExpressions: false, exclude })
+})
+
+const hasShapeKeys = computed(() =>
+  Array.isArray(shapeKeyGroups.value) && shapeKeyGroups.value.some(group => group.items.length)
 )
 
 function getVal(key) {
@@ -119,10 +169,34 @@ function setVal(key, event) {
   em.update?.()
 }
 
+function getShapeKeyVal(name) {
+  const root = vrm.value?.scene || props.mesh || null
+  if (!root) return 0
+  return getShapeKeyValue(root, name)
+}
+
+function setShapeKeyVal(name, event) {
+  const root = vrm.value?.scene || props.mesh || null
+  if (!root) return
+  const value = Number.parseFloat(event?.target?.value)
+  if (!Number.isFinite(value)) return
+  setShapeKeyValue(root, name, value)
+}
+
+watch(vrm, newVrm => {
+  const root = newVrm?.scene || null
+  if (root) {
+    ensureShapeKeyOverrides(root)
+    clearShapeKeyCache(root)
+  }
+})
+
 // Morph一覧を再取得（VRM切替や外部更新時用）
 defineExpose({
   reloadMorphs: () => {
     refreshTick.value++
+    const root = vrm.value?.scene || props.mesh || null
+    if (root) clearShapeKeyCache(root)
   }
 })
 </script>
@@ -147,5 +221,37 @@ defineExpose({
 }
 .morph-row input {
   flex: 1;
+}
+.morph-row--shape label {
+  width: auto;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.shape-group {
+  margin-bottom: 1rem;
+}
+
+.shape-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.shape-group__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(228, 233, 255, 0.82);
+}
+
+.shape-label-main {
+  font-weight: 500;
+}
+
+.shape-label-sub {
+  font-size: 0.7rem;
+  opacity: 0.65;
+  letter-spacing: 0.01em;
 }
 </style>

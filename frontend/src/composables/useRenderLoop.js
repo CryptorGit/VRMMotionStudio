@@ -10,7 +10,8 @@ export function useRenderLoop({
   updateIKMarkers,
   directionalLightHelper,
   viewer,
-  vrmGetter
+  vrmGetter,
+  postRender
 }) {
   const animate = createAnimator({
     clock,
@@ -21,7 +22,8 @@ export function useRenderLoop({
     camera,
     updateIKMarkers,
     directionalLightHelper,
-    vrmGetter
+    vrmGetter,
+    postRender
   })
 
   function onWindowResize() {

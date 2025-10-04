@@ -1,3 +1,5 @@
+import { applyShapeKeyOverrides } from './shapekeys.js'
+
 export function createAnimator({
   clock,
   targetFps,
@@ -7,7 +9,8 @@ export function createAnimator({
   camera,
   updateIKMarkers,
   directionalLightHelper,
-  vrmGetter
+  vrmGetter,
+  postRender
 }) {
   let lastFrameTime = 0
   let avgUpdate = 0
@@ -18,7 +21,6 @@ export function createAnimator({
   // DEV-only: SpringBone activity probe
   // Toggle with localStorage.setItem('springProbe', '0' | '1')
   const probeEnabled = () => import.meta.env.DEV && (typeof localStorage === 'undefined' || localStorage.getItem('springProbe') !== '0')
-  const springProbe = new WeakMap()
   function getRuntimeSpringJoints(vrm) {
     const out = []
     const mgr = vrm?.springBoneManager
@@ -115,17 +117,6 @@ export function createAnimator({
     state.samples++
     if (anyChanged) state.movingFrames++
     if (time - state.lastReport > 2000) {
-      try {
-        const enabled = !!(vrm?.springBoneManager && (vrm.springBoneManager.enabled ?? vrm.springBoneManager.isEnabled?.()))
-        console.debug('SpringProbe', {
-          model: vrm?.scene?.name || '(unnamed)',
-          enabled,
-          joints: state.jointsCount,
-          probeNodes: state.nodes.length,
-          movingFrames: state.movingFrames,
-          samples: state.samples
-        })
-      } catch {}
       state.lastReport = time
       state.movingFrames = 0
       state.samples = 0
@@ -146,6 +137,7 @@ export function createAnimator({
       if (Array.isArray(list)) {
         for (const v of list) {
           v?.update?.(delta)
+          try { applyShapeKeyOverrides(v?.scene) } catch {}
           // DEV: run probe to verify spring activity
           try { maybeProbeSpringBone(v, time) } catch {}
         }
@@ -163,6 +155,11 @@ export function createAnimator({
     if (scene.value && camera.value && renderer?.value?.render) {
       renderer.value.render(scene.value, camera.value)
     }
+    if (typeof postRender === 'function') {
+      try {
+        postRender({ renderer: renderer.value, scene: scene.value, camera: camera.value, time, delta })
+      } catch {}
+    }
     const renderDuration = performance.now() - renderStart
     avgRender =
       avgRender === 0
@@ -170,15 +167,6 @@ export function createAnimator({
         : avgRender * (1 - smoothing) + renderDuration * smoothing
 
     directionalLightHelper.update()
-
-    if (time - lastPerfLogTime >= 1000) {
-      if (import.meta.env.DEV) {
-        console.debug(
-          `avg helper.update: ${avgUpdate.toFixed(2)}ms, avg render: ${avgRender.toFixed(2)}ms`
-        )
-      }
-      lastPerfLogTime = time
-    }
   }
 
   return animate

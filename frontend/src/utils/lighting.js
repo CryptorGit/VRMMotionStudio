@@ -23,8 +23,8 @@ function safeWatch(handler, message) {
   return (...args) => {
     try {
       handler(...args)
-    } catch (e) {
-      console.error(message, e)
+    } catch {
+      // Handler failed
     }
   }
 }
@@ -54,8 +54,8 @@ export function loadLightingSettings(opts = {}) {
         t.z ?? directionalLight.value.target.position.z
       )
     }
-  } catch (e) {
-    console.error('Failed to load lighting settings:', e)
+  } catch {
+    // Failed to load lighting settings
   }
 }
 

@@ -1,228 +1,249 @@
 <template>
   <section class="timeline" :style="timelineStyle" ref="timelineRef">
-    <header class="timeline__toolbar">
-      <div class="toolbar__group toolbar__group--left">
-        <button
-          type="button"
-          class="toolbar__button"
-          :aria-pressed="props.loop"
-          @click="emit('toggle-loop')"
-          :title="tooltip('ループ再生を切り替えます')"
-        >
-          <Icon icon="mdi:repeat" />
-          <span>Loop</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="fitRange"
-          :title="tooltip('タイムラインの全範囲を表示します')"
-        >
-          <Icon icon="mdi:magnify-scan" />
-          <span>範囲フィット</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('add-keyframe', { time: props.currentTime })"
-          :title="tooltip('現在のフレームにキーを追加します')"
-        >
-          <Icon icon="mdi:animation" />
-          <span>キー追加</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button toolbar__button--alert"
-          @click="removeSelectedKeyframes"
-          :disabled="!hasSelection"
-          :title="tooltip('選択したキーを削除します')"
-        >
-          <Icon icon="mdi:delete-forever" />
-          <span>キー削除</span>
-        </button>
-      </div>
+    <div class="timeline__primary">
+      <header class="timeline__toolbar">
+        <div class="toolbar__group toolbar__group--left">
+          <button
+            type="button"
+            class="toolbar__button"
+            :aria-pressed="props.loop"
+            @click="emit('toggle-loop')"
+            :title="tooltip('ループ再生を切り替えます')"
+          >
+            <Icon icon="mdi:repeat" />
+            <span>Loop</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="fitRange"
+            :title="tooltip('タイムラインの全範囲を表示します')"
+          >
+            <Icon icon="mdi:magnify-scan" />
+            <span>範囲フィット</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('add-keyframe', { time: props.currentTime })"
+            :title="tooltip('現在のフレームにキーを追加します')"
+          >
+            <Icon icon="mdi:animation" />
+            <span>キー追加</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button toolbar__button--secondary"
+            :disabled="!hasSelection"
+            @click="emit('copy-keyframes')"
+            :title="tooltip('選択したキーをクリップボードにコピーします')"
+          >
+            <Icon icon="mdi:content-copy" />
+            <span>コピー</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button toolbar__button--secondary"
+            :disabled="!canPaste"
+            @click="emit('paste-keyframes')"
+            :title="tooltip('現在位置にキーを貼り付けます')"
+          >
+            <Icon icon="mdi:content-paste" />
+            <span>ペースト</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button toolbar__button--alert"
+            @click="removeSelectedKeyframes"
+            :disabled="!hasSelection"
+            :title="tooltip('選択したキーを削除します')"
+          >
+            <Icon icon="mdi:delete-forever" />
+            <span>キー削除</span>
+          </button>
+        </div>
 
-      <div class="toolbar__group toolbar__group--center">
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('jump-start')"
-          :title="tooltip('開始フレームに移動します')"
-        >
-          <Icon icon="mdi:skip-backward" />
-          <span>Start</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('play')"
-          :title="tooltip('再生します')"
-        >
-          <Icon icon="mdi:play" />
-          <span>Play</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('pause')"
-          :title="tooltip('一時停止します')"
-        >
-          <Icon icon="mdi:pause" />
-          <span>Pause</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('stop')"
-          :title="tooltip('停止して開始位置へ戻ります')"
-        >
-          <Icon icon="mdi:stop" />
-          <span>Stop</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button"
-          @click="emit('jump-end')"
-          :title="tooltip('終了フレームに移動します')"
-        >
-          <Icon icon="mdi:skip-forward" />
-          <span>End</span>
-        </button>
-      </div>
+        <div class="toolbar__group toolbar__group--center">
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('jump-start')"
+            :title="tooltip('開始フレームに移動します')"
+          >
+            <Icon icon="mdi:skip-backward" />
+            <span>Start</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('play')"
+            :title="tooltip('再生します')"
+          >
+            <Icon icon="mdi:play" />
+            <span>Play</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('pause')"
+            :title="tooltip('一時停止します')"
+          >
+            <Icon icon="mdi:pause" />
+            <span>Pause</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('stop')"
+            :title="tooltip('停止して開始位置へ戻ります')"
+          >
+            <Icon icon="mdi:stop" />
+            <span>Stop</span>
+          </button>
+          <button
+            type="button"
+            class="toolbar__button"
+            @click="emit('jump-end')"
+            :title="tooltip('終了フレームに移動します')"
+          >
+            <Icon icon="mdi:skip-forward" />
+            <span>End</span>
+          </button>
+        </div>
 
-      <div class="toolbar__group toolbar__group--right">
-        <label class="toolbar__field">
-          <span>Start</span>
-          <input
-            type="number"
-            v-model.number="startFrameInput"
-            @change="commitRange"
-            @keydown.enter.prevent="commitRange"
-          />
-        </label>
-        <label class="toolbar__field">
-          <span>End</span>
-          <input
-            type="number"
-            v-model.number="endFrameInput"
-            @change="commitRange"
-            @keydown.enter.prevent="commitRange"
-          />
-        </label>
-        <button
-          type="button"
-          class="toolbar__button toolbar__button--secondary"
-          @click="emit('request-import')"
-          :title="tooltip('タイムラインをインポートします')"
-        >
-          <Icon icon="mdi:file-upload-outline" />
-          <span>インポート</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button toolbar__button--secondary"
-          :disabled="!hasTimelineContent"
-          @click="emit('export-timeline')"
-          :title="tooltip('タイムラインをエクスポートします')"
-        >
-          <Icon icon="mdi:file-download-outline" />
-          <span>エクスポート</span>
-        </button>
-        <button
-          type="button"
-          class="toolbar__button toolbar__button--alert"
-          :disabled="!hasTimelineContent"
-          @click="emit('clear-timeline')"
-          :title="tooltip('タイムラインをクリアします')"
-        >
-          <Icon icon="mdi:trash-can-outline" />
-          <span>クリア</span>
-        </button>
-      </div>
-    </header>
+        <div class="toolbar__group toolbar__group--right">
+          <label class="toolbar__field">
+            <span>Start</span>
+            <input
+              type="number"
+              v-model.number="startFrameInput"
+              @change="commitRange"
+              @keydown.enter.prevent="commitRange"
+            />
+          </label>
+          <label class="toolbar__field">
+            <span>End</span>
+            <input
+              type="number"
+              v-model.number="endFrameInput"
+              @change="commitRange"
+              @keydown.enter.prevent="commitRange"
+            />
+          </label>
+          <button
+            type="button"
+            class="toolbar__button toolbar__button--alert"
+            :disabled="!hasTimelineContent"
+            @click="emit('clear-timeline')"
+            :title="tooltip('タイムラインをクリアします')"
+          >
+            <Icon icon="mdi:trash-can-outline" />
+            <span>クリア</span>
+          </button>
+        </div>
+      </header>
 
-    <div class="timeline__header">
-      <div
-        class="timeline__ticks-wrapper"
-        ref="ticksWrapperRef"
-        @scroll="handleTicksScroll"
-        @wheel="handleHeaderWheel"
-      >
+      <div class="timeline__header">
         <div
-          class="timeline__ticks"
-          :style="ticksStyle"
-          @pointerdown="handleHeaderPointerDown"
+          class="timeline__ticks-wrapper"
+          ref="ticksWrapperRef"
+          @scroll="handleTicksScroll"
+          @wheel="handleHeaderWheel"
         >
           <div
-            v-for="tick in ticks"
-            :key="tick.id"
-            class="timeline__tick"
-            :class="{ 'timeline__tick--major': tick.major }"
-            :style="{ left: `${tick.x}px` }"
-            :title="tick.frameLabel"
+            class="timeline__ticks"
+            :style="ticksStyle"
+            @pointerdown="handleHeaderPointerDown"
           >
-            <div v-if="tick.showLabel" class="timeline__tick-label">
-              <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
-              <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
-            </div>
-          </div>
-          <div class="timeline__playhead timeline__playhead--header" :style="playheadStyle" aria-hidden="true"></div>
-          <div class="timeline__current-frame" :style="playheadStyle">
-            <div class="timeline__current-frame-indicator">
-              <span>{{ currentFrameLabel }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="timeline__body">
-      <div
-        class="timeline__scroll-area"
-        ref="tracksWrapperRef"
-        @scroll="handleTracksScroll"
-        @pointerdown="handlePointerDown"
-        @wheel="handleWheel"
-      >
-        <div class="timeline__content" :style="contentStyle">
-          <div class="timeline__gridlines" aria-hidden="true">
             <div
               v-for="tick in ticks"
-              :key="`grid-${tick.id}`"
-              class="timeline__gridline"
-              :class="{ 'timeline__gridline--major': tick.major }"
+              :key="tick.id"
+              class="timeline__tick"
+              :class="{ 'timeline__tick--major': tick.major }"
               :style="{ left: `${tick.x}px` }"
-            ></div>
+              :title="tick.frameLabel"
+            >
+              <div v-if="tick.showLabel" class="timeline__tick-label">
+                <span class="timeline__tick-label-time">{{ tick.timeLabel }}</span>
+                <span class="timeline__tick-label-frame">{{ tick.frameLabel }}</span>
+              </div>
+            </div>
+            <div class="timeline__playhead timeline__playhead--header" :style="playheadStyle" aria-hidden="true"></div>
+            <div class="timeline__current-frame" :style="playheadStyle">
+              <div class="timeline__current-frame-indicator">
+                <span>{{ currentFrameLabel }}</span>
+              </div>
+            </div>
           </div>
-
-          <div class="timeline__memory" :style="memoryStyle"></div>
-
-          <div class="timeline__keys">
-            <div
-              v-for="frame in visibleFrames"
-              :key="frame.id"
-              class="timeline__keyframe"
-              :class="{ 'is-selected': selectedKeyframes.has(frame.id) }"
-              :style="{ left: `${timeToX(frame.time)}px` }"
-              @pointerdown.stop.prevent="startKeyframeDrag($event, frame)"
-              @contextmenu.prevent="emit('remove-keyframe', { keyframeId: frame.id })"
-              :title="tooltip(keyTitle(frame))"
-            ></div>
-          </div>
-
-          <div class="timeline__playhead timeline__playhead--body" :style="playheadStyle" aria-hidden="true"></div>
-          <div v-if="selectionRange" class="timeline__selection" :style="selectionStyle"></div>
         </div>
       </div>
-    </div>
 
-    <div class="timeline__scrollbar">
-      <div
-        class="timeline__scrollbar-track"
-        ref="scrollbarWrapperRef"
-        @scroll="handleScrollbarScroll"
-      >
-        <div class="timeline__scrollbar-spacer" :style="{ width: `${contentWidth}px` }"></div>
+      <div class="timeline__body">
+        <div
+          class="timeline__scroll-area"
+          ref="tracksWrapperRef"
+          @scroll="handleTracksScroll"
+          @pointerdown="handlePointerDown"
+          @wheel="handleWheel"
+        >
+          <div class="timeline__content" :style="contentStyle">
+            <div class="timeline__gridlines" aria-hidden="true">
+              <div
+                v-for="tick in ticks"
+                :key="`grid-${tick.id}`"
+                class="timeline__gridline"
+                :class="{ 'timeline__gridline--major': tick.major }"
+                :style="{ left: `${tick.x}px` }"
+              ></div>
+            </div>
+
+            <div class="timeline__memory" :style="memoryStyle"></div>
+
+            <div class="timeline__curves" aria-hidden="true">
+              <svg
+                class="timeline__curves-canvas"
+                :viewBox="`0 0 ${Math.max(contentWidth, 1)} ${CURVE_VIEWBOX_HEIGHT}`"
+                preserveAspectRatio="none"
+              >
+                <path
+                  v-for="segment in timelineCurvePaths"
+                  :key="segment.id"
+                  :d="segment.path"
+                  :class="{ 'is-modified': segment.modified }"
+                />
+              </svg>
+            </div>
+
+            <div class="timeline__keys">
+              <div
+                v-for="frame in visibleFrames"
+                :key="frame.id"
+                class="timeline__keyframe"
+                :class="{
+                  'is-selected': selectedKeyframes.has(frame.id),
+                  'has-curve': easedKeyframeIds.has(frame.id)
+                }"
+                :style="{ left: `${timeToX(frame.time)}px` }"
+                @pointerdown.stop.prevent="startKeyframeDrag($event, frame)"
+                @contextmenu.prevent="emit('remove-keyframe', { keyframeId: frame.id })"
+                :title="tooltip(keyTitle(frame))"
+              ></div>
+            </div>
+
+            <div class="timeline__playhead timeline__playhead--body" :style="playheadStyle" aria-hidden="true"></div>
+            <div v-if="selectionRange" class="timeline__selection" :style="selectionStyle"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline__scrollbar">
+        <div
+          class="timeline__scrollbar-track"
+          ref="scrollbarWrapperRef"
+          @scroll="handleScrollbarScroll"
+        >
+          <div class="timeline__scrollbar-spacer" :style="{ width: `${contentWidth}px` }"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -235,6 +256,49 @@ import { useCaptions } from '../../composables/useCaptions.js'
 
 const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
+const CURVE_VIEWBOX_HEIGHT = 36
+
+const DEFAULT_CURVE = Object.freeze({
+  in: { x: 2 / 3, y: 2 / 3 },
+  out: { x: 1 / 3, y: 1 / 3 }
+})
+
+function clamp01(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 0
+  if (num <= 0) return 0
+  if (num >= 1) return 1
+  return num
+}
+
+function sanitizeCurve(curve, fallback = DEFAULT_CURVE) {
+  const fb = fallback || DEFAULT_CURVE
+  return {
+    in: {
+      x: clamp01(curve?.in?.x ?? fb.in.x),
+      y: clamp01(curve?.in?.y ?? fb.in.y)
+    },
+    out: {
+      x: clamp01(curve?.out?.x ?? fb.out.x),
+      y: clamp01(curve?.out?.y ?? fb.out.y)
+    }
+  }
+}
+
+function cloneCurve(curve) {
+  return sanitizeCurve(curve, DEFAULT_CURVE)
+}
+
+function isCurveModified(curve) {
+  if (!curve) return false
+  const sanitized = sanitizeCurve(curve)
+  return (
+    Math.abs(sanitized.in.x - DEFAULT_CURVE.in.x) > 1e-4 ||
+    Math.abs(sanitized.in.y - DEFAULT_CURVE.in.y) > 1e-4 ||
+    Math.abs(sanitized.out.x - DEFAULT_CURVE.out.x) > 1e-4 ||
+    Math.abs(sanitized.out.y - DEFAULT_CURVE.out.y) > 1e-4
+  )
+}
 
 const props = defineProps({
   keyframes: { type: Array, default: () => [] },
@@ -245,7 +309,8 @@ const props = defineProps({
   isPlaying: { type: Boolean, required: true },
   loop: { type: Boolean, default: false },
   snap: { type: Boolean, default: true },
-  height: { type: [Number, String], default: null }
+  height: { type: [Number, String], default: null },
+  canPaste: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -264,9 +329,12 @@ const emit = defineEmits([
   'move-keyframes',
   'update-range',
   'update:snap',
-  'request-import',
+  'import-timeline',
   'export-timeline',
-  'clear-timeline'
+  'copy-keyframes',
+  'paste-keyframes',
+  'clear-timeline',
+  'update-keyframe-selection'
 ])
 
 const { tooltip } = useCaptions()
@@ -293,6 +361,73 @@ const STORAGE_KEY_MODE = 'timeline.view.mode'
 
 const keyframesList = computed(() => (Array.isArray(props.keyframes) ? props.keyframes : []))
 const hasTimelineContent = computed(() => keyframesList.value.length > 0)
+
+const keyframeMap = computed(() => {
+  const map = new Map()
+  keyframesList.value.forEach(frame => {
+    if (!frame || frame.id == null) return
+    map.set(frame.id, frame)
+  })
+  return map
+})
+
+const selectedFrameIds = computed(() => Array.from(selectedKeyframes.value))
+
+const inspectorFrames = computed(() => {
+  const frames = selectedFrameIds.value
+    .map(id => keyframeMap.value.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.time - b.time)
+  return frames.map((frame, index) => {
+    const curve = cloneCurve(frame.curve)
+    return {
+      id: frame.id,
+      time: frame.time,
+      frameLabel: formatFrameLabelFromTime(frame.time),
+      timeLabel: formatTimeLabel(frame.time),
+      curve,
+      isFirst: index === 0,
+      isLast: index === frames.length - 1
+    }
+  })
+})
+
+watch(
+  keyframesList,
+  () => {
+    const map = keyframeMap.value
+    if (!map) return
+    const next = new Set()
+    selectedKeyframes.value.forEach(id => {
+      if (map.has(id)) next.add(id)
+    })
+    if (next.size !== selectedKeyframes.value.size) {
+      selectedKeyframes.value = next
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  [inspectorFrames, selectedFrameIds],
+  ([frames, ids]) => {
+    const normalizedFrames = Array.isArray(frames)
+      ? frames.map(frame => ({
+          ...frame,
+          curve: cloneCurve(frame.curve)
+        }))
+      : []
+    emit('update-keyframe-selection', {
+      frames: normalizedFrames,
+      selectedIds: Array.isArray(ids) ? [...ids] : [],
+      hasSelection: normalizedFrames.length > 0,
+      hasMultiple: normalizedFrames.length > 1,
+      startTime: normalizedFrames[0]?.time ?? null,
+      endTime: normalizedFrames[normalizedFrames.length - 1]?.time ?? null
+    })
+  },
+  { immediate: true }
+)
 
 const frameDuration = computed(() => 1 / Math.max(props.frameRate || 60, 1))
 const minViewDuration = computed(() => Math.max(frameDuration.value, MIN_VIEW_DURATION_EPSILON))
@@ -364,6 +499,51 @@ const visibleFrames = computed(() => {
   if (!items.length) return []
   const margin = Math.max(minViewDuration.value, visibleDuration.value * 0.1)
   return items.filter(frame => frame.time >= viewStart.value - margin && frame.time <= viewEnd.value + margin)
+})
+
+const timelineCurvePaths = computed(() => {
+  const frames = [...keyframesList.value].sort((a, b) => a.time - b.time)
+  if (frames.length < 2) return []
+  const baseY = CURVE_VIEWBOX_HEIGHT / 2
+  const amplitude = CURVE_VIEWBOX_HEIGHT * 0.4
+  const result = []
+  for (let i = 0; i < frames.length - 1; i++) {
+    const current = frames[i]
+    const next = frames[i + 1]
+    const startX = timeToX(current.time)
+    const endX = timeToX(next.time)
+    const width = endX - startX
+    if (!Number.isFinite(width) || width <= 0.5) continue
+    const startCurve = sanitizeCurve(current.curve)
+    const endCurve = sanitizeCurve(next.curve)
+    const ctrl1X = startX + width * startCurve.out.x
+    const ctrl2X = startX + width * endCurve.in.x
+    const ctrl1Y = baseY - amplitude * (startCurve.out.y - 0.5) * 2
+    const ctrl2Y = baseY - amplitude * (endCurve.in.y - 0.5) * 2
+    const path = `M ${startX} ${baseY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${baseY}`
+    result.push({
+      id: `${current.id}-${next.id}`,
+      path,
+      modified: isCurveModified(startCurve) || isCurveModified(endCurve)
+    })
+  }
+  return result
+})
+
+const easedKeyframeIds = computed(() => {
+  const result = new Set()
+  const frames = [...keyframesList.value].sort((a, b) => a.time - b.time)
+  for (let i = 0; i < frames.length - 1; i++) {
+    const current = frames[i]
+    const next = frames[i + 1]
+    if (!current || !next) continue
+    const modified = isCurveModified(current.curve) || isCurveModified(next.curve)
+    if (modified) {
+      result.add(current.id)
+      result.add(next.id)
+    }
+  }
+  return result
 })
 
 const ticks = computed(() => {
@@ -742,6 +922,13 @@ function formatFrameLabel(frameNumber) {
   return `F${frameNumber}`
 }
 
+function formatFrameLabelFromTime(time) {
+  const fps = props.frameRate || 60
+  const startFrame = Math.round(props.startTime * fps)
+  const frameNumber = startFrame + Math.round((time - props.startTime) * fps)
+  return formatFrameLabel(frameNumber)
+}
+
 function getPointerInfo(event, source = 'tracks') {
   const container = source === 'ticks' ? ticksWrapperRef.value : tracksWrapperRef.value
   if (!container) {
@@ -920,7 +1107,7 @@ function keyTitle(frame) {
 .timeline {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 100%;
   min-height: 0;
   background: radial-gradient(circle at top, rgba(32, 38, 52, 0.85), rgba(12, 15, 24, 0.96));
@@ -931,6 +1118,15 @@ function keyTitle(frame) {
   --timeline-ruler-height: 46px;
   --timeline-key-lane-height: 36px;
   --timeline-playhead-color: #ff615a;
+  --timeline-key-padding-y: 10px;
+  --timeline-curves-height: 36px;
+}
+
+.timeline__primary {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .timeline input,
@@ -1226,6 +1422,35 @@ function keyTitle(frame) {
   border-radius: 4px 0 0 4px;
 }
 
+.timeline__curves {
+  position: absolute;
+  top: calc(var(--timeline-key-padding-y) + (var(--timeline-key-lane-height) / 2) - (var(--timeline-curves-height) / 2));
+  height: var(--timeline-curves-height);
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.timeline__curves-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.timeline__curves-canvas path {
+  fill: none;
+  stroke: rgba(90, 160, 255, 0.6);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(45, 140, 255, 0.35));
+}
+
+.timeline__curves-canvas path.is-modified {
+  stroke: color-mix(in srgb, var(--accent, #2d8cff) 80%, rgba(255, 255, 255, 0.92));
+  stroke-width: 2.2;
+}
+
 
  
 .timeline__keys {
@@ -1235,7 +1460,7 @@ function keyTitle(frame) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 10px 0;
+  padding: var(--timeline-key-padding-y) 0;
   z-index: 3;
   pointer-events: none;
 }
@@ -1271,6 +1496,12 @@ function keyTitle(frame) {
   transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
   box-shadow: 0 0 12px rgba(45, 140, 255, 0.85);
   background: color-mix(in srgb, var(--accent, #2d8cff) 90%, rgba(255, 255, 255, 0.3));
+}
+
+.timeline__keyframe.has-curve {
+  background: color-mix(in srgb, var(--accent, #2d8cff) 85%, rgba(255, 255, 255, 0.35));
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 14px rgba(45, 140, 255, 0.9);
 }
 
 .timeline__playhead {
@@ -1367,6 +1598,21 @@ function keyTitle(frame) {
 
   .toolbar__button {
     min-width: 38px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .timeline {
+    flex-direction: column;
+  }
+
+  .timeline__inspector {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.85rem;
   }
 }
 </style>

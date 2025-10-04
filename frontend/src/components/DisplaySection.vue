@@ -82,28 +82,24 @@
       </div>
       <hr />
       <div class="row">
-        <label class="checkbox">
-          <input type="checkbox" v-model="virtualTrackersEnabledLocal" />
-          <span>バーチャルトラッカー</span>
-        </label>
-        <button type="button" @click="$emit('reset-virtual-trackers')">位置リセット</button>
+        <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設定</h4>
       </div>
       <div class="row">
-        <label class="checkbox">
-          <input type="checkbox" v-model="showVirtualTrackerLabelsLocal" />
-          <span>トラッカー名表示</span>
+        <label class="stretch">
+          アウトライン太さ
+          <input
+            type="range"
+            min="0"
+            max="0.005"
+            step="0.0001"
+            v-model.number="outlineWidthLocal"
+          />
         </label>
       </div>
       <div class="row">
         <label class="stretch">
-          トラッカー表示サイズ
-          <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="virtualTrackerSizeLocal" />
-        </label>
-      </div>
-      <div class="row">
-        <label class="stretch">
-          トラッカー名表示サイズ
-          <input type="range" min="0.05" max="2.0" step="0.05" v-model.number="virtualTrackerLabelScaleLocal" />
+          アウトライン色
+          <input type="color" v-model="outlineColorLocal" style="width: 100%;" />
         </label>
       </div>
     </div>
@@ -125,10 +121,8 @@ const props = defineProps({
   highlightConstraint: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true },
-  virtualTrackersEnabled: { type: Boolean, default: false },
-  showVirtualTrackerLabels: { type: Boolean, default: true },
-  virtualTrackerSize: { type: Number, default: 0.08 },
-  virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  outlineWidth: { type: Number, default: 0.002 },
+  outlineColor: { type: String, default: '#000000' }
 })
 
 const emit = defineEmits([
@@ -142,13 +136,10 @@ const emit = defineEmits([
   'update:highlightConstraint',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:outlineWidth',
+  'update:outlineColor',
   'toggle-all-bones',
-  'toggle-all-bone-names',
-  'update:virtualTrackersEnabled',
-  'reset-virtual-trackers',
-  'update:showVirtualTrackerLabels',
-  'update:virtualTrackerSize',
-  'update:virtualTrackerLabelScale'
+  'toggle-all-bone-names'
 ])
 
 const showLightMarkerLocal = computed({
@@ -191,21 +182,13 @@ const boneLabelScaleLocal = computed({
   get: () => props.boneLabelScale,
   set: v => emit('update:boneLabelScale', v)
 })
-const virtualTrackersEnabledLocal = computed({
-  get: () => props.virtualTrackersEnabled,
-  set: v => emit('update:virtualTrackersEnabled', v)
+const outlineWidthLocal = computed({
+  get: () => props.outlineWidth,
+  set: v => emit('update:outlineWidth', v)
 })
-const showVirtualTrackerLabelsLocal = computed({
-  get: () => props.showVirtualTrackerLabels,
-  set: v => emit('update:showVirtualTrackerLabels', v)
-})
-const virtualTrackerSizeLocal = computed({
-  get: () => props.virtualTrackerSize,
-  set: v => emit('update:virtualTrackerSize', v)
-})
-const virtualTrackerLabelScaleLocal = computed({
-  get: () => props.virtualTrackerLabelScale,
-  set: v => emit('update:virtualTrackerLabelScale', v)
+const outlineColorLocal = computed({
+  get: () => props.outlineColor,
+  set: v => emit('update:outlineColor', v)
 })
 
 const allBonesVisible = computed({

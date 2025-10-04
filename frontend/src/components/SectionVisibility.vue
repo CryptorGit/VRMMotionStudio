@@ -20,10 +20,8 @@
       :show-other-bones="showOtherBones"
       :bone-dot-size="boneDotSize"
       :bone-label-scale="boneLabelScale"
-      :virtual-trackers-enabled="virtualTrackersEnabled"
-      :show-virtual-tracker-labels="showVirtualTrackerLabels"
-      :virtual-tracker-size="virtualTrackerSize"
-      :virtual-tracker-label-scale="virtualTrackerLabelScale"
+      :outline-width="outlineWidth"
+      :outline-color="outlineColor"
       @update:show-light-marker="v => emit('update:showLightMarker', v)"
       @update:marker-color="v => emit('update:markerColor', v)"
       @update:show-extended-bones="v => emit('update:showExtendedBones', v)"
@@ -34,13 +32,34 @@
       @update:show-other-bones="v => emit('update:showOtherBones', v)"
       @update:bone-dot-size="v => emit('update:boneDotSize', v)"
       @update:bone-label-scale="v => emit('update:boneLabelScale', v)"
-      @update:virtual-trackers-enabled="v => emit('update:virtualTrackersEnabled', v)"
-      @update:show-virtual-tracker-labels="v => emit('update:showVirtualTrackerLabels', v)"
-      @update:virtual-tracker-size="v => emit('update:virtualTrackerSize', v)"
-      @update:virtual-tracker-label-scale="v => emit('update:virtualTrackerLabelScale', v)"
+      @update:outline-width="v => emit('update:outlineWidth', v)"
+      @update:outline-color="v => emit('update:outlineColor', v)"
       @toggle-all-bones="v => emit('toggle-all-bones', v)"
       @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
+    />
+    <TrackerSection
+      v-else-if="active === 'trackers'"
+      :virtual-trackers-enabled="virtualTrackersEnabled"
+      :virtual-tracker-display-visible="virtualTrackerDisplayVisible"
+      :show-virtual-tracker-labels="showVirtualTrackerLabels"
+      :virtual-tracker-size="virtualTrackerSize"
+      :virtual-tracker-label-scale="virtualTrackerLabelScale"
+      @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
+      @update:virtualTrackerDisplayVisible="v => emit('update:virtualTrackerDisplayVisible', v)"
+      @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
+      @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
+      @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
       @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
+    />
+    <KeySettingsSection
+      v-else-if="active === 'keys'"
+      :selection="timelineSelection"
+      :snap="timelineSnap"
+      :loop="timelineLoop"
+      @update:snap="v => emit('update:timelineSnap', v)"
+      @update:loop="v => emit('update:timelineLoop', v)"
+      @remove-selected="() => emit('remove-selected-keyframes')"
+      @update-curves="payload => emit('update-keyframe-curves', payload)"
     />
     <CameraSection
       v-else-if="active === 'camera'"
@@ -49,20 +68,20 @@
       :camera-far="cameraFar"
       :camera-resolution-width="cameraResolutionWidth"
       :camera-resolution-height="cameraResolutionHeight"
-      :show-camera-helper="showCameraHelper"
-  :camera-wheel-sensitivity="cameraWheelSensitivity"
-  :camera-translate-sensitivity="cameraTranslateSensitivity"
-  :camera-rotate-sensitivity="cameraRotateSensitivity"
+    :show-camera-helper="showCameraHelper"
+    :camera-wheel-sensitivity="cameraWheelSensitivity"
+    :camera-translate-sensitivity="cameraTranslateSensitivity"
+    :camera-rotate-sensitivity="cameraRotateSensitivity"
       :capture-busy="captureBusy"
       @update:cameraFov="v => emit('update:cameraFov', v)"
       @update:cameraNear="v => emit('update:cameraNear', v)"
       @update:cameraFar="v => emit('update:cameraFar', v)"
       @update:cameraResolutionWidth="v => emit('update:cameraResolutionWidth', v)"
       @update:cameraResolutionHeight="v => emit('update:cameraResolutionHeight', v)"
-      @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
-  @update:cameraWheelSensitivity="v => emit('update:cameraWheelSensitivity', v)"
-  @update:cameraTranslateSensitivity="v => emit('update:cameraTranslateSensitivity', v)"
-  @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
+    @update:showCameraHelper="v => emit('update:showCameraHelper', v)"
+    @update:cameraWheelSensitivity="v => emit('update:cameraWheelSensitivity', v)"
+    @update:cameraTranslateSensitivity="v => emit('update:cameraTranslateSensitivity', v)"
+    @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
       @capture="() => emit('capture-camera')"
     />
     <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
@@ -89,6 +108,8 @@ import ModelSection from './ModelSection.vue'
 import DisplaySection from './DisplaySection.vue'
 import PhysicsSection from './PhysicsSection.vue'
 import CameraSection from './CameraSection.vue'
+import KeySettingsSection from './KeySettingsSection.vue'
+import TrackerSection from './TrackerSection.vue'
 
 defineProps({
   ambient: Object,
@@ -108,7 +129,10 @@ defineProps({
   showOtherBones: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true },
+  outlineWidth: { type: Number, default: 0.002 },
+  outlineColor: { type: String, default: '#000000' },
   virtualTrackersEnabled: { type: Boolean, default: false },
+  virtualTrackerDisplayVisible: { type: Boolean, default: true },
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
@@ -122,7 +146,10 @@ defineProps({
   cameraTranslateSensitivity: { type: Number, default: 1.0 },
   cameraRotateSensitivity: { type: Number, default: 1.0 },
   captureBusy: { type: Boolean, default: false },
-  active: { type: String, default: 'lighting' }
+  active: { type: String, default: 'lighting' },
+  timelineSelection: { type: Object, default: () => ({}) },
+  timelineSnap: { type: Boolean, default: true },
+  timelineLoop: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -139,7 +166,10 @@ const emit = defineEmits([
   'update:showOtherBones',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:outlineWidth',
+  'update:outlineColor',
   'update:virtualTrackersEnabled',
+  'update:virtualTrackerDisplayVisible',
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
@@ -159,7 +189,11 @@ const emit = defineEmits([
   'toggle-all-bones',
   'toggle-all-bone-names',
   'remove-model',
-  'reset-virtual-trackers'
+  'reset-virtual-trackers',
+  'update:timelineSnap',
+  'update:timelineLoop',
+  'remove-selected-keyframes',
+  'update-keyframe-curves'
 ])
 </script>
 
@@ -170,6 +204,8 @@ const emit = defineEmits([
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
 }
 
 .sections::-webkit-scrollbar {

@@ -8,9 +8,10 @@
       <fieldset class="group">
         <legend>出力解像度</legend>
         <div class="resolution">
-          <label class="resolution__label">
-            幅
+          <div class="resolution__field">
+            <label for="camera-resolution-width">幅</label>
             <input
+              id="camera-resolution-width"
               type="number"
               min="64"
               max="16384"
@@ -18,11 +19,11 @@
               v-model.number="widthLocal"
               aria-label="出力幅"
             />
-          </label>
-          <span class="resolution__separator">×</span>
-          <label class="resolution__label">
-            高さ
+          </div>
+          <div class="resolution__field">
+            <label for="camera-resolution-height">高さ</label>
             <input
+              id="camera-resolution-height"
               type="number"
               min="64"
               max="16384"
@@ -30,7 +31,7 @@
               v-model.number="heightLocal"
               aria-label="出力高さ"
             />
-          </label>
+          </div>
           <div class="resolution__presets">
             <label>プリセット</label>
             <select v-model="presetLocal">
@@ -256,35 +257,31 @@ function clampNumber(value, min, max) {
 .resolution {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem 0.4rem;
-  align-items: center;
+  gap: 0.9rem 0.75rem;
+  align-items: end;
 }
 
-.resolution__label {
+.resolution__field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.8rem;
 }
 
-.resolution__label input {
+.resolution__field input {
   width: 100%;
-  padding: 0.35rem 0.45rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(16, 19, 28, 0.8);
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 19, 28, 0.82);
   color: inherit;
-}
-
-.resolution__separator {
-  grid-column: span 2;
-  text-align: center;
-  opacity: 0.7;
-  font-size: 0.85rem;
+  text-align: right;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
 }
 
 .resolution__presets {
-  grid-column: span 2;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 0.4rem;
