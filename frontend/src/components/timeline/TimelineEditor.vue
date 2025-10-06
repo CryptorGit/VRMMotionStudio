@@ -8,7 +8,7 @@
             class="toolbar__button"
             :aria-pressed="props.loop"
             @click="emit('toggle-loop')"
-            :title="tooltip('ループ�E生を刁E��替えまぁE)"
+            :title="tooltip('ループ再生を切り替えます')"
           >
             <Icon icon="mdi:repeat" />
             <span>Loop</span>
@@ -17,16 +17,16 @@
             type="button"
             class="toolbar__button"
             @click="fitRange"
-            :title="tooltip('タイムラインの全篁E��を表示しまぁE)"
+            :title="tooltip('タイムラインの全範囲を表示します')"
           >
             <Icon icon="mdi:magnify-scan" />
-            <span>篁E��フィチE��</span>
+            <span>範囲フィット</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="emit('add-keyframe', { time: props.currentTime })"
-            :title="tooltip('現在のフレームにキーを追加しまぁE)"
+            :title="tooltip('現在のフレームにキーを追加します')"
           >
             <Icon icon="mdi:animation" />
             <span>キー追加</span>
@@ -36,27 +36,27 @@
             class="toolbar__button toolbar__button--secondary"
             :disabled="!hasSelection"
             @click="emit('copy-keyframes')"
-            :title="tooltip('選択したキーをクリチE�Eボ�Eドにコピ�EしまぁE)"
+            :title="tooltip('選択したキーをクリップボードにコピーします')"
           >
             <Icon icon="mdi:content-copy" />
-            <span>コピ�E</span>
+            <span>コピー</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--secondary"
             :disabled="!canPaste"
             @click="emit('paste-keyframes')"
-            :title="tooltip('現在位置にキーを貼り付けまぁE)"
+            :title="tooltip('現在位置にキーを貼り付けます')"
           >
             <Icon icon="mdi:content-paste" />
-            <span>ペ�EスチE/span>
+            <span>ペースト</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--alert"
             @click="removeSelectedKeyframes"
             :disabled="!hasSelection"
-            :title="tooltip('選択したキーを削除しまぁE)"
+            :title="tooltip('選択したキーを削除します')"
           >
             <Icon icon="mdi:delete-forever" />
             <span>キー削除</span>
@@ -68,7 +68,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-start')"
-            :title="tooltip('開始フレームに移動しまぁE)"
+            :title="tooltip('開始フレームに移動します')"
           >
             <Icon icon="mdi:skip-backward" />
             <span>Start</span>
@@ -77,7 +77,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('play')"
-            :title="tooltip('再生しまぁE)"
+            :title="tooltip('再生します')"
           >
             <Icon icon="mdi:play" />
             <span>Play</span>
@@ -86,7 +86,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('pause')"
-            :title="tooltip('一時停止しまぁE)"
+            :title="tooltip('一時停止します')"
           >
             <Icon icon="mdi:pause" />
             <span>Pause</span>
@@ -95,7 +95,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('stop')"
-            :title="tooltip('停止して開始位置へ戻りまぁE)"
+            :title="tooltip('停止して開始位置へ戻ります')"
           >
             <Icon icon="mdi:stop" />
             <span>Stop</span>
@@ -104,7 +104,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-end')"
-            :title="tooltip('終亁E��レームに移動しまぁE)"
+            :title="tooltip('終了フレームに移動します')"
           >
             <Icon icon="mdi:skip-forward" />
             <span>End</span>
@@ -135,7 +135,7 @@
             class="toolbar__button toolbar__button--alert"
             :disabled="!hasTimelineContent"
             @click="emit('clear-timeline')"
-            :title="tooltip('タイムラインをクリアしまぁE)"
+            :title="tooltip('タイムラインをクリアします')"
           >
             <Icon icon="mdi:trash-can-outline" />
             <span>クリア</span>
@@ -1616,5 +1616,3 @@ function keyTitle(frame) {
   }
 }
 </style>
-
-

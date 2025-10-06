@@ -13,5 +13,3 @@ export function useFileLoader(ctx) {
 
   return { fileInput, openFile, ...loader }
 }
-
-

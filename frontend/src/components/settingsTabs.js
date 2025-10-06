@@ -1,21 +1,27 @@
 export const SECTION_TABS = [
   {
     id: 'lighting',
-    label: '照昁E,
-    description: 'ライト�E環墁E�Eの調整',
+    label: '照明',
+    description: 'ライト・環境光の調整',
     icon: 'mdi:lightbulb-on-outline'
   },
   {
     id: 'display',
     label: '表示',
-    description: 'ボ�EンめE��ラチE��ー表示の管琁E,
+    description: 'ボーンやトラッカー表示の管理',
     icon: 'mdi:monitor-eye'
   },
   {
     id: 'trackers',
-    label: 'トラチE��ー',
-    description: 'バ�EチャルトラチE��ーの設宁E,
+    label: 'トラッカー',
+    description: 'バーチャルトラッカーの設定',
     icon: 'mdi:axis-arrow'
+  },
+  {
+    id: 'bones',
+    label: 'ボーン',
+    description: '指などのボーン制御',
+    icon: 'mdi:hand-pointing-up'
   },
   {
     id: 'keys',
@@ -26,27 +32,25 @@ export const SECTION_TABS = [
   {
     id: 'camera',
     label: 'カメラ',
-    description: 'レンダーカメラと出力設宁E,
+    description: 'レンダーカメラと出力設定',
     icon: 'mdi:video-outline'
   },
   {
     id: 'morph',
-    label: 'モーチE,
-    description: '表惁Eシェイプキーの制御',
+    label: 'モーフ',
+    description: '表情/シェイプキーの制御',
     icon: 'mdi:emoticon-outline'
   },
   {
     id: 'model',
-    label: 'モチE��',
-    description: '読み込み済みモチE��の管琁E,
+    label: 'モデル',
+    description: '読み込み済みモデルの管理',
     icon: 'mdi:account-group-outline'
   },
   {
     id: 'physics',
-    label: '物琁E,
-    description: 'スプリングボ�Eン等�E設宁E,
+    label: '物理',
+    description: 'スプリングボーン等の設定',
     icon: 'mdi:atom'
   }
 ]
-
-

@@ -181,5 +181,3 @@ export function handleWindowResize(camera, renderer, container) {
   camera.updateProjectionMatrix()
   renderer.setSize(width, height, false)
 }
-
-

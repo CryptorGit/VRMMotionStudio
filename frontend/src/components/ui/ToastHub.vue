@@ -7,7 +7,7 @@
     >
       <header class="toast-item__header">
         <span class="toast-item__title">{{ toast.title }}</span>
-        <button type="button" class="toast-item__dismiss" @click="$emit('dismiss', toast.id)">ÁE/button>
+        <button type="button" class="toast-item__dismiss" @click="$emit('dismiss', toast.id)">×</button>
       </header>
       <p class="toast-item__body">{{ toast.message }}</p>
     </article>
@@ -58,5 +58,3 @@ defineEmits(['dismiss'])
   line-height: 1.4;
 }
 </style>
-
-

@@ -6,5 +6,3 @@ export function useRenderer(ctx) {
   const { init, cleanup } = useThreeViewerInit({ ...ctx, onWindowResize })
   return { animate, initRenderer: init, cleanupRenderer: cleanup }
 }
-
-

@@ -1,7 +1,7 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>照明設宁E/h3>
+      <h3>照明設定</h3>
     </header>
     <div class="section__content">
       <LightingPanel
@@ -55,5 +55,3 @@ const directionalIntensity = computed({
   padding: 0 0.85rem 0.85rem;
 }
 </style>
-
-

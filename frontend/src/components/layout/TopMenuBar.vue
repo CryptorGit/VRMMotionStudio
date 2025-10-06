@@ -10,27 +10,27 @@
         class="top-menu__item"
         role="menuitem"
         @click="$emit('import')"
-        :title="tooltip('モチE��を読み込みまぁE)"
+        :title="tooltip('モデルを読み込みます')"
       >
         <Icon icon="mdi:file-import" />
-        <span>インポ�EチE/span>
+        <span>インポート</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('export')"
-        :title="tooltip('現在のポ�Eズをエクスポ�EトしまぁE)"
+        :title="tooltip('現在のポーズをエクスポートします')"
       >
         <Icon icon="mdi:file-export" />
-        <span>エクスポ�EチE/span>
+        <span>エクスポート</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('timeline-import')"
-        :title="tooltip('タイムラインを読み込みまぁE)"
+        :title="tooltip('タイムラインを読み込みます')"
       >
         <Icon icon="mdi:timeline-clock-outline" />
         <span>TL 読込</span>
@@ -42,20 +42,20 @@
         :disabled="!timelineExportEnabled"
         :aria-disabled="!timelineExportEnabled"
         @click="$emit('timeline-export')"
-        :title="tooltip(timelineExportEnabled ? 'タイムラインを保存しまぁE : '保存できるタイムラインがありません')"
+        :title="tooltip(timelineExportEnabled ? 'タイムラインを保存します' : '保存できるタイムラインがありません')"
       >
         <Icon icon="mdi:timeline-text-outline" />
-        <span>TL 保孁E/span>
+        <span>TL 保存</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('clear-cache')"
-        :title="tooltip('読み込んだモチE��めE��定をリセチE��しまぁE)"
+        :title="tooltip('読み込んだモデルや設定をリセットします')"
       >
         <Icon icon="mdi:trash-can-outline" />
-        <span>キャチE��ュ削除</span>
+        <span>キャッシュ削除</span>
       </button>
       <button
         type="button"
@@ -63,10 +63,10 @@
         role="menuitemcheckbox"
         :aria-checked="autoRestore"
         @click="$emit('toggle-auto-restore')"
-        :title="tooltip(`起動時に前回のモチE��めE{autoRestore ? '復允E��まぁE : '復允E��ません'}`)"
+        :title="tooltip(`起動時に前回のモデルを${autoRestore ? '復元します' : '復元しません'}`)"
       >
         <Icon :icon="autoRestore ? 'mdi:backup-restore' : 'mdi:backup-restore'" />
-        <span>自動復允E{{ autoRestore ? 'ON' : 'OFF' }}</span>
+        <span>自動復元 {{ autoRestore ? 'ON' : 'OFF' }}</span>
       </button>
       <button
         type="button"
@@ -74,7 +74,7 @@
         role="switch"
         :aria-checked="showCaptions"
         @click="$emit('toggle-captions')"
-        :title="tooltip(showCaptions ? 'キャプション表示をOFFにしまぁE : 'キャプション表示をONにしまぁE)"
+        :title="tooltip(showCaptions ? 'キャプション表示をOFFにします' : 'キャプション表示をONにします')"
       >
   <Icon :icon="showCaptions ? 'mdi:tooltip-text-outline' : 'mdi:tooltip-outline'" />
         <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
@@ -84,11 +84,11 @@
       <button
         type="button"
         class="top-menu__item top-menu__item--icon"
-        :aria-label="theme === 'dark' ? 'ライトテーマに刁E��' : 'ダークチE�Eマに刁E��'"
+        :aria-label="theme === 'dark' ? 'ライトテーマに切替' : 'ダークテーマに切替'"
         role="switch"
         :aria-checked="theme === 'dark'"
         @click="$emit('toggle-theme')"
-        :title="tooltip(theme === 'dark' ? 'ライトテーマに刁E��替えまぁE : 'ダークチE�Eマに刁E��替えまぁE)"
+        :title="tooltip(theme === 'dark' ? 'ライトテーマに切り替えます' : 'ダークテーマに切り替えます')"
       >
         <Icon :icon="theme === 'dark' ? 'mdi:weather-night' : 'mdi:white-balance-sunny'" />
       </button>
@@ -246,5 +246,3 @@ const tooltip = message => (props.showCaptions ? message : '')
   }
 }
 </style>
-
-

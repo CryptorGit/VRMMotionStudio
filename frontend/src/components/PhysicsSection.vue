@@ -1,7 +1,7 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>物琁E��宁E/h3>
+      <h3>物理設定</h3>
     </header>
     <div class="section__content">
       <label class="toggle">
@@ -55,5 +55,3 @@ const springBoneEnabledLocal = computed({
   color: var(--text-muted, rgba(240, 245, 255, 0.8));
 }
 </style>
-
-

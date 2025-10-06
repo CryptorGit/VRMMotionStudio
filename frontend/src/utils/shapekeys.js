@@ -128,14 +128,14 @@ export function ensureShapeKeyCache(root, { force = false } = {}) {
       // morphTargetDictionaryから読み込み
       for (const [name, index] of Object.entries(dict)) {
         if (!Number.isInteger(index)) continue
-        if (index < 0 || index >= influences.length) continue // 有効な篁E��のみ
+        if (index < 0 || index >= influences.length) continue // 有効な範囲のみ
         if (!map.has(name)) map.set(name, [])
         map.get(name).push({ object: obj, index })
         const displayName = extractMorphTargetDisplayName(obj, index)
         if (displayName) recordShapeKeyDisplayName(store, name, displayName)
       }
       
-      // geometry.morphAttributesからも確認！EictになぁE��合�Eフォールバック�E�E
+      // geometry.morphAttributesからも確認（dictにない場合のフォールバック）
       const geometry = obj.geometry
       if (geometry?.morphAttributes && typeof geometry.morphAttributes === 'object') {
         const positionMorphs = geometry.morphAttributes.position || []
@@ -143,11 +143,11 @@ export function ensureShapeKeyCache(root, { force = false } = {}) {
           const attr = positionMorphs[i]
           if (!attr) continue
           
-          // dictに既に存在する場合�EスキチE�E
+          // dictに既に存在する場合はスキップ
           const existingName = Object.keys(dict).find(key => dict[key] === i)
           if (existingName) continue
           
-          // 属性から名前を取征E
+          // 属性から名前を取得
           const attrName = attr.name || attr?.userData?.name
           const candidateName = attrName ? String(attrName).trim() : `morph_${i}`
           
@@ -197,17 +197,17 @@ const SHAPEKEY_LABEL_OVERRIDES = {
 }
 
 const SHAPEKEY_GROUP_DEFINITIONS = [
-  { key: 'eyes', label: '目・瞳', matchers: [/\beye/i, /blink/, /wink/, /look(?!at)/, /gaze/, /pupil/, /iris/, /睨/, /視緁E, /目緁E, /注要E, /^目/, /瞳/, /ウィンク/, /まばたき/, /^要E] },
-  { key: 'brow', label: '省E, matchers: [/brow/, /mayu/, /省E] },
-  { key: 'mouth', label: '口・口允E, matchers: [/mouth/, /\blip/i, /jaw/, /tongue/, /teeth/, /^[aiueo]$/i, /viseme/, /vrc\.v_/, /^口/, /^ぁE, /^ぁE, /^ぁE, /^ぁE, /^ぁE, /^めE, /^笁E, /smile/, /frown/, /舁E, /歯/] },
-  { key: 'face', label: '頬・表惁E, matchers: [/face/, /cheek/, /nose/, /鼻/, /頬/, /tear/, /涁E, /ほぁE, /頰/, /表惁E] },
+  { key: 'eyes', label: '目・瞳', matchers: [/\beye/i, /blink/, /wink/, /look(?!at)/, /gaze/, /pupil/, /iris/, /睨/, /視線/, /目線/, /注視/, /^目/, /瞳/, /ウィンク/, /まばたき/, /^見/] },
+  { key: 'brow', label: '眉', matchers: [/brow/, /mayu/, /眉/] },
+  { key: 'mouth', label: '口・口元', matchers: [/mouth/, /\blip/i, /jaw/, /tongue/, /teeth/, /^[aiueo]$/i, /viseme/, /vrc\.v_/, /^口/, /^あ/, /^い/, /^う/, /^え/, /^お/, /^ん/, /^笑/, /smile/, /frown/, /舌/, /歯/] },
+  { key: 'face', label: '頬・表情', matchers: [/face/, /cheek/, /nose/, /鼻/, /頬/, /tear/, /涙/, /ほお/, /頰/, /表情/] },
   { key: 'hair', label: '髪', matchers: [/hair/, /髪/, /bang/, /前髪/] },
-  { key: 'body', label: '身佁E, matchers: [/body/, /bust/, /breast/, /arm/, /hand/, /finger/, /leg/, /foot/, /toe/, /shoulder/, /spine/, /waist/, /hip/, /neck/, /頭/, /肩/, /腁E, /扁E, /足/, /持E, /胸/, /佁E] }
+  { key: 'body', label: '身体', matchers: [/body/, /bust/, /breast/, /arm/, /hand/, /finger/, /leg/, /foot/, /toe/, /shoulder/, /spine/, /waist/, /hip/, /neck/, /頭/, /肩/, /腕/, /手/, /足/, /指/, /胸/, /体/] }
 ]
 
 const SHAPEKEY_GROUP_ORDER = ['eyes', 'brow', 'mouth', 'face', 'hair', 'body', 'other']
 
-const DEFAULT_UNNAMED_LABEL = '名称未設宁E
+const DEFAULT_UNNAMED_LABEL = '名称未設定'
 
 function normalizeShapeKeyName(name) {
   if (!name) return ''
@@ -242,7 +242,7 @@ function inferShapeKeyGroup(name) {
       return { key: def.key, label: def.label }
     }
   }
-  return { key: 'other', label: 'そ�E仁E }
+  return { key: 'other', label: 'その他' }
 }
 
 function getShapeKeyDisplayName(root, name) {
@@ -279,7 +279,7 @@ export function describeShapeKeys(root, { includeExpressions = false, exclude = 
     let display = friendly
     if (count > 0) {
       const marker = duplicateSuffix(count) || '別'
-      display = `${friendly}�E�E{marker}�E�`
+      display = `${friendly}（${marker}）`
     }
     group.items.push({
       name: rawName,
@@ -367,5 +367,3 @@ export function applyShapeKeyOverrides(root) {
     }
   }
 }
-
-

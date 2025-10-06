@@ -2,12 +2,12 @@
   <section class="key-settings">
     <header class="key-settings__header">
       <div class="key-settings__title">
-        <h2>キー設宁E/h2>
+        <h2>キー設定</h2>
         <p v-if="hasSelection" class="key-settings__subtitle">
-          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">�E�褁E���E�E/span>
+          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">（複数）</span>
         </p>
         <p v-else class="key-settings__subtitle">
-          タイムラインでキーを選択すると詳細が表示されます、E
+          タイムラインでキーを選択すると詳細が表示されます。
         </p>
       </div>
       <div v-if="hasSelection && rangeLabel" class="key-settings__range">
@@ -18,11 +18,11 @@
     <div class="key-settings__controls">
       <label class="key-settings__toggle">
         <input type="checkbox" :checked="snap" @change="onSnapChange" />
-        <span>フレームにスナッチE/span>
+        <span>フレームにスナップ</span>
       </label>
       <label class="key-settings__toggle">
         <input type="checkbox" :checked="loop" @change="onLoopChange" />
-        <span>ループ�E甁E/span>
+        <span>ループ再生</span>
       </label>
       <button
         type="button"
@@ -41,11 +41,11 @@
       </div>
     </div>
     <div v-else class="key-settings__empty">
-      <p>選択されたキーはありません、E/p>
+      <p>選択されたキーはありません。</p>
     </div>
 
     <p v-if="hasSelection && !hasMultiple" class="key-settings__hint">
-      褁E��のキーを選択するとイージングカーブを編雁E��きます、E
+      複数のキーを選択するとイージングカーブを編集できます。
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
@@ -87,7 +87,7 @@ const rangeLabel = computed(() => {
   const end = props.selection?.endTime
   if (hasMultiple.value && Number.isFinite(start) && Number.isFinite(end)) {
     const span = Math.max(0, end - start)
-    return `${formatSeconds(start)} ↁE${formatSeconds(end)} (΁E${formatSeconds(span)})`
+    return `${formatSeconds(start)} → ${formatSeconds(end)} (Δ ${formatSeconds(span)})`
   }
   const single = props.selection?.frames?.[0]?.time
   return Number.isFinite(single) ? formatSeconds(single) : ''
@@ -290,5 +290,3 @@ function onCurvesUpdate(payload) {
   width: 100%;
 }
 </style>
-
-

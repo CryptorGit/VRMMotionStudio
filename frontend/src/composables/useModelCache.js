@@ -86,7 +86,6 @@ export function useModelCache() {
         return Promise.resolve(null)
       }
       dbPromise = openDB(DB_NAME, DB_STORE).catch(e => {
-
         useLocal = true
         return null
       })
@@ -180,7 +179,7 @@ export function useModelCache() {
           devLog({ event: 'cache:local:ok' })
           return true
         } catch (lsErr) {
-
+          console.error('Failed to cache model to localStorage:', lsErr)
           devLog({ event: 'cache:local:error', message: String(lsErr && lsErr.message) })
           return false
         }
@@ -197,7 +196,6 @@ export function useModelCache() {
         devLog({ event: 'cache:idb:ok' })
         return true
       } catch (dbErr) {
-
         useLocal = true
         const serializedLists = await serializeListsForLocalStorage(dataLists)
         try {
@@ -205,13 +203,13 @@ export function useModelCache() {
           devLog({ event: 'cache:idb:fallback-local:ok' })
           return true
         } catch (lsErr) {
-
+          console.error('Failed to cache model to localStorage:', lsErr)
           devLog({ event: 'cache:idb:fallback-local:error', message: String(lsErr && lsErr.message) })
           return false
         }
       }
     } catch (e) {
-
+      console.error('Failed to cache model:', e)
       devLog({ event: 'cache:error', message: String(e && e.message) })
       return false
     }
@@ -273,7 +271,6 @@ export function useModelCache() {
         })
         return normalized
       } catch (dbErr) {
-
         useLocal = true
         try {
           const raw = localStorage.getItem(LOCAL_KEY)
@@ -296,13 +293,13 @@ export function useModelCache() {
           })
           return restored
         } catch (lsErr) {
-
+          console.error('Failed to load cached model from localStorage:', lsErr)
           devLog({ event: 'load:idb-fallback-local:error', message: String(lsErr && lsErr.message) })
           return []
         }
       }
     } catch (e) {
-
+      console.error('Failed to load cached model:', e)
       devLog({ event: 'load:error', message: String(e && e.message) })
       return []
     }
@@ -323,7 +320,7 @@ export function useModelCache() {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed))
           }
         } catch (lsErr) {
-
+          console.error('Failed to clear model cache in localStorage:', lsErr)
         }
         return
       }
@@ -338,7 +335,6 @@ export function useModelCache() {
         }
         await promisifyRequest(tx)
       } catch (dbErr) {
-
         useLocal = true
         try {
           if (index === undefined) {
@@ -351,15 +347,11 @@ export function useModelCache() {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed))
           }
         } catch (lsErr) {
-
         }
       }
     } catch (e) {
-
     }
   }
 
   return { cacheFiles, loadCachedFiles, deleteCachedFiles, getDB }
 }
-
-

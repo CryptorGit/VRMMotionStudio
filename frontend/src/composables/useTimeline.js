@@ -659,7 +659,9 @@ export function useTimeline({ trackers, renderCamera }) {
         setCurrentTime(startTime.value)
       }
     } catch (error) {
-
+      if (import.meta?.env?.DEV) {
+        console.error('Failed to deserialize timeline snapshot', error)
+      }
       return false
     } finally {
       restoringState = false
@@ -1649,7 +1651,7 @@ export function useTimeline({ trackers, renderCamera }) {
     try {
       const version = Number(snapshot.version) || TIMELINE_SERIAL_VERSION
       if (version > TIMELINE_SERIAL_VERSION && import.meta?.env?.DEV) {
-
+        console.warn('Timeline snapshot version is newer than supported:', version)
       }
 
       if (Number.isFinite(snapshot.frameRate) && snapshot.frameRate > 0) {
@@ -1702,7 +1704,9 @@ export function useTimeline({ trackers, renderCamera }) {
         setCurrentTime(startTime.value)
       }
     } catch (error) {
-
+      if (import.meta?.env?.DEV) {
+        console.error('Failed to deserialize timeline snapshot', error)
+      }
       return false
     } finally {
       restoringState = false
@@ -1766,5 +1770,3 @@ export function useTimeline({ trackers, renderCamera }) {
     restoreState
   }
 }
-
-

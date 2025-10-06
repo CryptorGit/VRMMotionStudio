@@ -2,15 +2,15 @@
   <div id="menu" ref="menu">
     <button id="menu-button" @click="toggleMenu"><i class="fa-solid fa-bars"></i></button>
     <ul id="menu-list" :class="{ hidden: !menuOpen }">
-      <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポ�EチE/li>
-      <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポ�EチE/li>
-      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> 照明設宁E/li>
-      <li id="display-option" @click="openSidebarSection('display')"><i class="fa-solid fa-eye"></i> 表示管琁E/li>
-      <li id="physics-option" @click="openSidebarSection('physics')"><i class="fa-solid fa-atom"></i> 物琁E��宁E/li>
-      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーチE/li>
-      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モチE��管琁E/li>
-      <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャチE��ュ削除</li>
-  <li id="toggle-restore" @click="toggleAutoRestore"><i class="fa-solid fa-rotate"></i> モチE��自動復允E {{ autoRestore ? 'ON' : 'OFF' }}</li>
+      <li id="import-option" @click="openFile"><i class="fa-solid fa-file-import"></i> インポート</li>
+      <li id="export-option" @click="exportPose"><i class="fa-solid fa-file-export"></i> エクスポート</li>
+      <li id="light-option" @click="openSidebarSection('lighting')"><i class="fa-solid fa-lightbulb"></i> 照明設定</li>
+      <li id="display-option" @click="openSidebarSection('display')"><i class="fa-solid fa-eye"></i> 表示管理</li>
+      <li id="physics-option" @click="openSidebarSection('physics')"><i class="fa-solid fa-atom"></i> 物理設定</li>
+      <li id="morph-option" @click="openSidebarSection('morph')"><i class="fa-solid fa-face-smile"></i> モーフ</li>
+      <li id="models-option" @click="openSidebarSection('models')"><i class="fa-solid fa-list"></i> モデル管理</li>
+      <li id="clear-cache-option" @click="clearCache"><i class="fa-solid fa-trash"></i> キャッシュ削除</li>
+  <li id="toggle-restore" @click="toggleAutoRestore"><i class="fa-solid fa-rotate"></i> モデル自動復元: {{ autoRestore ? 'ON' : 'OFF' }}</li>
     </ul>
   </div>
 </template>
@@ -64,5 +64,3 @@ defineExpose({ menu })
 #menu-list li { cursor: pointer; padding: 4px 8px; }
 #menu-list li:hover { background: #f0f0f0; }
 </style>
-
-

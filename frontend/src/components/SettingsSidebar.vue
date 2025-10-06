@@ -1,7 +1,7 @@
 <template>
   <aside class="properties-panel">
     <div class="properties-body">
-      <nav class="tab-strip" role="tablist" aria-label="設定�EカチE��リ">
+      <nav class="tab-strip" role="tablist" aria-label="設定カテゴリ">
         <button
           v-for="tab in SECTION_TABS"
           :key="tab.id"
@@ -45,6 +45,8 @@
           :show-virtual-tracker-labels="showVirtualTrackerLabels"
           :virtual-tracker-size="virtualTrackerSize"
           :virtual-tracker-label-scale="virtualTrackerLabelScale"
+          :has-models-loaded="hasModelsLoaded"
+          :finger-states="fingerStates"
           :camera-fov="cameraFov"
           :camera-near="cameraNear"
           :camera-far="cameraFar"
@@ -78,6 +80,7 @@
           @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
           @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
           @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
+          @update:fingerStates="v => emit('update:fingerStates', v)"
           @update:cameraFov="v => emit('update:cameraFov', v)"
           @update:cameraNear="v => emit('update:cameraNear', v)"
           @update:cameraFar="v => emit('update:cameraFar', v)"
@@ -138,6 +141,8 @@ const props = defineProps({
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  hasModelsLoaded: { type: Boolean, default: false },
+  fingerStates: { type: Object, default: () => ({}) },
   cameraFov: { type: Number, required: true },
   cameraNear: { type: Number, required: true },
   cameraFar: { type: Number, required: true },
@@ -174,6 +179,7 @@ const emit = defineEmits([
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
+  'update:fingerStates',
   'update:cameraFov',
   'update:cameraNear',
   'update:cameraFar',
@@ -341,5 +347,3 @@ const {
   background: transparent;
 }
 </style>
-
-

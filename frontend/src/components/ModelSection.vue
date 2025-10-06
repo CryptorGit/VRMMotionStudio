@@ -1,7 +1,7 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>モチE��管琁E/h3>
+      <h3>モデル管理</h3>
     </header>
     <div class="section__content">
       <label class="lookat-toggle">
@@ -70,5 +70,3 @@ const lookAtEnabledLocal = computed({
   color: var(--text-muted, rgba(240, 245, 255, 0.8));
 }
 </style>
-
-

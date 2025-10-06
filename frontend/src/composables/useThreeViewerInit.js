@@ -90,5 +90,3 @@ export function useThreeViewerInit({
   return { init, cleanup }
 }
 
-
-

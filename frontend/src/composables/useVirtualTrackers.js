@@ -1,15 +1,14 @@
 import { ref, watch, markRaw, reactive } from 'vue'
 import * as THREE from 'three'
 
-// Extended trackers: head, chest, hips, shoulders, arms, elbows, hands, knees, feet, gaze
+// VRChat-like trackers + upper arms and gaze
+// head, chest, hips, L/R upperArm, L/R hand, L/R elbow, L/R foot, L/R knee, gaze
 export const TRACKER_DEFS = [
   { key: 'head', label: 'Head', color: 0x3aa6ff },
   { key: 'chest', label: 'Chest', color: 0x00c853 },
   { key: 'hips', label: 'Hips', color: 0xff7043 },
-  { key: 'leftShoulder', label: 'L Shoulder', color: 0x42a5f5 },
-  { key: 'rightShoulder', label: 'R Shoulder', color: 0xef5350 },
-  { key: 'leftUpperArm', label: 'L Arm', color: 0x1e88e5 },
-  { key: 'rightUpperArm', label: 'R Arm', color: 0xe53935 },
+  { key: 'leftUpperArm', label: 'L Upper Arm', color: 0x1e88e5 },
+  { key: 'rightUpperArm', label: 'R Upper Arm', color: 0xe53935 },
   { key: 'leftHand', label: 'L Hand', color: 0x2979ff },
   { key: 'rightHand', label: 'R Hand', color: 0xff1744 },
   { key: 'leftElbow', label: 'L Elbow', color: 0x1565c0 },
@@ -18,7 +17,7 @@ export const TRACKER_DEFS = [
   { key: 'rightFoot', label: 'R Foot', color: 0x8d6e63 },
   { key: 'leftKnee', label: 'L Knee', color: 0x26a69a },
   { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 },
-  { key: 'gaze', label: 'Gaze', color: 0xffd700 }
+  { key: 'gaze', label: 'Gaze Target', color: 0xffeb3b }
 ]
 
 export const TRACKER_ROTATION_ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX']
@@ -174,7 +173,7 @@ export function useVirtualTrackers({
     startAngles: { x: 0, y: 0, z: 0 },
     rotationRing: null,
     didMove: false,
-    // ビューポ�Eト固定軸での回転用
+    // ビューポート固定軸での回転用
     viewBasisX: new THREE.Vector3(),
     viewBasisY: new THREE.Vector3(),
     viewBasisZ: new THREE.Vector3()
@@ -231,6 +230,52 @@ export function useVirtualTrackers({
   for (const def of TRACKER_DEFS) {
     trackerStates[def.key] = createDefaultTrackerState(def)
   }
+
+  // Track previous model state for proper enable/disable management
+  let previousModelCount = 0
+  let userWantsTrackers = false
+
+  // Watch models: manage tracker enable/disable based on model loading
+  watch(models, (newModels, oldModels) => {
+    const currentCount = Array.isArray(newModels) ? newModels.length : 0
+    const previousCount = Array.isArray(oldModels) ? oldModels.length : 0
+    
+    // Models were removed (went to 0)
+    if (currentCount === 0 && previousCount > 0) {
+      // Force disable when all models removed
+      if (enabled.value) {
+        userWantsTrackers = true // Remember user wanted trackers
+        enabled.value = false
+      }
+    }
+    // Models were added (went from 0 to some)
+    else if (currentCount > 0 && previousCount === 0) {
+      // Re-enable if user wanted trackers before
+      if (userWantsTrackers) {
+        enabled.value = true
+        userWantsTrackers = false
+      }
+    }
+    // Model reload (count changed but not to/from 0)
+    else if (currentCount !== previousCount) {
+      // Just update tracker positions, don't change enabled state
+      if (enabled.value && currentCount > 0) {
+        // Reinitialize tracker positions for new models
+        setTimeout(() => {
+          layoutDefaultPositions({ force: true })
+        }, 100)
+      }
+    }
+    
+    previousModelCount = currentCount
+  }, { immediate: false })
+
+  // Initial check: disable trackers if no models on mount
+  watch(() => models?.value?.length || 0, (count) => {
+    if (count === 0 && enabled.value) {
+      enabled.value = false
+    }
+  }, { immediate: true })
 
   function toDegrees(radians) {
     return Math.round(radians * RAD2DEG * 1000) / 1000
@@ -592,7 +637,7 @@ export function useVirtualTrackers({
       const model = getActiveModel()
       if (model) {
         setSavedPositions(model, null)
-        // トラチE��ー回転オフセチE��もクリア
+        // トラッカー回転オフセットもクリア
         trackerRotationOffsets.delete(model)
       }
     } catch {}
@@ -612,10 +657,6 @@ export function useVirtualTrackers({
     head: ['head', 'neck'],
     chest: ['chest', 'upperChest', 'spine'],
     hips: ['hips'],
-    leftShoulder: ['leftShoulder', 'leftUpperArm'],
-    rightShoulder: ['rightShoulder', 'rightUpperArm'],
-    leftUpperArm: ['leftUpperArm'],
-    rightUpperArm: ['rightUpperArm'],
     leftHand: ['leftHand'],
     rightHand: ['rightHand'],
     leftElbow: ['leftLowerArm', 'leftUpperArm'],
@@ -623,8 +664,7 @@ export function useVirtualTrackers({
     leftFoot: ['leftFoot', 'leftLowerLeg'],
     rightFoot: ['rightFoot', 'rightLowerLeg'],
     leftKnee: ['leftLowerLeg', 'leftUpperLeg'],
-    rightKnee: ['rightLowerLeg', 'rightUpperLeg'],
-    gaze: ['head', 'neck']
+    rightKnee: ['rightLowerLeg', 'rightUpperLeg']
   }
 
   function captureInitialWorldPose(model) {
@@ -675,18 +715,16 @@ export function useVirtualTrackers({
       const hips = getBone(vrm, 'hips')
       const head = getBone(vrm, 'head') || getBone(vrm, 'neck')
       const chest = getBone(vrm, 'chest') || getBone(vrm, 'spine')
-      const lShoulder = getBone(vrm, 'leftShoulder')
-      const rShoulder = getBone(vrm, 'rightShoulder')
       const lUpperArm = getBone(vrm, 'leftUpperArm')
       const rUpperArm = getBone(vrm, 'rightUpperArm')
       const lHand = getBone(vrm, 'leftHand')
       const rHand = getBone(vrm, 'rightHand')
       const lElbow = getBone(vrm, 'leftLowerArm')
       const rElbow = getBone(vrm, 'rightLowerArm')
-  const lFoot = getBone(vrm, 'leftFoot')
-  const rFoot = getBone(vrm, 'rightFoot')
-  const lKnee = getBone(vrm, 'leftLowerLeg')
-  const rKnee = getBone(vrm, 'rightLowerLeg')
+      const lFoot = getBone(vrm, 'leftFoot')
+      const rFoot = getBone(vrm, 'rightFoot')
+      const lKnee = getBone(vrm, 'leftLowerLeg')
+      const rKnee = getBone(vrm, 'rightLowerLeg')
       const m = new THREE.Vector3()
       const initMap = initialWorldPose.get(model)
 
@@ -742,17 +780,13 @@ export function useVirtualTrackers({
         }
 
         m.add(off)
-        // 修正: forceがtrueの場合、または位置が未設定（原点付近）の場合のみ更新
-        const isNearOrigin = t.mesh.position.lengthSq() < 0.001
-        if (force || isNearOrigin) t.mesh.position.copy(m)
+        if (force || !usedSaved) t.mesh.position.copy(m)
         syncTrackerStateFromMesh(key)
       }
 
       setFrom('hips', hips)
       setFrom('chest', chest)
       setFrom('head', head, new THREE.Vector3(0, 0.1, 0))
-      setFrom('leftShoulder', lShoulder)
-      setFrom('rightShoulder', rShoulder)
       setFrom('leftUpperArm', lUpperArm)
       setFrom('rightUpperArm', rUpperArm)
       setFrom('leftElbow', lElbow)
@@ -763,26 +797,17 @@ export function useVirtualTrackers({
       setFrom('rightKnee', rKnee)
       setFrom('leftFoot', lFoot)
       setFrom('rightFoot', rFoot)
-      
-      // Gaze tracker: 顔の前方に配置
+      // Gaze target: positioned in front of the head
       const gazeTracker = trackers.value.find(x => x.key === 'gaze')
       if (gazeTracker && head) {
-        const savedGaze = saved?.gaze
-        if (savedGaze && typeof savedGaze === 'object' && Array.isArray(savedGaze.position)) {
-          const pos = savedGaze.position
-          if (savedGaze.space === 'world') {
-            gazeTracker.mesh.position.set(pos[0], pos[1], pos[2])
-          } else {
-            const lp = new THREE.Vector3().fromArray(pos)
-            gazeTracker.mesh.position.copy(vrm.scene.localToWorld(lp.clone()))
-          }
-        } else {
+        const savedGaze = saved?.['gaze']
+        if (!savedGaze || force) {
           head.updateWorldMatrix(true, false)
-          const headPos = head.getWorldPosition(new THREE.Vector3())
-          const headRot = head.getWorldQuaternion(new THREE.Quaternion())
-          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(headRot)
-          gazeTracker.mesh.position.copy(headPos).add(forward.multiplyScalar(2.0))
-          gazeTracker.mesh.position.y = headPos.y
+          const gazePos = new THREE.Vector3()
+          head.getWorldPosition(gazePos)
+          gazePos.z -= 2.0 // 2 meters in front of head
+          gazeTracker.mesh.position.copy(gazePos)
+          syncTrackerStateFromMesh('gaze')
         }
       }
     }
@@ -790,7 +815,7 @@ export function useVirtualTrackers({
     layoutCameraTracker({ savedAll: saved, force })
     if (vrm && !didInitialLayout) didInitialLayout = true
     
-    // トラチE��ー位置が変更された場合、回転オフセチE��をクリア
+    // トラッカー位置が変更された場合、回転オフセットをクリア
     if (force && model) {
       trackerRotationOffsets.delete(model)
     }
@@ -906,7 +931,7 @@ export function useVirtualTrackers({
       const hit = picks[0].object.userData.__vt ? picks[0].object : picks[0].object.parent
       const trackerKey = resolveTrackerKeyFromObject(hit)
       
-      // 操作モード決宁E 左クリチE��=移勁E 右クリチE��=パン/チルチE 中クリチE��=ロール
+      // 操作モード決定: 左クリック=移動, 右クリック=パン/チルト, 中クリック=ロール
       let mode = 'translate'
       if (e.button === 2) mode = 'rotate-pan-tilt'
       else if (e.button === 1) mode = 'rotate-roll'
@@ -939,7 +964,7 @@ export function useVirtualTrackers({
         dragState.plane.intersectLine(new THREE.Line3(ray.origin, ray.origin.clone().add(ray.direction.clone().multiplyScalar(1000))), ip)
         dragState.planeOffset.copy(ip).sub(p)
       } else {
-        // 回転モーチE ビューポ�Eト固定軸を保孁E
+        // 回転モード: ビューポート固定軸を保存
         const state = ensureTrackerState(trackerKey)
         if (state?.angles) {
           dragState.startAngles = {
@@ -951,12 +976,12 @@ export function useVirtualTrackers({
           dragState.startAngles = { x: 0, y: 0, z: 0 }
         }
         
-        // ビューポ�Eト基準軸を計算（カメラのワールド空間での向き�E�E
+        // ビューポート基準軸を計算（カメラのワールド空間での向き）
         const camWorldMat = new THREE.Matrix4()
         camera.value.updateMatrixWorld(true)
         camWorldMat.copy(camera.value.matrixWorld)
         
-        // カメラ右方吁E(X), 上方吁E(Y), 奥方吁E(-Z)
+        // カメラ右方向 (X), 上方向 (Y), 奥方向 (-Z)
         dragState.viewBasisX.set(1, 0, 0).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
         dragState.viewBasisY.set(0, 1, 0).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
         dragState.viewBasisZ.set(0, 0, -1).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
@@ -976,7 +1001,7 @@ export function useVirtualTrackers({
     dragState.pointerDelta.set(e.clientX - dragState.pointerStart.x, e.clientY - dragState.pointerStart.y)
     
     if (dragState.mode === 'translate') {
-      // 平行移動�E琁E
+      // 平行移動処理
       computeMouseNdc(e, dom)
       raycaster.setFromCamera(mouseNdc, camera.value)
       const ray = raycaster.ray
@@ -997,23 +1022,23 @@ export function useVirtualTrackers({
         }
       }
     } else if (dragState.mode === 'rotate-pan-tilt') {
-      // パン/チルト回転: ビューポ�Eト固定軸で回転
+      // パン/チルト回転: ビューポート固定軸で回転
       const sensitivity = 0.5 // 感度調整
       const deltaX = dragState.pointerDelta.x * sensitivity
       const deltaY = dragState.pointerDelta.y * sensitivity
 
-      // 横ドラチE��: ワールドY軸�E�上方向）で回転�E�パン�E�E
+      // 横ドラッグ: ワールドY軸（上方向）で回転（パン）
       const panAngle = deltaX * DEG2RAD
   cameraBasisUp.set(0, 1, 0)
   const panQuat = dragTmpQuatA.setFromAxisAngle(cameraBasisUp, panAngle)
 
-      // 縦ドラチE��: ビューポ�Eト�EX軸�E�左右方向）で回転�E�チルト！E
+      // 縦ドラッグ: ビューポートのX軸（左右方向）で回転（チルト）
   const tiltAngle = deltaY * DEG2RAD
       const tiltQuat = dragTmpQuatB.setFromAxisAngle(dragState.viewBasisX, tiltAngle)
 
-      // 回転を適用: 最初�E姿勢から相対皁E��回転
+      // 回転を適用: 最初の姿勢から相対的に回転
       const newQuat = dragTmpQuatC.copy(dragState.startQuaternion)
-      newQuat.premultiply(panQuat) // パンを�Eに適用
+      newQuat.premultiply(panQuat) // パンを先に適用
       newQuat.premultiply(tiltQuat) // チルトを後に適用
 
       dragState.target.quaternion.copy(newQuat)
@@ -1026,11 +1051,11 @@ export function useVirtualTrackers({
       
       dragState.didMove = true
     } else if (dragState.mode === 'rotate-roll') {
-      // ロール回転: カメラからトラチE��ーへの視線をZ軸としてロール
+      // ロール回転: カメラからトラッカーへの視線をZ軸としてロール
       const sensitivity = 0.5
       const deltaX = dragState.pointerDelta.x * sensitivity
       
-      // カメラからトラチE��ーへの方向をロール軸とする
+      // カメラからトラッカーへの方向をロール軸とする
       const trackerPos = dragState.target.getWorldPosition(new THREE.Vector3())
       const camPos = camera.value.position.clone()
       const rollAxis = trackerPos.clone().sub(camPos).normalize()
@@ -1245,6 +1270,8 @@ export function useVirtualTrackers({
       spine: getBone(vrm, 'spine') || getBone(vrm, 'chest') || getBone(vrm, 'upperChest'),
       neck: getBone(vrm, 'neck') || getBone(vrm, 'chest'),
       head: getBone(vrm, 'head'),
+      leftShoulder: getBone(vrm, 'leftShoulder'),
+      rightShoulder: getBone(vrm, 'rightShoulder'),
       leftUpperArm: getBone(vrm, 'leftUpperArm'),
       leftLowerArm: getBone(vrm, 'leftLowerArm'),
       leftHand: getBone(vrm, 'leftHand'),
@@ -1253,10 +1280,12 @@ export function useVirtualTrackers({
       rightHand: getBone(vrm, 'rightHand'),
       leftUpperLeg: getBone(vrm, 'leftUpperLeg'),
       leftLowerLeg: getBone(vrm, 'leftLowerLeg'),
-  leftFoot: getBone(vrm, 'leftFoot'),
+      leftFoot: getBone(vrm, 'leftFoot'),
       rightUpperLeg: getBone(vrm, 'rightUpperLeg'),
       rightLowerLeg: getBone(vrm, 'rightLowerLeg'),
-  rightFoot: getBone(vrm, 'rightFoot')
+      rightFoot: getBone(vrm, 'rightFoot'),
+      leftEye: getBone(vrm, 'leftEye'),
+      rightEye: getBone(vrm, 'rightEye')
     }
     boneCache.set(model, map)
     return map
@@ -1315,14 +1344,14 @@ export function useVirtualTrackers({
     
     const trackerWorldQ = trackerEntry.mesh.getWorldQuaternion(new THREE.Quaternion())
     
-    // オフセチE��マップ�E初期匁E
+    // オフセットマップの初期化
     let offsetMap = trackerRotationOffsets.get(model)
     if (!offsetMap) {
       offsetMap = new Map()
       trackerRotationOffsets.set(model, offsetMap)
     }
     
-    // オフセチE��の計算（�E回�Eみ�E�E
+    // オフセットの計算（初回のみ）
     let offset = offsetMap.get(key)
     if (!offset) {
       const boneWorldQ = bone.getWorldQuaternion(new THREE.Quaternion())
@@ -1331,10 +1360,10 @@ export function useVirtualTrackers({
       offsetMap.set(key, offset)
     }
     
-    // ターゲチE��回転を計算（トラチE��ー回転 ÁEオフセチE���E�E
+    // ターゲット回転を計算（トラッカー回転 × オフセット）
     const targetWorldQ = offset.clone().multiply(trackerWorldQ)
     
-    // 親のワールド回転を取征E
+    // 親のワールド回転を取得
     const parentWorldQ = bone.parent
       ? bone.parent.getWorldQuaternion(new THREE.Quaternion())
       : new THREE.Quaternion()
@@ -1447,30 +1476,27 @@ export function useVirtualTrackers({
       }
     } catch {}
 
-    // Gaze tracking: 視線トラッカーを見るように目を回転
+    // Arms IK (2-bone approx with upper arm support)
     try {
-      const gazeTracker = trackers.value.find(t => t.key === 'gaze')
-      if (gazeTracker?.mesh && model.vrm?.lookAt) {
-        const gazePos = gazeTracker.mesh.position.clone()
-        model.vrm.lookAt.target = gazePos
+      // Apply upper arm tracker rotations to shoulders (make shoulders move)
+      const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
+      const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
+      
+      if (bones.leftShoulder && leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
+        const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
+        const targetDir = leftUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
+        rotateBoneToward(bones.leftShoulder, targetDir, 0.5)
       }
-    } catch {}
-
-    // Shoulder rotation from trackers
-    try {
-      if (bones.leftShoulder) {
-        applyTrackerRotationToBone(bones.leftShoulder, 'leftShoulder', { weight: 0.7 })
+      
+      if (bones.rightShoulder && rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
+        const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
+        const targetDir = rightUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
+        rotateBoneToward(bones.rightShoulder, targetDir, 0.5)
       }
-      if (bones.rightShoulder) {
-        applyTrackerRotationToBone(bones.rightShoulder, 'rightShoulder', { weight: 0.7 })
-      }
-    } catch {}
-
-    // Arms IK (2-bone approx)
-    try {
+      
       solveLimb(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 'leftHand', 'leftElbow')
       solveLimb(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, 'rightHand', 'rightElbow')
-      // 手首�E回転を適用
+      // 手首の回転を適用
       if (bones.leftHand) {
         applyTrackerRotationToBone(bones.leftHand, 'leftHand', { weight: 0.85 })
       }
@@ -1482,12 +1508,27 @@ export function useVirtualTrackers({
     try {
       solveLimb(bones.leftUpperLeg, bones.leftLowerLeg, bones.leftFoot, 'leftFoot', 'leftKnee')
       solveLimb(bones.rightUpperLeg, bones.rightLowerLeg, bones.rightFoot, 'rightFoot', 'rightKnee')
-      // 足首�E回転を適用
+      // 足首の回転を適用
       if (bones.leftFoot) {
         applyTrackerRotationToBone(bones.leftFoot, 'leftFoot', { weight: 0.85 })
       }
       if (bones.rightFoot) {
         applyTrackerRotationToBone(bones.rightFoot, 'rightFoot', { weight: 0.85 })
+      }
+    } catch {}
+
+    // Gaze tracking: make eyes look at gaze tracker
+    try {
+      const gazeTracker = trackers.value.find(t => t.key === 'gaze')
+      if (gazeTracker?.mesh && trackerIsIndividuallyEnabled('gaze')) {
+        const gazePos = gazeTracker.mesh.position
+        const headBone = bones.head || bones.neck
+        
+        if (headBone && model.vrm.lookAt) {
+          // Use VRM's built-in lookAt system to avoid breaking eye rendering
+          const lookAtTarget = gazePos.clone()
+          model.vrm.lookAt.target = lookAtTarget
+        }
       }
     } catch {}
 
@@ -1511,7 +1552,7 @@ export function useVirtualTrackers({
 
   watch(models, () => {
     pruneSavedForMissingModels()
-    // モチE��変更時にトラチE��ー回転オフセチE��をクリア
+    // モデル変更時にトラッカー回転オフセットをクリア
     const model = getActiveModel()
     if (model) {
       trackerRotationOffsets.delete(model)
@@ -1716,5 +1757,3 @@ export function useVirtualTrackers({
     rebuild: () => { createGizmos(); layoutDefaultPositions({ force: true }); setVisibility(enabled.value) }
   }
 }
-
-

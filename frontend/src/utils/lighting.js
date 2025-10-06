@@ -108,5 +108,3 @@ watch(
     'Failed to update light marker intensity:'
   )
 )
-
-

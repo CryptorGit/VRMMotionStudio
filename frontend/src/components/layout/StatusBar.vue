@@ -7,7 +7,7 @@
     </div>
     <div class="status-bar__right">
       <slot name="shortcuts">
-        <span class="status-bar__placeholder">追加惁E��はここに表示されまぁE/span>
+        <span class="status-bar__placeholder">追加情報はここに表示されます</span>
       </slot>
     </div>
   </footer>
@@ -54,5 +54,3 @@ const props = defineProps({
   }
 }
 </style>
-
-

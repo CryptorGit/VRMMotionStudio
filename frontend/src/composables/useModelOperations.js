@@ -80,7 +80,7 @@ export function useModelOperations({
         camera.value.lookAt(target)
       }
     } catch (e) {
-
+      console.warn('frameObject error:', e)
     }
   }
 
@@ -550,7 +550,7 @@ export function useModelOperations({
       } catch {}
     }
     if (unresolved.length) {
-      
+      try { console.debug('unresolved spring joints', unresolved) } catch {}
       try { logToServer?.({ event: 'spring-joints-unresolved', unresolved }) } catch {}
     }
     return indices
@@ -650,7 +650,7 @@ export function useModelOperations({
               boneNameVisible: !!model.boneNameVisible
             }
           }
-
+          console.debug('BoneClassification', payload)
           try { logToServer?.({ event: 'bone-debug', payload }) } catch {}
         } catch {}
       }
@@ -911,7 +911,7 @@ export function useModelOperations({
             boneNameVisible: !!model.boneNameVisible
           }
         }
-
+        console.debug('BoneClassification', payload)
         try { logToServer?.({ event: 'bone-debug', payload }) } catch {}
         try {
           function computeIndex(o) {
@@ -1212,7 +1212,7 @@ export function useModelOperations({
       if (data.length) localStorage.setItem(LOCAL_MODELS_KEY, JSON.stringify(data))
       else localStorage.removeItem(LOCAL_MODELS_KEY)
     } catch (e) {
-
+      console.warn('Failed to save model state', e)
     }
   }
 
@@ -1221,7 +1221,7 @@ export function useModelOperations({
       const raw = localStorage.getItem(LOCAL_MODELS_KEY)
       return raw ? JSON.parse(raw) : []
     } catch (e) {
-
+      console.warn('Failed to load model state', e)
       return []
     }
   }
@@ -1231,7 +1231,7 @@ export function useModelOperations({
     try {
       onCachePersisted({ ok, reason, error: error || null })
     } catch (notifyError) {
-
+      console.warn('onCachePersisted callback failed', notifyError)
     }
   }
 
@@ -1286,6 +1286,7 @@ export function useModelOperations({
           .catch(error => {
             reportCacheResult(false, reason, error)
             logToServer?.({ event: 'cache:persist:error', reason, groups: snapshot.length, counts: snapshot.map(list => list.length), message: String(error?.message || error) })
+            console.warn('Failed to persist model cache (fire-and-forget):', reason, error)
           })
       }
     } catch (error) {
@@ -1293,7 +1294,7 @@ export function useModelOperations({
       try {
         logToServer?.({ event: 'cache:persist:error', reason, message: String(error?.message || error) })
       } catch {}
-
+      console.warn('Failed to schedule cache persistence:', reason, error)
     }
   }
 
@@ -1394,7 +1395,7 @@ export function useModelOperations({
       }
       try { vrm?.dispose?.() } catch {}
     } catch (e) {
-
+      console.error('Failed to dispose model resources:', e)
     }
   }
 
@@ -1421,7 +1422,7 @@ export function useModelOperations({
         persistenceHandled = true
       }
     } catch (e) {
-
+      console.error('Failed to remove model:', e)
       if (!persistenceHandled) reportCacheResult(false, 'remove', e)
     } finally {
       saveModelState()
@@ -1436,10 +1437,10 @@ export function useModelOperations({
       await cache.deleteCachedFiles()
       reportCacheResult(true, 'clear', null)
     } catch (error) {
-
+      console.warn('Failed to clear persisted cache', error)
       reportCacheResult(false, 'clear', error)
     }
-    // Also clear persisted UI/cache states so "キャチE��ュ削除" manages them too
+    // Also clear persisted UI/cache states so "キャッシュ削除" manages them too
     try {
       // Imported models visibility/state snapshot
       localStorage.removeItem('importedModels')
@@ -1481,7 +1482,7 @@ export function useModelOperations({
 
     const manager = new THREE.LoadingManager()
     manager.onError = url => {
-
+      console.error('Resource load failed:', url)
       logToServer?.({ event: 'resource-error', url })
     }
 
@@ -1494,7 +1495,7 @@ export function useModelOperations({
             try {
               const vrm = gltf?.userData?.vrm
               if (!vrm) {
-
+                console.error('VRM not found in GLTF', modelFile.name)
                 return resolve()
               }
               vrm.scene.userData.vrm = vrm
@@ -1537,7 +1538,7 @@ export function useModelOperations({
           undefined,
           error => {
             const status = error && error.target && error.target.status
-
+            console.error('Load error:', status, error)
             logToServer?.({ event: 'error', message: error?.message, status })
             resolve()
           }
@@ -1547,31 +1548,31 @@ export function useModelOperations({
     try { logToServer?.({ event: 'handleFiles:cache-input', counts: models.value.map(m => (m.files ? m.files.length : 0)) }) } catch {}
     const cached = await persistModels('load')
     if (!cached) {
-
-      alert('モチE��のキャチE��ュに失敗しました')
+      console.error('Failed to cache model files')
+      alert('モデルのキャッシュに失敗しました')
     }
     try { logToServer?.({ event: 'handleFiles:cached', ok: !!cached, models: models.value.length }) } catch {}
     saveModelState()
   }
 
   async function restoreCachedModel(savedState = loadModelState()) {
-
+    console.debug('restoreCachedModel: start')
     try { logToServer?.({ event: 'restore:start' }) } catch {}
     let saved
     try {
       saved = await cache.loadCachedFiles()
-
+      console.debug('restoreCachedModel: load result', saved)
       try { logToServer?.({ event: 'restore:loaded', groups: saved.length }) } catch {}
     } catch (e) {
-
-
-      alert('モチE��の復允E��失敗しました')
+      console.warn('Failed to load cached files')
+      console.debug(e)
+      alert('モデルの復元に失敗しました')
       return false
     }
     if (!saved.length) {
-
+      console.info('No cached model to restore')
       try { logToServer?.({ event: 'restore:empty' }) } catch {}
-      alert('復允E��るモチE��がありません')
+      alert('復元するモデルがありません')
       return false
     }
     const files = []
@@ -1585,7 +1586,7 @@ export function useModelOperations({
           }
           files.push(file)
         } catch (err) {
-
+          console.error('Failed to reconstruct file from cache', err)
           try { logToServer?.({ event: 'restore:reconstruct-error', name: f?.name, haveData: !!f?.data, dataType: Object.prototype.toString.call(f?.data), message: err?.message }) } catch {}
         }
       }
@@ -1603,11 +1604,12 @@ export function useModelOperations({
         }
       })
       saveModelState()
+      console.info(`restoreCachedModel: restored ${models.value.length} model(s)`)
       try { logToServer?.({ event: 'restore:done', models: models.value.length }) } catch {}
       return true
     } catch (e) {
-
-      alert('モチE��の復允E��にエラーが発生しました')
+      console.error('Failed to restore cached model files', e)
+      alert('モデルの復元中にエラーが発生しました')
       return false
     }
   }
@@ -1628,13 +1630,13 @@ export function useModelOperations({
     if (typeof document === 'undefined') return
     if (document.visibilityState !== 'hidden') return
     Promise.resolve(persistModels('visibilitychange')).catch(error => {
-
+      console.warn('visibilitychange cache persist failed', error)
     })
   }
 
   function handlePageHide() {
     Promise.resolve(persistModels('pagehide')).catch(error => {
-
+      console.warn('pagehide cache persist failed', error)
     })
   }
 
@@ -1642,7 +1644,7 @@ export function useModelOperations({
     try {
       fireAndForgetPersist('beforeunload')
     } catch (error) {
-
+      console.warn('beforeunload cache persist failed', error)
     }
   }
 
@@ -1676,5 +1678,3 @@ export function useModelOperations({
     onDrop
   }
 }
-
-

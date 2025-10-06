@@ -17,5 +17,3 @@ export function useMenu({ settingsSidebar, logToServer }) {
 
   return { menuOpen, toggleMenu, openSidebarSection }
 }
-
-

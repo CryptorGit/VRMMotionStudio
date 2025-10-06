@@ -41,5 +41,3 @@ export function useTheme(defaultTheme = 'dark') {
     toggleTheme
   }
 }
-
-

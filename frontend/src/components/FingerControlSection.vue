@@ -1,214 +1,219 @@
-﻿<tmplat>
-  <sction class="sction">
-    <hadr class="sction__hadr">
+<template>
+  <section class="section">
+    <header class="section__header">
       <h3>指の設定</h3>
-    </hadr>
-    <div class="sction__contnt">
+    </header>
+    <div class="section__content">
       <div class="hand-group">
         <h4>左手</h4>
-        <div class="fingr-control" v-for="fingr in lftFingrs" :ky="fingr.ky">
-          <labl>
-            <span class="fingr-nam">{{ fingr.labl }}<</span>
+        <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
+          <label>
+            <span class="finger-name">{{ finger.label }}</span>
             <input
-              typ="rang"
+              type="range"
               min="0"
               max="1"
-              stp="0.01"
-              :valu="gtFingrValu('lft', fingr.ky)"
-              @input="stFingrValu('lft', fingr.ky, $vnt.targt.valu)"
+              step="0.01"
+              :value="getFingerValue('left', finger.key)"
+              @input="setFingerValue('left', finger.key, $event.target.value)"
             />
-            <span class="fingr-valu">{{ (gtFingrValu('lft', fingr.ky) * 100).toFixd(0) }}%<</span>
-          </labl>
+            <span class="finger-value">{{ (getFingerValue('left', finger.key) * 100).toFixed(0) }}%</span>
+          </label>
         </div>
       </div>
 
       <div class="hand-group">
         <h4>右手</h4>
-        <div class="fingr-control" v-for="fingr in rightFingrs" :ky="fingr.ky">
-          <labl>
-            <span class="fingr-nam">{{ fingr.labl }}<</span>
+        <div class="finger-control" v-for="finger in rightFingers" :key="finger.key">
+          <label>
+            <span class="finger-name">{{ finger.label }}</span>
             <input
-              typ="rang"
+              type="range"
               min="0"
               max="1"
-              stp="0.01"
-              :valu="gtFingrValu('right', fingr.ky)"
-              @input="stFingrValu('right', fingr.ky, $vnt.targt.valu)"
+              step="0.01"
+              :value="getFingerValue('right', finger.key)"
+              @input="setFingerValue('right', finger.key, $event.target.value)"
             />
-            <span class="fingr-valu">{{ (gtFingrValu('right', fingr.ky) * 100).toFixd(0) }}%<</span>
-          </labl>
+            <span class="finger-value">{{ (getFingerValue('right', finger.key) * 100).toFixed(0) }}%</span>
+          </label>
         </div>
       </div>
 
       <div class="actions">
-        <button typ="button" class="btn btn--scondary" @click="rstAllFingrs">すべてリセット</button>
+        <button type="button" class="btn btn--secondary" @click="resetAllFingers">すべてリセット</button>
       </div>
     </div>
-  </sction>
-</tmplat>
+  </section>
+</template>
 
-<script stup>
-import { computd } from 'vu'
+<script setup>
+import { computed } from 'vue'
 
-const props = dfinProps({
-  fingrStats: { typ: Objct, dfault: () => ({}) }
+const props = defineProps({
+  fingerStates: { type: Object, default: () => ({}) }
 })
 
-const mit = dfinmits(['updat:fingr'])
+const emit = defineEmits(['update:finger'])
 
-const fingrs = [
-  { ky: 'thumb', labl: '親指' },
-  { ky: 'indx', labl: '人差し指' },
-  { ky: 'middl', labl: '中指' },
-  { ky: 'ring', labl: '薬指' },
-  { ky: 'littl', labl: '小指' }
+const fingers = [
+  { key: 'thumb', label: '親指' },
+  { key: 'index', label: '人差し指' },
+  { key: 'middle', label: '中指' },
+  { key: 'ring', label: '薬指' },
+  { key: 'little', label: '小指' }
 ]
 
-const lftFingrs = computd(() => fingrs)
-const rightFingrs = computd(() => fingrs)
+const leftFingers = computed(() => fingers)
+const rightFingers = computed(() => fingers)
 
-function gtFingrValu(hand, fingr) {
-  const ky = `${hand}_${fingr}`
-  rturn props.fingrStats?.[ky] ?? 0
+function getFingerValue(hand, finger) {
+  const key = `${hand}_${finger}`
+  return props.fingerStates?.[key] ?? 0
 }
 
-function stFingrValu(hand, fingr, valu) {
-  const ky = `${hand}_${fingr}`
-  const numValu = Math.max(0, Math.min(1, Numbr(valu) || 0))
-  mit('updat:fingr', { hand, fingr, valu: numValu })
+function setFingerValue(hand, finger, value) {
+  const key = `${hand}_${finger}`
+  const numValue = Math.max(0, Math.min(1, Number(value) || 0))
+  emit('update:finger', { hand, finger, value: numValue })
 }
 
-function rstAllFingrs() {
-  fingrs.forach(f => {
-    stFingrValu('lft', f.ky, 0)
-    stFingrValu('right', f.ky, 0)
+function resetAllFingers() {
+  fingers.forEach(f => {
+    setFingerValue('left', f.key, 0)
+    setFingerValue('right', f.key, 0)
   })
 }
 </script>
 
-<styl scopd>
-.sction {
+<style scoped>
+.section {
   background: rgba(36, 40, 52, 0.6);
-  bordr: 1px solid rgba(255, 255, 255, 0.06);
-  bordr-radius: 10px;
-  ovrflow: hiddn;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-.sction__hadr {
-  padding: 0.75rm 0.85rm 0.4rm;
-  bordr-bottom: 1px solid rgba(255, 255, 255, 0.04);
+.section__header {
+  padding: 0.75rem 0.85rem 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.sction__hadr h3 {
+.section__header h3 {
   margin: 0;
-  font-siz: 0.95rm;
-  lttr-spacing: 0.04m;
-  font-wight: 600;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.sction__contnt {
-  padding: 0.85rm;
-  display: flx;
-  flx-dirction: column;
-  gap: 1.2rm;
+.section__content {
+  padding: 1rem 0.85rem;
 }
 
 .hand-group {
-  display: flx;
-  flx-dirction: column;
-  gap: 0.6rm;
+  margin-bottom: 1.5rem;
+}
+
+.hand-group:last-of-type {
+  margin-bottom: 1rem;
 }
 
 .hand-group h4 {
-  margin: 0;
-  font-siz: 0.85rm;
-  font-wight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  padding-bottom: 0.3rm;
-  bordr-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fingr-control {
-  display: flx;
-  align-itms: cntr;
-}
-
-.fingr-control labl {
-  display: flx;
-  align-itms: cntr;
-  gap: 0.6rm;
-  width: 100%;
-  font-siz: 0.82rm;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.fingr-nam {
-  min-width: 70px;
-  flx-shrink: 0;
-}
-
-.fingr-control input[typ="rang"] {
-  flx: 1 1 auto;
-  hight: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  bordr-radius: 2px;
-  outlin: non;
-  cursor: pointr;
-}
-
-.fingr-control input[typ="rang"]::-wbkit-slidr-thumb {
-  -wbkit-apparanc: non;
-  apparanc: non;
-  width: 14px;
-  hight: 14px;
-  bordr-radius: 50%;
-  background: var(--accnt, #2d8cff);
-  cursor: pointr;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-.fingr-control input[typ="rang"]::-moz-rang-thumb {
-  width: 14px;
-  hight: 14px;
-  bordr-radius: 50%;
-  background: var(--accnt, #2d8cff);
-  cursor: pointr;
-  bordr: non;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-}
-
-.fingr-valu {
-  min-width: 40px;
-  txt-align: right;
-  font-siz: 0.78rm;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.7);
-  font-variant-numric: tabular-nums;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.finger-control {
+  margin-bottom: 0.75rem;
+}
+
+.finger-control label {
+  display: grid;
+  grid-template-columns: 5rem 1fr 3rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.finger-name {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.finger-value {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #42a5f5;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #64b5f6;
+  transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #42a5f5;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: #64b5f6;
+  transform: scale(1.1);
 }
 
 .actions {
-  display: flx;
-  gap: 0.5rm;
-  padding-top: 0.5rm;
-  bordr-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  gap: 0.5rem;
 }
 
 .btn {
-  padding: 0.4rm 0.8rm;
-  bordr-radius: 6px;
-  font-siz: 0.8rm;
-  font-wight: 500;
-  cursor: pointr;
-  transition: all 0.15s as;
-  bordr: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
 }
 
-.btn--scondary {
+.btn--secondary {
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.btn--scondary:hovr {
-  background: rgba(255, 255, 255, 0.15);
-  bordr-color: rgba(255, 255, 255, 0.3);
+.btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.95);
 }
-</styl>
+</style>

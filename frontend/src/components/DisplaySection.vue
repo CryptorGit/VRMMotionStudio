@@ -1,76 +1,76 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>表示とチE�Eル</h3>
+      <h3>表示とツール</h3>
     </header>
     <div class="section__content">
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showLightMarkerLocal" />
-          <span>ライト�Eーカー表示</span>
+          <span>ライトマーカー表示</span>
         </label>
         <label>
-          <span>マ�Eカー色</span>
+          <span>マーカー色</span>
           <input type="color" v-model="markerColorLocal" />
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="allBonesVisible" />
-          <span>ボ�Eン表示�E�人型！E/span>
+          <span>ボーン表示（人型）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="allBoneNamesVisible" />
-          <span>ボ�Eン名表示</span>
+          <span>ボーン名表示</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showPhysicalBonesLocal" />
-          <span>ボ�Eン表示�E�物琁E��E/span>
+          <span>ボーン表示（物理）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showOtherBonesLocal" />
-          <span>ボ�Eン表示�E�その他！E/span>
+          <span>ボーン表示（その他）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showExtendedBonesLocal" />
-          <span>ボ�Eン表示�E�拡張�E�E/span>
+          <span>ボーン表示（拡張）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showColliderNodesLocal" />
-          <span>ボ�Eン表示�E�コライダー�E�E/span>
+          <span>ボーン表示（コライダー）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="showNonDeformingBonesLocal" />
-          <span>ボ�Eン表示�E�非変形�E�E/span>
+          <span>ボーン表示（非変形）</span>
         </label>
       </div>
       <div class="row">
         <label class="checkbox">
           <input type="checkbox" v-model="highlightConstraintLocal" />
-          <span>制紁E��イライチE/span>
+          <span>制約ハイライト</span>
         </label>
       </div>
       <div class="row">
         <label class="stretch">
-          ボ�Eン表示サイズ
+          ボーン表示サイズ
           <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
         </label>
       </div>
       <div class="row">
         <label class="stretch">
-          ボ�Eン名表示サイズ�E�大きさ�E�E
+          ボーン名表示サイズ（大きさ）
           <input
             type="range"
             min="0.05"
@@ -82,11 +82,11 @@
       </div>
       <hr />
       <div class="row">
-        <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設宁E/h4>
+        <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設定</h4>
       </div>
       <div class="row">
         <label class="stretch">
-          アウトライン太ぁE
+          アウトライン太さ
           <input
             type="range"
             min="0"
@@ -284,5 +284,3 @@ hr {
   margin: 0.5rem 0;
 }
 </style>
-
-

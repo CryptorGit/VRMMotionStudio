@@ -2,7 +2,7 @@
   <div id="morph-editor">
     <div v-if="vrm">
       <template v-if="presentPresets && presentPresets.length">
-        <div class="section-title">プリセチE��</div>
+        <div class="section-title">プリセット</div>
         <div
           v-for="p in presentPresets"
           :key="p.key"
@@ -68,7 +68,7 @@
         </div>
       </template>
     </div>
-    <div v-else>VRM が読み込まれてぁE��せん</div>
+    <div v-else>VRM が読み込まれていません</div>
   </div>
   </template>
 
@@ -89,12 +89,12 @@ const props = defineProps({
 
 const vrm = computed(() => props.mesh?.userData?.vrm || null)
 
-// 再取得トリガ�E�リロード�Eタン用・依存に含めて再計算させる�E�E
+// 再取得トリガ（リロードボタン用・依存に含めて再計算させる）
 const refreshTick = ref(0)
 
 // VRMに実際に含まれるExpression名一覧
 const expressionNames = computed(() => {
-  refreshTick.value // 参�Eで依存に含める
+  refreshTick.value // 参照で依存に含める
   const em = vrm.value?.expressionManager
   if (!em) return []
   try {
@@ -129,14 +129,14 @@ const presetNameSet = computed(() => new Set(Object.values(VRMExpressionPresetNa
 
 const expressionNameSet = computed(() => new Set(expressionNames.value.map(name => String(name).toLowerCase())))
 
-// VRMに存在するプリセチE��のみ
+// VRMに存在するプリセットのみ
 const presentPresets = computed(() =>
   expressionNames.value
     .filter(n => presetNameSet.value.has(String(n)))
     .map(n => ({ key: n, label: presetLabels[n] || String(n) }))
 )
 
-// VRMに存在するカスタム名�Eみ
+// VRMに存在するカスタム名のみ
 const customNames = computed(() =>
   expressionNames.value.filter(n => !presetNameSet.value.has(String(n)))
 )
@@ -191,7 +191,7 @@ watch(vrm, newVrm => {
   }
 })
 
-// Morph一覧を�E取得！ERM刁E��めE��部更新時用�E�E
+// Morph一覧を再取得（VRM切替や外部更新時用）
 defineExpose({
   reloadMorphs: () => {
     refreshTick.value++
@@ -255,5 +255,3 @@ defineExpose({
   letter-spacing: 0.01em;
 }
 </style>
-
-

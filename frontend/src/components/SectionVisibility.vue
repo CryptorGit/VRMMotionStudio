@@ -44,12 +44,18 @@
       :show-virtual-tracker-labels="showVirtualTrackerLabels"
       :virtual-tracker-size="virtualTrackerSize"
       :virtual-tracker-label-scale="virtualTrackerLabelScale"
+      :has-models-loaded="hasModelsLoaded"
       @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
       @update:virtualTrackerDisplayVisible="v => emit('update:virtualTrackerDisplayVisible', v)"
       @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
       @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
       @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
       @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
+    />
+    <FingerControlSection
+      v-else-if="active === 'bones'"
+      :finger-states="fingerStates"
+      @update:finger="handleFingerUpdate"
     />
     <KeySettingsSection
       v-else-if="active === 'keys'"
@@ -110,8 +116,9 @@ import PhysicsSection from './PhysicsSection.vue'
 import CameraSection from './CameraSection.vue'
 import KeySettingsSection from './KeySettingsSection.vue'
 import TrackerSection from './TrackerSection.vue'
+import FingerControlSection from './FingerControlSection.vue'
 
-defineProps({
+const props = defineProps({
   ambient: Object,
   directional: Object,
   mesh: Object,
@@ -136,6 +143,8 @@ defineProps({
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  hasModelsLoaded: { type: Boolean, default: false },
+  fingerStates: { type: Object, default: () => ({}) },
   cameraFov: { type: Number, required: true },
   cameraNear: { type: Number, required: true },
   cameraFar: { type: Number, required: true },
@@ -173,6 +182,7 @@ const emit = defineEmits([
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
+  'update:fingerStates',
   'update:cameraFov',
   'update:cameraNear',
   'update:cameraFar',
@@ -195,6 +205,12 @@ const emit = defineEmits([
   'remove-selected-keyframes',
   'update-keyframe-curves'
 ])
+
+function handleFingerUpdate({ hand, finger, value }) {
+  const key = `${hand}_${finger}`
+  const updated = { ...props.fingerStates, [key]: value }
+  emit('update:fingerStates', updated)
+}
 </script>
 
 <style scoped>
@@ -221,5 +237,3 @@ const emit = defineEmits([
   background: transparent;
 }
 </style>
-
-

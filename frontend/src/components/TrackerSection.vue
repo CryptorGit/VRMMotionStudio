@@ -1,22 +1,28 @@
 <template>
   <section class="section">
     <header class="section__header">
-      <h3>バ�EチャルトラチE��ー</h3>
+      <h3>バーチャルトラッカー</h3>
     </header>
     <div class="section__content">
       <div class="row row--header">
-        <label class="checkbox">
-          <input type="checkbox" :checked="virtualTrackersEnabled" @change="onEnabledChange($event.target.checked)">
-          <span>トラチE��ーを有効匁E/span>
+        <label class="checkbox" :class="{ disabled: !hasModelsLoaded }">
+          <input 
+            type="checkbox" 
+            :checked="virtualTrackersEnabled" 
+            :disabled="!hasModelsLoaded"
+            @change="onEnabledChange($event.target.checked)"
+            :title="!hasModelsLoaded ? 'モデルを読み込んでください' : ''"
+          >
+          <span>トラッカーを有効化</span>
         </label>
         <div class="actions">
-          <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">位置リセチE��</button>
+          <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">位置リセット</button>
         </div>
       </div>
       <div class="row row--toggles">
         <label class="checkbox">
           <input type="checkbox" :checked="virtualTrackerDisplayVisible" @change="onDisplayToggle($event.target.checked)">
-          <span>トラチE��ー表示</span>
+          <span>トラッカー表示</span>
         </label>
         <label class="checkbox">
           <input type="checkbox" :checked="showVirtualTrackerLabels" @change="emit('update:showVirtualTrackerLabels', $event.target.checked)">
@@ -25,7 +31,7 @@
       </div>
       <div class="row">
         <label class="stretch">
-          トラチE��ー表示サイズ
+          トラッカー表示サイズ
           <input
             type="range"
             min="0.005"
@@ -49,7 +55,7 @@
           >
         </label>
       </div>
-      <p class="tracker-note">ビューポ�Eト上で直接ドラチE��して調整してください、E/p>
+      <p class="tracker-note">ビューポート上で直接ドラッグして調整してください。</p>
     </div>
   </section>
 </template>
@@ -62,7 +68,8 @@ const props = defineProps({
   virtualTrackerDisplayVisible: { type: Boolean, default: true },
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
-  virtualTrackerLabelScale: { type: Number, default: 1.0 }
+  virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  hasModelsLoaded: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -185,5 +192,3 @@ label.stretch {
   opacity: 0.7;
 }
 </style>
-
-

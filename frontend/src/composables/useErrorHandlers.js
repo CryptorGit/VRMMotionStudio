@@ -12,5 +12,3 @@ export function useErrorHandlers({ handleError, handleUnhandledRejection }) {
   return { setup, cleanup }
 }
 
-
-

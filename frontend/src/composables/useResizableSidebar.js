@@ -46,5 +46,3 @@ export function useResizableSidebar(initialWidth = 300, minWidth = 150) {
 
   return { width, isResizing, startResize }
 }
-
-
