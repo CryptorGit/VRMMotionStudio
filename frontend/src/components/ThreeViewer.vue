@@ -164,9 +164,22 @@
                 v-model:show-virtual-tracker-labels="showVirtualTrackerLabels"
                 v-model:virtual-tracker-size="virtualTrackerSize"
                 v-model:virtual-tracker-label-scale="virtualTrackerLabelScale"
+                v-model:forearm-twist-share="forearmTwistShare"
                 :has-models-loaded="hasModelsLoaded"
+                :selected-tracker-key="selectedTrackerKey"
+                :selected-tracker-label="selectedTrackerLabel"
+                :tracker-position="selectedTrackerPosition"
+                :tracker-rotation="selectedTrackerRotation"
+                :tracker-rotation-order="selectedTrackerRotationOrder"
+                v-model:show-tracker-axes="showTrackerAxes"
+                v-model:tracker-axes-length="trackerAxesLength"
                 :finger-states="fingerStates"
                 @update:fingerStates="updateFingerStates"
+                @update:tracker-position="handleTrackerPositionUpdate"
+                @update:tracker-rotation="handleTrackerRotationUpdate"
+                @update:tracker-rotation-order="handleTrackerRotationOrderUpdate"
+                @reset-tracker-position="handleResetTrackerPosition"
+                @reset-tracker-rotation="handleResetTrackerRotation"
                 :tracker-states="trackerStatesView"
                 :tracker-rotation-orders="trackerRotationOrders"
                 :active-tracker-key="lastTrackerKey"
@@ -194,12 +207,14 @@
                 @remove-selected-keyframes="handleSettingsRemoveSelectedKeyframes"
                 @update-keyframe-curves="handleTimelineCurveUpdate"
                 @reset-virtual-trackers="resetVirtualTrackers"
+                @reset-all-tracker-orientations="handleResetAllTrackerRotations"
                 @toggle-model="toggleModelVisibility"
                 @toggle-bone="toggleBoneVisibility"
                 @toggle-bone-names="toggleBoneNameVisibility"
                 @toggle-all-bones="toggleAllBones"
                 @toggle-all-bone-names="toggleAllBoneNames"
                 @remove-model="removeModel"
+                @reset-outline="handleResetOutlineDefaults"
                 @capture-render="captureRenderImage"
               />
             </div>
@@ -253,7 +268,7 @@ import {
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
-import { useVirtualTrackers, TRACKER_ROTATION_ORDERS } from '../composables/useVirtualTrackers.js'
+import { useVirtualTrackers, TRACKER_ROTATION_ORDERS, TRACKER_DEFS } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useHistory } from '../composables/useHistory.js'
 import { useTheme } from '../composables/useTheme.js'
@@ -288,12 +303,35 @@ const boneLabelScale = ref(1.0)
 // VRMアウトライン設定
 const outlineWidth = ref(0.002)
 const outlineColor = ref('#000000')
+const outlineDefaultWidth = ref(0.002)
+const outlineDefaultColor = ref('#000000')
+const outlineDefaultsCache = new WeakMap()
+const outlineAutoResetModels = new WeakSet()
+let outlineDefaultsCaptured = false
 
 const virtualTrackersEnabled = ref(false)
 const virtualTrackerDisplayVisible = ref(true)
 const showVirtualTrackerLabels = ref(true)
 const virtualTrackerSize = ref(0.08)
 const virtualTrackerLabelScale = ref(1.0)
+
+// 選択されたトラッカーの状態
+const selectedTrackerKey = ref(null)
+const selectedTrackerPosition = ref({ x: 0, y: 0, z: 0 })
+const selectedTrackerRotation = ref({ x: 0, y: 0, z: 0 })
+const selectedTrackerRotationOrder = ref('YXZ')
+
+// トラッカー回転軸の表示設定
+const showTrackerAxes = ref(false)
+const trackerAxesLength = ref(0.05)
+const forearmTwistShare = ref(0.7)
+
+// 選択されたトラッカーのラベル
+const selectedTrackerLabel = computed(() => {
+  if (!selectedTrackerKey.value) return ''
+  const def = TRACKER_DEFS.find(d => d.key === selectedTrackerKey.value)
+  return def?.label || selectedTrackerKey.value
+})
 
 // Check if models are loaded (for disabling tracker toggle)
 const hasModelsLoaded = computed(() => {
@@ -448,11 +486,16 @@ function getDisplaySettingsSnapshot() {
     showOtherBones: showOtherBones.value,
     boneDotSize: boneDotSize.value,
     boneLabelScale: boneLabelScale.value,
+  outlineWidth: outlineWidth.value,
+  outlineColor: outlineColor.value,
     virtualTrackersEnabled: virtualTrackersEnabled.value,
     virtualTrackerDisplayVisible: virtualTrackerDisplayVisible.value,
     showVirtualTrackerLabels: showVirtualTrackerLabels.value,
     virtualTrackerSize: virtualTrackerSize.value,
     virtualTrackerLabelScale: virtualTrackerLabelScale.value,
+    showTrackerAxes: showTrackerAxes.value,
+    trackerAxesLength: trackerAxesLength.value,
+  forearmTwistShare: forearmTwistShare.value,
     virtualTrackerStates: serializeTrackerStates(),
     lastTrackerKey: lastTrackerKey.value,
     cameraFov: renderCameraFov.value,
@@ -463,7 +506,8 @@ function getDisplaySettingsSnapshot() {
     showCameraHelper: showRenderCameraHelper.value,
     cameraWheelSensitivity: cameraWheelSensitivity.value,
     cameraTranslateSensitivity: cameraTranslateSensitivity.value,
-    cameraRotateSensitivity: cameraRotateSensitivity.value
+    cameraRotateSensitivity: cameraRotateSensitivity.value,
+    fingerStates: { ...fingerStates }
   }
 }
 
@@ -665,11 +709,20 @@ function loadDisplaySettings() {
     if (typeof data.showOtherBones === 'boolean') showOtherBones.value = data.showOtherBones
     if (Number.isFinite(data.boneDotSize)) boneDotSize.value = data.boneDotSize
     if (Number.isFinite(data.boneLabelScale)) boneLabelScale.value = data.boneLabelScale
+    if (Number.isFinite(data.outlineWidth)) outlineWidth.value = Math.min(0.005, Math.max(0, data.outlineWidth))
+    if (typeof data.outlineColor === 'string') outlineColor.value = data.outlineColor
     if (typeof data.virtualTrackersEnabled === 'boolean') virtualTrackersEnabled.value = data.virtualTrackersEnabled
     if (typeof data.virtualTrackerDisplayVisible === 'boolean') virtualTrackerDisplayVisible.value = data.virtualTrackerDisplayVisible
     if (typeof data.showVirtualTrackerLabels === 'boolean') showVirtualTrackerLabels.value = data.showVirtualTrackerLabels
     if (Number.isFinite(data.virtualTrackerSize)) virtualTrackerSize.value = data.virtualTrackerSize
     if (Number.isFinite(data.virtualTrackerLabelScale)) virtualTrackerLabelScale.value = data.virtualTrackerLabelScale
+    if (typeof data.showTrackerAxes === 'boolean') showTrackerAxes.value = data.showTrackerAxes
+    if (Number.isFinite(data.trackerAxesLength)) trackerAxesLength.value = data.trackerAxesLength
+    if (Number.isFinite(data.forearmTwistShare)) {
+      const clamped = Math.min(1, Math.max(0, data.forearmTwistShare))
+      forearmTwistShare.value = clamped
+      try { trackerController?.setForearmTwistShareRatio?.(clamped) } catch {}
+    }
     if (data.virtualTrackerStates && typeof data.virtualTrackerStates === 'object') {
       pendingTrackerStateSnapshot = data.virtualTrackerStates
       if (trackerController) {
@@ -691,6 +744,19 @@ function loadDisplaySettings() {
     if (Number.isFinite(data.cameraWheelSensitivity)) cameraWheelSensitivity.value = clamp0to2(data.cameraWheelSensitivity)
     if (Number.isFinite(data.cameraTranslateSensitivity)) cameraTranslateSensitivity.value = clamp0to2(data.cameraTranslateSensitivity)
     if (Number.isFinite(data.cameraRotateSensitivity)) cameraRotateSensitivity.value = clamp0to2(data.cameraRotateSensitivity)
+    // 指状態の復元
+    if (data.fingerStates && typeof data.fingerStates === 'object') {
+      try { Object.assign(fingerStates, data.fingerStates) } catch {}
+    }
+    // アウトライン太さ値をスライダー範囲へ正規化
+    outlineWidth.value = Math.min(0.005, Math.max(0, Number(outlineWidth.value) || 0.002))
+    // 回転軸表示再適用（コントローラ生成済みの場合）
+    try {
+      if (trackerController) {
+        trackerController.setRotationAxesVisible?.(showTrackerAxes.value)
+        trackerController.updateRotationAxesLength?.(trackerAxesLength.value)
+      }
+    } catch {}
   } catch {
     // Failed to load display settings
   } finally {
@@ -955,9 +1021,97 @@ function handleTrackerTransformEvent(event = {}) {
   if (event.persisted !== false) scheduleDisplaySettingsSave()
   if (event.key && event.key !== 'all') {
     lastTrackerKey.value = event.key
+    selectedTrackerKey.value = event.key
     refreshTrackerAdjustState(event.key)
+    updateSelectedTrackerState(event.key)
   } else if (!event.key && lastTrackerKey.value) {
     refreshTrackerAdjustState(lastTrackerKey.value)
+  }
+}
+
+// 選択されたトラッカーの状態を更新
+function updateSelectedTrackerState(key) {
+  if (!key || !trackerController) return
+  
+  const snapshot = trackerController.getTrackerSnapshot(key)
+  if (!snapshot) return
+  
+  // 位置を更新
+  if (snapshot.position && Array.isArray(snapshot.position)) {
+    selectedTrackerPosition.value = {
+      x: snapshot.position[0] || 0,
+      y: snapshot.position[1] || 0,
+      z: snapshot.position[2] || 0
+    }
+  }
+  
+  // 角度を更新
+  if (snapshot.angles) {
+    selectedTrackerRotation.value = {
+      x: snapshot.angles.x || 0,
+      y: snapshot.angles.y || 0,
+      z: snapshot.angles.z || 0
+    }
+  }
+}
+
+// トラッカー位置を更新
+function handleTrackerPositionUpdate({ axis, value }) {
+  if (!selectedTrackerKey.value || !trackerController) return
+  
+  const newPosition = { ...selectedTrackerPosition.value }
+  newPosition[axis] = value
+  selectedTrackerPosition.value = newPosition
+  
+  trackerController.setTrackerPosition(selectedTrackerKey.value, newPosition)
+}
+
+// トラッカー角度を更新
+function handleTrackerRotationUpdate({ axis, value }) {
+  if (!selectedTrackerKey.value || !trackerController) return
+  
+  const newRotation = { ...selectedTrackerRotation.value }
+  newRotation[axis] = value
+  selectedTrackerRotation.value = newRotation
+  
+  trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, newRotation, selectedTrackerRotationOrder.value)
+}
+
+// トラッカー回転順序を更新
+function handleTrackerRotationOrderUpdate(order) {
+  selectedTrackerRotationOrder.value = order
+  // 現在の回転角度で新しい順序を適用
+  if (selectedTrackerKey.value && trackerController) {
+    trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, order)
+  }
+}
+
+// トラッカー位置をリセット
+function handleResetTrackerPosition() {
+  if (!selectedTrackerKey.value || !trackerController) return
+  
+  const defaultPosition = { x: 0, y: 0, z: 0 }
+  selectedTrackerPosition.value = defaultPosition
+  trackerController.setTrackerPosition(selectedTrackerKey.value, defaultPosition)
+}
+
+// トラッカー角度をリセット
+function handleResetTrackerRotation() {
+  if (!selectedTrackerKey.value || !trackerController) return
+  
+  const defaultRotation = { x: 0, y: 0, z: 0 }
+  selectedTrackerRotation.value = defaultRotation
+  trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, defaultRotation, selectedTrackerRotationOrder.value)
+}
+
+function handleResetAllTrackerRotations() {
+  if (!trackerController) return
+  try {
+    trackerController.resetAllTrackerRotations({ keepEnabled: true, persist: true })
+  } catch {}
+  refreshTrackerAdjustState()
+  if (selectedTrackerKey.value) {
+    updateSelectedTrackerState(selectedTrackerKey.value)
   }
 }
 
@@ -1500,20 +1654,45 @@ trackerController = useVirtualTrackers({
   onManipulateStart: payload => {
     if (payload?.key) {
       lastTrackerKey.value = payload.key
+      selectedTrackerKey.value = payload.key
       refreshTrackerAdjustState(payload.key)
+      updateSelectedTrackerState(payload.key)
     }
     pushHistory('tracker-drag')
   },
   onManipulateEnd: () => {
     refreshTrackerAdjustState()
+    if (selectedTrackerKey.value) {
+      updateSelectedTrackerState(selectedTrackerKey.value)
+    }
   },
   onTrackerTransform: handleTrackerTransformEvent
 })
+
+// 復元済み設定から回転軸表示/長さを適用
+try {
+  trackerController.setRotationAxesVisible?.(showTrackerAxes.value)
+  trackerController.updateRotationAxesLength?.(trackerAxesLength.value)
+} catch {}
 
 refreshTrackerAdjustState()
 
 const trackerStatesView = computed(() => trackerController?.trackerStates || {})
 const trackerRotationOrders = computed(() => trackerController?.rotationOrders || TRACKER_ROTATION_ORDERS)
+
+// selectedTrackerKeyの変更を監視してUIを更新
+watch(selectedTrackerKey, (newKey) => {
+  if (newKey) {
+    updateSelectedTrackerState(newKey)
+  }
+})
+
+// trackerControllerのselectedTrackerKeyと同期
+watch(() => trackerController?.selectedTrackerKey?.value, (newKey) => {
+  if (newKey && newKey !== selectedTrackerKey.value) {
+    selectedTrackerKey.value = newKey
+  }
+})
 
 timelineController = useTimeline({ trackers: trackerController.trackers, renderCamera })
 let syncTimelineRefs = () => {}
@@ -1747,6 +1926,35 @@ watch(virtualTrackersEnabled, v => {
     applyTimelinePoseImmediate()
   }
   refreshTrackerAdjustState()
+  scheduleDisplaySettingsSave()
+})
+
+// 回転軸の可視性を監視
+watch(showTrackerAxes, (visible) => {
+  if (trackerController) {
+    try {
+      trackerController.setRotationAxesVisible(visible)
+    } catch {}
+  }
+  scheduleDisplaySettingsSave()
+})
+
+// 回転軸の長さを監視
+watch(trackerAxesLength, (length) => {
+  if (trackerController) {
+    try {
+      trackerController.updateRotationAxesLength(length)
+    } catch {}
+  }
+  scheduleDisplaySettingsSave()
+})
+
+watch(forearmTwistShare, (ratio) => {
+  if (trackerController?.setForearmTwistShareRatio) {
+    try {
+      trackerController.setForearmTwistShareRatio(ratio)
+    } catch {}
+  }
   scheduleDisplaySettingsSave()
 })
 
@@ -2505,15 +2713,132 @@ onMounted(async () => {
 })
 
 // If models list becomes non-empty later, auto-enable virtual trackers so they appear
+function captureOutlineDefaults(material) {
+  if (!material || outlineDefaultsCache.has(material)) return
+  if (!(material.isMToonMaterial || material.type === 'MToonMaterial')) return
+  let width = 0.002
+  try {
+    if (typeof material.outlineWidthFactor === 'number') {
+      width = material.outlineWidthFactor
+    } else if (material.uniforms?.outlineWidthFactor?.value != null) {
+      width = material.uniforms.outlineWidthFactor.value
+    }
+  } catch {}
+  width = Math.min(0.005, Math.max(0, Number(width) || 0.002))
+
+  let colorHex = '#000000'
+  try {
+    let baseColor = null
+    if (material.outlineColorFactor?.isColor) {
+      baseColor = material.outlineColorFactor
+    } else if (material.uniforms?.outlineColorFactor?.value) {
+      baseColor = material.uniforms.outlineColorFactor.value
+    }
+    if (baseColor) {
+      const tempColor = baseColor.isColor
+        ? baseColor.clone()
+        : new THREE.Color(baseColor.r ?? baseColor.x ?? 0, baseColor.g ?? baseColor.y ?? 0, baseColor.b ?? baseColor.z ?? 0)
+      colorHex = `#${tempColor.getHexString()}`
+    }
+  } catch {}
+
+  outlineDefaultsCache.set(material, { width, color: colorHex })
+  if (!outlineDefaultsCaptured) {
+    outlineDefaultWidth.value = width
+    outlineDefaultColor.value = colorHex
+    outlineDefaultsCaptured = true
+  }
+}
+
+function applyOutlineToMaterial(material, width, colorHex) {
+  if (!material || !(material.isMToonMaterial || material.type === 'MToonMaterial')) return
+  const clampedWidth = Math.min(0.005, Math.max(0, Number(width) || 0.002))
+  const color = new THREE.Color(colorHex || '#000000')
+  try {
+    if (typeof material.outlineWidthFactor === 'number') {
+      material.outlineWidthFactor = clampedWidth
+    } else if (material.uniforms?.outlineWidthFactor) {
+      material.uniforms.outlineWidthFactor.value = clampedWidth
+    }
+  } catch {}
+  try {
+    if (material.outlineColorFactor?.isColor) {
+      material.outlineColorFactor.copy(color)
+    } else if (material.uniforms?.outlineColorFactor?.value) {
+      const target = material.uniforms.outlineColorFactor.value
+      if (target.isColor) {
+        target.copy(color)
+      } else if (Array.isArray(target)) {
+        material.uniforms.outlineColorFactor.value = [color.r, color.g, color.b]
+      } else if (typeof target === 'object' && target) {
+        target.r = color.r
+        target.g = color.g
+        target.b = color.b
+      } else {
+        material.uniforms.outlineColorFactor.value = color.clone()
+      }
+    }
+  } catch {}
+  material.uniformsNeedUpdate = true
+  material.needsUpdate = true
+}
+
+function resetOutlineToDefaults() {
+  let fallbackWidth = outlineDefaultWidth.value
+  if (!Number.isFinite(fallbackWidth)) fallbackWidth = 0.002
+  let fallbackColor = outlineDefaultColor.value || '#000000'
+  let firstWidth = null
+  let firstColor = null
+  try {
+    (models.value || []).forEach(model => {
+      model?.vrm?.scene?.traverse(obj => {
+        if (!obj.isMesh || !obj.material) return
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+        materials.forEach(mat => {
+          if (!(mat.isMToonMaterial || mat.type === 'MToonMaterial')) return
+          captureOutlineDefaults(mat)
+          const defaults = outlineDefaultsCache.get(mat) || {}
+          applyOutlineToMaterial(mat, defaults.width ?? fallbackWidth, defaults.color ?? fallbackColor)
+          if (firstWidth == null && Number.isFinite(defaults.width)) firstWidth = defaults.width
+          if (!firstColor && typeof defaults.color === 'string') firstColor = defaults.color
+        })
+      })
+    })
+  } catch {}
+  if (Number.isFinite(firstWidth)) {
+    outlineWidth.value = Math.min(0.005, Math.max(0, firstWidth))
+    outlineDefaultWidth.value = outlineWidth.value
+  } else {
+    outlineWidth.value = fallbackWidth
+    outlineDefaultWidth.value = fallbackWidth
+  }
+  outlineColor.value = firstColor || fallbackColor
+  outlineDefaultColor.value = outlineColor.value
+  updateOutlineSettings()
+  scheduleDisplaySettingsSave()
+}
+
 watch(models, (arr) => {
   try {
     const hasModel = Array.isArray(arr) && arr.some(m => !!m?.vrm)
     if (hasModel && !virtualTrackersEnabled.value) ensureVirtualTrackers()
     // Whenever models appear or change, rebuild trackers to place camera in front of the model
     if (hasModel) {
+      let shouldAutoResetOutline = false
+      for (const model of arr || []) {
+        if (model?.vrm && !outlineAutoResetModels.has(model)) {
+          outlineAutoResetModels.add(model)
+          shouldAutoResetOutline = true
+        }
+      }
+      if (shouldAutoResetOutline) {
+        try { resetOutlineToDefaults() } catch {}
+      }
       try { trackerController.rebuild?.() } catch {}
       // Frame avatar front unless overridden by timeline camera track
       try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
+      // 初期アウトライン幅をVRMマテリアルから取得（ユーザーがまだ変更していない場合のみ）
+      try { initOutlineWidthFromModel() } catch {}
     }
     // アウトライン設定を適用
     updateOutlineSettings()
@@ -2523,35 +2848,93 @@ watch(models, (arr) => {
 // アウトライン設定の変更を監視
 watch([outlineWidth, outlineColor], () => {
   updateOutlineSettings()
+  scheduleDisplaySettingsSave()
 })
+
+function handleResetOutlineDefaults() {
+  resetOutlineToDefaults()
+}
 
 function updateOutlineSettings() {
   try {
+    const width = outlineWidth.value
+    const colorHex = outlineColor.value
     models.value.forEach(model => {
       if (!model?.vrm?.scene) return
       model.vrm.scene.traverse(obj => {
-        if (obj.isMesh && obj.material) {
-          const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-          materials.forEach(mat => {
-            // MToonMaterialの場合のみアウトライン設定を適用
-            if (mat.isMToonMaterial || mat.type === 'MToonMaterial') {
-              const color = new THREE.Color(outlineColor.value)
-              if (typeof mat.outlineWidthFactor === 'number' || mat.uniforms?.outlineWidthFactor) {
-                try { mat.outlineWidthFactor = outlineWidth.value } catch {}
-              }
-              if (mat.uniforms?.outlineColorFactor !== undefined) {
-                try { mat.outlineColorFactor = color } catch {
-                  mat.uniforms.outlineColorFactor.value.set(color.r, color.g, color.b)
-                }
-              }
-              mat.uniformsNeedUpdate = true
-              mat.needsUpdate = true
+        if (!obj.isMesh || !obj.material) return
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+        materials.forEach(mat => {
+          if (!(mat.isMToonMaterial || mat.type === 'MToonMaterial')) return
+          captureOutlineDefaults(mat)
+          applyOutlineToMaterial(mat, width, colorHex)
+          const defaults = outlineDefaultsCache.get(mat)
+          if (defaults) {
+            if (Number.isFinite(defaults.width)) {
+              outlineDefaultWidth.value = defaults.width
             }
-          })
-        }
+            if (typeof defaults.color === 'string') {
+              outlineDefaultColor.value = defaults.color
+            }
+          }
+        })
       })
     })
   } catch {}
+}
+
+// VRMの最初のMToonマテリアルからoutlineWidthFactor/outlineColorFactorを取得し初期値に反映
+// すでにユーザーが値を動かしている(= default 0.002 以外 or persisted でロード済)場合は上書きしない
+let outlineInitializedFromModel = false
+function initOutlineWidthFromModel() {
+  if (outlineInitializedFromModel) return
+  // 既にキャッシュ復元等で他値がセットされている場合はスキップ
+  const current = Number(outlineWidth.value)
+  // 許容誤差内で初期デフォルトなら取得を試行
+  if (Math.abs(current - 0.002) > 1e-6) {
+    outlineInitializedFromModel = true
+    return
+  }
+  for (const model of models.value) {
+    try {
+      model?.vrm?.scene?.traverse(obj => {
+        if (outlineInitializedFromModel) return
+        if (obj.isMesh && obj.material) {
+          const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+          for (const mat of materials) {
+            if ((mat.isMToonMaterial || mat.type === 'MToonMaterial')) {
+              let ow = null
+              try {
+                if (typeof mat.outlineWidthFactor === 'number') ow = mat.outlineWidthFactor
+                else if (mat.uniforms?.outlineWidthFactor) ow = mat.uniforms.outlineWidthFactor.value
+              } catch {}
+              if (typeof ow === 'number' && isFinite(ow)) {
+                // 制限内にクランプ
+                outlineWidth.value = Math.min(0.005, Math.max(0, ow))
+                outlineInitializedFromModel = true
+              }
+              // カラーも初期化（ユーザー変更前のみ）
+              if (!outlineInitializedFromModel) {
+                let c = null
+                try {
+                  if (mat.outlineColorFactor) c = mat.outlineColorFactor
+                  else if (mat.uniforms?.outlineColorFactor) c = mat.uniforms.outlineColorFactor.value
+                } catch {}
+                if (c && typeof c.r === 'number') {
+                  const hex = new THREE.Color(c.r, c.g, c.b).getHexString()
+                  if (outlineColor.value === '#000000') {
+                    outlineColor.value = '#' + hex
+                  }
+                }
+              }
+              if (outlineInitializedFromModel) return
+            }
+          }
+        }
+      })
+    } catch {}
+    if (outlineInitializedFromModel) break
+  }
 }
 
 onUnmounted(() => {

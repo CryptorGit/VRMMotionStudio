@@ -1,16 +1,9 @@
 <template>
-  <section class="section">
-    <header class="section__header">
-      <h3>照明設定</h3>
-    </header>
-    <div class="section__content">
-      <LightingPanel
-        :ambient="ambient"
-        :directional="directional"
-        v-model:directional-intensity="directionalIntensity"
-      />
-    </div>
-  </section>
+  <LightingPanel
+    :ambient="ambient"
+    :directional="directional"
+    v-model:directional-intensity="directionalIntensity"
+  />
 </template>
 
 <script setup>
@@ -34,24 +27,5 @@ const directionalIntensity = computed({
 </script>
 
 <style scoped>
-.section {
-  background: rgba(36, 40, 52, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.section__header {
-  padding: 0.75rem 0.85rem 0.4rem;
-}
-
-.section__header h3 {
-  margin: 0;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-}
-
-.section__content {
-  padding: 0 0.85rem 0.85rem;
-}
+/* Styles removed - direct component rendering */
 </style>

@@ -1,19 +1,12 @@
 <template>
-  <section class="section">
-    <header class="section__header">
-      <h3>モデル管理</h3>
-    </header>
-    <div class="section__content">
-      <label class="lookat-toggle">
-        <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
-      </label>
-      <ModelList
-        :models="models"
-        @toggle="(i, v) => emit('toggle-model', i, v)"
-        @remove="i => emit('remove-model', i)"
-      />
-    </div>
-  </section>
+  <label class="lookat-toggle">
+    <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
+  </label>
+  <ModelList
+    :models="models"
+    @toggle="(i, v) => emit('toggle-model', i, v)"
+    @remove="i => emit('remove-model', i)"
+  />
 </template>
 
 <script setup>

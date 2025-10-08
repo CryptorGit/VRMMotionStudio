@@ -159,6 +159,17 @@ export function useVirtualTrackers({
   const dragTmpQuatB = new THREE.Quaternion()
   const dragTmpQuatC = new THREE.Quaternion()
 
+  const handTranslationLocks = {
+    leftHand: { active: false, relative: new THREE.Quaternion() },
+    rightHand: { active: false, relative: new THREE.Quaternion() }
+  }
+  const lockTmpQuatA = new THREE.Quaternion()
+  const lockTmpQuatB = new THREE.Quaternion()
+  // Forearm (lower arm) vs wrist roll (twist) share. Default: 70% forearm, 30% wrist.
+  let forearmTwistShareRatio = 0.7
+  let rotationAxesGlobalVisible = false
+  let trackerAxesLengthState = 0.05
+
   const dragState = {
     active: false,
     mode: 'translate', // 'translate' | 'rotate-pan-tilt' | 'rotate-roll'
@@ -170,9 +181,11 @@ export function useVirtualTrackers({
     pointerStart: new THREE.Vector2(),
     pointerDelta: new THREE.Vector2(),
     startQuaternion: new THREE.Quaternion(),
+    startPosition: new THREE.Vector3(),
     startAngles: { x: 0, y: 0, z: 0 },
     rotationRing: null,
-    didMove: false,
+  didMove: false,
+  translationLockKey: null,
     // ビューポート固定軸での回転用
     viewBasisX: new THREE.Vector3(),
     viewBasisY: new THREE.Vector3(),
@@ -180,11 +193,76 @@ export function useVirtualTrackers({
   }
 
   const lastActiveKey = ref(null)
+  const selectedTrackerKey = ref(null)
   let draggingKey = null
+
+  
+
+  function handLockForKey(trackerKey) {
+    if (trackerKey === 'leftHand') return handTranslationLocks.leftHand
+    if (trackerKey === 'rightHand') return handTranslationLocks.rightHand
+    return null
+  }
+
+  function activateHandTranslationLock(trackerKey) {
+    const lock = handLockForKey(trackerKey)
+    if (!lock) return
+    const model = getActiveModel()
+    if (!model) {
+      lock.active = false
+      return
+    }
+    const bones = ensureBoneMap(model)
+    const shoulder = trackerKey === 'leftHand' ? bones.leftShoulder : bones.rightShoulder
+    const upper = trackerKey === 'leftHand' ? bones.leftUpperArm : bones.rightUpperArm
+    const lower = trackerKey === 'leftHand' ? bones.leftLowerArm : bones.rightLowerArm
+    const hand = trackerKey === 'leftHand' ? bones.leftHand : bones.rightHand
+    
+    if (!shoulder || !upper || !lower || !hand) {
+      lock.active = false
+      return
+    }
+    
+    try {
+      // 全ての関節のワールド変換を更新
+      shoulder.updateMatrixWorld(true, true)
+      upper.updateMatrixWorld(true, true)
+      lower.updateMatrixWorld(true, true)
+      hand.updateMatrixWorld(true, true)
+      
+      // 前腕から手首への相対回転を保存
+      const lowerWorldQ = lower.getWorldQuaternion(lockTmpQuatA)
+      const handWorldQ = hand.getWorldQuaternion(lockTmpQuatB)
+      lock.relative.copy(lowerWorldQ.clone().invert().multiply(handWorldQ))
+      
+      // 肩から見た手首の方向ベクトルも保存（手首の姿勢を保持するため）
+      const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3())
+      const handPos = hand.getWorldPosition(new THREE.Vector3())
+      const shoulderToHand = handPos.clone().sub(shoulderPos).normalize()
+      
+      // 手首のワールド向き（Forward方向）を保存
+      const handForward = new THREE.Vector3(0, 0, 1).applyQuaternion(handWorldQ)
+      
+      // 追加情報を保存
+      lock.shoulderToHandDirection = shoulderToHand
+      lock.handForwardDirection = handForward
+      
+      lock.active = true
+    } catch {
+      lock.active = false
+    }
+  }
+
+  function releaseHandTranslationLock(trackerKey) {
+    const lock = handLockForKey(trackerKey)
+    if (!lock) return
+    lock.active = false
+  }
 
   function markActiveKey(key) {
     if (!key) return
     lastActiveKey.value = key
+    selectedTrackerKey.value = key
   }
 
   function notifyTrackerTransform(key, meta = {}) {
@@ -210,7 +288,8 @@ export function useVirtualTrackers({
       label: def.label,
       enabled: true,
       order: DEFAULT_ROTATION_ORDER,
-      angles: { x: 0, y: 0, z: 0 }
+      angles: { x: 0, y: 0, z: 0 },
+      axisScale: { x: 1, y: 1, z: 1 }
     }
   }
 
@@ -223,6 +302,7 @@ export function useVirtualTrackers({
       trackerStates[key] = state
     }
     if (!state.angles) state.angles = { x: 0, y: 0, z: 0 }
+    if (!state.axisScale) state.axisScale = { x: 1, y: 1, z: 1 }
     state.order = normalizeOrder(state.order)
     return state
   }
@@ -579,14 +659,27 @@ export function useVirtualTrackers({
   sprite.userData.baseScale = sprite.scale.clone()
   sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
       let rotationRing = null
+      let rotationAxes = null
       if (!isCamera) {
         rotationRing = markRaw(createRotationRing(def.color))
-        if (rotationRing) mesh.add(rotationRing)
+  if (rotationRing) mesh.add(rotationRing)
+  rotationAxes = markRaw(createRotationAxesHelper(trackerAxesLengthState || 0.05))
+        if (rotationAxes) {
+          rotationAxes.visible = rotationAxesGlobalVisible
+          mesh.add(rotationAxes)
+        }
       }
       mesh.add(sprite)
       group.value.add(mesh)
       // camera tracker disabled
-      trackers.value.push({ key: def.key, name: def.label, mesh, labelSprite: sprite, rotationRing })
+      trackers.value.push({ 
+        key: def.key, 
+        name: def.label, 
+        mesh, 
+        labelSprite: sprite, 
+        rotationRing,
+        rotationAxes
+      })
       ensureTrackerState(def.key)
       applyTrackerStateToMesh(def.key)
     }
@@ -629,6 +722,9 @@ export function useVirtualTrackers({
         : (enabledVis && displayVisible.value && hasModel && trackerIsIndividuallyEnabled(t.key))
       t.mesh.visible = meshVisible
       if (t.labelSprite) t.labelSprite.visible = meshVisible && labelsVisible()
+      if (t.rotationAxes) {
+        t.rotationAxes.visible = rotationAxesGlobalVisible && meshVisible
+      }
     }
   }
 
@@ -944,8 +1040,10 @@ export function useVirtualTrackers({
       dragState.pointerStart.set(e.clientX, e.clientY)
       dragState.pointerDelta.set(0, 0)
       dragState.startQuaternion.copy(hit.quaternion)
+      dragState.startPosition.copy(hit.position)
       dragState.didMove = false
       draggingKey = trackerKey
+      dragState.translationLockKey = null
       
       if (trackerKey) {
         markActiveKey(trackerKey)
@@ -956,14 +1054,15 @@ export function useVirtualTrackers({
       dragState.rotationRing = null
       
       if (mode === 'translate') {
-        // Drag plane parallel to screen through hit point
-        const p = new THREE.Vector3().copy(hit.getWorldPosition(new THREE.Vector3()))
-        dragState.plane.setFromNormalAndCoplanarPoint(camera.value.getWorldDirection(new THREE.Vector3()), p)
-        const ray = raycaster.ray
-        const ip = new THREE.Vector3()
-        dragState.plane.intersectLine(new THREE.Line3(ray.origin, ray.origin.clone().add(ray.direction.clone().multiplyScalar(1000))), ip)
-        dragState.planeOffset.copy(ip).sub(p)
+        // 手首トラッカー移動時は、手首の角度を固定するためロックを有効化
+        if (trackerKey === 'leftHand' || trackerKey === 'rightHand') {
+          activateHandTranslationLock(trackerKey)
+          dragState.translationLockKey = trackerKey
+        }
+        // ビューポート基準の平行移動: カメラの right / up ベクトルを基底とし、スクリーン移動を直接位置へ反映
+        // ここでは開始時の位置を保持するだけで良い
       } else {
+        // 回転モード時: 手首トラッカーは回転可能（ロック解除不要、元々回転処理で分配される）
         // 回転モード: ビューポート固定軸を保存
         const state = ensureTrackerState(trackerKey)
         if (state?.angles) {
@@ -985,6 +1084,34 @@ export function useVirtualTrackers({
         dragState.viewBasisX.set(1, 0, 0).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
         dragState.viewBasisY.set(0, 1, 0).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
         dragState.viewBasisZ.set(0, 0, -1).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
+
+        // 回転開始時にトラッカーのローカル基底をビュー基準に整列させる: 
+        //   Y = world up (0,1,0)
+        //   X = camera right (viewBasisX)
+        //   Z = camera forward (viewBasisZ)
+        // これによりユーザーがドラッグする軸が直感的に一致
+        try {
+          const basisX = dragState.viewBasisX.clone().normalize()
+          const basisY = new THREE.Vector3(0, 1, 0) // 世界Y固定
+          // Zは X×Y ではなく viewBasisZ を優先（要求仕様: ビューポート奥行きと常に平行）
+          const basisZ = dragState.viewBasisZ.clone().normalize()
+          // Orthonormal correction: 再直交化
+          // Ensure X ⟂ Y
+          basisX.sub(basisY.clone().multiplyScalar(basisX.dot(basisY))).normalize()
+          // Recompute Z = X×Y to guarantee右手系, then slerp toward viewBasisZ for stability
+          const recomputedZ = new THREE.Vector3().crossVectors(basisX, basisY).normalize()
+          const blendedZ = recomputedZ.clone().lerp(basisZ, 0.5).normalize()
+          // 修正: Z再計算後 X = Y×Z で再直交化
+          const fixedX = new THREE.Vector3().crossVectors(basisY, blendedZ).normalize()
+          const finalZ = new THREE.Vector3().crossVectors(fixedX, basisY).normalize()
+          const m = new THREE.Matrix4().makeBasis(fixedX, basisY, finalZ)
+          const viewAlignedQ = new THREE.Quaternion().setFromRotationMatrix(m)
+          // 元の回転との差分を適用し、ユーザーの既存方向を破壊し過ぎないように球面補間
+          const blended = dragState.startQuaternion.clone().slerp(viewAlignedQ, 0.65)
+          hit.quaternion.copy(blended)
+          hit.updateMatrixWorld(true)
+          syncTrackerStateFromMesh(trackerKey)
+        } catch {}
         
         const entry = trackers.value.find(t => t.key === trackerKey)
         dragState.rotationRing = entry?.rotationRing || null
@@ -1001,25 +1128,31 @@ export function useVirtualTrackers({
     dragState.pointerDelta.set(e.clientX - dragState.pointerStart.x, e.clientY - dragState.pointerStart.y)
     
     if (dragState.mode === 'translate') {
-      // 平行移動処理
-      computeMouseNdc(e, dom)
-      raycaster.setFromCamera(mouseNdc, camera.value)
-      const ray = raycaster.ray
-      const ip = new THREE.Vector3()
-      const line = new THREE.Line3(ray.origin, ray.origin.clone().add(ray.direction.clone().multiplyScalar(2000)))
-      if (dragState.plane.intersectLine(line, ip)) {
-        const wp = ip.sub(dragState.planeOffset)
-        dragState.target.position.copy(wp)
-        dragState.didMove = true
-        // If dragging the camera tracker, also move the active camera immediately (in camera mode this is the render camera)
-        if (dragState.target.userData?.isCamera && camera?.value) {
-          try {
-            camera.value.position.copy(dragState.target.position)
-            // Keep current orientation of the tracker (rotation may be adjusted elsewhere)
-            camera.value.quaternion.copy(dragState.target.quaternion)
-            camera.value.updateMatrixWorld(true)
-          } catch {}
-        }
+      // ビューポート基準での2軸移動 (X=カメラ右, Y=カメラ上)
+      const deltaX = dragState.pointerDelta.x
+      const deltaY = dragState.pointerDelta.y
+      camera.value.updateMatrixWorld(true)
+      const moveRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.value.quaternion).normalize()
+      const moveUp = new THREE.Vector3(0, 1, 0) // ワールドY固定（仕様）
+      // スケール: 垂直FOV から 1 pixel あたりのワールド長 = 2 * dist * tan(fov/2) / viewportHeight
+      let scale = 0.0025
+      try {
+        const dist = camera.value.position.distanceTo(dragState.startPosition) || 1
+        const fovRad = THREE.MathUtils.degToRad(camera.value.fov || 45)
+        const domRect = dom.getBoundingClientRect()
+        const perPixel = (2 * dist * Math.tan(fovRad / 2)) / (domRect.height || 1)
+        scale = perPixel
+      } catch {}
+      const movement = new THREE.Vector3()
+        .add(moveRight.multiplyScalar(deltaX * scale))
+        .add(moveUp.multiplyScalar(-deltaY * scale))
+      dragState.target.position.copy(dragState.startPosition.clone().add(movement))
+      dragState.didMove = true
+      if (dragState.target.userData?.isCamera && camera?.value) {
+        try {
+          camera.value.position.copy(dragState.target.position)
+          camera.value.updateMatrixWorld(true)
+        } catch {}
       }
     } else if (dragState.mode === 'rotate-pan-tilt') {
       // パン/チルト回転: ビューポート固定軸で回転
@@ -1051,22 +1184,16 @@ export function useVirtualTrackers({
       
       dragState.didMove = true
     } else if (dragState.mode === 'rotate-roll') {
-      // ロール回転: カメラからトラッカーへの視線をZ軸としてロール
+      // ロール回転: トラッカー自身のローカルZ軸で回転（仕様に合わせる）
       const sensitivity = 0.5
       const deltaX = dragState.pointerDelta.x * sensitivity
-      
-      // カメラからトラッカーへの方向をロール軸とする
-      const trackerPos = dragState.target.getWorldPosition(new THREE.Vector3())
-      const camPos = camera.value.position.clone()
-      const rollAxis = trackerPos.clone().sub(camPos).normalize()
-      
+      // ビュー奥行き軸（開始時 viewBasisZ）を使用し、Z軸が常に視線方向に一致する前提維持
+      const worldZAxis = dragState.viewBasisZ && dragState.viewBasisZ.lengthSq() > 0
+        ? dragState.viewBasisZ.clone().normalize()
+        : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.value.quaternion).normalize()
       const rollAngle = deltaX * DEG2RAD
-      const rollQuat = new THREE.Quaternion().setFromAxisAngle(rollAxis, rollAngle)
-      
-      const newQuat = new THREE.Quaternion()
-      newQuat.copy(dragState.startQuaternion)
-      newQuat.premultiply(rollQuat)
-      
+      const rollQuat = new THREE.Quaternion().setFromAxisAngle(worldZAxis, rollAngle)
+      const newQuat = dragState.startQuaternion.clone().premultiply(rollQuat)
       dragState.target.quaternion.copy(newQuat)
       dragState.target.updateMatrixWorld(true)
       
@@ -1090,6 +1217,10 @@ export function useVirtualTrackers({
       dragState.mode = 'translate'
       dragState.didMove = false
       dragState.rotationRing = null
+      if (dragState.translationLockKey) {
+        releaseHandTranslationLock(dragState.translationLockKey)
+      }
+      dragState.translationLockKey = null
       draggingKey = null
       controls.value && (controls.value.enabled = true)
       try { renderer.value?.domElement?.releasePointerCapture?.(e.pointerId) } catch {}
@@ -1118,7 +1249,25 @@ export function useVirtualTrackers({
           })
         }
       } catch {}
+      if (releasedKey === 'leftHand' || releasedKey === 'rightHand') {
+        releaseHandTranslationLock(releasedKey)
+      }
     }
+  }
+
+  // トラッカー移動時のホイールによる奥行き移動 (ビューポート前後=カメラ前方方向)
+  function onWheel(e) {
+    if (!enabled.value) return
+    if (!dragState.active || dragState.mode !== 'translate' || !dragState.target) return
+    if (!camera?.value) return
+    e.preventDefault()
+    const delta = Math.sign(e.deltaY)
+    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.value.quaternion).normalize()
+    const dist = camera.value.position.distanceTo(dragState.target.position) || 1
+    const speed = Math.max(dist * 0.05, 0.02)
+    dragState.target.position.add(camForward.multiplyScalar(speed * -delta))
+    dragState.startPosition.copy(dragState.target.position)
+    dragState.didMove = true
   }
 
   function onContextMenu(e) {
@@ -1139,6 +1288,7 @@ export function useVirtualTrackers({
     dom.addEventListener('pointermove', onPointerMove)
     dom.addEventListener('pointerup', onPointerUp)
     dom.addEventListener('contextmenu', onContextMenu)
+    dom.addEventListener('wheel', onWheel, { passive: false })
   }
   function detachEvents() {
     const dom = renderer.value?.domElement
@@ -1147,6 +1297,7 @@ export function useVirtualTrackers({
     dom.removeEventListener('pointermove', onPointerMove)
     dom.removeEventListener('pointerup', onPointerUp)
     dom.removeEventListener('contextmenu', onContextMenu)
+    dom.removeEventListener('wheel', onWheel)
   }
 
   function setDisplayVisible(value) {
@@ -1169,10 +1320,29 @@ export function useVirtualTrackers({
     })
   }
 
-  function setTrackerRotationDegrees(key, angles, { persist = true } = {}) {
+  function setTrackerRotationDegrees(key, angles, rotationOrder, { persist = true } = {}) {
+    // Support old signature: setTrackerRotationDegrees(key, angles, { persist })
+    // and new signature: setTrackerRotationDegrees(key, angles, rotationOrder, { persist })
+    let options = { persist: true }
+    let order = 'YXZ'
+    
+    if (typeof rotationOrder === 'object' && rotationOrder !== null && !Array.isArray(rotationOrder)) {
+      // Old signature: third argument is options
+      options = rotationOrder
+      order = 'YXZ'
+    } else if (typeof rotationOrder === 'string') {
+      // New signature: third argument is rotation order
+      order = rotationOrder
+      options = arguments[3] || { persist: true }
+    }
+    
     if (key === CAMERA_TRACKER_KEY) return
     const state = ensureTrackerState(key)
     if (!state) return
+    
+    // Update rotation order
+    state.order = order
+    
     const target = state.angles || (state.angles = { x: 0, y: 0, z: 0 })
     if (angles && typeof angles === 'object') {
       if (angles.x !== undefined) target.x = sanitizeAngleInput(angles.x)
@@ -1181,7 +1351,7 @@ export function useVirtualTrackers({
     }
     applyTrackerStateToMesh(key)
     markActiveKey(key)
-    if (persist) persistTrackerTransforms()
+    if (options.persist) persistTrackerTransforms()
     const snapshotAngles = {
       x: sanitizeAngleInput(state.angles?.x),
       y: sanitizeAngleInput(state.angles?.y),
@@ -1190,8 +1360,8 @@ export function useVirtualTrackers({
     notifyTrackerTransform(key, {
       type: 'rotation',
       angles: snapshotAngles,
-      persisted: persist !== false,
-      source: persist === false ? 'transient' : 'user'
+      persisted: options.persist !== false,
+      source: options.persist === false ? 'transient' : 'user'
     })
   }
 
@@ -1212,6 +1382,26 @@ export function useVirtualTrackers({
         source: persist === false ? 'transient' : 'user'
       })
     }
+  }
+
+  function setTrackerAxisScale(key, axisScale, { persist = true } = {}) {
+    if (key === CAMERA_TRACKER_KEY) return
+    const state = ensureTrackerState(key)
+    if (!state) return
+    const target = state.axisScale || (state.axisScale = { x: 1, y: 1, z: 1 })
+    if (axisScale && typeof axisScale === 'object') {
+      if (axisScale.x !== undefined) target.x = Math.max(0.1, Math.min(3.0, toFiniteNumber(axisScale.x, 1)))
+      if (axisScale.y !== undefined) target.y = Math.max(0.1, Math.min(3.0, toFiniteNumber(axisScale.y, 1)))
+      if (axisScale.z !== undefined) target.z = Math.max(0.1, Math.min(3.0, toFiniteNumber(axisScale.z, 1)))
+    }
+    markActiveKey(key)
+    if (persist) persistTrackerTransforms()
+    notifyTrackerTransform(key, {
+      type: 'axisScale',
+      axisScale: { ...target },
+      persisted: persist !== false,
+      source: persist === false ? 'transient' : 'user'
+    })
   }
 
   function setTrackerPosition(key, position, { persist = true } = {}) {
@@ -1413,6 +1603,313 @@ export function useVirtualTrackers({
     return a.getWorldPosition(new THREE.Vector3()).distanceTo(b.getWorldPosition(new THREE.Vector3())) || 0.2
   }
 
+  function applyHandTranslationConstraint(lower, hand, lockState, trackerKey) {
+    if (!lockState?.active || !lockState.relative || !lower || !hand) return false
+    
+    try {
+      lower.updateWorldMatrix(true, false)
+      hand.updateWorldMatrix(true, false)
+      
+      // 基本: 前腕から手首への相対回転を保持
+      const lowerWorldQ = lower.getWorldQuaternion(lockTmpQuatA)
+      const desiredHandWorldQ = lowerWorldQ.clone().multiply(lockState.relative)
+      
+      // 追加: 保存された手首の向きを使って、腕全体の向きを調整
+      if (lockState.shoulderToHandDirection && lockState.handForwardDirection) {
+        const model = getActiveModel()
+        const bones = ensureBoneMap(model)
+        const shoulder = trackerKey === 'leftHand' ? bones.leftShoulder : bones.rightShoulder
+        
+        if (shoulder) {
+          shoulder.updateWorldMatrix(true, false)
+          const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3())
+          const handPos = hand.getWorldPosition(new THREE.Vector3())
+          const currentShoulderToHand = handPos.clone().sub(shoulderPos)
+          
+          if (currentShoulderToHand.lengthSq() > 1e-8) {
+            currentShoulderToHand.normalize()
+            
+            // 肩から手首への方向が変わった場合、手首の向きも同じように回転させる
+            const savedDir = lockState.shoulderToHandDirection
+            const currentDir = currentShoulderToHand
+            
+            // 保存された方向から現在の方向への回転を計算
+            const rotationAxis = new THREE.Vector3().crossVectors(savedDir, currentDir)
+            
+            if (rotationAxis.lengthSq() > 1e-8) {
+              rotationAxis.normalize()
+              const dotProduct = THREE.MathUtils.clamp(savedDir.dot(currentDir), -1, 1)
+              const angle = Math.acos(dotProduct)
+              
+              // 手首の向きを同じ回転量だけ回転
+              const armRotation = new THREE.Quaternion().setFromAxisAngle(rotationAxis, angle)
+              const rotatedHandForward = lockState.handForwardDirection.clone().applyQuaternion(armRotation)
+              
+              // 手首の新しいワールド回転を計算（Z軸がrotatedHandForwardを向くように）
+              const currentHandForward = new THREE.Vector3(0, 0, 1).applyQuaternion(desiredHandWorldQ)
+              const handRotationAxis = new THREE.Vector3().crossVectors(currentHandForward, rotatedHandForward)
+              
+              if (handRotationAxis.lengthSq() > 1e-8) {
+                handRotationAxis.normalize()
+                const handDotProduct = THREE.MathUtils.clamp(currentHandForward.dot(rotatedHandForward), -1, 1)
+                const handAngle = Math.acos(handDotProduct)
+                const handAdjustment = new THREE.Quaternion().setFromAxisAngle(handRotationAxis, handAngle)
+                
+                desiredHandWorldQ.premultiply(handAdjustment)
+              }
+            }
+          }
+        }
+      }
+      
+      // ローカル回転に変換して適用
+      const parentWorldQ = hand.parent ? hand.parent.getWorldQuaternion(lockTmpQuatB) : lockTmpQuatB.identity()
+      const invParentWorldQ = parentWorldQ.clone().invert()
+      const newHandLocalQ = invParentWorldQ.multiply(desiredHandWorldQ)
+      hand.quaternion.copy(newHandLocalQ)
+      hand.updateMatrixWorld(true)
+      
+      return true
+    } catch (err) {
+      console.warn('[applyHandTranslationConstraint] Error:', err)
+      return false
+    }
+  }
+
+  // ================= Hand relative orientation preservation & roll distribution helpers =================
+  const initialHandRelativeQuats = new WeakMap() // model -> { left: Quaternion, right: Quaternion }
+
+  function ensureInitialHandRelQuats(model, bones) {
+    if (!model || !bones) return
+    if (initialHandRelativeQuats.has(model)) return
+    const record = {}
+    if (bones.leftLowerArm && bones.leftHand) {
+      record.left = captureLowerToHandRelative(bones.leftLowerArm, bones.leftHand)
+    }
+    if (bones.rightLowerArm && bones.rightHand) {
+      record.right = captureLowerToHandRelative(bones.rightLowerArm, bones.rightHand)
+    }
+    initialHandRelativeQuats.set(model, record)
+  }
+
+  function captureLowerToHandRelative(lower, hand) {
+    try {
+      lower.updateWorldMatrix(true, false); hand.updateWorldMatrix(true, false)
+      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
+      const handWorldQ = hand.getWorldQuaternion(new THREE.Quaternion())
+      return lowerWorldQ.clone().invert().multiply(handWorldQ)
+    } catch { return new THREE.Quaternion() }
+  }
+
+  function applyStoredHandRelative(lower, hand, relQ) {
+    if (!relQ) return
+    try {
+      lower.updateWorldMatrix(true, false)
+      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
+      const desiredHandWorldQ = lowerWorldQ.clone().multiply(relQ)
+      const parentWorldQ = hand.parent ? hand.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+      const invParentWorldQ = parentWorldQ.clone().invert()
+      const newLocal = invParentWorldQ.multiply(desiredHandWorldQ)
+      hand.quaternion.copy(newLocal)
+      hand.updateMatrixWorld(true)
+    } catch {}
+  }
+
+  function extractRollAroundAxis(q, axisWorld) {
+    // Extract roll component approximated by projecting axis-angle
+    const normAxis = axisWorld.clone().normalize()
+    // convert quaternion to axis-angle
+    const qw = THREE.MathUtils.clamp(q.w, -1, 1)
+    let angle = 2 * Math.acos(qw)
+    let s = Math.sqrt(Math.max(0, 1 - qw * qw))
+    let axis = new THREE.Vector3(1,0,0)
+    if (s >= 1e-6) {
+      axis.set(q.x / s, q.y / s, q.z / s)
+    } else {
+      angle = 0
+    }
+    axis.normalize()
+    const sign = Math.sign(axis.dot(normAxis)) || 1
+    const rollAngle = angle * Math.abs(axis.dot(normAxis)) * sign
+    return { rollAngle }
+  }
+
+  function distributeForearmRoll(lower, hand, trackerKey, lockState) {
+    if (!lower || !hand || !trackerIsIndividuallyEnabled(trackerKey)) return
+    if (lockState?.active) return // When translation lock is active, avoid adjustments
+    try {
+      // Get tracker rotation (local quaternion from state offset + mesh quaternion)
+      const tracker = trackers.value.find(t => t.key === trackerKey)
+      if (!tracker?.mesh) return
+      // Build a relative orientation baseline (current) and desired (with tracker)
+      lower.updateWorldMatrix(true, false); hand.updateWorldMatrix(true, false)
+      const lowerWorldPos = lower.getWorldPosition(new THREE.Vector3())
+      const handWorldPos = hand.getWorldPosition(new THREE.Vector3())
+      const axisWorld = handWorldPos.clone().sub(lowerWorldPos)
+      if (axisWorld.lengthSq() < 1e-8) return
+      axisWorld.normalize()
+
+      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
+      const handWorldQ = hand.getWorldQuaternion(new THREE.Quaternion())
+      // Current relative
+      const relCurrent = lowerWorldQ.clone().invert().multiply(handWorldQ)
+
+      // Desired additional twist from tracker roll only: project tracker mesh quaternion's relative difference
+      // Use tracker.mesh.quaternion as world orientation target hint.
+      const desiredHandDirWorld = new THREE.Vector3(0,0,1).applyQuaternion(tracker.mesh.quaternion)
+      // Compute roll component needed to rotate current hand forward (approx) axis onto desired around axisWorld
+      const handForwardWorld = new THREE.Vector3(0,0,1).applyQuaternion(handWorldQ)
+      const projF = handForwardWorld.clone().projectOnPlane(axisWorld)
+      const projD = desiredHandDirWorld.clone().projectOnPlane(axisWorld)
+      if (projF.lengthSq() < 1e-6 || projD.lengthSq() < 1e-6) return
+      projF.normalize(); projD.normalize()
+      let dot = THREE.MathUtils.clamp(projF.dot(projD), -1, 1)
+      let angle = Math.acos(dot)
+      // Determine sign with cross
+      const cross = new THREE.Vector3().crossVectors(projF, projD)
+      if (cross.dot(axisWorld) < 0) angle = -angle
+      const rollQuat = new THREE.Quaternion().setFromAxisAngle(axisWorld, angle)
+
+      // Distribute: forearm 70%, wrist 30%
+      const forearmAngle = angle * forearmTwistShareRatio
+      const wristAngle = angle * (1 - forearmTwistShareRatio)
+      const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(axisWorld, forearmAngle)
+      const wristTwistQ = new THREE.Quaternion().setFromAxisAngle(axisWorld, wristAngle)
+
+      // Apply to world: new lower world = lowerWorldQ * forearmTwistQ
+      const newLowerWorldQ = lowerWorldQ.clone().multiply(forearmTwistQ)
+      const newHandWorldQ = newLowerWorldQ.clone().multiply(relCurrent.clone().multiply(wristTwistQ))
+
+      // Convert back to local
+      const parentLowerWorldQ = lower.parent ? lower.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+      const invParentLowerWorldQ = parentLowerWorldQ.clone().invert()
+      const newLowerLocal = invParentLowerWorldQ.multiply(newLowerWorldQ)
+      const invNewLowerWorldQ = newLowerWorldQ.clone().invert()
+      const newHandLocal = invNewLowerWorldQ.multiply(newHandWorldQ)
+      lower.quaternion.copy(newLowerLocal)
+      hand.quaternion.copy(newHandLocal)
+      lower.updateMatrixWorld(true)
+      hand.updateMatrixWorld(true)
+    } catch {}
+  }
+
+  // Replace previous approach with full tracker orientation usage: swing (aim) drives lower & hand aim; twist distributed.
+  function distributeHandTrackerRotation(lower, hand, trackerKey, lockState) {
+    if (!lower || !hand || !trackerIsIndividuallyEnabled(trackerKey)) return
+    
+    try {
+      const tracker = trackers.value.find(t => t.key === trackerKey)
+      if (!tracker?.mesh) return
+      
+      const model = getActiveModel()
+      const bones = ensureBoneMap(model)
+      
+      // 更新
+      lower.updateWorldMatrix(true, false)
+      hand.updateWorldMatrix(true, false)
+      tracker.mesh.updateWorldMatrix(true, false)
+      
+      const trackerWorldQ = tracker.mesh.getWorldQuaternion(new THREE.Quaternion())
+      
+      // トランスレーションロック有効時: 手首の角度を固定する（前腕から手への相対回転を保持）
+      if (lockState?.active && lockState.relative) {
+        // 前腕のワールド回転を取得
+        const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
+        
+        // 手首の目標ワールド回転 = 前腕のワールド回転 × 保存された相対回転
+        const desiredHandWorldQ = lowerWorldQ.clone().multiply(lockState.relative)
+        
+        // 手首の親（前腕）のワールド回転
+        const parentWorldQ = hand.parent ? hand.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+        const invParentWorldQ = parentWorldQ.clone().invert()
+        
+        // ローカル回転に変換
+        const newHandLocalQ = invParentWorldQ.multiply(desiredHandWorldQ)
+        hand.quaternion.copy(newHandLocalQ)
+        hand.updateMatrixWorld(true)
+        return
+      }
+      
+      // ロック無効時: トラッカーの回転を前腕と手首に分配
+      
+      // 1. 前腕から手首への軸（Roll軸）
+      const lowerPos = lower.getWorldPosition(new THREE.Vector3())
+      const handPos = hand.getWorldPosition(new THREE.Vector3())
+      const forearmAxis = handPos.clone().sub(lowerPos)
+      if (forearmAxis.lengthSq() < 1e-8) return
+      forearmAxis.normalize()
+      
+      // 2. 現在の手首のワールド回転
+      const currentHandWorldQ = hand.getWorldQuaternion(new THREE.Quaternion())
+      
+      // 3. トラッカー回転と現在の手首回転の差分
+      const deltaQ = currentHandWorldQ.clone().invert().multiply(trackerWorldQ)
+      
+      // 4. 差分をSwingとTwistに分解
+      // Twist: forearmAxis周りの回転
+      // Swing: それ以外の回転
+      
+      const qw = THREE.MathUtils.clamp(deltaQ.w, -1, 1)
+      let angle = 2 * Math.acos(qw)
+      let s = Math.sqrt(Math.max(0, 1 - qw * qw))
+      let axis = new THREE.Vector3(1, 0, 0)
+      
+      if (s >= 1e-6) {
+        axis.set(deltaQ.x / s, deltaQ.y / s, deltaQ.z / s)
+        axis.normalize()
+      } else {
+        // 角度がほぼ0の場合は何もしない
+        return
+      }
+      
+      // forearmAxisとの内積でTwist成分を計算
+      const dotProduct = axis.dot(forearmAxis)
+      const twistAngle = angle * dotProduct
+      
+      // Twist quaternion
+      const twistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, twistAngle)
+      
+      // Swing quaternion (deltaQからtwistを除去)
+      const invTwistQ = twistQ.clone().invert()
+      const swingQ = deltaQ.clone().multiply(invTwistQ)
+      
+      // 5. Swing成分を手首に適用（手首の向きを変える）
+      const handWorldQWithSwing = currentHandWorldQ.clone().multiply(swingQ)
+      
+      // 6. Twist成分を前腕と手首に分配
+      const forearmTwistAngle = twistAngle * forearmTwistShareRatio
+      const handTwistAngle = twistAngle * (1 - forearmTwistShareRatio)
+      
+      const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, forearmTwistAngle)
+      const handTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, handTwistAngle)
+      
+      // 7. 前腕にTwistを適用
+      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
+      const newLowerWorldQ = forearmTwistQ.clone().multiply(lowerWorldQ)
+      
+      const parentLowerWorldQ = lower.parent ? lower.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+      const invParentLowerWorldQ = parentLowerWorldQ.clone().invert()
+      const newLowerLocalQ = invParentLowerWorldQ.multiply(newLowerWorldQ)
+      
+      lower.quaternion.copy(newLowerLocalQ)
+      lower.updateMatrixWorld(true)
+      
+      // 8. 手首にSwing + Twistを適用
+      const finalHandWorldQ = handTwistQ.clone().multiply(handWorldQWithSwing)
+      
+      // 手首の親（更新後の前腕）のワールド回転を再取得
+      const parentHandWorldQ = hand.parent ? hand.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+      const invParentHandWorldQ = parentHandWorldQ.clone().invert()
+      const newHandLocalQ = invParentHandWorldQ.multiply(finalHandWorldQ)
+      
+      hand.quaternion.copy(newHandLocalQ)
+      hand.updateMatrixWorld(true)
+      
+    } catch (err) {
+      console.warn('[distributeHandTrackerRotation] Error:', err)
+    }
+  }
+
   function update() {
     if (!enabled.value) return
     const model = getActiveModel()
@@ -1472,36 +1969,41 @@ export function useVirtualTrackers({
       }
       const headBone = bones.head || bones.neck
       if (headBone) {
-        applyTrackerRotationToBone(headBone, 'head', { weight: 0.85 })
-      }
-    } catch {}
+        if (trackerIsIndividuallyEnabled('head')) {
+          applyTrackerRotationToBone(headBone, 'head', { weight: 0.85 })
+        }
+        const leftHandLock = handTranslationLocks.leftHand
+        const rightHandLock = handTranslationLocks.rightHand
 
-    // Arms IK (2-bone approx with upper arm support)
-    try {
-      // Apply upper arm tracker rotations to shoulders (make shoulders move)
-      const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
-      const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
-      
-      if (bones.leftShoulder && leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
-        const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
-        const targetDir = leftUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
-        rotateBoneToward(bones.leftShoulder, targetDir, 0.5)
-      }
-      
-      if (bones.rightShoulder && rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
-        const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
-        const targetDir = rightUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
-        rotateBoneToward(bones.rightShoulder, targetDir, 0.5)
-      }
-      
-      solveLimb(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 'leftHand', 'leftElbow')
-      solveLimb(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, 'rightHand', 'rightElbow')
-      // 手首の回転を適用
-      if (bones.leftHand) {
-        applyTrackerRotationToBone(bones.leftHand, 'leftHand', { weight: 0.85 })
-      }
-      if (bones.rightHand) {
-        applyTrackerRotationToBone(bones.rightHand, 'rightHand', { weight: 0.85 })
+        // Hand tracker full rotation (pan/tilt/roll) should influence forearm+hand.
+        // We no longer forcibly restore an initial relative pose; instead we decompose
+        // tracker rotation into swing (aim) + twist (roll) and distribute twist across
+        // forearm (lower arm) and hand according to forearmTwistShareRatio.
+
+        const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
+        const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
+
+        if (bones.leftShoulder && leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
+          const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
+          const targetDir = leftUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
+          rotateBoneToward(bones.leftShoulder, targetDir, 0.5)
+        }
+
+        if (bones.rightShoulder && rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
+          const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
+          const targetDir = rightUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
+          rotateBoneToward(bones.rightShoulder, targetDir, 0.5)
+        }
+
+  solveLimb(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 'leftHand', 'leftElbow')
+  solveLimb(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, 'rightHand', 'rightElbow')
+
+  // Apply full tracker rotation decomposition & twist distribution
+  distributeHandTrackerRotation(bones.leftLowerArm, bones.leftHand, 'leftHand', leftHandLock)
+  distributeHandTrackerRotation(bones.rightLowerArm, bones.rightHand, 'rightHand', rightHandLock)
+
+        if (leftHandLock?.active) applyHandTranslationConstraint(bones.leftLowerArm, bones.leftHand, leftHandLock, 'leftHand')
+        if (rightHandLock?.active) applyHandTranslationConstraint(bones.rightLowerArm, bones.rightHand, rightHandLock, 'rightHand')
       }
     } catch {}
     // Legs IK
@@ -1515,25 +2017,48 @@ export function useVirtualTrackers({
       if (bones.rightFoot) {
         applyTrackerRotationToBone(bones.rightFoot, 'rightFoot', { weight: 0.85 })
       }
-    } catch {}
 
+    } catch {}
     // Gaze tracking: make eyes look at gaze tracker
     try {
       const gazeTracker = trackers.value.find(t => t.key === 'gaze')
       if (gazeTracker?.mesh && trackerIsIndividuallyEnabled('gaze')) {
         const gazePos = gazeTracker.mesh.position
-        const headBone = bones.head || bones.neck
         
-        if (headBone && model.vrm.lookAt) {
-          // Use VRM's built-in lookAt system to avoid breaking eye rendering
-          const lookAtTarget = gazePos.clone()
-          model.vrm.lookAt.target = lookAtTarget
+        // まず VRM lookAt を使いターゲット設定 (一部モデルでまぶたコントロールを含むため)
+        if (model.vrm.lookAt) {
+          model.vrm.lookAt.target = gazePos.clone()
+        }
+        // 追加で左右の目ボーンを直接ターゲット方向へ微調整（lookAt精度不足補正）
+        const bones = ensureBoneMap(model)
+        const eyes = [bones.leftEye, bones.rightEye].filter(Boolean)
+        eyes.forEach(eye => {
+          try {
+            const parentQ = eye.parent ? eye.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
+            const parentQInv = parentQ.clone().invert()
+            const eyePos = eye.getWorldPosition(new THREE.Vector3())
+            const dir = gazePos.clone().sub(eyePos).normalize()
+            // 基準: eye forward を (0,0,1) と仮定し lookAt 行列生成
+            const m = new THREE.Matrix4().lookAt(eyePos, gazePos, new THREE.Vector3(0, 1, 0))
+            const worldQ = new THREE.Quaternion().setFromRotationMatrix(m)
+            const localQ = parentQInv.multiply(worldQ)
+            // 過度な揺れを避けるため補間
+            eye.quaternion.slerp(localQ, 0.85)
+            eye.updateMatrixWorld(true)
+          } catch {}
+        })
+      } else {
+        // Gaze trackerが無効な場合、lookAtをリセット
+        if (model.vrm.lookAt) {
+          model.vrm.lookAt.target = null
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[VirtualTrackers] Gaze tracking error:', err)
+    }
 
     vrmRoot.updateMatrixWorld(true, true)
-  }
+  } // end update()
 
   function solveLimb(upper, lower, eff, effKey, poleKey) {
     if (!upper || !lower || !eff) return
@@ -1639,6 +2164,66 @@ export function useVirtualTrackers({
     return mesh
   }
 
+  // 回転軸ヘルパーを作成
+  function createRotationAxesHelper(length = trackerAxesLengthState || 0.05) {
+    let appliedLength = Number(length)
+    if (!Number.isFinite(appliedLength) || appliedLength <= 0) {
+      appliedLength = trackerAxesLengthState || 0.05
+    }
+    const group = new THREE.Group()
+    group.name = 'vt:rotationAxes'
+    group.renderOrder = 998
+    group.visible = false
+    group.userData.__vtAxes = true
+
+    // X軸（赤）
+    const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(appliedLength, 0, 0)
+    ])
+    const xAxisMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xff0000, 
+      depthTest: false, 
+      depthWrite: false,
+      linewidth: 2
+    })
+    const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial)
+    xAxis.renderOrder = 998
+    group.add(xAxis)
+
+    // Y軸（緑）
+    const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, appliedLength, 0)
+    ])
+    const yAxisMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x00ff00, 
+      depthTest: false, 
+      depthWrite: false,
+      linewidth: 2
+    })
+    const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial)
+    yAxis.renderOrder = 998
+    group.add(yAxis)
+
+    // Z軸（青）
+    const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, appliedLength)
+    ])
+    const zAxisMaterial = new THREE.LineBasicMaterial({ 
+      color: 0x0000ff, 
+      depthTest: false, 
+      depthWrite: false,
+      linewidth: 2
+    })
+    const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial)
+    zAxis.renderOrder = 998
+    group.add(zAxis)
+
+    return group
+  }
+
   function updateViewAlignedIndicators(entry) {
     const mesh = entry?.mesh
     const cam = camera?.value
@@ -1728,12 +2313,93 @@ export function useVirtualTrackers({
     }
   }
 
+  // 回転軸の可視性を設定
+  function setRotationAxesVisible(visible) {
+    rotationAxesGlobalVisible = !!visible
+    trackers.value.forEach(t => {
+      if (t?.rotationAxes) {
+        t.rotationAxes.visible = visible && t.mesh.visible
+      }
+    })
+  }
+
+  // 回転軸の長さを更新
+  function updateRotationAxesLength(length) {
+    const len = Number(length)
+    if (!Number.isFinite(len) || len <= 0) return
+    trackerAxesLengthState = len
+    trackers.value.forEach(t => {
+      if (!t?.rotationAxes) return
+      
+      // 既存の軸を削除
+      while (t.rotationAxes.children.length > 0) {
+        const child = t.rotationAxes.children[0]
+        child.geometry?.dispose()
+        child.material?.dispose()
+        t.rotationAxes.remove(child)
+      }
+
+      // 新しい長さで軸を再作成
+      // X軸（赤）
+      const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(length, 0, 0)
+      ])
+      const xAxisMaterial = new THREE.LineBasicMaterial({ 
+        color: 0xff0000, 
+        depthTest: false, 
+        depthWrite: false,
+        linewidth: 2
+      })
+      const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial)
+      xAxis.renderOrder = 998
+      t.rotationAxes.add(xAxis)
+
+      // Y軸（緑）
+      const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, length, 0)
+      ])
+      const yAxisMaterial = new THREE.LineBasicMaterial({ 
+        color: 0x00ff00, 
+        depthTest: false, 
+        depthWrite: false,
+        linewidth: 2
+      })
+      const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial)
+      yAxis.renderOrder = 998
+      t.rotationAxes.add(yAxis)
+
+      // Z軸（青）
+      const zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, length)
+      ])
+      const zAxisMaterial = new THREE.LineBasicMaterial({ 
+        color: 0x0000ff, 
+        depthTest: false, 
+        depthWrite: false,
+        linewidth: 2
+      })
+      const zAxis = new THREE.Line(zAxisGeometry, zAxisMaterial)
+      zAxis.renderOrder = 998
+      t.rotationAxes.add(zAxis)
+    })
+  }
+
+  function setForearmTwistShareRatio(value) {
+    const ratio = THREE.MathUtils.clamp(Number(value), 0, 1)
+    if (!Number.isFinite(ratio)) return
+    forearmTwistShareRatio = ratio
+  }
+
   return {
     enabled,
     displayVisible,
     trackerStates,
     trackers,
     lastActiveTrackerKey: lastActiveKey,
+    selectedTrackerKey,
     init,
     cleanup,
     setEnabled,
@@ -1741,6 +2407,7 @@ export function useVirtualTrackers({
     setTrackerEnabled,
     setTrackerRotationDegrees,
     setTrackerRotationOrder,
+    setTrackerAxisScale,
     setTrackerPosition,
     syncTrackerStateFromMesh,
     resetTrackerRotation,
@@ -1750,7 +2417,10 @@ export function useVirtualTrackers({
     getCameraState,
     saveCameraState,
     saveCameraStateFromObject,
-    getTrackerSnapshot,
+  getTrackerSnapshot,
+  setRotationAxesVisible,
+  updateRotationAxesLength,
+  setForearmTwistShareRatio,
   rotationOrders: TRACKER_ROTATION_ORDERS,
   persistTrackerTransforms,
     // Force rebuild API for resilience

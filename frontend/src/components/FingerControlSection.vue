@@ -1,50 +1,43 @@
 <template>
-  <section class="section">
-    <header class="section__header">
-      <h3>指の設定</h3>
-    </header>
-    <div class="section__content">
-      <div class="hand-group">
-        <h4>左手</h4>
-        <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
-          <label>
-            <span class="finger-name">{{ finger.label }}</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              :value="getFingerValue('left', finger.key)"
-              @input="setFingerValue('left', finger.key, $event.target.value)"
-            />
-            <span class="finger-value">{{ (getFingerValue('left', finger.key) * 100).toFixed(0) }}%</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="hand-group">
-        <h4>右手</h4>
-        <div class="finger-control" v-for="finger in rightFingers" :key="finger.key">
-          <label>
-            <span class="finger-name">{{ finger.label }}</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              :value="getFingerValue('right', finger.key)"
-              @input="setFingerValue('right', finger.key, $event.target.value)"
-            />
-            <span class="finger-value">{{ (getFingerValue('right', finger.key) * 100).toFixed(0) }}%</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button type="button" class="btn btn--secondary" @click="resetAllFingers">すべてリセット</button>
-      </div>
+  <div class="hand-group">
+    <h4>左手</h4>
+    <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
+      <label>
+        <span class="finger-name">{{ finger.label }}</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          :value="getFingerValue('left', finger.key)"
+          @input="setFingerValue('left', finger.key, $event.target.value)"
+        />
+        <span class="finger-value">{{ (getFingerValue('left', finger.key) * 100).toFixed(0) }}%</span>
+      </label>
     </div>
-  </section>
+  </div>
+
+  <div class="hand-group">
+    <h4>右手</h4>
+    <div class="finger-control" v-for="finger in rightFingers" :key="finger.key">
+      <label>
+        <span class="finger-name">{{ finger.label }}</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          :value="getFingerValue('right', finger.key)"
+          @input="setFingerValue('right', finger.key, $event.target.value)"
+        />
+        <span class="finger-value">{{ (getFingerValue('right', finger.key) * 100).toFixed(0) }}%</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button type="button" class="btn btn--secondary" @click="resetAllFingers">すべてリセット</button>
+  </div>
 </template>
 
 <script setup>
@@ -96,18 +89,31 @@ function resetAllFingers() {
 
 .section__header {
   padding: 0.75rem 0.85rem 0.4rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .section__header h3 {
   margin: 0;
   font-size: 0.95rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.04em;
 }
 
 .section__content {
   padding: 1rem 0.85rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.section__content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.section__content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent, #2d8cff) 40%, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+}
+
+.section__content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .hand-group {
@@ -122,9 +128,11 @@ function resetAllFingers() {
   margin: 0 0 0.75rem 0;
   font-size: 0.85rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .finger-control {
@@ -145,65 +153,74 @@ function resetAllFingers() {
 
 .finger-value {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 input[type="range"] {
   width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+input[type="range"]:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #42a5f5;
+  width: 16px;
+  height: 16px;
+  background: var(--accent, #42a5f5);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: #64b5f6;
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
+  transform: scale(1.15);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: #42a5f5;
+  width: 16px;
+  height: 16px;
+  background: var(--accent, #42a5f5);
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: #64b5f6;
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
+  transform: scale(1.15);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 .actions {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   gap: 0.5rem;
 }
 
 .btn {
-  padding: 0.4rem 0.85rem;
-  font-size: 0.75rem;
-  border: none;
-  border-radius: 4px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   font-weight: 500;
 }
 
@@ -213,7 +230,8 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 .btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
   color: rgba(255, 255, 255, 0.95);
 }
 </style>

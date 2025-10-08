@@ -1,12 +1,6 @@
 <template>
-  <section class="section">
-    <header class="section__header">
-      <h3>カメラ設定</h3>
-      <p class="section__caption">レンダーカメラと出力を調整します</p>
-    </header>
-    <div class="section__content">
-      <fieldset class="group">
-        <legend>出力解像度</legend>
+  <fieldset class="group">
+    <legend>出力解像度</legend>
         <div class="resolution">
           <div class="resolution__field">
             <label for="camera-resolution-width">幅</label>
@@ -108,8 +102,6 @@
           </button>
         </div>
       </fieldset>
-    </div>
-  </section>
 </template>
 
 <script setup>

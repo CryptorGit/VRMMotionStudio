@@ -59,6 +59,8 @@ export function useThreeViewerInit({
       RIGHT: THREE.MOUSE.ROTATE,
       MIDDLE: THREE.MOUSE.DOLLY
     }
+    // 縦方向をY軸の縦方向に固定（ワールド座標のY軸を使用）
+    controls.value.screenSpacePanning = true
     controls.value.enabled = true
     controls.value.addEventListener('start', onControlStart)
     controls.value.addEventListener('end', onControlEnd)

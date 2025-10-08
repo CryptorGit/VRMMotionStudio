@@ -45,7 +45,15 @@
           :show-virtual-tracker-labels="showVirtualTrackerLabels"
           :virtual-tracker-size="virtualTrackerSize"
           :virtual-tracker-label-scale="virtualTrackerLabelScale"
+          :forearm-twist-share="forearmTwistShare"
           :has-models-loaded="hasModelsLoaded"
+          :selected-tracker-key="selectedTrackerKey"
+          :selected-tracker-label="selectedTrackerLabel"
+          :tracker-position="trackerPosition"
+          :tracker-rotation="trackerRotation"
+          :tracker-rotation-order="trackerRotationOrder"
+          :show-tracker-axes="showTrackerAxes"
+          :tracker-axes-length="trackerAxesLength"
           :finger-states="fingerStates"
           :camera-fov="cameraFov"
           :camera-near="cameraNear"
@@ -80,7 +88,15 @@
           @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
           @update:virtualTrackerSize="v => emit('update:virtualTrackerSize', v)"
           @update:virtualTrackerLabelScale="v => emit('update:virtualTrackerLabelScale', v)"
+          @update:showTrackerAxes="v => emit('update:showTrackerAxes', v)"
+          @update:trackerAxesLength="v => emit('update:trackerAxesLength', v)"
+          @update:forearm-twist-share="v => emit('update:forearmTwistShare', v)"
           @update:fingerStates="v => emit('update:fingerStates', v)"
+          @update:tracker-position="v => emit('update:tracker-position', v)"
+          @update:tracker-rotation="v => emit('update:tracker-rotation', v)"
+          @update:tracker-rotation-order="v => emit('update:tracker-rotation-order', v)"
+          @reset-tracker-position="() => emit('reset-tracker-position')"
+          @reset-tracker-rotation="() => emit('reset-tracker-rotation')"
           @update:cameraFov="v => emit('update:cameraFov', v)"
           @update:cameraNear="v => emit('update:cameraNear', v)"
           @update:cameraFar="v => emit('update:cameraFar', v)"
@@ -103,6 +119,7 @@
           @remove-model="(...args) => emit('remove-model', ...args)"
           @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
           @reset-all-tracker-orientations="() => emit('reset-all-tracker-orientations')"
+          @reset-outline="() => emit('reset-outline')"
         />
       </div>
     </div>
@@ -141,7 +158,15 @@ const props = defineProps({
   showVirtualTrackerLabels: { type: Boolean, default: true },
   virtualTrackerSize: { type: Number, default: 0.08 },
   virtualTrackerLabelScale: { type: Number, default: 1.0 },
+  forearmTwistShare: { type: Number, default: 0.7 },
   hasModelsLoaded: { type: Boolean, default: false },
+  selectedTrackerKey: { type: String, default: null },
+  selectedTrackerLabel: { type: String, default: '' },
+  trackerPosition: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
+  trackerRotation: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
+  trackerRotationOrder: { type: String, default: 'YXZ' },
+  showTrackerAxes: { type: Boolean, default: false },
+  trackerAxesLength: { type: Number, default: 0.05 },
   fingerStates: { type: Object, default: () => ({}) },
   cameraFov: { type: Number, required: true },
   cameraNear: { type: Number, required: true },
@@ -179,7 +204,15 @@ const emit = defineEmits([
   'update:showVirtualTrackerLabels',
   'update:virtualTrackerSize',
   'update:virtualTrackerLabelScale',
+  'update:forearmTwistShare',
+  'update:showTrackerAxes',
+  'update:trackerAxesLength',
   'update:fingerStates',
+  'update:tracker-position',
+  'update:tracker-rotation',
+  'update:tracker-rotation-order',
+  'reset-tracker-position',
+  'reset-tracker-rotation',
   'update:cameraFov',
   'update:cameraNear',
   'update:cameraFar',
@@ -197,6 +230,8 @@ const emit = defineEmits([
   'toggle-all-bone-names',
   'remove-model',
   'reset-virtual-trackers',
+  'reset-all-tracker-orientations',
+  'reset-outline',
   'update-timeline-snap',
   'update-timeline-loop',
   'remove-selected-keyframes',
@@ -230,6 +265,7 @@ const {
   showVirtualTrackerLabels,
   virtualTrackerSize,
   virtualTrackerLabelScale,
+  forearmTwistShare,
   cameraFov,
   cameraNear,
   cameraFar,

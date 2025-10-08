@@ -1,14 +1,7 @@
 <template>
-  <section class="section">
-    <header class="section__header">
-      <h3>物理設定</h3>
-    </header>
-    <div class="section__content">
-      <label class="toggle">
-        <input type="checkbox" v-model="springBoneEnabledLocal" /> SpringBone 有効
-      </label>
-    </div>
-  </section>
+  <label class="toggle">
+    <input type="checkbox" v-model="springBoneEnabledLocal" /> SpringBone 有効
+  </label>
 </template>
 
 <script setup>
