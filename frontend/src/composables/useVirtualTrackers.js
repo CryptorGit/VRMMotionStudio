@@ -48,6 +48,28 @@ function defaultCameraRotationArray() {
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 
+/**
+ * 角度を-180~180度の範囲に正規化
+ */
+function normalizeAngle(degrees) {
+  let angle = degrees % 360
+  if (angle > 180) angle -= 360
+  if (angle < -180) angle += 360
+  return angle
+}
+
+/**
+ * Quaternionからオイラー角（度）を取得し、-180~180に正規化
+ */
+function getEulerAnglesFromQuaternion(quaternion, order = 'YXZ') {
+  const euler = new THREE.Euler().setFromQuaternion(quaternion, order)
+  return {
+    x: normalizeAngle(euler.x * RAD2DEG),
+    y: normalizeAngle(euler.y * RAD2DEG),
+    z: normalizeAngle(euler.z * RAD2DEG)
+  }
+}
+
 function defaultCameraState() {
   return {
     space: 'world',
@@ -418,11 +440,14 @@ export function useVirtualTrackers({
     const state = ensureTrackerState(key)
     if (!tracker?.mesh || !state) return
     const order = normalizeOrder(state.order)
-    trackerEuler.setFromQuaternion(tracker.mesh.quaternion, order)
+    
+    // Quaternionからオイラー角を取得し、-180~180度に正規化
+    const normalizedAngles = getEulerAnglesFromQuaternion(tracker.mesh.quaternion, order)
+    
     const angles = state.angles || (state.angles = { x: 0, y: 0, z: 0 })
-    angles.x = toDegrees(trackerEuler.x)
-    angles.y = toDegrees(trackerEuler.y)
-    angles.z = toDegrees(trackerEuler.z)
+    angles.x = normalizedAngles.x
+    angles.y = normalizedAngles.y
+    angles.z = normalizedAngles.z
   }
 
   function trackerIsIndividuallyEnabled(key) {
@@ -1043,7 +1068,6 @@ export function useVirtualTrackers({
       dragState.startPosition.copy(hit.position)
       dragState.didMove = false
       draggingKey = trackerKey
-      dragState.translationLockKey = null
       
       if (trackerKey) {
         markActiveKey(trackerKey)
@@ -1054,15 +1078,10 @@ export function useVirtualTrackers({
       dragState.rotationRing = null
       
       if (mode === 'translate') {
-        // 手首トラッカー移動時は、手首の角度を固定するためロックを有効化
-        if (trackerKey === 'leftHand' || trackerKey === 'rightHand') {
-          activateHandTranslationLock(trackerKey)
-          dragState.translationLockKey = trackerKey
-        }
+        // VRChat準拠: トランスレーションロックは不要
+        // 手首トラッカーの位置を直接移動するだけ
         // ビューポート基準の平行移動: カメラの right / up ベクトルを基底とし、スクリーン移動を直接位置へ反映
-        // ここでは開始時の位置を保持するだけで良い
       } else {
-        // 回転モード時: 手首トラッカーは回転可能（ロック解除不要、元々回転処理で分配される）
         // 回転モード: ビューポート固定軸を保存
         const state = ensureTrackerState(trackerKey)
         if (state?.angles) {
@@ -1085,28 +1104,19 @@ export function useVirtualTrackers({
         dragState.viewBasisY.set(0, 1, 0).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
         dragState.viewBasisZ.set(0, 0, -1).applyMatrix4(camWorldMat).sub(camera.value.position).normalize()
 
-        // 回転開始時にトラッカーのローカル基底をビュー基準に整列させる: 
-        //   Y = world up (0,1,0)
-        //   X = camera right (viewBasisX)
-        //   Z = camera forward (viewBasisZ)
-        // これによりユーザーがドラッグする軸が直感的に一致
+        // 回転開始時にトラッカーのローカル基底をビュー基準に整列させる
         try {
           const basisX = dragState.viewBasisX.clone().normalize()
           const basisY = new THREE.Vector3(0, 1, 0) // 世界Y固定
-          // Zは X×Y ではなく viewBasisZ を優先（要求仕様: ビューポート奥行きと常に平行）
           const basisZ = dragState.viewBasisZ.clone().normalize()
           // Orthonormal correction: 再直交化
-          // Ensure X ⟂ Y
           basisX.sub(basisY.clone().multiplyScalar(basisX.dot(basisY))).normalize()
-          // Recompute Z = X×Y to guarantee右手系, then slerp toward viewBasisZ for stability
           const recomputedZ = new THREE.Vector3().crossVectors(basisX, basisY).normalize()
           const blendedZ = recomputedZ.clone().lerp(basisZ, 0.5).normalize()
-          // 修正: Z再計算後 X = Y×Z で再直交化
           const fixedX = new THREE.Vector3().crossVectors(basisY, blendedZ).normalize()
           const finalZ = new THREE.Vector3().crossVectors(fixedX, basisY).normalize()
           const m = new THREE.Matrix4().makeBasis(fixedX, basisY, finalZ)
           const viewAlignedQ = new THREE.Quaternion().setFromRotationMatrix(m)
-          // 元の回転との差分を適用し、ユーザーの既存方向を破壊し過ぎないように球面補間
           const blended = dragState.startQuaternion.clone().slerp(viewAlignedQ, 0.65)
           hit.quaternion.copy(blended)
           hit.updateMatrixWorld(true)
@@ -1128,12 +1138,36 @@ export function useVirtualTrackers({
     dragState.pointerDelta.set(e.clientX - dragState.pointerStart.x, e.clientY - dragState.pointerStart.y)
     
     if (dragState.mode === 'translate') {
-      // ビューポート基準での2軸移動 (X=カメラ右, Y=カメラ上)
+      // VRChat準拠: カメラ→トラッカーの視線ベクトルに垂直な平面上で移動
       const deltaX = dragState.pointerDelta.x
       const deltaY = dragState.pointerDelta.y
       camera.value.updateMatrixWorld(true)
-      const moveRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.value.quaternion).normalize()
-      const moveUp = new THREE.Vector3(0, 1, 0) // ワールドY固定（仕様）
+      
+      // カメラからトラッカーへの視線ベクトル（法線）
+      const viewDirection = new THREE.Vector3()
+        .subVectors(dragState.startPosition, camera.value.position)
+        .normalize()
+      
+      // カメラの右方向（ビューポートX軸）
+      const cameraRight = new THREE.Vector3(1, 0, 0)
+        .applyQuaternion(camera.value.quaternion)
+        .normalize()
+      
+      // カメラの上方向（ビューポートY軸の基準）
+      const cameraUp = new THREE.Vector3(0, 1, 0)
+        .applyQuaternion(camera.value.quaternion)
+        .normalize()
+      
+      // 移動平面上のX軸 = カメラ右方向を視線ベクトルに垂直な平面へ投影
+      const moveRight = cameraRight.clone()
+        .sub(viewDirection.clone().multiplyScalar(cameraRight.dot(viewDirection)))
+        .normalize()
+      
+      // 移動平面上のY軸 = カメラ上方向を視線ベクトルに垂直な平面へ投影
+      const moveUp = cameraUp.clone()
+        .sub(viewDirection.clone().multiplyScalar(cameraUp.dot(viewDirection)))
+        .normalize()
+      
       // スケール: 垂直FOV から 1 pixel あたりのワールド長 = 2 * dist * tan(fov/2) / viewportHeight
       let scale = 0.0025
       try {
@@ -1143,6 +1177,7 @@ export function useVirtualTrackers({
         const perPixel = (2 * dist * Math.tan(fovRad / 2)) / (domRect.height || 1)
         scale = perPixel
       } catch {}
+      
       const movement = new THREE.Vector3()
         .add(moveRight.multiplyScalar(deltaX * scale))
         .add(moveUp.multiplyScalar(-deltaY * scale))
@@ -1217,10 +1252,6 @@ export function useVirtualTrackers({
       dragState.mode = 'translate'
       dragState.didMove = false
       dragState.rotationRing = null
-      if (dragState.translationLockKey) {
-        releaseHandTranslationLock(dragState.translationLockKey)
-      }
-      dragState.translationLockKey = null
       draggingKey = null
       controls.value && (controls.value.enabled = true)
       try { renderer.value?.domElement?.releasePointerCapture?.(e.pointerId) } catch {}
@@ -1249,9 +1280,6 @@ export function useVirtualTrackers({
           })
         }
       } catch {}
-      if (releasedKey === 'leftHand' || releasedKey === 'rightHand') {
-        releaseHandTranslationLock(releasedKey)
-      }
     }
   }
 
@@ -1734,179 +1762,309 @@ export function useVirtualTrackers({
     return { rollAngle }
   }
 
-  function distributeForearmRoll(lower, hand, trackerKey, lockState) {
-    if (!lower || !hand || !trackerIsIndividuallyEnabled(trackerKey)) return
-    if (lockState?.active) return // When translation lock is active, avoid adjustments
-    try {
-      // Get tracker rotation (local quaternion from state offset + mesh quaternion)
-      const tracker = trackers.value.find(t => t.key === trackerKey)
-      if (!tracker?.mesh) return
-      // Build a relative orientation baseline (current) and desired (with tracker)
-      lower.updateWorldMatrix(true, false); hand.updateWorldMatrix(true, false)
-      const lowerWorldPos = lower.getWorldPosition(new THREE.Vector3())
-      const handWorldPos = hand.getWorldPosition(new THREE.Vector3())
-      const axisWorld = handWorldPos.clone().sub(lowerWorldPos)
-      if (axisWorld.lengthSq() < 1e-8) return
-      axisWorld.normalize()
-
-      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
-      const handWorldQ = hand.getWorldQuaternion(new THREE.Quaternion())
-      // Current relative
-      const relCurrent = lowerWorldQ.clone().invert().multiply(handWorldQ)
-
-      // Desired additional twist from tracker roll only: project tracker mesh quaternion's relative difference
-      // Use tracker.mesh.quaternion as world orientation target hint.
-      const desiredHandDirWorld = new THREE.Vector3(0,0,1).applyQuaternion(tracker.mesh.quaternion)
-      // Compute roll component needed to rotate current hand forward (approx) axis onto desired around axisWorld
-      const handForwardWorld = new THREE.Vector3(0,0,1).applyQuaternion(handWorldQ)
-      const projF = handForwardWorld.clone().projectOnPlane(axisWorld)
-      const projD = desiredHandDirWorld.clone().projectOnPlane(axisWorld)
-      if (projF.lengthSq() < 1e-6 || projD.lengthSq() < 1e-6) return
-      projF.normalize(); projD.normalize()
-      let dot = THREE.MathUtils.clamp(projF.dot(projD), -1, 1)
-      let angle = Math.acos(dot)
-      // Determine sign with cross
-      const cross = new THREE.Vector3().crossVectors(projF, projD)
-      if (cross.dot(axisWorld) < 0) angle = -angle
-      const rollQuat = new THREE.Quaternion().setFromAxisAngle(axisWorld, angle)
-
-      // Distribute: forearm 70%, wrist 30%
-      const forearmAngle = angle * forearmTwistShareRatio
-      const wristAngle = angle * (1 - forearmTwistShareRatio)
-      const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(axisWorld, forearmAngle)
-      const wristTwistQ = new THREE.Quaternion().setFromAxisAngle(axisWorld, wristAngle)
-
-      // Apply to world: new lower world = lowerWorldQ * forearmTwistQ
-      const newLowerWorldQ = lowerWorldQ.clone().multiply(forearmTwistQ)
-      const newHandWorldQ = newLowerWorldQ.clone().multiply(relCurrent.clone().multiply(wristTwistQ))
-
-      // Convert back to local
-      const parentLowerWorldQ = lower.parent ? lower.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-      const invParentLowerWorldQ = parentLowerWorldQ.clone().invert()
-      const newLowerLocal = invParentLowerWorldQ.multiply(newLowerWorldQ)
-      const invNewLowerWorldQ = newLowerWorldQ.clone().invert()
-      const newHandLocal = invNewLowerWorldQ.multiply(newHandWorldQ)
-      lower.quaternion.copy(newLowerLocal)
-      hand.quaternion.copy(newHandLocal)
-      lower.updateMatrixWorld(true)
-      hand.updateMatrixWorld(true)
-    } catch {}
-  }
-
-  // Replace previous approach with full tracker orientation usage: swing (aim) drives lower & hand aim; twist distributed.
-  function distributeHandTrackerRotation(lower, hand, trackerKey, lockState) {
-    if (!lower || !hand || !trackerIsIndividuallyEnabled(trackerKey)) return
+  // ===== VRChat-style Arm IK Implementation =====
+  
+  /**
+   * VRChat準拠の腕IK実装
+   * 手首トラッカーの位置と回転を直接使用し、2ボーンIKで肘を計算
+   * 前腕のツイストは手首の回転から自動的に分配
+   */
+  function solveVRChatArmIK(shoulder, upperArm, lowerArm, hand, handTrackerKey, elbowTrackerKey) {
+    if (!shoulder || !upperArm || !lowerArm || !hand) return
+    if (!trackerIsIndividuallyEnabled(handTrackerKey)) return
+    
+    const handTracker = trackers.value.find(t => t.key === handTrackerKey)
+    if (!handTracker?.mesh) return
     
     try {
-      const tracker = trackers.value.find(t => t.key === trackerKey)
-      if (!tracker?.mesh) return
-      
-      const model = getActiveModel()
-      const bones = ensureBoneMap(model)
-      
-      // 更新
-      lower.updateWorldMatrix(true, false)
+      // 全ボーンのワールド行列を更新
+      shoulder.updateWorldMatrix(true, false)
+      upperArm.updateWorldMatrix(true, false)
+      lowerArm.updateWorldMatrix(true, false)
       hand.updateWorldMatrix(true, false)
-      tracker.mesh.updateWorldMatrix(true, false)
+      handTracker.mesh.updateWorldMatrix(true, false)
       
-      const trackerWorldQ = tracker.mesh.getWorldQuaternion(new THREE.Quaternion())
+      // 1. 基本的な位置とボーン長を取得
+      const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3())
+      const handTargetPos = handTracker.mesh.position.clone()
+      const handTargetRot = handTracker.mesh.getWorldQuaternion(new THREE.Quaternion())
       
-      // トランスレーションロック有効時: 手首の角度を固定する（前腕から手への相対回転を保持）
-      if (lockState?.active && lockState.relative) {
-        // 前腕のワールド回転を取得
-        const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
-        
-        // 手首の目標ワールド回転 = 前腕のワールド回転 × 保存された相対回転
-        const desiredHandWorldQ = lowerWorldQ.clone().multiply(lockState.relative)
-        
-        // 手首の親（前腕）のワールド回転
-        const parentWorldQ = hand.parent ? hand.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-        const invParentWorldQ = parentWorldQ.clone().invert()
-        
-        // ローカル回転に変換
-        const newHandLocalQ = invParentWorldQ.multiply(desiredHandWorldQ)
-        hand.quaternion.copy(newHandLocalQ)
-        hand.updateMatrixWorld(true)
-        return
+      const upperLength = boneLength(upperArm, lowerArm)
+      const lowerLength = boneLength(lowerArm, hand)
+      
+      // 2. 肘ヒント（ポールベクトル）の位置を取得
+      let elbowHintPos = null
+      if (elbowTrackerKey && trackerIsIndividuallyEnabled(elbowTrackerKey)) {
+        const elbowTracker = trackers.value.find(t => t.key === elbowTrackerKey)
+        if (elbowTracker?.mesh) {
+          elbowHintPos = elbowTracker.mesh.position.clone()
+        }
       }
       
-      // ロック無効時: トラッカーの回転を前腕と手首に分配
-      
-      // 1. 前腕から手首への軸（Roll軸）
-      const lowerPos = lower.getWorldPosition(new THREE.Vector3())
-      const handPos = hand.getWorldPosition(new THREE.Vector3())
-      const forearmAxis = handPos.clone().sub(lowerPos)
-      if (forearmAxis.lengthSq() < 1e-8) return
-      forearmAxis.normalize()
-      
-      // 2. 現在の手首のワールド回転
-      const currentHandWorldQ = hand.getWorldQuaternion(new THREE.Quaternion())
-      
-      // 3. トラッカー回転と現在の手首回転の差分
-      const deltaQ = currentHandWorldQ.clone().invert().multiply(trackerWorldQ)
-      
-      // 4. 差分をSwingとTwistに分解
-      // Twist: forearmAxis周りの回転
-      // Swing: それ以外の回転
-      
-      const qw = THREE.MathUtils.clamp(deltaQ.w, -1, 1)
-      let angle = 2 * Math.acos(qw)
-      let s = Math.sqrt(Math.max(0, 1 - qw * qw))
-      let axis = new THREE.Vector3(1, 0, 0)
-      
-      if (s >= 1e-6) {
-        axis.set(deltaQ.x / s, deltaQ.y / s, deltaQ.z / s)
-        axis.normalize()
-      } else {
-        // 角度がほぼ0の場合は何もしない
-        return
+      // 肘ヒントがない場合はデフォルト方向を使用
+      if (!elbowHintPos) {
+        // VRChatのデフォルト: 前方やや下方向
+        const isLeft = handTrackerKey === 'leftHand'
+        const sideDir = isLeft ? -1 : 1
+        elbowHintPos = shoulderPos.clone().add(new THREE.Vector3(sideDir * 0.3, -0.2, 0.5))
       }
       
-      // forearmAxisとの内積でTwist成分を計算
-      const dotProduct = axis.dot(forearmAxis)
-      const twistAngle = angle * dotProduct
+      // 3. 2ボーンIKで肘の位置を計算
+      const elbowPos = computeElbowPos(shoulderPos, handTargetPos, elbowHintPos, upperLength, lowerLength)
       
-      // Twist quaternion
-      const twistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, twistAngle)
+      // 4. 上腕（shoulder → upperArm）の回転を計算
+      // 肩から肘への方向に向ける
+      const shoulderToElbow = elbowPos.clone().sub(shoulderPos)
+      if (shoulderToElbow.lengthSq() > 1e-8) {
+        shoulderToElbow.normalize()
+        rotateBoneToward(shoulder, shoulderToElbow, 1.0)
+        shoulder.updateMatrixWorld(true)
+      }
       
-      // Swing quaternion (deltaQからtwistを除去)
-      const invTwistQ = twistQ.clone().invert()
-      const swingQ = deltaQ.clone().multiply(invTwistQ)
+      // 5. 上腕ボーンの回転を計算
+      upperArm.updateWorldMatrix(true, false)
+      if (shoulderToElbow.lengthSq() > 1e-8) {
+        rotateBoneToward(upperArm, shoulderToElbow, 1.0)
+        upperArm.updateMatrixWorld(true)
+      }
       
-      // 5. Swing成分を手首に適用（手首の向きを変える）
-      const handWorldQWithSwing = currentHandWorldQ.clone().multiply(swingQ)
+      // 6. 前腕の基本回転を計算（肘から手首への方向）
+      const elbowToHand = handTargetPos.clone().sub(elbowPos)
+      if (elbowToHand.lengthSq() > 1e-8) {
+        elbowToHand.normalize()
+        rotateBoneToward(lowerArm, elbowToHand, 1.0)
+        lowerArm.updateMatrixWorld(true)
+      }
       
-      // 6. Twist成分を前腕と手首に分配
-      const forearmTwistAngle = twistAngle * forearmTwistShareRatio
-      const handTwistAngle = twistAngle * (1 - forearmTwistShareRatio)
+      // 7. 前腕のツイスト（Roll）を手首トラッカーの回転から計算
+      const forearmAxis = elbowToHand.clone()
+      const handTrackerUp = new THREE.Vector3(0, 1, 0).applyQuaternion(handTargetRot)
       
-      const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, forearmTwistAngle)
-      const handTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, handTwistAngle)
+      // 前腕軸に垂直な平面でのUp方向を計算
+      const projectedTrackerUp = handTrackerUp.clone().projectOnPlane(forearmAxis)
       
-      // 7. 前腕にTwistを適用
-      const lowerWorldQ = lower.getWorldQuaternion(new THREE.Quaternion())
-      const newLowerWorldQ = forearmTwistQ.clone().multiply(lowerWorldQ)
+      if (projectedTrackerUp.lengthSq() > 1e-6) {
+        projectedTrackerUp.normalize()
+        
+        // 現在の前腕のUp方向
+        const currentLowerArmQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
+        const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(currentLowerArmQ)
+        const projectedCurrentUp = currentUp.clone().projectOnPlane(forearmAxis)
+        
+        if (projectedCurrentUp.lengthSq() > 1e-6) {
+          projectedCurrentUp.normalize()
+          
+          // ツイスト角度を計算
+          const twistDot = THREE.MathUtils.clamp(projectedCurrentUp.dot(projectedTrackerUp), -1, 1)
+          let twistAngle = Math.acos(twistDot)
+          
+          // 符号を決定
+          const twistCross = new THREE.Vector3().crossVectors(projectedCurrentUp, projectedTrackerUp)
+          if (twistCross.dot(forearmAxis) < 0) twistAngle = -twistAngle
+          
+          // ツイストを前腕と手首に分配
+          const forearmTwistAngle = twistAngle * forearmTwistShareRatio
+          const handTwistAngle = twistAngle * (1 - forearmTwistShareRatio)
+          
+          // 前腕にツイストを適用
+          const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, forearmTwistAngle)
+          const lowerArmWorldQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
+          const newLowerArmWorldQ = forearmTwistQ.clone().multiply(lowerArmWorldQ)
+          
+          const lowerArmParentQ = lowerArm.parent
+            ? lowerArm.parent.getWorldQuaternion(new THREE.Quaternion())
+            : new THREE.Quaternion()
+          const invLowerArmParentQ = lowerArmParentQ.clone().invert()
+          const newLowerArmLocalQ = invLowerArmParentQ.multiply(newLowerArmWorldQ)
+          
+          lowerArm.quaternion.copy(newLowerArmLocalQ)
+          lowerArm.updateMatrixWorld(true)
+          
+          // 8. 手首の回転を計算（トラッカーの回転 + 手首分のツイスト）
+          hand.updateWorldMatrix(true, false)
+          const handParentQ = hand.parent
+            ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
+            : new THREE.Quaternion()
+          const invHandParentQ = handParentQ.clone().invert()
+          
+          // 手首分のツイストを追加
+          const handTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, handTwistAngle)
+          const handWorldQ = handTwistQ.clone().multiply(handTargetRot)
+          
+          const handLocalQ = invHandParentQ.multiply(handWorldQ)
+          hand.quaternion.copy(handLocalQ)
+          hand.updateMatrixWorld(true)
+          
+          return
+        }
+      }
       
-      const parentLowerWorldQ = lower.parent ? lower.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-      const invParentLowerWorldQ = parentLowerWorldQ.clone().invert()
-      const newLowerLocalQ = invParentLowerWorldQ.multiply(newLowerWorldQ)
+      // ツイスト計算に失敗した場合は、トラッカーの回転をそのまま適用
+      hand.updateWorldMatrix(true, false)
+      const handParentQ = hand.parent
+        ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
+        : new THREE.Quaternion()
+      const invHandParentQ = handParentQ.clone().invert()
+      const handLocalQ = invHandParentQ.multiply(handTargetRot)
       
-      lower.quaternion.copy(newLowerLocalQ)
-      lower.updateMatrixWorld(true)
-      
-      // 8. 手首にSwing + Twistを適用
-      const finalHandWorldQ = handTwistQ.clone().multiply(handWorldQWithSwing)
-      
-      // 手首の親（更新後の前腕）のワールド回転を再取得
-      const parentHandWorldQ = hand.parent ? hand.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion()
-      const invParentHandWorldQ = parentHandWorldQ.clone().invert()
-      const newHandLocalQ = invParentHandWorldQ.multiply(finalHandWorldQ)
-      
-      hand.quaternion.copy(newHandLocalQ)
+      hand.quaternion.copy(handLocalQ)
       hand.updateMatrixWorld(true)
       
     } catch (err) {
-      console.warn('[distributeHandTrackerRotation] Error:', err)
+      console.warn('[solveVRChatArmIK] Error:', err)
+    }
+  }
+
+  // ===== VRChat-style Arm IK Implementation =====
+  
+  /**
+   * VRChat準拠の腕IK実装
+   * 手首トラッカーの位置と回転を直接使用し、2ボーンIKで肘を計算
+   * 前腕のツイストは手首の回転から自動的に分配
+   */
+  function solveVRChatArmIK(shoulder, upperArm, lowerArm, hand, handTrackerKey, elbowTrackerKey) {
+    if (!shoulder || !upperArm || !lowerArm || !hand) return
+    if (!trackerIsIndividuallyEnabled(handTrackerKey)) return
+    
+    const handTracker = trackers.value.find(t => t.key === handTrackerKey)
+    if (!handTracker?.mesh) return
+    
+    try {
+      // 全ボーンのワールド行列を更新
+      shoulder.updateWorldMatrix(true, false)
+      upperArm.updateWorldMatrix(true, false)
+      lowerArm.updateWorldMatrix(true, false)
+      hand.updateWorldMatrix(true, false)
+      handTracker.mesh.updateWorldMatrix(true, false)
+      
+      // 1. 基本的な位置とボーン長を取得
+      const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3())
+      const handTargetPos = handTracker.mesh.position.clone()
+      const handTargetRot = handTracker.mesh.getWorldQuaternion(new THREE.Quaternion())
+      
+      const upperLength = boneLength(upperArm, lowerArm)
+      const lowerLength = boneLength(lowerArm, hand)
+      
+      // 2. 肘ヒント（ポールベクトル）の位置を取得
+      let elbowHintPos = null
+      if (elbowTrackerKey && trackerIsIndividuallyEnabled(elbowTrackerKey)) {
+        const elbowTracker = trackers.value.find(t => t.key === elbowTrackerKey)
+        if (elbowTracker?.mesh) {
+          elbowHintPos = elbowTracker.mesh.position.clone()
+        }
+      }
+      
+      // 肘ヒントがない場合はデフォルト方向を使用
+      if (!elbowHintPos) {
+        // VRChatのデフォルト: 前方やや下方向
+        const isLeft = handTrackerKey === 'leftHand'
+        const sideDir = isLeft ? -1 : 1
+        elbowHintPos = shoulderPos.clone().add(new THREE.Vector3(sideDir * 0.3, -0.2, 0.5))
+      }
+      
+      // 3. 2ボーンIKで肘の位置を計算
+      const elbowPos = computeElbowPos(shoulderPos, handTargetPos, elbowHintPos, upperLength, lowerLength)
+      
+      // 4. 上腕（shoulder → upperArm）の回転を計算
+      // 肩から肘への方向に向ける
+      const shoulderToElbow = elbowPos.clone().sub(shoulderPos)
+      if (shoulderToElbow.lengthSq() > 1e-8) {
+        shoulderToElbow.normalize()
+        rotateBoneToward(shoulder, shoulderToElbow, 1.0)
+        shoulder.updateMatrixWorld(true)
+      }
+      
+      // 5. 上腕ボーンの回転を計算
+      upperArm.updateWorldMatrix(true, false)
+      if (shoulderToElbow.lengthSq() > 1e-8) {
+        rotateBoneToward(upperArm, shoulderToElbow, 1.0)
+        upperArm.updateMatrixWorld(true)
+      }
+      
+      // 6. 前腕の基本回転を計算（肘から手首への方向）
+      const elbowToHand = handTargetPos.clone().sub(elbowPos)
+      if (elbowToHand.lengthSq() > 1e-8) {
+        elbowToHand.normalize()
+        rotateBoneToward(lowerArm, elbowToHand, 1.0)
+        lowerArm.updateMatrixWorld(true)
+      }
+      
+      // 7. 前腕のツイスト（Roll）を手首トラッカーの回転から計算
+      const forearmAxis = elbowToHand.clone()
+      const handTrackerUp = new THREE.Vector3(0, 1, 0).applyQuaternion(handTargetRot)
+      
+      // 前腕軸に垂直な平面でのUp方向を計算
+      const projectedTrackerUp = handTrackerUp.clone().projectOnPlane(forearmAxis)
+      
+      if (projectedTrackerUp.lengthSq() > 1e-6) {
+        projectedTrackerUp.normalize()
+        
+        // 現在の前腕のUp方向
+        const currentLowerArmQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
+        const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(currentLowerArmQ)
+        const projectedCurrentUp = currentUp.clone().projectOnPlane(forearmAxis)
+        
+        if (projectedCurrentUp.lengthSq() > 1e-6) {
+          projectedCurrentUp.normalize()
+          
+          // ツイスト角度を計算
+          const twistDot = THREE.MathUtils.clamp(projectedCurrentUp.dot(projectedTrackerUp), -1, 1)
+          let twistAngle = Math.acos(twistDot)
+          
+          // 符号を決定
+          const twistCross = new THREE.Vector3().crossVectors(projectedCurrentUp, projectedTrackerUp)
+          if (twistCross.dot(forearmAxis) < 0) twistAngle = -twistAngle
+          
+          // ツイストを前腕と手首に分配
+          const forearmTwistAngle = twistAngle * forearmTwistShareRatio
+          const handTwistAngle = twistAngle * (1 - forearmTwistShareRatio)
+          
+          // 前腕にツイストを適用
+          const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, forearmTwistAngle)
+          const lowerArmWorldQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
+          const newLowerArmWorldQ = forearmTwistQ.clone().multiply(lowerArmWorldQ)
+          
+          const lowerArmParentQ = lowerArm.parent
+            ? lowerArm.parent.getWorldQuaternion(new THREE.Quaternion())
+            : new THREE.Quaternion()
+          const invLowerArmParentQ = lowerArmParentQ.clone().invert()
+          const newLowerArmLocalQ = invLowerArmParentQ.multiply(newLowerArmWorldQ)
+          
+          lowerArm.quaternion.copy(newLowerArmLocalQ)
+          lowerArm.updateMatrixWorld(true)
+          
+          // 8. 手首の回転を計算（トラッカーの回転 + 手首分のツイスト）
+          hand.updateWorldMatrix(true, false)
+          const handParentQ = hand.parent
+            ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
+            : new THREE.Quaternion()
+          const invHandParentQ = handParentQ.clone().invert()
+          
+          // 手首分のツイストを追加
+          const handTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, handTwistAngle)
+          const handWorldQ = handTwistQ.clone().multiply(handTargetRot)
+          
+          const handLocalQ = invHandParentQ.multiply(handWorldQ)
+          hand.quaternion.copy(handLocalQ)
+          hand.updateMatrixWorld(true)
+          
+          return
+        }
+      }
+      
+      // ツイスト計算に失敗した場合は、トラッカーの回転をそのまま適用
+      hand.updateWorldMatrix(true, false)
+      const handParentQ = hand.parent
+        ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
+        : new THREE.Quaternion()
+      const invHandParentQ = handParentQ.clone().invert()
+      const handLocalQ = invHandParentQ.multiply(handTargetRot)
+      
+      hand.quaternion.copy(handLocalQ)
+      hand.updateMatrixWorld(true)
+      
+    } catch (err) {
+      console.warn('[solveVRChatArmIK] Error:', err)
     }
   }
 
@@ -1972,38 +2130,30 @@ export function useVirtualTrackers({
         if (trackerIsIndividuallyEnabled('head')) {
           applyTrackerRotationToBone(headBone, 'head', { weight: 0.85 })
         }
-        const leftHandLock = handTranslationLocks.leftHand
-        const rightHandLock = handTranslationLocks.rightHand
-
-        // Hand tracker full rotation (pan/tilt/roll) should influence forearm+hand.
-        // We no longer forcibly restore an initial relative pose; instead we decompose
-        // tracker rotation into swing (aim) + twist (roll) and distribute twist across
-        // forearm (lower arm) and hand according to forearmTwistShareRatio.
-
-        const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
-        const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
-
-        if (bones.leftShoulder && leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
-          const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
-          const targetDir = leftUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
-          rotateBoneToward(bones.leftShoulder, targetDir, 0.5)
-        }
-
-        if (bones.rightShoulder && rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
-          const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
-          const targetDir = rightUpperArmTracker.mesh.position.clone().sub(shoulderPos).normalize()
-          rotateBoneToward(bones.rightShoulder, targetDir, 0.5)
-        }
-
-  solveLimb(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 'leftHand', 'leftElbow')
-  solveLimb(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, 'rightHand', 'rightElbow')
-
-  // Apply full tracker rotation decomposition & twist distribution
-  distributeHandTrackerRotation(bones.leftLowerArm, bones.leftHand, 'leftHand', leftHandLock)
-  distributeHandTrackerRotation(bones.rightLowerArm, bones.rightHand, 'rightHand', rightHandLock)
-
-        if (leftHandLock?.active) applyHandTranslationConstraint(bones.leftLowerArm, bones.leftHand, leftHandLock, 'leftHand')
-        if (rightHandLock?.active) applyHandTranslationConstraint(bones.rightLowerArm, bones.rightHand, rightHandLock, 'rightHand')
+        
+        // ===== VRChat準拠の腕IK =====
+        // 手首トラッカーの位置と回転を直接使用
+        // 前腕のツイストは自動計算で分配
+        
+        // 左腕
+        solveVRChatArmIK(
+          bones.leftShoulder,
+          bones.leftUpperArm,
+          bones.leftLowerArm,
+          bones.leftHand,
+          'leftHand',
+          'leftElbow'
+        )
+        
+        // 右腕
+        solveVRChatArmIK(
+          bones.rightShoulder,
+          bones.rightUpperArm,
+          bones.rightLowerArm,
+          bones.rightHand,
+          'rightHand',
+          'rightElbow'
+        )
       }
     } catch {}
     // Legs IK
