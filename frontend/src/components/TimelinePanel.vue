@@ -14,13 +14,16 @@
         </span>
       </div>
       <div class="header-controls">
-        <button type="button" @click="handlePlayPause">
+        <button type="button" @click="handleJumpStart" title="最初に戻る">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button type="button" @click="handlePlayPause" :title="isPlaying ? '一時停止' : '再生'">
           <i :class="isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play'"></i>
         </button>
-        <button type="button" @click="handleStop">
-          <i class="fa-solid fa-stop"></i>
+        <button type="button" @click="handleJumpEnd" title="最後に移動">
+          <i class="fa-solid fa-forward-step"></i>
         </button>
-        <button type="button" @click="handleAddAll">
+        <button type="button" @click="handleAddAll" title="全トラッカーのキーを追加">
           <i class="fa-solid fa-circle-plus"></i>
         </button>
         <button
@@ -121,7 +124,6 @@ const emit = defineEmits([
   'seek',
   'play',
   'pause',
-  'stop',
   'add-all-keyframes',
   'add-keyframe',
   'remove-keyframe'
@@ -259,8 +261,12 @@ function handlePlayPause() {
   emit(props.isPlaying ? 'pause' : 'play')
 }
 
-function handleStop() {
-  emit('stop')
+function handleJumpStart() {
+  emit('seek', 0)
+}
+
+function handleJumpEnd() {
+  emit('seek', props.duration)
 }
 
 function toggleCollapse() {

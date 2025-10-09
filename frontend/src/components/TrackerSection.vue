@@ -186,6 +186,23 @@
             </label>
           </div>
         </div>
+        
+        <!-- 有効/無効設定 -->
+        <div class="setting-group" v-if="selectedTracker !== 'gaze'">
+          <div class="setting-group__header">
+            <h5>表示</h5>
+          </div>
+          <div class="row row--toggles">
+            <label class="checkbox">
+              <input 
+                type="checkbox" 
+                :checked="trackerEnabled"
+                @change="$emit('update:tracker-enabled', $event.target.checked)"
+              >
+              <span>このトラッカーを有効化</span>
+            </label>
+          </div>
+        </div>
       </div>
 </template>
 
@@ -206,6 +223,7 @@ const props = defineProps({
   trackerPosition: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotation: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotationOrder: { type: String, default: 'YXZ' },
+  trackerEnabled: { type: Boolean, default: true },
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 }
 })
@@ -220,6 +238,7 @@ const emit = defineEmits([
   'update:trackerAxesLength',
   'update:forearmTwistShare',
   'update:tracker-rotation-order',
+  'update:tracker-enabled',
   'reset-virtual-trackers',
   'reset-virtual-tracker-rotations',
   'update:tracker-position',
@@ -275,6 +294,7 @@ const updateForearmTwistShare = value => {
 </script>
 
 <style scoped>
+/* ===== レイアウト ===== */
 .row {
   display: flex;
   align-items: center;
@@ -286,6 +306,9 @@ const updateForearmTwistShare = value => {
 .row--header {
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 1rem;
 }
 
 .row--toggles {
@@ -298,184 +321,269 @@ const updateForearmTwistShare = value => {
   gap: 0.5rem;
 }
 
+/* ===== ラベル・テキスト ===== */
 label {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.82rem;
-  color: var(--text-muted, rgba(240, 245, 255, 0.8));
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+
+label:hover {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 label.checkbox {
   flex: 0 0 auto;
+  cursor: pointer;
+  user-select: none;
 }
 
 label.stretch {
   flex: 1 1 100%;
   flex-direction: column;
   align-items: flex-start;
+  gap: 0.6rem;
 }
 
+/* ===== チェックボックス ===== */
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent, #42a5f5);
+  transition: transform 0.15s ease;
+}
+
+input[type="checkbox"]:hover {
+  transform: scale(1.1);
+}
+
+label.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+label.disabled input {
+  cursor: not-allowed;
+}
+
+/* ===== レンジスライダー ===== */
 input[type="range"] {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(90deg, rgba(66, 165, 245, 0.15) 0%, rgba(66, 165, 245, 0.08) 100%);
   border-radius: 3px;
   outline: none;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 input[type="range"]:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(90deg, rgba(66, 165, 245, 0.25) 0%, rgba(66, 165, 245, 0.12) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
   height: 16px;
-  background: var(--accent, #42a5f5);
+  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(66, 165, 245, 0.4), 0 0 0 0 rgba(66, 165, 245, 0);
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
-  transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%);
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(66, 165, 245, 0.6), 0 0 0 4px rgba(66, 165, 245, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: var(--accent, #42a5f5);
-  border: none;
+  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(66, 165, 245, 0.4);
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
-  transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%);
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(66, 165, 245, 0.6);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
+/* ===== ボタン ===== */
 .ghost {
-  background: transparent;
-  color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  padding: 0.3rem 0.65rem;
+  background: linear-gradient(135deg, rgba(66, 165, 245, 0.08) 0%, rgba(30, 136, 229, 0.06) 100%);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(66, 165, 245, 0.25);
+  padding: 0.4rem 0.75rem;
   border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.ghost:hover,
-.ghost:focus-visible {
-  background: rgba(80, 120, 200, 0.18);
-  border-color: rgba(120, 170, 255, 0.45);
+.ghost:hover {
+  background: linear-gradient(135deg, rgba(66, 165, 245, 0.18) 0%, rgba(30, 136, 229, 0.12) 100%);
+  border-color: rgba(100, 181, 246, 0.4);
   color: #fff;
-  outline: none;
+  box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
+  transform: translateY(-1px);
 }
 
+.ghost:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.ghost:focus-visible {
+  outline: 2px solid rgba(66, 165, 245, 0.5);
+  outline-offset: 2px;
+}
+
+/* ===== トラッカー設定エリア ===== */
 .tracker-note {
-  margin: 0.2rem 0 0;
+  margin: 0.5rem 0;
   font-size: 0.75rem;
-  opacity: 0.7;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0.5rem;
+  background: rgba(66, 165, 245, 0.05);
+  border-left: 3px solid rgba(66, 165, 245, 0.3);
+  border-radius: 4px;
 }
 
 .tracker-settings {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(36, 40, 52, 0.6) 0%, rgba(30, 34, 45, 0.6) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(66, 165, 245, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .settings-title {
-  margin: 0 0 1rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid rgba(66, 165, 245, 0.2);
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .setting-group {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .setting-group__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .setting-group h5 {
   margin: 0;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
 }
 
+/* ===== リセットボタン ===== */
 .btn-reset-small {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.08) 0%, rgba(244, 67, 54, 0.06) 100%);
+  border: 1px solid rgba(255, 87, 34, 0.25);
+  color: rgba(255, 152, 0, 0.9);
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 0.75rem;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  transition: all 0.2s ease;
+  gap: 0.3rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .btn-reset-small:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(244, 67, 54, 0.12) 100%);
+  border-color: rgba(255, 152, 0, 0.4);
+  color: rgba(255, 193, 7, 1);
+  box-shadow: 0 2px 6px rgba(255, 87, 34, 0.3);
+  transform: translateY(-1px);
 }
 
+.btn-reset-small:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== 入力フィールド ===== */
 .xyz-controls {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .xyz-item {
   display: grid;
-  grid-template-columns: 2rem 1fr;
+  grid-template-columns: 2.5rem 1fr;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .xyz-label {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
 }
 
 .xyz-item input[type="number"] {
-  padding: 0.3rem 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.25) 100%);
+  border: 1px solid rgba(66, 165, 245, 0.2);
+  border-radius: 6px;
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+  transition: all 0.2s ease;
+}
+
+.xyz-item input[type="number"]:hover {
+  border-color: rgba(66, 165, 245, 0.35);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.3) 100%);
 }
 
 .xyz-item input[type="number"]:focus {
   outline: none;
   border-color: rgba(66, 165, 245, 0.6);
+  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.35) 100%);
 }
 
 .input-row {
@@ -506,72 +614,132 @@ input[type="range"]::-moz-range-thumb:hover {
   border-color: rgba(66, 165, 245, 0.6);
 }
 
+/* ===== オイラー角回転順序選択 ===== */
 .euler-order-row {
   margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(66, 165, 245, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(66, 165, 245, 0.15);
 }
 
 .euler-order-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
 
 .euler-order-select {
-  padding: 0.3rem 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.3) 100%);
+  border: 1px solid rgba(66, 165, 245, 0.25);
+  border-radius: 6px;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .euler-order-select:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(66, 165, 245, 0.4);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.35) 100%);
 }
 
 .euler-order-select:focus {
   outline: none;
   border-color: rgba(66, 165, 245, 0.6);
+  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
+/* ===== 角度スライダー ===== */
 .angle-controls,
 .axis-controls {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .angle-slider,
 .axis-slider {
   display: grid;
-  grid-template-columns: 6rem 1fr 3.5rem;
+  grid-template-columns: 7rem 1fr 4rem;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .twist-slider {
-  grid-template-columns: 8rem 1fr 3.5rem;
-}
-
-.twist-slider input[type="range"] {
-  width: 100%;
+  grid-template-columns: 9rem 1fr 4rem;
 }
 
 .angle-label,
 .axis-label {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
 
 .angle-value,
 .axis-value {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  color: rgba(66, 165, 245, 0.9);
   text-align: right;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-family: 'Consolas', 'Monaco', monospace;
 }
+
+/* ===== 色選択 ===== */
+.color-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.color-label {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  background: rgba(66, 165, 245, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(66, 165, 245, 0.15);
+}
+
+.color-label span {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.color-label input[type="color"] {
+  width: 3.5rem;
+  height: 2.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.color-label input[type="color"]:hover {
+  border-color: rgba(66, 165, 245, 0.5);
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(66, 165, 245, 0.3);
+}
+
+.color-label input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.color-label input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
 </style>

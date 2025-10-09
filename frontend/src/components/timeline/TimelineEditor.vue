@@ -76,29 +76,11 @@
           <button
             type="button"
             class="toolbar__button"
-            @click="emit('play')"
-            :title="tooltip('再生します')"
+            @click="togglePlayPause"
+            :title="tooltip(props.isPlaying ? '一時停止します' : '再生します')"
           >
-            <Icon icon="mdi:play" />
-            <span>Play</span>
-          </button>
-          <button
-            type="button"
-            class="toolbar__button"
-            @click="emit('pause')"
-            :title="tooltip('一時停止します')"
-          >
-            <Icon icon="mdi:pause" />
-            <span>Pause</span>
-          </button>
-          <button
-            type="button"
-            class="toolbar__button"
-            @click="emit('stop')"
-            :title="tooltip('停止して開始位置へ戻ります')"
-          >
-            <Icon icon="mdi:stop" />
-            <span>Stop</span>
+            <Icon :icon="props.isPlaying ? 'mdi:pause' : 'mdi:play'" />
+            <span>{{ props.isPlaying ? 'Pause' : 'Play' }}</span>
           </button>
           <button
             type="button"
@@ -317,7 +299,6 @@ const emit = defineEmits([
   'seek',
   'play',
   'pause',
-  'stop',
   'step-frames',
   'jump-start',
   'jump-end',
@@ -837,6 +818,14 @@ function fitRange() {
 }
 
 // removed toggle (frames only)
+
+function togglePlayPause() {
+  if (props.isPlaying) {
+    emit('pause')
+  } else {
+    emit('play')
+  }
+}
 
 function commitRange() {
   const startF = Math.min(startFrameInput.value, endFrameInput.value - 1)

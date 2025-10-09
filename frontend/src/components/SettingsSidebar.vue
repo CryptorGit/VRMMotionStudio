@@ -382,4 +382,28 @@ const {
 .properties-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Unify inner section cards and controls */
+:deep(.section) {
+  background: rgba(36, 40, 52, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 14px 28px rgba(10, 12, 18, 0.25);
+}
+:deep(.section__header) {
+  padding: 0.7rem 0.9rem 0.35rem;
+}
+:deep(.section__content) {
+  padding: 0 0.9rem 0.9rem;
+}
+:deep(input[type="range"]) {
+  width: 100%;
+}
+:deep(select), :deep(input[type="number"]) {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: var(--text-strong, #f4f6ff);
+  padding: 0.35rem 0.5rem;
+}
 </style>

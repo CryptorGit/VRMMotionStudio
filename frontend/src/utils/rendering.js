@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { applyShapeKeyOverrides } from './shapekeys.js'
 
 export function createAnimator({
@@ -136,7 +137,10 @@ export function createAnimator({
       const list = typeof vrmGetter === 'function' ? vrmGetter() : []
       if (Array.isArray(list)) {
         for (const v of list) {
-          v?.update?.(delta)
+          // 標準VRM更新（LookAt, SpringBone等）
+          try { v?.update?.(delta) } catch {}
+          // 一部実装では springBoneManager.update が必要な場合があるためフォールバック
+          try { v?.springBoneManager?.update?.(delta) } catch {}
           try { applyShapeKeyOverrides(v?.scene) } catch {}
           // DEV: run probe to verify spring activity
           try { maybeProbeSpringBone(v, time) } catch {}

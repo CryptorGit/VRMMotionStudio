@@ -363,8 +363,9 @@ export function useVirtualTrackers({
       // Just update tracker positions, don't change enabled state
       if (enabled.value && currentCount > 0) {
         // Reinitialize tracker positions for new models
+        // force: false を使用して保存された位置を優先
         setTimeout(() => {
-          layoutDefaultPositions({ force: true })
+          layoutDefaultPositions({ force: false })
         }, 100)
       }
     }
@@ -452,7 +453,9 @@ export function useVirtualTrackers({
 
   function trackerIsIndividuallyEnabled(key) {
     if (key === CAMERA_TRACKER_KEY) return false
-    return true
+    const state = trackerStates[key]
+    if (!state) return true // デフォルトは有効
+    return state.enabled !== false
   }
 
   function getTrackerEntry(key) {
@@ -473,12 +476,17 @@ export function useVirtualTrackers({
       trackerLocalPos.copy(trackerWorldPos)
       vrm.scene.worldToLocal(trackerLocalPos)
       const state = ensureTrackerState(tracker.key)
+      const def = TRACKER_DEFS.find(d => d.key === tracker.key)
+      // 保存時は UI で変更された現在のマテリアル色を優先して保存する
+      let colorHex = (def?.color ?? 0xffffff)
+      try { if (mesh?.material?.color) colorHex = mesh.material.color.getHex() } catch {}
       const entry = {
         space: 'local',
         position: trackerLocalPos.toArray([]),
         rotation: mesh.quaternion.toArray([]),
         order: state?.order || DEFAULT_ROTATION_ORDER,
-        enabled: state?.enabled !== false
+        enabled: state?.enabled !== false,
+        color: colorHex // トラッカーの色を保存
       }
       if (state?.angles) {
         entry.angles = {
@@ -487,8 +495,26 @@ export function useVirtualTrackers({
           z: sanitizeAngleInput(state.angles.z)
         }
       }
+      if (state?.axisScale) {
+        entry.axisScale = {
+          x: toFiniteNumber(state.axisScale.x, 1),
+          y: toFiniteNumber(state.axisScale.y, 1),
+          z: toFiniteNumber(state.axisScale.z, 1)
+        }
+      }
       payload[tracker.key] = entry
     }
+    
+    // ボーンの姿勢（回転オフセット）も保存
+    const offsetMap = trackerRotationOffsets.get(model)
+    if (offsetMap && offsetMap.size > 0) {
+      const boneOffsetsData = {}
+      offsetMap.forEach((quat, key) => {
+        boneOffsetsData[key] = quat.toArray([])
+      })
+      payload.__boneRotationOffsets = boneOffsetsData
+    }
+    
     return payload
   }
 
@@ -870,6 +896,27 @@ export function useVirtualTrackers({
               m.copy(vrm.scene.localToWorld(lp.clone()))
             }
             if (typeof savedEntry.order === 'string' && state) state.order = normalizeOrder(savedEntry.order)
+            
+            // 有効/無効状態の復元
+            if (typeof savedEntry.enabled === 'boolean' && state) {
+              state.enabled = savedEntry.enabled
+            }
+            
+            // 色の復元（メッシュのマテリアルカラーを更新）
+            if (typeof savedEntry.color === 'number' && t.mesh?.material) {
+              try {
+                t.mesh.material.color.setHex(savedEntry.color)
+              } catch {}
+            }
+            
+            // 軸スケールの復元
+            if (savedEntry.axisScale && typeof savedEntry.axisScale === 'object' && state) {
+              if (!state.axisScale) state.axisScale = { x: 1, y: 1, z: 1 }
+              if (typeof savedEntry.axisScale.x === 'number') state.axisScale.x = savedEntry.axisScale.x
+              if (typeof savedEntry.axisScale.y === 'number') state.axisScale.y = savedEntry.axisScale.y
+              if (typeof savedEntry.axisScale.z === 'number') state.axisScale.z = savedEntry.axisScale.z
+            }
+            
             if (Array.isArray(savedEntry.rotation) && savedEntry.rotation.length === 4) {
               const [qx, qy, qz, qw] = savedEntry.rotation
               t.mesh.quaternion.set(qx, qy, qz, qw).normalize()
@@ -904,10 +951,25 @@ export function useVirtualTrackers({
         if (force || !usedSaved) t.mesh.position.copy(m)
         syncTrackerStateFromMesh(key)
       }
+      
+      // ボーンの回転オフセットを復元
+      if (saved?.__boneRotationOffsets && typeof saved.__boneRotationOffsets === 'object') {
+        const offsetMap = new Map()
+        Object.entries(saved.__boneRotationOffsets).forEach(([key, quatArray]) => {
+          if (Array.isArray(quatArray) && quatArray.length === 4) {
+            const quat = new THREE.Quaternion().fromArray(quatArray)
+            offsetMap.set(key, quat)
+          }
+        })
+        if (offsetMap.size > 0) {
+          trackerRotationOffsets.set(model, offsetMap)
+        }
+      }
 
       setFrom('hips', hips)
       setFrom('chest', chest)
-      setFrom('head', head, new THREE.Vector3(0, 0.1, 0))
+      // 頭のトラッカーはボーン位置そのままに設定（オフセットなし）
+      setFrom('head', head, new THREE.Vector3(0, 0, 0))
       setFrom('leftUpperArm', lUpperArm)
       setFrom('rightUpperArm', rUpperArm)
       setFrom('leftElbow', lElbow)
@@ -1337,13 +1399,13 @@ export function useVirtualTrackers({
     if (key === CAMERA_TRACKER_KEY) return
     const state = ensureTrackerState(key)
     if (!state) return
-    state.enabled = true
+    state.enabled = !!value
     updateTrackerVisibility(key)
     markActiveKey(key)
     if (persist) persistTrackerTransforms()
     notifyTrackerTransform(key, {
       type: 'enabled',
-      value: true,
+      value: state.enabled,
       persisted: persist !== false
     })
   }
@@ -2234,7 +2296,8 @@ export function useVirtualTrackers({
     }
     if (!enabled.value) return
     createGizmos()
-    layoutDefaultPositions({ force: true })
+    // 保存された位置を優先するため force: false を使用
+    layoutDefaultPositions({ force: false })
     setVisibility(true)
   })
 
@@ -2244,7 +2307,8 @@ export function useVirtualTrackers({
     const modelPresent = !!getActiveModel()?.vrm
     if (enabled.value && modelPresent) {
       createGizmos()
-      layoutDefaultPositions({ force: true })
+      // 初期化時は保存された位置を使用
+      layoutDefaultPositions({ force: false })
       setVisibility(true)
     } else {
       setVisibility(false)

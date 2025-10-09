@@ -114,7 +114,6 @@
                     @seek="handleTimelineSeek"
                     @play="handleTimelinePlay"
                     @pause="handleTimelinePause"
-                    @stop="handleTimelineStop"
                     @step-frames="handleTimelineStepFrames"
                     @jump-start="handleTimelineJumpStart"
                     @jump-end="handleTimelineJumpEnd"
@@ -171,6 +170,7 @@
                 :tracker-position="selectedTrackerPosition"
                 :tracker-rotation="selectedTrackerRotation"
                 :tracker-rotation-order="selectedTrackerRotationOrder"
+                :tracker-enabled="selectedTrackerEnabled"
                 v-model:show-tracker-axes="showTrackerAxes"
                 v-model:tracker-axes-length="trackerAxesLength"
                 :finger-states="fingerStates"
@@ -178,6 +178,7 @@
                 @update:tracker-position="handleTrackerPositionUpdate"
                 @update:tracker-rotation="handleTrackerRotationUpdate"
                 @update:tracker-rotation-order="handleTrackerRotationOrderUpdate"
+                @update:tracker-enabled="handleTrackerEnabledUpdate"
                 @reset-tracker-position="handleResetTrackerPosition"
                 @reset-tracker-rotation="handleResetTrackerRotation"
                 :tracker-states="trackerStatesView"
@@ -320,6 +321,7 @@ const selectedTrackerKey = ref(null)
 const selectedTrackerPosition = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotation = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotationOrder = ref('YXZ')
+const selectedTrackerEnabled = ref(true)
 
 // トラッカー回転軸の表示設定
 const showTrackerAxes = ref(false)
@@ -1053,6 +1055,19 @@ function updateSelectedTrackerState(key) {
       z: snapshot.angles.z || 0
     }
   }
+  
+  // 回転順序を更新
+  if (snapshot.order) {
+    selectedTrackerRotationOrder.value = snapshot.order
+  }
+  
+  // 有効/無効状態を更新
+  const state = trackerController.trackerStates?.[key]
+  if (state) {
+    selectedTrackerEnabled.value = state.enabled !== false
+  } else {
+    selectedTrackerEnabled.value = true
+  }
 }
 
 // トラッカー位置を更新
@@ -1083,6 +1098,33 @@ function handleTrackerRotationOrderUpdate(order) {
   // 現在の回転角度で新しい順序を適用
   if (selectedTrackerKey.value && trackerController) {
     trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, order)
+  }
+}
+
+// トラッカー有効/無効を更新
+function handleTrackerEnabledUpdate(enabled) {
+  if (!selectedTrackerKey.value || !trackerController) return
+  selectedTrackerEnabled.value = enabled
+  
+  // トラッカーの有効/無効状態を更新
+  if (enabled) {
+    trackerController.setTrackerEnabled?.(selectedTrackerKey.value, true, { persist: true })
+  } else {
+    // トラッカー状態を無効に設定
+    const state = trackerController.trackerStates?.[selectedTrackerKey.value]
+    if (state) {
+      state.enabled = false
+      trackerController.persistTrackerTransforms?.()
+    }
+  }
+  
+  // 表示を更新
+  const tracker = trackerController.trackers?.value?.find(t => t.key === selectedTrackerKey.value)
+  if (tracker) {
+    tracker.mesh.visible = enabled && virtualTrackerDisplayVisible.value
+    if (tracker.labelSprite) {
+      tracker.labelSprite.visible = enabled && virtualTrackerDisplayVisible.value && showVirtualTrackerLabels.value
+    }
   }
 }
 
@@ -2326,10 +2368,6 @@ function handleTimelinePause() {
   try { timelineController.pause() } catch {}
 }
 
-function handleTimelineStop() {
-  try { timelineController.stop() } catch {}
-}
-
 function handleTimelineStepFrames(delta) {
   try { timelineController.stepByFrames(delta) } catch {}
 }
@@ -2579,7 +2617,8 @@ watch([
 
 watch(models, () => {
   if (virtualTrackersEnabled.value) {
-    try { trackerController.reset() } catch {}
+    // 既存の保存データを尊重し、完全リセットは行わない
+    try { trackerController.rebuild?.() } catch {}
     applyTimelinePoseImmediate()
   }
 })
