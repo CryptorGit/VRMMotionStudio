@@ -109,27 +109,12 @@
     @capture="() => emit('capture-camera')"
   />
   <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
-  <ModelSection
-    v-else-if="active === 'model'"
-    :models="models"
-    :look-at-enabled="lookAtEnabled"
-    @update:look-at-enabled="v => emit('update:lookAtEnabled', v)"
-    @toggle-model="(...args) => emit('toggle-model', ...args)"
-    @remove-model="(...args) => emit('remove-model', ...args)"
-  />
-  <PhysicsSection
-    v-else-if="active === 'physics'"
-    :spring-bone-enabled="springBoneEnabled"
-    @update:spring-bone-enabled="v => emit('update:springBoneEnabled', v)"
-  />
 </template>
 
 <script setup>
 import LightingSection from './LightingSection.vue'
 import MorphSection from './MorphSection.vue'
-import ModelSection from './ModelSection.vue'
 import DisplaySection from './DisplaySection.vue'
-import PhysicsSection from './PhysicsSection.vue'
 import CameraSection from './CameraSection.vue'
 import KeySettingsSection from './KeySettingsSection.vue'
 import TrackerSection from './TrackerSection.vue'
@@ -143,8 +128,6 @@ const props = defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  springBoneEnabled: { type: Boolean, required: true },
-  lookAtEnabled: { type: Boolean, required: true },
   showExtendedBones: { type: Boolean, required: true },
   showColliderNodes: { type: Boolean, required: true },
   showNonDeformingBones: { type: Boolean, required: true },
@@ -190,8 +173,6 @@ const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
-  'update:springBoneEnabled',
-  'update:lookAtEnabled',
   'update:showExtendedBones',
   'update:showColliderNodes',
   'update:showNonDeformingBones',
@@ -228,12 +209,10 @@ const emit = defineEmits([
   'update:cameraTranslateSensitivity',
   'update:cameraRotateSensitivity',
   'capture-camera',
-  'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
   'toggle-all-bones',
   'toggle-all-bone-names',
-  'remove-model',
   'reset-virtual-trackers',
   'update:timelineSnap',
   'update:timelineLoop',

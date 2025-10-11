@@ -40,17 +40,5 @@ export const SECTION_TABS = [
     label: 'モーフ',
     description: '表情/シェイプキーの制御',
     icon: 'mdi:emoticon-outline'
-  },
-  {
-    id: 'model',
-    label: 'モデル',
-    description: '読み込み済みモデルの管理',
-    icon: 'mdi:account-group-outline'
-  },
-  {
-    id: 'physics',
-    label: '物理',
-    description: 'スプリングボーン等の設定',
-    icon: 'mdi:atom'
   }
 ]

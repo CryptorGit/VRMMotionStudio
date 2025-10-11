@@ -60,17 +60,6 @@
       <button
         type="button"
         class="top-menu__item"
-        role="menuitemcheckbox"
-        :aria-checked="autoRestore"
-        @click="$emit('toggle-auto-restore')"
-        :title="tooltip(`起動時に前回のモデルを${autoRestore ? '復元します' : '復元しません'}`)"
-      >
-        <Icon :icon="autoRestore ? 'mdi:backup-restore' : 'mdi:backup-restore'" />
-        <span>自動復元 {{ autoRestore ? 'ON' : 'OFF' }}</span>
-      </button>
-      <button
-        type="button"
-        class="top-menu__item"
         role="switch"
         :aria-checked="showCaptions"
         @click="$emit('toggle-captions')"
@@ -103,10 +92,6 @@ const props = defineProps({
   theme: {
     type: String,
     default: 'dark'
-  },
-  autoRestore: {
-    type: Boolean,
-    default: true
   },
   showCaptions: {
     type: Boolean,

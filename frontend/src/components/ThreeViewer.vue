@@ -2,13 +2,11 @@
   <div class="app-frame">
     <TopMenuBar
       :theme="theme"
-      :auto-restore="autoRestore"
       :show-captions="showCaptions"
       :timeline-export-enabled="timelineHasContent"
       @import="openFile"
       @export="exportPose"
       @clear-cache="clearAllCache"
-      @toggle-auto-restore="toggleAutoRestore"
       @toggle-theme="toggleTheme"
       @toggle-captions="toggleCaptions"
       @timeline-import="handleTimelineRequestImport"
@@ -27,7 +25,6 @@
       >
         <template #primary>
           <SplitPane
-            class="workspace-split workspace-split--column"
             direction="vertical"
             storage-key="layout.split.column"
             :initial-primary-ratio="0.68"
@@ -170,7 +167,6 @@
                 :tracker-position="selectedTrackerPosition"
                 :tracker-rotation="selectedTrackerRotation"
                 :tracker-rotation-order="selectedTrackerRotationOrder"
-                :tracker-enabled="selectedTrackerEnabled"
                 v-model:show-tracker-axes="showTrackerAxes"
                 v-model:tracker-axes-length="trackerAxesLength"
                 :finger-states="fingerStates"
@@ -178,7 +174,6 @@
                 @update:tracker-position="handleTrackerPositionUpdate"
                 @update:tracker-rotation="handleTrackerRotationUpdate"
                 @update:tracker-rotation-order="handleTrackerRotationOrderUpdate"
-                @update:tracker-enabled="handleTrackerEnabledUpdate"
                 @reset-tracker-position="handleResetTrackerPosition"
                 @reset-tracker-rotation="handleResetTrackerRotation"
                 :tracker-states="trackerStatesView"
@@ -209,12 +204,10 @@
                 @update-keyframe-curves="handleTimelineCurveUpdate"
                 @reset-virtual-trackers="resetVirtualTrackers"
                 @reset-all-tracker-orientations="handleResetAllTrackerRotations"
-                @toggle-model="toggleModelVisibility"
                 @toggle-bone="toggleBoneVisibility"
                 @toggle-bone-names="toggleBoneNameVisibility"
                 @toggle-all-bones="toggleAllBones"
                 @toggle-all-bone-names="toggleAllBoneNames"
-                @remove-model="removeModel"
                 @reset-outline="handleResetOutlineDefaults"
                 @capture-render="captureRenderImage"
               />
@@ -233,7 +226,6 @@
       type="file"
       ref="fileInput"
       accept=".vrm"
-      multiple
       style="display:none"
       @change="onFileChange"
     />
@@ -321,8 +313,6 @@ const selectedTrackerKey = ref(null)
 const selectedTrackerPosition = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotation = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotationOrder = ref('YXZ')
-const selectedTrackerEnabled = ref(true)
-
 // トラッカー回転軸の表示設定
 const showTrackerAxes = ref(false)
 const trackerAxesLength = ref(0.05)
@@ -437,13 +427,28 @@ provide(captionInjectionKey, {
 })
 
 const autoRestore = ref(true)
-const toasts = ref([])
-let toastSeed = 0
 const STORAGE_PERSIST_TOAST_KEY = 'cache.persist.toast'
 const CACHE_SAVED_TOAST_KEY = 'cache.saved.toast'
 let cacheSavedToastShown = false
 let storagePersistToastState = 'unknown'
 let lastCacheErrorToastAt = 0
+const uiNotice = ref('')
+let uiNoticeTimer = null
+
+function showNotice(message, duration = 5000) {
+  uiNotice.value = message || ''
+  if (typeof window !== 'undefined' && uiNoticeTimer) {
+    window.clearTimeout(uiNoticeTimer)
+    uiNoticeTimer = null
+  }
+  if (!message) return
+  if (typeof window !== 'undefined' && duration > 0) {
+    uiNoticeTimer = window.setTimeout(() => {
+      uiNotice.value = ''
+      uiNoticeTimer = null
+    }, duration)
+  }
+}
 
 try {
   cacheSavedToastShown = sessionStorage.getItem(CACHE_SAVED_TOAST_KEY) === '1'
@@ -772,41 +777,8 @@ function clamp0to2(v) {
   return Math.min(2, Math.max(0, n))
 }
 
-function pushToast(message, title = '通知', timeout = 3200) {
-  const id = ++toastSeed
-  const toast = { id, title, message }
-  toasts.value = [...toasts.value, toast]
-  if (timeout > 0) {
-    toast._timer = window.setTimeout(() => dismissToast(id), timeout)
-  }
-  return id
-}
-
-function dismissToast(id) {
-  toasts.value = toasts.value.filter(item => {
-    if (item.id === id && item._timer) window.clearTimeout(item._timer)
-    return item.id !== id
-  })
-}
-
 function loadAutoRestore() {
-  try {
-    autoRestore.value = localStorage.getItem('autoRestore') !== '0'
-  } catch {
-    autoRestore.value = true
-  }
-}
-
-function toggleAutoRestore() {
-  autoRestore.value = !autoRestore.value
-  try {
-    if (autoRestore.value) {
-      localStorage.removeItem('autoRestore')
-    } else {
-      localStorage.setItem('autoRestore', '0')
-    }
-  } catch {}
-  pushToast(`モデル自動復元: ${autoRestore.value ? 'ON' : 'OFF'}`, '設定')
+  autoRestore.value = true
 }
 
 function loadCaptionPreference() {
@@ -828,7 +800,7 @@ function toggleCaptions() {
       localStorage.setItem(CAPTION_STORAGE_KEY, '0')
     }
   } catch {}
-  pushToast(`ボタンキャプション: ${showCaptions.value ? '表示' : '非表示'}`, '設定')
+  showNotice(`設定: ボタンキャプション ${showCaptions.value ? '表示' : '非表示'}`, 3200)
 }
 
 async function logToServer(data) {
@@ -881,14 +853,14 @@ function handleCachePersisted(event = {}) {
   if (event.ok) {
     const successReasons = ['load', 'restore', 'visibilitychange', 'pagehide', 'remove']
     if (!cacheSavedToastShown && successReasons.includes(event.reason)) {
-      pushToast('キャッシュを保存しました', 'キャッシュ', 2800)
+      showNotice('キャッシュ: 保存しました', 2800)
       cacheSavedToastShown = true
       try { sessionStorage.setItem(CACHE_SAVED_TOAST_KEY, '1') } catch {}
     }
   } else if (event.ok === false && event.reason !== 'clear') {
     const now = Date.now()
     if (!lastCacheErrorToastAt || now - lastCacheErrorToastAt > 10000) {
-      pushToast('キャッシュの保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      showNotice('キャッシュ: 保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 5600)
       lastCacheErrorToastAt = now
     }
   }
@@ -912,7 +884,8 @@ const fileLoader = useFileLoader({
   highlightConstraint,
   boneDotSize,
   boneLabelScale,
-  onCachePersisted: handleCachePersisted
+  onCachePersisted: handleCachePersisted,
+  showNotice
 })
 
 const {
@@ -1060,14 +1033,6 @@ function updateSelectedTrackerState(key) {
   if (snapshot.order) {
     selectedTrackerRotationOrder.value = snapshot.order
   }
-  
-  // 有効/無効状態を更新
-  const state = trackerController.trackerStates?.[key]
-  if (state) {
-    selectedTrackerEnabled.value = state.enabled !== false
-  } else {
-    selectedTrackerEnabled.value = true
-  }
 }
 
 // トラッカー位置を更新
@@ -1098,33 +1063,6 @@ function handleTrackerRotationOrderUpdate(order) {
   // 現在の回転角度で新しい順序を適用
   if (selectedTrackerKey.value && trackerController) {
     trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, order)
-  }
-}
-
-// トラッカー有効/無効を更新
-function handleTrackerEnabledUpdate(enabled) {
-  if (!selectedTrackerKey.value || !trackerController) return
-  selectedTrackerEnabled.value = enabled
-  
-  // トラッカーの有効/無効状態を更新
-  if (enabled) {
-    trackerController.setTrackerEnabled?.(selectedTrackerKey.value, true, { persist: true })
-  } else {
-    // トラッカー状態を無効に設定
-    const state = trackerController.trackerStates?.[selectedTrackerKey.value]
-    if (state) {
-      state.enabled = false
-      trackerController.persistTrackerTransforms?.()
-    }
-  }
-  
-  // 表示を更新
-  const tracker = trackerController.trackers?.value?.find(t => t.key === selectedTrackerKey.value)
-  if (tracker) {
-    tracker.mesh.visible = enabled && virtualTrackerDisplayVisible.value
-    if (tracker.labelSprite) {
-      tracker.labelSprite.visible = enabled && virtualTrackerDisplayVisible.value && showVirtualTrackerLabels.value
-    }
   }
 }
 
@@ -1572,7 +1510,13 @@ const storageStatus = computed(() => {
   return `キャッシュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
 })
 
-const statusMessage = computed(() => `${frameStatus.value} | ${storageStatus.value}`)
+const statusMessage = computed(() => {
+  const parts = []
+  if (uiNotice.value) parts.push(uiNotice.value)
+  if (frameStatus.value) parts.push(frameStatus.value)
+  if (storageStatus.value) parts.push(storageStatus.value)
+  return parts.join(' | ')
+})
 
 try {
   const savedSnap = localStorage.getItem('timeline.snap')
@@ -2029,7 +1973,7 @@ watch(lastTrackerKey, key => {
 function resetVirtualTrackers() {
   try {
     trackerController.reset()
-    pushToast('バーチャルトラッカーをリセットしました', 'トラッカー')
+    showNotice('トラッカー: バーチャルトラッカーをリセットしました', 3200)
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
   } catch {}
@@ -2048,7 +1992,7 @@ function applyTimelinePoseImmediate() {
 
 function handleTimelineAddKey(payload) {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   ensureVirtualTrackers()
@@ -2060,15 +2004,15 @@ function handleTimelineAddKey(payload) {
     if (Number.isFinite(payload?.time)) timelineController.setCurrentTime(payload.time)
     const entry = timelineController.addSnapshotAtTime(targetTime)
     if (!entry) {
-      pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
+      showNotice('タイムライン: キーの追加に失敗しました', 4200)
       return
     }
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('add-key')
-    pushToast('現在のポーズをキーに追加しました', 'タイムライン', 2200)
+    showNotice('タイムライン: 現在のポーズをキーに追加しました', 2200)
   } catch (error) {
-    pushToast('キーの追加に失敗しました', 'タイムライン', 4200)
+    showNotice('タイムライン: キーの追加に失敗しました', 4200)
   }
 }
 
@@ -2209,37 +2153,37 @@ function pasteClipboardFallback(clipboard, anchorTime) {
 
 function handleTimelineCopyKeyframes() {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   const ids = Array.isArray(timelineSelection.selectedIds) && timelineSelection.selectedIds.length
     ? timelineSelection.selectedIds
     : timelineSelection.frames.map(frame => frame.id)
   if (!ids.length) {
-    pushToast('コピーするキーを選択してください', 'タイムライン', 3200)
+    showNotice('タイムライン: コピーするキーを選択してください', 3200)
     return
   }
   try {
     const clipboardPayload = captureTimelineClipboard(ids)
     if (!clipboardPayload) {
-      pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+      showNotice('タイムライン: キーのコピーに失敗しました', 4200)
       return
     }
     timelineClipboard.value = clipboardPayload
-    pushToast(`${clipboardPayload.frames.length}個のキーをコピーしました`, 'タイムライン', 2200)
+    showNotice(`タイムライン: ${clipboardPayload.frames.length}個のキーをコピーしました`, 2200)
   } catch {
-    pushToast('キーのコピーに失敗しました', 'タイムライン', 4200)
+    showNotice('タイムライン: キーのコピーに失敗しました', 4200)
   }
 }
 
 function handleTimelinePasteKeyframes() {
   if (!timelineController) {
-    pushToast('タイムラインが初期化されていません', 'タイムライン', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   const normalizedClipboard = normalizeClipboardPayload(timelineClipboard.value, timelineFrameRate.value || 60)
   if (!normalizedClipboard) {
-    pushToast('貼り付けるキーがありません', 'タイムライン', 3200)
+    showNotice('タイムライン: 貼り付けるキーがありません', 3200)
     return
   }
   timelineClipboard.value = normalizedClipboard
@@ -2251,15 +2195,15 @@ function handleTimelinePasteKeyframes() {
       ? timelineController.pasteKeyframes(normalizedClipboard, { time: anchorTime })
       : pasteClipboardFallback(normalizedClipboard, anchorTime)
     if (!Array.isArray(pasted) || !pasted.length) {
-      pushToast('キーの貼り付けに失敗しました', 'タイムライン', 4200)
+      showNotice('タイムライン: キーの貼り付けに失敗しました', 4200)
       return
     }
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('paste-keys')
-    pushToast(`${pasted.length}個のキーを貼り付けました`, 'タイムライン', 2200)
+    showNotice(`タイムライン: ${pasted.length}個のキーを貼り付けました`, 2200)
   } catch {
-    pushToast('キーの貼り付けに失敗しました', 'タイムライン', 4200)
+    showNotice('タイムライン: キーの貼り付けに失敗しました', 4200)
   }
 }
 
@@ -2405,7 +2349,7 @@ function handleTimelineRange({ startFrame, endFrame }) {
 function handleTimelineRequestImport() {
   const input = timelineFileInput.value
   if (!input) {
-    pushToast('タイムラインの読み込みに失敗しました (input missing)', 'タイムライン', 4200)
+    showNotice('タイムライン: 読み込みに失敗しました (入力が見つかりません)', 4200)
     return
   }
   input.value = ''
@@ -2419,21 +2363,21 @@ async function handleTimelineImportFile(event) {
   try {
     const text = await file.text()
     const data = JSON.parse(text)
-  pushHistory('import')
-  const ok = timelineController.deserialize(data)
+    pushHistory('import')
+    const ok = timelineController.deserialize(data)
     if (!ok) {
-      pushToast('タイムラインの読み込みに失敗しました', 'タイムライン', 4800)
+      showNotice('タイムライン: 読み込みに失敗しました', 4800)
       return
     }
     ensureVirtualTrackers()
     try { timelineController.pause() } catch {}
-  applyTimelinePoseImmediate()
-    pushToast(`${file.name} を読み込みました`, 'タイムライン', 3200)
+    applyTimelinePoseImmediate()
+    showNotice(`タイムライン: ${file.name} を読み込みました`, 3200)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('import')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    pushToast('タイムラインJSONの解析に失敗しました', 'タイムライン', 5200)
+    showNotice('タイムライン: JSONの解析に失敗しました', 5200)
   } finally {
     if (input) input.value = ''
   }
@@ -2452,34 +2396,32 @@ function handleTimelineExport() {
     anchor.click()
     document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
-    pushToast('タイムラインをエクスポートしました', 'タイムライン', 2600)
+    showNotice('タイムライン: エクスポートしました', 2600)
   } catch {
-    pushToast('タイムラインのエクスポートに失敗しました', 'タイムライン', 4800)
+    showNotice('タイムライン: エクスポートに失敗しました', 4800)
   }
 }
 
 function handleTimelineClear() {
   if (!timelineController) return
-  const confirmed = window.confirm('タイムラインをすべて削除しますか？')
-  if (!confirmed) return
   try {
     pushHistory('clear')
     timelineController.clearAll()
     timelineController.stop()
     timelineClipboard.value = null
-    pushToast('タイムラインをリセットしました', 'タイムライン', 2600)
+    showNotice('タイムライン: リセットしました', 2600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    pushToast('タイムラインのリセットに失敗しました', 'タイムライン', 4800)
+    showNotice('タイムライン: リセットに失敗しました', 4800)
   }
 }
 
 function captureRenderImage() {
   if (captureBusy.value) return
   if (!renderer.value || !scene.value || !renderCamera.value) {
-    pushToast('レンダーカメラがまだ準備できていません', 'カメラ', 4200)
+    showNotice('カメラ: レンダー準備ができていません', 4200)
     return
   }
 
@@ -2520,9 +2462,9 @@ function captureRenderImage() {
     document.body.appendChild(anchor)
     anchor.click()
     document.body.removeChild(anchor)
-    pushToast(`${filename} を保存しました`, 'カメラ', 2800)
+    showNotice(`カメラ: ${filename} を保存しました`, 2800)
   } catch {
-    pushToast('レンダー画像の書き出しに失敗しました', 'カメラ', 5200)
+    showNotice('カメラ: レンダー画像の書き出しに失敗しました', 5200)
   } finally {
     try {
       if (renderCamera.value) {
@@ -2569,7 +2511,7 @@ async function clearAllCache() {
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
-    pushToast('キャッシュとタイムラインをリセットしました', 'キャッシュ')
+    showNotice('キャッシュ: キャッシュとタイムラインをリセットしました', 3600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
@@ -2578,12 +2520,12 @@ async function clearAllCache() {
 
 function handleError(e) {
   const msg = e?.error?.message || e?.message || '不明なエラーが発生しました'
-  pushToast(msg, 'エラー', 5200)
+  showNotice(`エラー: ${msg}`, 5200)
 }
 
 function handleUnhandledRejection(e) {
   const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
-  pushToast(msg, 'エラー', 5200)
+  showNotice(`エラー: ${msg}`, 5200)
 }
 
 const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHandlers({
@@ -2650,12 +2592,12 @@ onMounted(async () => {
   if (storageSupported.value) {
     if (persistedGranted) {
       if (storagePersistToastState !== 'granted') {
-        pushToast('キャッシュの永続化が有効になりました', 'キャッシュ', 3600)
+        showNotice('キャッシュ: 永続化が有効になりました', 3600)
         storagePersistToastState = 'granted'
         try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'granted') } catch {}
       }
     } else if (storagePersistToastState !== 'denied') {
-      pushToast('キャッシュの永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 'キャッシュ', 5600)
+      showNotice('キャッシュ: 永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 5600)
       storagePersistToastState = 'denied'
       try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'denied') } catch {}
     }
@@ -2746,7 +2688,7 @@ onMounted(async () => {
     }
   } catch {}
 
-  pushToast('Blender風レイアウトを読み込みました', 'UI', 2400)
+  showNotice('UI: Blender風レイアウトを読み込みました', 2400)
   logToServer({ event: 'init' })
   animate(0)
 })

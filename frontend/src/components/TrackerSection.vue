@@ -87,10 +87,6 @@
           <span class="axis-value">{{ forearmTwistSharePercent }}%</span>
         </div>
       </div>
-
-      <p class="tracker-note">ビューポート上で直接ドラッグして調整してください。</p>
-      <p class="tracker-note">ツイスト配分は手首と前腕のねじりをどの程度共有するかを制御します。</p>
-      
       <!-- トラッカー個別設定 -->
       <div v-if="virtualTrackersEnabled && selectedTracker" class="tracker-settings">
         <h4 class="settings-title">{{ selectedTrackerLabel }} 設定</h4>
@@ -187,22 +183,6 @@
           </div>
         </div>
         
-        <!-- 有効/無効設定 -->
-        <div class="setting-group" v-if="selectedTracker !== 'gaze'">
-          <div class="setting-group__header">
-            <h5>表示</h5>
-          </div>
-          <div class="row row--toggles">
-            <label class="checkbox">
-              <input 
-                type="checkbox" 
-                :checked="trackerEnabled"
-                @change="$emit('update:tracker-enabled', $event.target.checked)"
-              >
-              <span>このトラッカーを有効化</span>
-            </label>
-          </div>
-        </div>
       </div>
 </template>
 
@@ -223,7 +203,6 @@ const props = defineProps({
   trackerPosition: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotation: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotationOrder: { type: String, default: 'YXZ' },
-  trackerEnabled: { type: Boolean, default: true },
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 }
 })
@@ -238,7 +217,6 @@ const emit = defineEmits([
   'update:trackerAxesLength',
   'update:forearmTwistShare',
   'update:tracker-rotation-order',
-  'update:tracker-enabled',
   'reset-virtual-trackers',
   'reset-virtual-tracker-rotations',
   'update:tracker-position',
@@ -327,13 +305,13 @@ label {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-muted, rgba(240, 245, 255, 0.82));
   font-weight: 400;
   transition: color 0.2s ease;
 }
 
 label:hover {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong, #f4f6ff);
 }
 
 label.checkbox {
@@ -354,7 +332,7 @@ input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--accent, #42a5f5);
+  accent-color: var(--accent, #5c8cff);
   transition: transform 0.15s ease;
 }
 
@@ -375,7 +353,7 @@ label.disabled input {
 input[type="range"] {
   width: 100%;
   height: 6px;
-  background: linear-gradient(90deg, rgba(66, 165, 245, 0.15) 0%, rgba(66, 165, 245, 0.08) 100%);
+  background: linear-gradient(90deg, rgba(92, 140, 255, 0.15) 0%, rgba(92, 140, 255, 0.08) 100%);
   border-radius: 3px;
   outline: none;
   cursor: pointer;
@@ -384,7 +362,7 @@ input[type="range"] {
 }
 
 input[type="range"]:hover {
-  background: linear-gradient(90deg, rgba(66, 165, 245, 0.25) 0%, rgba(66, 165, 245, 0.12) 100%);
+  background: linear-gradient(90deg, rgba(92, 140, 255, 0.25) 0%, rgba(92, 140, 255, 0.12) 100%);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -392,36 +370,36 @@ input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
   height: 16px;
-  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+  background: linear-gradient(135deg, var(--accent, #5c8cff) 0%, color-mix(in srgb, var(--accent, #5c8cff) 30%, #1f2b5b) 100%);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(66, 165, 245, 0.4), 0 0 0 0 rgba(66, 165, 245, 0);
+  box-shadow: 0 2px 6px rgba(92, 140, 255, 0.4), 0 0 0 0 rgba(92, 140, 255, 0);
   border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #5c8cff) 20%, #ffffff) 0%, var(--accent, #5c8cff) 100%);
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(66, 165, 245, 0.6), 0 0 0 4px rgba(66, 165, 245, 0.1);
+  box-shadow: 0 4px 12px rgba(92, 140, 255, 0.6), 0 0 0 4px rgba(92, 140, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.4);
 }
 
 input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+  background: linear-gradient(135deg, var(--accent, #5c8cff) 0%, color-mix(in srgb, var(--accent, #5c8cff) 30%, #1f2b5b) 100%);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(66, 165, 245, 0.4);
+  box-shadow: 0 2px 6px rgba(92, 140, 255, 0.4);
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: linear-gradient(135deg, #64b5f6 0%, #42a5f5 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #5c8cff) 20%, #ffffff) 0%, var(--accent, #5c8cff) 100%);
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(66, 165, 245, 0.6);
+  box-shadow: 0 4px 12px rgba(92, 140, 255, 0.6);
   border-color: rgba(255, 255, 255, 0.4);
 }
 
@@ -455,27 +433,6 @@ input[type="range"]::-moz-range-thumb:hover {
 .ghost:focus-visible {
   outline: 2px solid rgba(66, 165, 245, 0.5);
   outline-offset: 2px;
-}
-
-/* ===== トラッカー設定エリア ===== */
-.tracker-note {
-  margin: 0.5rem 0;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.6);
-  padding: 0.5rem;
-  background: rgba(66, 165, 245, 0.05);
-  border-left: 3px solid rgba(66, 165, 245, 0.3);
-  border-radius: 4px;
-}
-
-.tracker-settings {
-  margin-top: 1.5rem;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(36, 40, 52, 0.6) 0%, rgba(30, 34, 45, 0.6) 100%);
-  border-radius: 12px;
-  border: 1px solid rgba(66, 165, 245, 0.15);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .settings-title {
@@ -566,24 +523,26 @@ input[type="range"]::-moz-range-thumb:hover {
 .xyz-item input[type="number"] {
   padding: 0.4rem 0.6rem;
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.25) 100%);
-  border: 1px solid rgba(66, 165, 245, 0.2);
+  border: 1px solid rgba(92, 140, 255, 0.25);
   border-radius: 6px;
   color: #fff;
-  font-size: 0.85rem;
-  font-family: 'Consolas', 'Monaco', monospace;
-  transition: all 0.2s ease;
-}
-
-.xyz-item input[type="number"]:hover {
-  border-color: rgba(66, 165, 245, 0.35);
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.3) 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .xyz-item input[type="number"]:focus {
   outline: none;
-  border-color: rgba(66, 165, 245, 0.6);
-  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.35) 100%);
+  border-color: rgba(92, 140, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(92, 140, 255, 0.15);
+}
+
+.tracker-settings {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(36, 40, 52, 0.6) 0%, rgba(30, 34, 45, 0.6) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(92, 140, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .input-row {
@@ -611,7 +570,7 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .input-row input[type="number"]:focus {
   outline: none;
-  border-color: rgba(66, 165, 245, 0.6);
+  border-color: rgba(92, 140, 255, 0.6);
 }
 
 /* ===== オイラー角回転順序選択 ===== */

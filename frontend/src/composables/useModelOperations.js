@@ -25,8 +25,17 @@ export function useModelOperations({
   cache,
   poses,
   selectedPose,
-  onCachePersisted
+  onCachePersisted,
+  showNotice
 }) {
+  const reportNotice = (message, duration = 5200) => {
+    if (typeof showNotice === 'function') {
+      showNotice(message, duration)
+    } else {
+      console.info('[notice]', message)
+    }
+  }
+
   const models = ref([])
   let nextModelId = 1
 
@@ -1549,7 +1558,7 @@ export function useModelOperations({
     const cached = await persistModels('load')
     if (!cached) {
       console.error('Failed to cache model files')
-      alert('モデルのキャッシュに失敗しました')
+      reportNotice('モデルのキャッシュに失敗しました', 5600)
     }
     try { logToServer?.({ event: 'handleFiles:cached', ok: !!cached, models: models.value.length }) } catch {}
     saveModelState()
@@ -1566,13 +1575,13 @@ export function useModelOperations({
     } catch (e) {
       console.warn('Failed to load cached files')
       console.debug(e)
-      alert('モデルの復元に失敗しました')
+      reportNotice('モデルの復元に失敗しました', 5600)
       return false
     }
     if (!saved.length) {
       console.info('No cached model to restore')
       try { logToServer?.({ event: 'restore:empty' }) } catch {}
-      alert('復元するモデルがありません')
+      reportNotice('復元するモデルがありません', 4200)
       return false
     }
     const files = []
@@ -1609,7 +1618,7 @@ export function useModelOperations({
       return true
     } catch (e) {
       console.error('Failed to restore cached model files', e)
-      alert('モデルの復元中にエラーが発生しました')
+      reportNotice('モデルの復元中にエラーが発生しました', 5600)
       return false
     }
   }

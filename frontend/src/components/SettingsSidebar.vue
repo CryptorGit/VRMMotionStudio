@@ -28,8 +28,6 @@
           :show-light-marker="showLightMarker"
           :marker-color="markerColor"
           :directional-intensity="directionalIntensity"
-          :spring-bone-enabled="springBoneEnabled"
-          :look-at-enabled="lookAtEnabled"
           :show-extended-bones="showExtendedBones"
           :show-collider-nodes="showColliderNodes"
           :show-non-deforming-bones="showNonDeformingBones"
@@ -71,8 +69,6 @@
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
-          @update:springBoneEnabled="v => emit('update:springBoneEnabled', v)"
-          @update:lookAtEnabled="v => emit('update:lookAtEnabled', v)"
           @update:showExtendedBones="v => emit('update:showExtendedBones', v)"
           @update:showColliderNodes="v => emit('update:showColliderNodes', v)"
           @update:showNonDeformingBones="v => emit('update:showNonDeformingBones', v)"
@@ -111,12 +107,10 @@
           @update:timelineLoop="v => emit('update-timeline-loop', v)"
           @remove-selected-keyframes="() => emit('remove-selected-keyframes')"
           @update-keyframe-curves="payload => emit('update-keyframe-curves', payload)"
-          @toggle-model="(...args) => emit('toggle-model', ...args)"
           @toggle-bone="(...args) => emit('toggle-bone', ...args)"
           @toggle-bone-names="(...args) => emit('toggle-bone-names', ...args)"
           @toggle-all-bones="(...args) => emit('toggle-all-bones', ...args)"
           @toggle-all-bone-names="(...args) => emit('toggle-all-bone-names', ...args)"
-          @remove-model="(...args) => emit('remove-model', ...args)"
           @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
           @reset-all-tracker-orientations="() => emit('reset-all-tracker-orientations')"
           @reset-outline="() => emit('reset-outline')"
@@ -141,8 +135,6 @@ const props = defineProps({
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
-  springBoneEnabled: { type: Boolean, required: true },
-  lookAtEnabled: { type: Boolean, required: true },
   showExtendedBones: { type: Boolean, required: true },
   showColliderNodes: { type: Boolean, required: true },
   showNonDeformingBones: { type: Boolean, required: true },
@@ -187,8 +179,6 @@ const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
-  'update:springBoneEnabled',
-  'update:lookAtEnabled',
   'update:showExtendedBones',
   'update:showColliderNodes',
   'update:showNonDeformingBones',
@@ -223,12 +213,10 @@ const emit = defineEmits([
   'update:cameraTranslateSensitivity',
   'update:cameraRotateSensitivity',
   'capture-render',
-  'toggle-model',
   'toggle-bone',
   'toggle-bone-names',
   'toggle-all-bones',
   'toggle-all-bone-names',
-  'remove-model',
   'reset-virtual-trackers',
   'reset-all-tracker-orientations',
   'reset-outline',
@@ -250,8 +238,6 @@ const {
   showLightMarker,
   markerColor,
   directionalIntensity,
-  springBoneEnabled,
-  lookAtEnabled,
   showExtendedBones,
   showColliderNodes,
   showNonDeformingBones,
