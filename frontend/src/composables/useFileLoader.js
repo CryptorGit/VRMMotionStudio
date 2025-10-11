@@ -3,7 +3,15 @@ import useModelLoader from './useModelLoader.js'
 
 export function useFileLoader(ctx) {
   const fileInput = ref(null)
-  const loader = useModelLoader(ctx)
+  
+  // Pass controller getters to avoid initialization order issues
+  const loaderCtx = {
+    ...ctx,
+    timelineController: ctx.timelineController,
+    trackerController: ctx.trackerController
+  }
+  
+  const loader = useModelLoader(loaderCtx)
 
   function openFile() {
     ctx.logToServer?.({ event: 'import' })

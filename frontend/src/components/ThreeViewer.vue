@@ -5,6 +5,7 @@
       :show-captions="showCaptions"
       :timeline-export-enabled="timelineHasContent"
       @import="openFile"
+      @import-audio="openAudioFile"
       @export="exportPose"
       @clear-cache="clearAllCache"
       @toggle-theme="toggleTheme"
@@ -198,6 +199,7 @@
                 :timeline-selection="timelineSelection"
                 :timeline-snap="timelineSnap"
                 :timeline-loop="timelineLoop"
+                :available-trackers="availableTrackers"
                 @update-timeline-snap="handleTimelineSnapSetting"
                 @update-timeline-loop="handleTimelineLoopSetting"
                 @remove-selected-keyframes="handleSettingsRemoveSelectedKeyframes"
@@ -208,7 +210,10 @@
                 @toggle-bone-names="toggleBoneNameVisibility"
                 @toggle-all-bones="toggleAllBones"
                 @toggle-all-bone-names="toggleAllBoneNames"
+                @toggle-model="toggleModelVisibility"
+                @remove-model="removeModel"
                 @reset-outline="handleResetOutlineDefaults"
+                @load-model-outline="handleLoadModelOutline"
                 @capture-render="captureRenderImage"
               />
             </div>
@@ -228,6 +233,13 @@
       accept=".vrm"
       style="display:none"
       @change="onFileChange"
+    />
+    <input
+      type="file"
+      ref="audioFileInput"
+      accept="audio/mp3,audio/mpeg,.mp3"
+      style="display:none"
+      @change="onAudioFileChange"
     />
     <input
       type="file"
@@ -302,6 +314,9 @@ const outlineDefaultsCache = new WeakMap()
 const outlineAutoResetModels = new WeakSet()
 let outlineDefaultsCaptured = false
 
+// モデルごとのアウトライン設定キャッシュ
+const modelOutlineCache = new WeakMap()
+
 const virtualTrackersEnabled = ref(false)
 const virtualTrackerDisplayVisible = ref(true)
 const showVirtualTrackerLabels = ref(true)
@@ -330,6 +345,14 @@ const hasModelsLoaded = computed(() => {
   return Array.isArray(models.value) && models.value.length > 0
 })
 
+// Available trackers for dropdown selection in Key Settings
+const availableTrackers = computed(() => {
+  return TRACKER_DEFS.map(def => ({
+    key: def.key,
+    label: def.label
+  }))
+})
+
 const trackerAxes = ['x', 'y', 'z']
 const trackerPositionRange = { min: -2.5, max: 2.5 }
 const trackerRotationRange = { min: -180, max: 180 }
@@ -346,6 +369,15 @@ const trackerAdjustState = reactive({
 
 const viewportMode = ref('view')
 const isCameraMode = computed(() => viewportMode.value === 'camera')
+
+// Audio playback
+const audioFileInput = ref(null)
+const audioContext = ref(null)
+const audioBuffer = ref(null)
+const audioSource = ref(null)
+const audioStartTime = ref(0)
+const audioDuration = ref(0)
+const audioPlaying = ref(false)
 
 const renderCameraFov = ref(45)
 const renderCameraNear = ref(0.1)
@@ -885,7 +917,9 @@ const fileLoader = useFileLoader({
   boneDotSize,
   boneLabelScale,
   onCachePersisted: handleCachePersisted,
-  showNotice
+  showNotice,
+  timelineController: () => timelineController,
+  trackerController: () => trackerController
 })
 
 const {
@@ -1970,6 +2004,35 @@ watch(lastTrackerKey, key => {
   if (key) refreshTrackerAdjustState(key)
 })
 
+// タイムライン再生状態とMP3オーディオを同期
+watch(timelinePlaying, (isPlaying, wasPlaying) => {
+  if (isPlaying === wasPlaying) return
+  
+  if (isPlaying) {
+    // タイムライン再生開始時、MP3を現在時刻から再生
+    if (audioBuffer.value && audioContext.value) {
+      const currentTime = timelineCurrentTime.value || 0
+      playAudio(currentTime)
+    }
+  } else {
+    // タイムライン停止時、MP3も停止
+    stopAudio()
+  }
+})
+
+// タイムライン時刻変更時、MP3もシーク
+watch(timelineCurrentTime, (newTime, oldTime) => {
+  // タイムライン再生中で、時刻が大きく変わった場合（シーク操作）
+  if (timelinePlaying.value && audioBuffer.value && audioContext.value) {
+    const delta = Math.abs(newTime - oldTime)
+    // 0.1秒以上の変化があったらシークとみなす
+    if (delta > 0.1) {
+      stopAudio()
+      playAudio(newTime)
+    }
+  }
+})
+
 function resetVirtualTrackers() {
   try {
     trackerController.reset()
@@ -2251,19 +2314,23 @@ function handleTimelineSelectionChange(payload) {
 function handleTimelineCurveUpdate(payload) {
   const updatesSource = Array.isArray(payload?.updates) ? payload.updates : []
   if (!updatesSource.length || !timelineController) return
+  
+  const trackerKey = payload?.trackerKey || 'all'
+  const curveColor = payload?.curveColor || '#5c8cff'
+  
   const updates = updatesSource
     .map(entry => {
       const keyframeId = Number(entry?.keyframeId ?? entry?.id)
       if (!Number.isFinite(keyframeId)) return null
       const curve = cloneTimelineCurve(entry?.curve)
-      return { keyframeId, curve }
+      return { keyframeId, curve, trackerKey, curveColor }
     })
     .filter(Boolean)
   if (!updates.length) return
   try {
     pushHistory('curve')
-    updates.forEach(({ keyframeId, curve }) => {
-      timelineController.updateKeyframe(keyframeId, { curve })
+    updates.forEach(({ keyframeId, curve, trackerKey, curveColor }) => {
+      timelineController.updateKeyframe(keyframeId, { curve, trackerKey, curveColor })
     })
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
@@ -2301,15 +2368,30 @@ function handleTimelineSeek(time) {
   try {
     timelineController.pause()
     timelineController.setCurrentTime(time)
+    // Sync audio to timeline position
+    if (audioBuffer.value) {
+      stopAudio()
+    }
   } catch {}
 }
 
 function handleTimelinePlay() {
-  try { timelineController.play() } catch {}
+  try { 
+    timelineController.play()
+    // Play audio from current timeline position
+    if (audioBuffer.value) {
+      const currentTime = timelineController.currentTime.value || 0
+      playAudio(currentTime)
+    }
+  } catch {}
 }
 
 function handleTimelinePause() {
-  try { timelineController.pause() } catch {}
+  try { 
+    timelineController.pause()
+    // Pause audio
+    pauseAudio()
+  } catch {}
 }
 
 function handleTimelineStepFrames(delta) {
@@ -2511,11 +2593,91 @@ async function clearAllCache() {
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
+    // Clear audio
+    stopAudio()
+    audioBuffer.value = null
+    audioDuration.value = 0
     showNotice('キャッシュ: キャッシュとタイムラインをリセットしました', 3600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {}
+}
+
+function openAudioFile() {
+  const input = audioFileInput.value
+  if (!input) return
+  input.value = ''
+  input.click()
+}
+
+async function onAudioFileChange(event) {
+  const input = event?.target
+  const file = input?.files?.[0]
+  if (!file) return
+  
+  try {
+    showNotice('オーディオ: 読み込み中...', 2000)
+    
+    // Initialize AudioContext if needed
+    if (!audioContext.value) {
+      audioContext.value = new (window.AudioContext || window.webkitAudioContext)()
+    }
+    
+    // Load audio file
+    const arrayBuffer = await file.arrayBuffer()
+    const decodedBuffer = await audioContext.value.decodeAudioData(arrayBuffer)
+    
+    audioBuffer.value = decodedBuffer
+    audioDuration.value = decodedBuffer.duration
+    
+    // Auto-adjust timeline end to match audio duration (60 FPS)
+    if (timelineController && audioDuration.value > 0) {
+      const endFrame = Math.ceil(audioDuration.value * 60) // 60 FPS
+      timelineController.setRangeFromFrames(0, endFrame)
+      if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+      markTimelineDirty('audio-import')
+    }
+    
+    showNotice(`オーディオ: ${file.name} を読み込みました (${audioDuration.value.toFixed(2)}秒)`, 3200)
+  } catch (error) {
+    console.error('Audio load failed:', error)
+    showNotice('オーディオ: 読み込みに失敗しました', 4800)
+  } finally {
+    if (input) input.value = ''
+  }
+}
+
+function playAudio(startTime = 0) {
+  if (!audioContext.value || !audioBuffer.value) return
+  
+  stopAudio()
+  
+  try {
+    audioSource.value = audioContext.value.createBufferSource()
+    audioSource.value.buffer = audioBuffer.value
+    audioSource.value.connect(audioContext.value.destination)
+    audioSource.value.start(0, startTime)
+    audioStartTime.value = audioContext.value.currentTime - startTime
+    audioPlaying.value = true
+  } catch (error) {
+    console.error('Audio playback failed:', error)
+  }
+}
+
+function stopAudio() {
+  if (audioSource.value) {
+    try {
+      audioSource.value.stop()
+      audioSource.value.disconnect()
+    } catch {}
+    audioSource.value = null
+  }
+  audioPlaying.value = false
+}
+
+function pauseAudio() {
+  stopAudio()
 }
 
 function handleError(e) {
@@ -2764,14 +2926,19 @@ function applyOutlineToMaterial(material, width, colorHex) {
   material.needsUpdate = true
 }
 
-function resetOutlineToDefaults() {
+function resetOutlineToDefaults(modelIndex = null) {
   let fallbackWidth = outlineDefaultWidth.value
   if (!Number.isFinite(fallbackWidth)) fallbackWidth = 0.002
   let fallbackColor = outlineDefaultColor.value || '#000000'
   let firstWidth = null
   let firstColor = null
+  
+  const modelsToReset = modelIndex !== null && Number.isFinite(modelIndex)
+    ? [models.value[modelIndex]].filter(Boolean)
+    : models.value || []
+  
   try {
-    (models.value || []).forEach(model => {
+    modelsToReset.forEach(model => {
       model?.vrm?.scene?.traverse(obj => {
         if (!obj.isMesh || !obj.material) return
         const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
@@ -2832,34 +2999,64 @@ watch([outlineWidth, outlineColor], () => {
   scheduleDisplaySettingsSave()
 })
 
-function handleResetOutlineDefaults() {
-  resetOutlineToDefaults()
+function handleResetOutlineDefaults(modelIndex = 0) {
+  resetOutlineToDefaults(modelIndex)
 }
+
+function handleLoadModelOutline(modelIndex) {
+  // モデル選択時に、そのモデルのアウトライン設定を読み込む
+  if (!Array.isArray(models.value) || models.value.length === 0) return
+  const targetModel = models.value[modelIndex]
+  if (!targetModel) return
+
+  // WeakMapからモデル固有の設定を取得
+  const cached = modelOutlineCache.get(targetModel)
+  if (cached) {
+    outlineWidth.value = cached.width
+    outlineColor.value = cached.color
+  } else {
+    // キャッシュがない場合はモデルのデフォルト値を取得
+    const defaults = outlineDefaultsCache.get(targetModel)
+    if (defaults) {
+      outlineWidth.value = defaults.width || 0.002
+      outlineColor.value = defaults.color || '#000000'
+    } else {
+      // デフォルト値にリセット
+      outlineWidth.value = 0.002
+      outlineColor.value = '#000000'
+    }
+  }
+  
+  // 選択したモデルのアウトライン設定を適用
+  updateOutlineSettingsForModel(targetModel, outlineWidth.value, outlineColor.value)
+}
+
+function updateOutlineSettingsForModel(model, width, colorHex) {
+  if (!model?.vrm?.scene) return
+  
+  try {
+    // モデルごとに現在の設定をキャッシュ
+    modelOutlineCache.set(model, { width, color: colorHex })
+    
+    model.vrm.scene.traverse(obj => {
+      if (!obj.isMesh || !obj.material) return
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+      materials.forEach(mat => {
+        if (!(mat.isMToonMaterial || mat.type === 'MToonMaterial')) return
+        captureOutlineDefaults(mat)
+        applyOutlineToMaterial(mat, width, colorHex)
+      })
+    })
+  } catch {}
+}
+
 
 function updateOutlineSettings() {
   try {
     const width = outlineWidth.value
     const colorHex = outlineColor.value
     models.value.forEach(model => {
-      if (!model?.vrm?.scene) return
-      model.vrm.scene.traverse(obj => {
-        if (!obj.isMesh || !obj.material) return
-        const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-        materials.forEach(mat => {
-          if (!(mat.isMToonMaterial || mat.type === 'MToonMaterial')) return
-          captureOutlineDefaults(mat)
-          applyOutlineToMaterial(mat, width, colorHex)
-          const defaults = outlineDefaultsCache.get(mat)
-          if (defaults) {
-            if (Number.isFinite(defaults.width)) {
-              outlineDefaultWidth.value = defaults.width
-            }
-            if (typeof defaults.color === 'string') {
-              outlineDefaultColor.value = defaults.color
-            }
-          }
-        })
-      })
+      updateOutlineSettingsForModel(model, width, colorHex)
     })
   } catch {}
 }

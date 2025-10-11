@@ -46,6 +46,28 @@ services:
       retries: 3
       start_period: 60s
 
+  # データベース (PostgreSQL)
+  database:
+    image: postgres:15-alpine
+    container_name: mokumoku-database
+    ports:
+      - "1313:8083"  # ホストポート:コンテナポート (PostgreSQLはコンテナ内で8083で起動)
+    environment:
+      - POSTGRES_DB=mokumoku
+      - POSTGRES_USER=mokumoku_user
+      - POSTGRES_PASSWORD=mokumoku_pass
+      - PGPORT=8083
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - mokumoku-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mokumoku_user -p 8083"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ファイルサーバ (静的ファイル配信)
   fileserver:
     image: nginx:alpine
@@ -58,6 +80,10 @@ services:
     networks:
       - mokumoku-network
     restart: unless-stopped
+
+volumes:
+  postgres-data:
+    driver: local
 
 networks:
   mokumoku-network:

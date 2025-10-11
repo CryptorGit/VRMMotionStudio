@@ -6,6 +6,12 @@ export const SECTION_TABS = [
     icon: 'mdi:lightbulb-on-outline'
   },
   {
+    id: 'model',
+    label: 'モデル',
+    description: 'モデルの表示・管理',
+    icon: 'mdi:account-outline'
+  },
+  {
     id: 'display',
     label: '表示',
     description: 'ボーンやトラッカー表示の管理',

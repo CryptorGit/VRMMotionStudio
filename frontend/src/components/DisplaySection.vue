@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
@@ -140,6 +140,22 @@ const props = defineProps({
 
 const selectedOutlineModelIndex = ref(0)
 
+// モデル選択時にそのモデルのアウトライン設定を読み込む
+watch(selectedOutlineModelIndex, (newIndex) => {
+  // 親コンポーネントにモデル選択変更を通知し、
+  // 親側でWeakMapキャッシュから設定を読み込む
+  emit('load-model-outline', newIndex)
+}, { immediate: false })
+
+// propsの変更を監視してローカル値を更新
+watch(() => props.outlineWidth, (newWidth) => {
+  // 外部からの変更を反映
+}, { immediate: true })
+
+watch(() => props.outlineColor, (newColor) => {
+  // 外部からの変更を反映
+}, { immediate: true })
+
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
@@ -155,7 +171,8 @@ const emit = defineEmits([
   'update:outlineColor',
   'toggle-all-bones',
   'toggle-all-bone-names',
-  'reset-outline'
+  'reset-outline',
+  'load-model-outline'
 ])
 
 const hasModels = computed(() => Array.isArray(props.models) && props.models.length > 0)

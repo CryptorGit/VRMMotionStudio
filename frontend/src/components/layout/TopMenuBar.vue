@@ -19,6 +19,16 @@
         type="button"
         class="top-menu__item"
         role="menuitem"
+        @click="$emit('import-audio')"
+        :title="tooltip('MP3音声ファイルを読み込みます')"
+      >
+        <Icon icon="mdi:music" />
+        <span>MP3 読込</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
         @click="$emit('export')"
         :title="tooltip('現在のポーズをエクスポートします')"
       >

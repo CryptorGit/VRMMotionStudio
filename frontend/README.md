@@ -9,7 +9,7 @@ npm run dev
 ```
 ブラウザで http://localhost:5173 を開いてください。
 
-バックエンド API は Vite 開発サーバが `http://localhost:8080` にプロキシします（`vite.config.js`）。
+バックエンド API は Vite 開発サーバが `http://localhost:8081` にプロキシします（`vite.config.js`）。
 
 ## ビルド/プレビュー
 ```powershell

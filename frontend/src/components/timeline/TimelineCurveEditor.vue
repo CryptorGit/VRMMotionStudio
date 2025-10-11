@@ -36,6 +36,7 @@
           :key="segment.id"
           :d="segment.path"
           :class="{ 'is-modified': segment.modified }"
+          :style="{ stroke: curveColor }"
         />
       </g>
 
@@ -153,7 +154,9 @@ const DEFAULT_CURVE = Object.freeze({
 const EPSILON = 1e-4
 
 const props = defineProps({
-  frames: { type: Array, default: () => [] }
+  frames: { type: Array, default: () => [] },
+  trackerKey: { type: String, default: 'all' },
+  curveColor: { type: String, default: '#5c8cff' }
 })
 
 const emit = defineEmits(['update', 'reset'])
@@ -191,6 +194,19 @@ const isCurveModified = curve => {
   )
 }
 
+// トラッカー切り替え時にカーブを更新
+watch(() => props.trackerKey, () => {
+  // 選択されているトラッカーのカーブを取得
+  const next = new Map()
+  props.frames.forEach(frame => {
+    const curves = frame.curves || (frame.curve ? { all: { curve: frame.curve, color: '#5c8cff' } } : {})
+    const trackerCurveData = curves[props.trackerKey] || curves.all || { curve: DEFAULT_CURVE, color: '#5c8cff' }
+    const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
+    next.set(frame.id, curve)
+  })
+  curvesState.value = next
+}, { immediate: true })
+
 watch(
   () => props.frames,
   frames => {
@@ -198,7 +214,11 @@ watch(
     const activeId = dragState.value?.frameId
     frames.forEach(frame => {
       if (activeId && activeId === frame.id) return
-      next.set(frame.id, cloneCurve(frame.curve))
+      // 選択されているトラッカーのカーブを取得
+      const curves = frame.curves || (frame.curve ? { all: { curve: frame.curve, color: '#5c8cff' } } : {})
+      const trackerCurveData = curves[props.trackerKey] || curves.all || { curve: DEFAULT_CURVE, color: '#5c8cff' }
+      const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
+      next.set(frame.id, curve)
     })
     curvesState.value = next
   },
@@ -492,7 +512,6 @@ function endHandleDrag() {
 
 .curve-editor__paths path {
   fill: none;
-  stroke: rgba(90, 150, 255, 0.6);
   stroke-width: 0.01;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -500,7 +519,6 @@ function endHandleDrag() {
 }
 
 .curve-editor__paths path.is-modified {
-  stroke: color-mix(in srgb, var(--accent, #2d8cff) 80%, rgba(255, 255, 255, 0.85));
   stroke-width: 0.014;
 }
 

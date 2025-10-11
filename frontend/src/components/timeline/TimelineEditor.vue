@@ -192,6 +192,7 @@
                   :key="segment.id"
                   :d="segment.path"
                   :class="{ 'is-modified': segment.modified }"
+                  :style="{ stroke: segment.color || '#5c8cff' }"
                 />
               </svg>
             </div>
@@ -488,6 +489,7 @@ const timelineCurvePaths = computed(() => {
   const baseY = CURVE_VIEWBOX_HEIGHT / 2
   const amplitude = CURVE_VIEWBOX_HEIGHT * 0.4
   const result = []
+  
   for (let i = 0; i < frames.length - 1; i++) {
     const current = frames[i]
     const next = frames[i + 1]
@@ -495,17 +497,36 @@ const timelineCurvePaths = computed(() => {
     const endX = timeToX(next.time)
     const width = endX - startX
     if (!Number.isFinite(width) || width <= 0.5) continue
-    const startCurve = sanitizeCurve(current.curve)
-    const endCurve = sanitizeCurve(next.curve)
-    const ctrl1X = startX + width * startCurve.out.x
-    const ctrl2X = startX + width * endCurve.in.x
-    const ctrl1Y = baseY - amplitude * (startCurve.out.y - 0.5) * 2
-    const ctrl2Y = baseY - amplitude * (endCurve.in.y - 0.5) * 2
-    const path = `M ${startX} ${baseY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${baseY}`
-    result.push({
-      id: `${current.id}-${next.id}`,
-      path,
-      modified: isCurveModified(startCurve) || isCurveModified(endCurve)
+    
+    // 各トラッカーのカーブを取得
+    const currentCurves = current.curves || (current.curve ? { all: { curve: current.curve, color: '#5c8cff' } } : { all: { curve: sanitizeCurve({}), color: '#5c8cff' } })
+    const nextCurves = next.curves || (next.curve ? { all: { curve: next.curve, color: '#5c8cff' } } : { all: { curve: sanitizeCurve({}), color: '#5c8cff' } })
+    
+    // 両方のフレームに存在するトラッカーキーを取得
+    const trackerKeys = new Set([...Object.keys(currentCurves), ...Object.keys(nextCurves)])
+    
+    // 各トラッカーのカーブパスを生成
+    trackerKeys.forEach(trackerKey => {
+      const startCurveData = currentCurves[trackerKey] || { curve: sanitizeCurve({}), color: '#5c8cff' }
+      const endCurveData = nextCurves[trackerKey] || { curve: sanitizeCurve({}), color: '#5c8cff' }
+      
+      const startCurve = sanitizeCurve(startCurveData.curve)
+      const endCurve = sanitizeCurve(endCurveData.curve)
+      const curveColor = startCurveData.color || '#5c8cff'
+      
+      const ctrl1X = startX + width * startCurve.out.x
+      const ctrl2X = startX + width * endCurve.in.x
+      const ctrl1Y = baseY - amplitude * (startCurve.out.y - 0.5) * 2
+      const ctrl2Y = baseY - amplitude * (endCurve.in.y - 0.5) * 2
+      const path = `M ${startX} ${baseY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${baseY}`
+      
+      result.push({
+        id: `${current.id}-${next.id}-${trackerKey}`,
+        path,
+        color: curveColor,
+        trackerKey,
+        modified: isCurveModified(startCurve) || isCurveModified(endCurve)
+      })
     })
   }
   return result

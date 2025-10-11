@@ -26,7 +26,7 @@ VRM ビューアを中心としたフロントエンド（Vite + Vue 3）と、�
   npm install
   npm run dev
   ```
-  ブラウザで http://localhost:5173 を開きます。フロントから `/api` へのリクエストは `http://localhost:8080` へプロキシされます。
+  ブラウザで http://localhost:5173 を開きます。フロントから `/api` へのリクエストは `http://localhost:8081` へプロキシされます。
 
 ## 環境変数
 `.env.example` を参考に環境変数を設定します。PowerShell 例:
@@ -56,7 +56,7 @@ $env:API_KEY="dev-api-key"
 ```powershell
 cd backend/java
 mvn spring-boot:run
-# -> http://localhost:8080
+# -> http://localhost:8081
 ```
 
 3) フロントエンド
@@ -64,7 +64,7 @@ mvn spring-boot:run
 cd frontend
 npm install
 npm run dev
-# -> http://localhost:5173 （/api は 8080 へプロキシ）
+# -> http://localhost:5173 （/api は 8081 へプロキシ）
 ```
 
 4) オプション: Python サーバ

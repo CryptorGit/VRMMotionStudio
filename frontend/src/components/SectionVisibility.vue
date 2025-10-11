@@ -6,6 +6,14 @@
     :directional-intensity="directionalIntensity"
     @update:directional-intensity="v => emit('update:directionalIntensity', v)"
   />
+  <ModelSection
+    v-else-if="active === 'model'"
+    :models="models"
+    :look-at-enabled="lookAtEnabled"
+    @toggle-model="(i, v) => emit('toggle-model', i, v)"
+    @remove-model="i => emit('remove-model', i)"
+    @update:lookAtEnabled="v => emit('update:lookAtEnabled', v)"
+  />
   <DisplaySection
     v-else-if="active === 'display'"
     :models="models"
@@ -35,7 +43,8 @@
     @update:outline-color="v => emit('update:outlineColor', v)"
     @toggle-all-bones="v => emit('toggle-all-bones', v)"
     @toggle-all-bone-names="v => emit('toggle-all-bone-names', v)"
-    @reset-outline="() => emit('reset-outline')"
+    @reset-outline="(i) => emit('reset-outline', i)"
+    @load-model-outline="(i) => emit('load-model-outline', i)"
   />
   <TrackerSection
     v-else-if="active === 'trackers'"
@@ -80,6 +89,7 @@
     :selection="timelineSelection"
     :snap="timelineSnap"
     :loop="timelineLoop"
+    :available-trackers="availableTrackers"
     @update:snap="v => emit('update:timelineSnap', v)"
     @update:loop="v => emit('update:timelineLoop', v)"
     @remove-selected="() => emit('remove-selected-keyframes')"
@@ -108,12 +118,13 @@
   @update:cameraRotateSensitivity="v => emit('update:cameraRotateSensitivity', v)"
     @capture="() => emit('capture-camera')"
   />
-  <MorphSection v-else-if="active === 'morph'" :mesh="mesh" />
+  <MorphSection v-else-if="active === 'morph'" :mesh="mesh" :models="models" />
 </template>
 
 <script setup>
 import LightingSection from './LightingSection.vue'
 import MorphSection from './MorphSection.vue'
+import ModelSection from './ModelSection.vue'
 import DisplaySection from './DisplaySection.vue'
 import CameraSection from './CameraSection.vue'
 import KeySettingsSection from './KeySettingsSection.vue'
@@ -125,6 +136,7 @@ const props = defineProps({
   directional: Object,
   mesh: Object,
   models: { type: Array, required: true },
+  lookAtEnabled: { type: Boolean, default: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
@@ -166,13 +178,17 @@ const props = defineProps({
   active: { type: String, default: 'lighting' },
   timelineSelection: { type: Object, default: () => ({}) },
   timelineSnap: { type: Boolean, default: true },
-  timelineLoop: { type: Boolean, default: false }
+  timelineLoop: { type: Boolean, default: false },
+  availableTrackers: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
+  'update:lookAtEnabled',
+  'toggle-model',
+  'remove-model',
   'update:showExtendedBones',
   'update:showColliderNodes',
   'update:showNonDeformingBones',
@@ -217,7 +233,8 @@ const emit = defineEmits([
   'update:timelineSnap',
   'update:timelineLoop',
   'remove-selected-keyframes',
-  'update-keyframe-curves'
+  'update-keyframe-curves',
+  'load-model-outline'
 ])
 
 function handleFingerUpdate({ hand, finger, value }) {

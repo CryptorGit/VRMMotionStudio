@@ -36,5 +36,5 @@ python .\app.py --port 8000
 ```
 
 ## メモ
-- 開発時、フロントは Vite 開発サーバが `/api` を `http://localhost:8080` にプロキシします。
+- 開発時、フロントは Vite 開発サーバが `/api` を `http://localhost:8081` にプロキシします。
 - H2 はメモリ DB。`schema.sql` / `data.sql` を `resources/` に配置済み。

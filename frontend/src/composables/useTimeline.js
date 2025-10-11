@@ -769,6 +769,49 @@ const DEFAULT_CURVE = Object.freeze({
   out: { x: 1 / 3, y: 1 / 3 }
 })
 
+// トラッカーごとのカーブとカラーを保存する構造
+// curves: { trackerKey: { curve: {...}, color: '#hex' } }
+// 'all' キーは全トラッカー共通のカーブ
+
+// トラッカーごとのカーブとカラーを保存する構造
+// curves: { trackerKey: { curve: {...}, color: '#hex' } }
+// 'all' キーは全トラッカー共通のカーブ
+
+function sanitizeCurves(curves) {
+  if (!curves || typeof curves !== 'object') {
+    return { all: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+  }
+  const result = {}
+  for (const [key, data] of Object.entries(curves)) {
+    result[key] = {
+      curve: sanitizeCurve(data?.curve, DEFAULT_CURVE),
+      color: typeof data?.color === 'string' ? data.color : '#5c8cff'
+    }
+  }
+  // 'all' キーがない場合は追加
+  if (!result.all) {
+    result.all = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+  }
+  return result
+}
+
+function cloneCurves(curves) {
+  if (!curves || typeof curves !== 'object') {
+    return { all: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+  }
+  const result = {}
+  for (const [key, data] of Object.entries(curves)) {
+    result[key] = {
+      curve: cloneCurve(data?.curve || DEFAULT_CURVE),
+      color: typeof data?.color === 'string' ? data.color : '#5c8cff'
+    }
+  }
+  if (!result.all) {
+    result.all = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+  }
+  return result
+}
+
 function clamp01(value) {
   if (!Number.isFinite(value)) return 0
   if (value < 0) return 0
@@ -1099,7 +1142,7 @@ export function useTimeline({ trackers, renderCamera }) {
     return Math.round(clampTime(time) * fps)
   }
 
-  function addKeyframe({ time, values, curve }) {
+  function addKeyframe({ time, values, curve, curves, trackerKey, curveColor }) {
     const clampedTime = clampTime(time)
     const targetFrame = timeToFrame(clampedTime)
     const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
@@ -1107,8 +1150,30 @@ export function useTimeline({ trackers, renderCamera }) {
     let updatedEntry = null
     const nextFrames = keyframes.value.map(frame => {
       if (timeToFrame(frame.time) !== targetFrame) return frame
-      const nextCurve = curve ? sanitizeCurve(curve, frame.curve || DEFAULT_CURVE) : cloneCurve(frame.curve || DEFAULT_CURVE)
-      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curve: nextCurve }
+      
+      // curvesパラメータがある場合はそれを使用、なければ既存のcurvesを保持
+      let nextCurves
+      if (curves) {
+        nextCurves = sanitizeCurves(curves)
+      } else if (trackerKey && curve) {
+        // 特定のトラッカーのカーブを更新
+        nextCurves = cloneCurves(frame.curves || {})
+        nextCurves[trackerKey] = {
+          curve: sanitizeCurve(curve, DEFAULT_CURVE),
+          color: curveColor || nextCurves[trackerKey]?.color || '#5c8cff'
+        }
+      } else if (curve) {
+        // 下位互換性のため、curveのみの場合は'all'キーに設定
+        nextCurves = cloneCurves(frame.curves || {})
+        nextCurves.all = {
+          curve: sanitizeCurve(curve, DEFAULT_CURVE),
+          color: curveColor || nextCurves.all?.color || '#5c8cff'
+        }
+      } else {
+        nextCurves = cloneCurves(frame.curves || {})
+      }
+      
+      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curves: nextCurves }
       return updatedEntry
     })
 
@@ -1124,7 +1189,7 @@ export function useTimeline({ trackers, renderCamera }) {
       id: nextKeyframeId++,
       time: clampedTime,
       values: sanitizedValues,
-      curve: sanitizeCurve(curve, DEFAULT_CURVE)
+      curves: curves ? sanitizeCurves(curves) : sanitizeCurves({ all: { curve: sanitizeCurve(curve, DEFAULT_CURVE), color: curveColor || '#5c8cff' } })
     }
     keyframes.value = [...nextFrames, entry].sort((a, b) => a.time - b.time)
     storeLastApplied(entry.values)
@@ -1172,21 +1237,40 @@ export function useTimeline({ trackers, renderCamera }) {
         updated.values = sanitizeSnapshotValues(payload.values, trackers, lastAppliedValues)
         changed = true
       }
-      if (payload.curve && typeof payload.curve === 'object') {
-        const nextCurve = sanitizeCurve(payload.curve, updated.curve || DEFAULT_CURVE)
-        if (
-          !updated.curve ||
-          updated.curve.in.x !== nextCurve.in.x ||
-          updated.curve.in.y !== nextCurve.in.y ||
-          updated.curve.out.x !== nextCurve.out.x ||
-          updated.curve.out.y !== nextCurve.out.y
-        ) {
-          updated.curve = nextCurve
-          changed = true
+      
+      // curvesの更新処理
+      if (payload.curves) {
+        updated.curves = sanitizeCurves(payload.curves)
+        changed = true
+      } else if (payload.trackerKey && payload.curve) {
+        // 特定のトラッカーのカーブを更新
+        if (!updated.curves) updated.curves = sanitizeCurves({})
+        updated.curves = cloneCurves(updated.curves)
+        updated.curves[payload.trackerKey] = {
+          curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
+          color: payload.curveColor || updated.curves[payload.trackerKey]?.color || '#5c8cff'
         }
+        changed = true
+      } else if (payload.curve) {
+        // 下位互換性のため、curveのみの場合は'all'キーに設定
+        if (!updated.curves) updated.curves = sanitizeCurves({})
+        updated.curves = cloneCurves(updated.curves)
+        updated.curves.all = {
+          curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
+          color: payload.curveColor || updated.curves.all?.color || '#5c8cff'
+        }
+        changed = true
       }
-      if (!updated.curve) {
-        updated.curve = cloneCurve(DEFAULT_CURVE)
+      
+      // 古いcurveプロパティのサポート（下位互換性）
+      if (!updated.curves && updated.curve) {
+        updated.curves = sanitizeCurves({ all: { curve: updated.curve, color: '#5c8cff' } })
+        delete updated.curve
+        changed = true
+      }
+      
+      if (!updated.curves) {
+        updated.curves = sanitizeCurves({})
       }
       return updated
     })

@@ -360,8 +360,16 @@ export function useVirtualTrackers({
     }
     // Model reload (count changed but not to/from 0)
     else if (currentCount !== previousCount) {
-      // Just update tracker positions, don't change enabled state
-      if (enabled.value && currentCount > 0) {
+      // 2つ目以降のモデルが追加された場合、トラッカーを再作成
+      if (enabled.value && currentCount > previousCount) {
+        // モデルが追加されたので、トラッカーを再作成
+        createGizmos()
+        // force: false を使用して保存された位置を優先
+        setTimeout(() => {
+          layoutDefaultPositions({ force: false })
+        }, 100)
+      } else if (enabled.value && currentCount > 0) {
+        // Just update tracker positions, don't change enabled state
         // Reinitialize tracker positions for new models
         // force: false を使用して保存された位置を優先
         setTimeout(() => {
@@ -2191,6 +2199,44 @@ export function useVirtualTrackers({
       if (headBone) {
         if (trackerIsIndividuallyEnabled('head')) {
           applyTrackerRotationToBone(headBone, 'head', { weight: 0.85 })
+        }
+        
+        // ===== UpperArm位置反映（回転は反映しない） =====
+        // UpperArmトラッカーの位置をボーンに反映（ボーンの制約に従って）
+        if (bones.leftShoulder && bones.leftUpperArm) {
+          const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
+          if (leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
+            try {
+              const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
+              const targetPos = leftUpperArmTracker.mesh.position.clone()
+              const direction = targetPos.clone().sub(shoulderPos)
+              
+              if (direction.lengthSq() > 1e-8) {
+                direction.normalize()
+                // 肩ボーンの方向をUpperArmトラッカーの位置に向ける
+                rotateBoneToward(bones.leftShoulder, direction, 1.0)
+                bones.leftShoulder.updateMatrixWorld(true)
+              }
+            } catch {}
+          }
+        }
+        
+        if (bones.rightShoulder && bones.rightUpperArm) {
+          const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
+          if (rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
+            try {
+              const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
+              const targetPos = rightUpperArmTracker.mesh.position.clone()
+              const direction = targetPos.clone().sub(shoulderPos)
+              
+              if (direction.lengthSq() > 1e-8) {
+                direction.normalize()
+                // 肩ボーンの方向をUpperArmトラッカーの位置に向ける
+                rotateBoneToward(bones.rightShoulder, direction, 1.0)
+                bones.rightShoulder.updateMatrixWorld(true)
+              }
+            } catch {}
+          }
         }
         
         // ===== VRChat準拠の腕IK =====

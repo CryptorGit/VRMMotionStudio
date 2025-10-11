@@ -25,6 +25,7 @@
           :directional="directional"
           :mesh="mesh"
           :models="models"
+          :look-at-enabled="lookAtEnabled"
           :show-light-marker="showLightMarker"
           :marker-color="markerColor"
           :directional-intensity="directionalIntensity"
@@ -66,9 +67,13 @@
           :timeline-selection="timelineSelection"
           :timeline-snap="timelineSnap"
           :timeline-loop="timelineLoop"
+          :available-trackers="availableTrackers"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
+          @update:lookAtEnabled="v => emit('update:lookAtEnabled', v)"
+          @toggle-model="(i, v) => emit('toggle-model', i, v)"
+          @remove-model="i => emit('remove-model', i)"
           @update:showExtendedBones="v => emit('update:showExtendedBones', v)"
           @update:showColliderNodes="v => emit('update:showColliderNodes', v)"
           @update:showNonDeformingBones="v => emit('update:showNonDeformingBones', v)"
@@ -87,7 +92,6 @@
           @update:showTrackerAxes="v => emit('update:showTrackerAxes', v)"
           @update:trackerAxesLength="v => emit('update:trackerAxesLength', v)"
           @update:forearm-twist-share="v => emit('update:forearmTwistShare', v)"
-          @update:fingerStates="v => emit('update:fingerStates', v)"
           @update:tracker-position="v => emit('update:tracker-position', v)"
           @update:tracker-rotation="v => emit('update:tracker-rotation', v)"
           @update:tracker-rotation-order="v => emit('update:tracker-rotation-order', v)"
@@ -113,7 +117,9 @@
           @toggle-all-bone-names="(...args) => emit('toggle-all-bone-names', ...args)"
           @reset-virtual-trackers="() => emit('reset-virtual-trackers')"
           @reset-all-tracker-orientations="() => emit('reset-all-tracker-orientations')"
-          @reset-outline="() => emit('reset-outline')"
+          @reset-outline="(i) => emit('reset-outline', i)"
+          @load-model-outline="(i) => emit('load-model-outline', i)"
+          @update:fingerStates="v => emit('update:fingerStates', v)"
         />
       </div>
     </div>
@@ -132,6 +138,7 @@ const props = defineProps({
   directional: Object,
   mesh: Object,
   models: { type: Array, required: true },
+  lookAtEnabled: { type: Boolean, default: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
@@ -172,13 +179,17 @@ const props = defineProps({
   captureBusy: { type: Boolean, default: false },
   timelineSelection: { type: Object, default: () => ({}) },
   timelineSnap: { type: Boolean, default: true },
-  timelineLoop: { type: Boolean, default: false }
+  timelineLoop: { type: Boolean, default: false },
+  availableTrackers: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
+  'update:lookAtEnabled',
+  'toggle-model',
+  'remove-model',
   'update:showExtendedBones',
   'update:showColliderNodes',
   'update:showNonDeformingBones',
@@ -220,6 +231,7 @@ const emit = defineEmits([
   'reset-virtual-trackers',
   'reset-all-tracker-orientations',
   'reset-outline',
+  'load-model-outline',
   'update-timeline-snap',
   'update-timeline-loop',
   'remove-selected-keyframes',
