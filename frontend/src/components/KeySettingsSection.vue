@@ -2,7 +2,6 @@
   <section class="key-settings">
     <header class="key-settings__header">
       <div class="key-settings__title">
-        <h2>キー設定</h2>
         <p v-if="hasSelection" class="key-settings__subtitle">
           選択中 {{ selectionCount }} 件<span v-if="hasMultiple">（複数）</span>
         </p>
@@ -14,25 +13,6 @@
         <span>{{ rangeLabel }}</span>
       </div>
     </header>
-
-    <div class="key-settings__controls">
-      <label class="key-settings__toggle">
-        <input type="checkbox" :checked="snap" @change="onSnapChange" />
-        <span>フレームにスナップ</span>
-      </label>
-      <label class="key-settings__toggle">
-        <input type="checkbox" :checked="loop" @change="onLoopChange" />
-        <span>ループ再生</span>
-      </label>
-      <button
-        type="button"
-        class="key-settings__btn key-settings__btn--danger"
-        :disabled="!hasSelection"
-        @click="onRemoveSelected"
-      >
-        選択したキーを削除
-      </button>
-    </div>
 
     <div v-if="hasSelection" class="key-settings__list">
       <div v-for="frame in frameRows" :key="frame.id" class="key-settings__row">
@@ -49,13 +29,34 @@
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
-      <TimelineCurveEditor :frames="selection.frames" @update="onCurvesUpdate" />
+      <!-- トラッカー選択 -->
+      <div class="curve-tracker-selector">
+        <label class="tracker-label">
+          <span>対象トラッカー</span>
+          <select v-model="selectedTracker" class="tracker-select">
+            <option value="all">すべて（イージングカーブ未設定）</option>
+            <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
+              {{ tracker.label }}
+            </option>
+          </select>
+        </label>
+        <label class="color-label">
+          <span>カーブ色</span>
+          <input type="color" v-model="curveColor" class="color-input" />
+        </label>
+      </div>
+      <TimelineCurveEditor 
+        :frames="selection.frames" 
+        :tracker-key="selectedTracker"
+        :curve-color="curveColor"
+        @update="onCurvesUpdate" 
+      />
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import TimelineCurveEditor from './timeline/TimelineCurveEditor.vue'
 
 const props = defineProps({
@@ -72,10 +73,14 @@ const props = defineProps({
     })
   },
   snap: { type: Boolean, default: true },
-  loop: { type: Boolean, default: false }
+  loop: { type: Boolean, default: false },
+  availableTrackers: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
+
+const selectedTracker = ref('all')
+const curveColor = ref('#5c8cff')
 
 const selectionCount = computed(() => Number(props.selection?.frames?.length ?? 0))
 const hasSelection = computed(() => selectionCount.value > 0)
@@ -110,20 +115,12 @@ function formatSeconds(seconds) {
   return `${sign}${abs.toFixed(3)}s`
 }
 
-function onSnapChange(event) {
-  emit('update:snap', event.target.checked)
-}
-
-function onLoopChange(event) {
-  emit('update:loop', event.target.checked)
-}
-
-function onRemoveSelected() {
-  emit('remove-selected')
-}
-
 function onCurvesUpdate(payload) {
-  emit('update-curves', payload)
+  emit('update-curves', {
+    ...payload,
+    trackerKey: selectedTracker.value,
+    curveColor: curveColor.value
+  })
 }
 </script>
 
@@ -284,6 +281,56 @@ function onCurvesUpdate(payload) {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(25, 28, 40, 0.92), rgba(20, 22, 32, 0.92));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 32px rgba(12, 15, 24, 0.35);
+}
+
+.curve-tracker-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: flex-end;
+}
+
+.tracker-label,
+.color-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(240, 244, 255, 0.85);
+}
+
+.tracker-label {
+  flex: 1;
+}
+
+.tracker-select {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: rgba(12, 16, 28, 0.6);
+  color: rgba(240, 244, 255, 0.9);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tracker-select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background: rgba(12, 16, 28, 0.8);
+}
+
+.color-input {
+  width: 80px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: rgba(12, 16, 28, 0.6);
+  cursor: pointer;
+}
+
+.color-input:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
 }
 
 .key-settings__curve-editor :deep(.curve-editor) {

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MokuMoku Dance Web - ファイルサーバ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 MokuMoku Dance Web ファイルサーバ</h1>
+        <div class="info">
+            <h2>サービス情報</h2>
+            <ul>
+                <li>フロントエンド: <a href="http://localhost:1301" style="color: #fff;">http://localhost:1301</a></li>
+                <li>バックエンド: <a href="http://localhost:1311" style="color: #fff;">http://localhost:1311</a></li>
+                <li>ファイルサーバ: <a href="http://localhost:1314" style="color: #fff;">http://localhost:1314</a></li>
+            </ul>
+        </div>
+        <div class="info">
+            <h2>ファイル配信</h2>
+            <p>このディレクトリには静的ファイル（VRMモデル、テクスチャ、JSONデータなど）を配置してください。</p>
+            <p>配置したファイルは <code>http://localhost:1314/ファイル名</code> でアクセスできます。</p>
+        </div>
+    </div>
+</body>
+</html>

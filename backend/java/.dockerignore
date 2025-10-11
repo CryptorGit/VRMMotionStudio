@@ -1,0 +1,10 @@
+# .dockerignore for backend
+target
+.git
+.gitignore
+*.log
+.DS_Store
+.env.local
+.vscode
+.idea
+*.iml

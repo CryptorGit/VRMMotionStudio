@@ -81,6 +81,16 @@
   </div>
   <div class="row">
     <label class="stretch">
+      <span>対象モデル</span>
+      <select v-model="selectedOutlineModelIndex" class="model-select">
+        <option v-for="(model, index) in models" :key="model.id" :value="index">
+          {{ model.name }}
+        </option>
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label class="stretch">
       アウトライン太さ
       <input
         type="range"
@@ -102,7 +112,7 @@
       type="button"
       class="btn-outline-reset"
       :disabled="!hasModels"
-      @click="emit('reset-outline')"
+      @click="emit('reset-outline', selectedOutlineModelIndex)"
     >
       デフォルトにリセット
     </button>
@@ -110,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
@@ -127,6 +137,8 @@ const props = defineProps({
   outlineWidth: { type: Number, default: 0.002 },
   outlineColor: { type: String, default: '#000000' }
 })
+
+const selectedOutlineModelIndex = ref(0)
 
 const emit = defineEmits([
   'update:showLightMarker',
@@ -292,5 +304,22 @@ hr {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin: 0.5rem 0;
+}
+
+.model-select {
+  width: 100%;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: rgba(12, 16, 28, 0.6);
+  color: rgba(240, 244, 255, 0.9);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.model-select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background: rgba(12, 16, 28, 0.8);
 }
 </style>
