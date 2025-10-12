@@ -34,7 +34,7 @@
         <label class="tracker-label">
           <span>対象トラッカー</span>
           <select v-model="selectedTracker" class="tracker-select">
-            <option value="all">すべて（イージングカーブ未設定）</option>
+            <option value="all">まとめて（未設定トラッカー）</option>
             <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
               {{ tracker.label }}
             </option>
@@ -128,8 +128,9 @@ watch(selectedTracker, (newTracker) => {
   if (!trackerCurveColors.value.has(newTracker)) {
     // フレームデータから色を取得
     const firstFrame = props.selection?.frames?.[0]
-    if (firstFrame?.curves?.[newTracker]?.color) {
-      trackerCurveColors.value.set(newTracker, firstFrame.curves[newTracker].color)
+    const inherited = firstFrame?.curves?.[newTracker] || firstFrame?.curves?.all
+    if (inherited?.color) {
+      trackerCurveColors.value.set(newTracker, inherited.color)
     } else {
       trackerCurveColors.value.set(newTracker, getDefaultColor(newTracker))
     }

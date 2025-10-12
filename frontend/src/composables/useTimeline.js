@@ -771,15 +771,15 @@ const DEFAULT_CURVE = Object.freeze({
 
 // トラッカーごとのカーブとカラーを保存する構造
 // curves: { trackerKey: { curve: {...}, color: '#hex' } }
-// 'all' キーは全トラッカー共通のカーブ
+// 'default' キーは未設定トラッカーのデフォルトカーブ
 
 // トラッカーごとのカーブとカラーを保存する構造
 // curves: { trackerKey: { curve: {...}, color: '#hex' } }
-// 'all' キーは全トラッカー共通のカーブ
+// 'default' キーは未設定トラッカーのデフォルトカーブ
 
 function sanitizeCurves(curves) {
   if (!curves || typeof curves !== 'object') {
-    return { all: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
   }
   const result = {}
   for (const [key, data] of Object.entries(curves)) {
@@ -788,16 +788,22 @@ function sanitizeCurves(curves) {
       color: typeof data?.color === 'string' ? data.color : '#5c8cff'
     }
   }
-  // 'all' キーがない場合は追加
-  if (!result.all) {
-    result.all = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  if (!result.default) {
+    // 互換性: 'all' キーがある場合は 'default' に移行
+    if (result.all) {
+      result.default = result.all
+      delete result.all
+    } else {
+      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+    }
   }
   return result
 }
 
 function cloneCurves(curves) {
   if (!curves || typeof curves !== 'object') {
-    return { all: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
   }
   const result = {}
   for (const [key, data] of Object.entries(curves)) {
@@ -806,8 +812,17 @@ function cloneCurves(curves) {
       color: typeof data?.color === 'string' ? data.color : '#5c8cff'
     }
   }
-  if (!result.all) {
-    result.all = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  if (!result.default) {
+    if (result.all) {
+      result.default = {
+        curve: cloneCurve(result.all.curve || DEFAULT_CURVE),
+        color: result.all.color || '#5c8cff'
+      }
+      delete result.all
+    } else {
+      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+    }
   }
   return result
 }
@@ -1173,7 +1188,8 @@ export function useTimeline({ trackers, renderCamera }) {
         nextCurves = cloneCurves(frame.curves || {})
       }
       
-      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curves: nextCurves }
+      const baseCurve = sanitizeCurve(nextCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
+      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curves: nextCurves, curve: baseCurve }
       return updatedEntry
     })
 
@@ -1185,11 +1201,17 @@ export function useTimeline({ trackers, renderCamera }) {
       return updatedEntry
     }
 
+    const sanitizedCurves = curves
+      ? sanitizeCurves(curves)
+      : sanitizeCurves({ all: { curve: sanitizeCurve(curve, DEFAULT_CURVE), color: curveColor || '#5c8cff' } })
+    const baseCurve = sanitizeCurve(sanitizedCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
+
     const entry = {
       id: nextKeyframeId++,
       time: clampedTime,
       values: sanitizedValues,
-      curves: curves ? sanitizeCurves(curves) : sanitizeCurves({ all: { curve: sanitizeCurve(curve, DEFAULT_CURVE), color: curveColor || '#5c8cff' } })
+      curves: sanitizedCurves,
+      curve: baseCurve
     }
     keyframes.value = [...nextFrames, entry].sort((a, b) => a.time - b.time)
     storeLastApplied(entry.values)
@@ -1272,6 +1294,7 @@ export function useTimeline({ trackers, renderCamera }) {
       if (!updated.curves) {
         updated.curves = sanitizeCurves({})
       }
+      updated.curve = sanitizeCurve(updated.curves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
       return updated
     })
     if (!changed) return keyframes.value.find(frame => frame.id === id) || null
@@ -1325,7 +1348,8 @@ export function useTimeline({ trackers, renderCamera }) {
     const sanitizedFrames = frames.map(frame => ({
       timeOffset: Number(frame.time) - baseTime || 0,
       values: cloneSnapshot(frame.values),
-      curve: cloneCurve(frame.curve || DEFAULT_CURVE)
+      curve: cloneCurve(frame.curve || frame.curves?.all?.curve || DEFAULT_CURVE),
+      curves: cloneCurves(frame.curves || {})
     }))
     return {
       version: TIMELINE_CLIPBOARD_VERSION,
@@ -1344,8 +1368,9 @@ export function useTimeline({ trackers, renderCamera }) {
         const offset = Number(frame?.timeOffset ?? frame?.offset ?? frame?.time)
         if (!Number.isFinite(offset)) return null
         const values = cloneSnapshot(frame?.values)
-        const curve = cloneCurve(frame?.curve || DEFAULT_CURVE)
-        return { offset, values, curve }
+        const curves = frame?.curves ? cloneCurves(frame.curves) : null
+        const curve = cloneCurve(frame?.curve || frame?.curves?.all?.curve || DEFAULT_CURVE)
+        return { offset, values, curve, curves }
       })
       .filter(Boolean)
       .sort((a, b) => a.offset - b.offset)
@@ -1357,7 +1382,12 @@ export function useTimeline({ trackers, renderCamera }) {
     const created = []
     normalized.forEach(entry => {
       const targetTime = baseTime + entry.offset
-      const keyframe = addKeyframe({ time: targetTime, values: entry.values, curve: entry.curve })
+      const keyframe = addKeyframe({
+        time: targetTime,
+        values: entry.values,
+        curve: entry.curve,
+        curves: entry.curves
+      })
       if (keyframe) created.push(keyframe)
     })
     applyCurrentPose()
@@ -1683,11 +1713,16 @@ export function useTimeline({ trackers, renderCamera }) {
         if (!Number.isFinite(id) || id <= 0) id = ++maxId
         else maxId = Math.max(maxId, id)
         const time = Number(entry.time)
+        const sanitizedCurve = sanitizeCurve(entry.curve, DEFAULT_CURVE)
+        const sanitizedCurves = entry.curves
+          ? sanitizeCurves(entry.curves)
+          : sanitizeCurves({ all: { curve: sanitizedCurve, color: entry.curveColor || '#5c8cff' } })
         return {
           id,
           time: Number.isFinite(time) ? clampTime(time) : startTime.value,
           values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues, renderCamera),
-          curve: sanitizeCurve(entry.curve, DEFAULT_CURVE)
+          curve: sanitizeCurve(sanitizedCurves.all?.curve || sanitizedCurve, DEFAULT_CURVE),
+          curves: sanitizedCurves
         }
       })
       .sort((a, b) => a.time - b.time)
@@ -1701,7 +1736,8 @@ export function useTimeline({ trackers, renderCamera }) {
       id: frame.id,
       time: frame.time,
       values: cloneSnapshot(frame.values),
-      curve: cloneCurve(frame.curve || DEFAULT_CURVE)
+      curve: cloneCurve(frame.curve || frame.curves?.all?.curve || DEFAULT_CURVE),
+      curves: cloneCurves(frame.curves || {})
     }))
   }
 

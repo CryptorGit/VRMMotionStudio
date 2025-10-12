@@ -286,6 +286,7 @@ import { useTheme } from '../composables/useTheme.js'
 import { captionInjectionKey } from '../composables/useCaptions.js'
 import { useStoragePersistence } from '../composables/useStoragePersistence.js'
 import { useFingerControl } from '../composables/useFingerControl.js'
+import { usePoseControls } from '../composables/usePoseControls.js'
 
 const viewer = ref(null)
 const currentMeshRef = ref(null)
@@ -945,8 +946,8 @@ const fileLoader = useFileLoader({
 
 const {
   fileInput,
-  poses,
-  selectedPose,
+  poses: _poses,
+  selectedPose: _selectedPose,
   models,
   onFileChange,
   toggleModelVisibility,
@@ -954,8 +955,7 @@ const {
   toggleBoneNameVisibility,
   removeModel,
   clearCache,
-  applyPose,
-  exportPose,
+  applyPose: _applyPose,
   openFile,
   onDragOver,
   onDragLeave,
@@ -971,6 +971,16 @@ const getActiveModel = () => {
 }
 
 const { applyFingerPose } = useFingerControl(fingerStates, getActiveModel)
+
+// Initialize pose controls for export
+const getFingerStates = () => fingerStates
+const { exportPose } = usePoseControls({
+  getModels: () => models.value,
+  timelineController: () => timelineController,
+  trackerController: () => trackerController,
+  showNotice,
+  getFingerStates
+})
 
 const timelineFileInput = ref(null)
 
@@ -2724,40 +2734,108 @@ function captureImage() {
     // 現在の背景色を保存
     const originalBackground = sceneRef.value.background
     
-    // GB（緑背景）に設定
-    sceneRef.value.background = new THREE.Color(0x00ff00)
-
-    // レンダラーのサイズを一時的に変更
-    const originalSize = new THREE.Vector2()
-    renderer.value.getSize(originalSize)
+    // バーチャルトラッカーを一時非表示
+    const wasTrackersVisible = virtualTrackerDisplayVisible.value
     
-    const captureWidth = renderCameraWidth.value
-    const captureHeight = renderCameraHeight.value
-    
-    renderer.value.setSize(captureWidth, captureHeight)
-    
-    // レンダリング
-    renderer.value.render(sceneRef.value, renderCamera.value)
-    
-    // キャンバスから画像データを取得
-    const canvas = renderer.value.domElement
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        link.download = `capture_${timestamp}.png`
-        link.href = url
-        link.click()
-        URL.revokeObjectURL(url)
-        showNotice(`画像書き出し: ${link.download}`, 3000)
+    // グリッドヘルパーを探して非表示にする
+    let gridHelper = null
+    sceneRef.value.traverse((obj) => {
+      if (obj.isGridHelper) {
+        gridHelper = obj
       }
+    })
+    const wasGridVisible = gridHelper ? gridHelper.visible : false
+    
+    try {
+      if (wasTrackersVisible) virtualTrackerDisplayVisible.value = false
+      if (gridHelper && wasGridVisible) gridHelper.visible = false
       
-      // 元のサイズと背景に戻す
-      renderer.value.setSize(originalSize.x, originalSize.y)
-      sceneRef.value.background = originalBackground
+      // 一フレーム待ってからレンダリング（非表示反映のため）
+      setTimeout(() => {
+        try {
+          // GB（緑背景）に設定
+          sceneRef.value.background = new THREE.Color(0x00ff00)
+
+          // レンダラーのサイズを一時的に変更
+          const originalSize = new THREE.Vector2()
+          renderer.value.getSize(originalSize)
+          
+          const captureWidth = renderCameraWidth.value
+          const captureHeight = renderCameraHeight.value
+          
+          renderer.value.setSize(captureWidth, captureHeight)
+          
+          // レンダリング
+          renderer.value.render(sceneRef.value, renderCamera.value)
+          
+          // キャンバスから画像データを取得
+          const canvas = renderer.value.domElement
+          canvas.toBlob(async (blob) => {
+            if (blob) {
+              try {
+                // File System Access APIを使ってファイル保存ダイアログを表示
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+                const suggestedName = `capture_${timestamp}.png`
+                
+                if (window.showSaveFilePicker) {
+                  const handle = await window.showSaveFilePicker({
+                    suggestedName,
+                    types: [
+                      {
+                        description: 'PNG画像',
+                        accept: { 'image/png': ['.png'] }
+                      }
+                    ]
+                  })
+                  const writable = await handle.createWritable()
+                  await writable.write(blob)
+                  await writable.close()
+                  showNotice(`画像書き出し: ${handle.name || suggestedName}`, 3000)
+                } else {
+                  // フォールバック: 従来のダウンロード方式
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.download = suggestedName
+                  link.href = url
+                  link.click()
+                  URL.revokeObjectURL(url)
+                  showNotice(`画像書き出し: ${suggestedName}`, 3000)
+                }
+              } catch (error) {
+                console.error('Image save failed:', error)
+                showNotice('画像書き出し: 保存に失敗しました', 3000)
+              }
+            }
+            
+            // 元のサイズと背景に戻す
+            renderer.value.setSize(originalSize.x, originalSize.y)
+            sceneRef.value.background = originalBackground
+            
+            // トラッカーとグリッドを元に戻す
+            if (wasTrackersVisible) virtualTrackerDisplayVisible.value = true
+            if (gridHelper && wasGridVisible) gridHelper.visible = true
+            
+            captureBusy.value = false
+          }, 'image/png')
+        } catch (error) {
+          console.error('Image capture failed:', error)
+          showNotice('画像書き出し: 失敗しました', 3000)
+          
+          // エラー時も元に戻す
+          if (wasTrackersVisible) virtualTrackerDisplayVisible.value = true
+          if (gridHelper && wasGridVisible) gridHelper.visible = true
+          captureBusy.value = false
+        }
+      }, 50)
+    } catch (error) {
+      console.error('Image capture setup failed:', error)
+      showNotice('画像書き出し: 失敗しました', 3000)
+      
+      // エラー時も元に戻す
+      if (wasTrackersVisible) virtualTrackerDisplayVisible.value = true
+      if (gridHelper && wasGridVisible) gridHelper.visible = true
       captureBusy.value = false
-    }, 'image/png')
+    }
   } catch (error) {
     console.error('Image capture failed:', error)
     showNotice('画像書き出し: 失敗しました', 3000)
@@ -2765,8 +2843,119 @@ function captureImage() {
   }
 }
 
-function captureVideo() {
-  showNotice('動画書き出し: この機能は今後実装予定です', 3000)
+async function captureVideo() {
+  if (!renderer?.value || !sceneRef.value || !renderCamera.value) {
+    showNotice('動画書き出し: レンダラーが初期化されていません', 3000)
+    return
+  }
+  
+  if (!timelineController || !timelineController.getKeyframes || timelineController.getKeyframes().length === 0) {
+    showNotice('動画書き出し: タイムラインにキーフレームがありません', 3000)
+    return
+  }
+  
+  try {
+    showNotice('動画書き出し: 準備中...', 2000)
+    
+    // MediaRecorder APIを使って動画をキャプチャ
+    const canvas = renderer.value.domElement
+    const stream = canvas.captureStream(60) // 60 FPS
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 8000000 // 8 Mbps
+    })
+    
+    const chunks = []
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunks.push(e.data)
+      }
+    }
+    
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: 'video/webm' })
+      try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+        const suggestedName = `video_${timestamp}.webm`
+        
+        if (window.showSaveFilePicker) {
+          const handle = await window.showSaveFilePicker({
+            suggestedName,
+            types: [
+              {
+                description: 'WebM動画',
+                accept: { 'video/webm': ['.webm'] }
+              }
+            ]
+          })
+          const writable = await handle.createWritable()
+          await writable.write(blob)
+          await writable.close()
+          showNotice(`動画書き出し: ${handle.name || suggestedName}`, 3000)
+        } else {
+          // フォールバック: 従来のダウンロード方式
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.download = suggestedName
+          link.href = url
+          link.click()
+          URL.revokeObjectURL(url)
+          showNotice(`動画書き出し: ${suggestedName}`, 3000)
+        }
+      } catch (error) {
+        console.error('Video save failed:', error)
+        showNotice('動画書き出し: 保存に失敗しました', 3000)
+      }
+    }
+    
+    // 背景とトラッカー/グリッドの状態を保存
+    const originalBackground = sceneRef.value.background
+    const wasTrackersVisible = virtualTrackerDisplayVisible.value
+    
+    // グリッドヘルパーを探して非表示にする
+    let gridHelper = null
+    sceneRef.value.traverse((obj) => {
+      if (obj.isGridHelper) {
+        gridHelper = obj
+      }
+    })
+    const wasGridVisible = gridHelper ? gridHelper.visible : false
+    const wasPlaying = timelineController.isPlaying()
+    
+    // GB（緑背景）に設定、トラッカーとグリッドを非表示
+    sceneRef.value.background = new THREE.Color(0x00ff00)
+    if (wasTrackersVisible) virtualTrackerDisplayVisible.value = false
+    if (gridHelper && wasGridVisible) gridHelper.visible = false
+    
+    // 録画開始
+    mediaRecorder.start()
+    showNotice('動画書き出し: 録画中...', 2000)
+    
+    // タイムラインを最初から再生
+    timelineController.stop()
+    timelineController.jumpToTime(timelineController.getStartTime())
+    timelineController.play()
+    
+    // タイムラインが終了したら録画停止
+    const checkEnd = setInterval(() => {
+      if (!timelineController.isPlaying()) {
+        clearInterval(checkEnd)
+        mediaRecorder.stop()
+        
+        // 元の状態に戻す
+        sceneRef.value.background = originalBackground
+        if (wasTrackersVisible) virtualTrackerDisplayVisible.value = true
+        if (gridHelper && wasGridVisible) gridHelper.visible = true
+        if (!wasPlaying) timelineController.stop()
+        
+        showNotice('動画書き出し: 録画完了', 2000)
+      }
+    }, 100)
+    
+  } catch (error) {
+    console.error('Video capture failed:', error)
+    showNotice('動画書き出し: 失敗しました', 3000)
+  }
 }
 
 function playAudio(startTime = 0) {

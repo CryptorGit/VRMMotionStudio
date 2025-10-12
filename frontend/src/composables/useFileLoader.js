@@ -8,7 +8,8 @@ export function useFileLoader(ctx) {
   const loaderCtx = {
     ...ctx,
     timelineController: ctx.timelineController,
-    trackerController: ctx.trackerController
+    trackerController: ctx.trackerController,
+    getFingerStates: ctx.getFingerStates
   }
   
   const loader = useModelLoader(loaderCtx)

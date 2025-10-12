@@ -169,13 +169,6 @@
           @wheel="handleWheel"
         >
           <div class="timeline__content" :style="contentStyle">
-            <canvas
-              v-if="audioWaveformData && audioWaveformData.length > 0"
-              ref="waveformCanvasRef"
-              class="timeline__waveform"
-              :width="contentWidth"
-              :height="CURVE_VIEWBOX_HEIGHT"
-            ></canvas>
             <div class="timeline__gridlines" aria-hidden="true">
               <div
                 v-for="tick in ticks"
@@ -188,6 +181,8 @@
 
             <div class="timeline__memory" :style="memoryStyle"></div>
 
+            <!-- 波形描画は非表示 -->
+            <!--
             <div class="timeline__curves" aria-hidden="true">
               <svg
                 class="timeline__curves-canvas"
@@ -203,6 +198,7 @@
                 />
               </svg>
             </div>
+            -->
 
             <div class="timeline__keys">
               <div
@@ -279,6 +275,33 @@ function cloneCurve(curve) {
   return sanitizeCurve(curve, DEFAULT_CURVE)
 }
 
+function cloneCurves(curves) {
+  if (!curves || typeof curves !== 'object') return {}
+  const result = {}
+  for (const [key, entry] of Object.entries(curves)) {
+    result[key] = {
+      curve: cloneCurve(entry?.curve),
+      color: typeof entry?.color === 'string' ? entry.color : '#5c8cff'
+    }
+  }
+  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  if (!result.default) {
+    if (result.all) {
+      result.default = {
+        curve: cloneCurve(result.all.curve || DEFAULT_CURVE),
+        color: result.all.color || '#5c8cff'
+      }
+      delete result.all
+    } else {
+      result.default = {
+        curve: cloneCurve(DEFAULT_CURVE),
+        color: '#5c8cff'
+      }
+    }
+  }
+  return result
+}
+
 function isCurveModified(curve) {
   if (!curve) return false
   const sanitized = sanitizeCurve(curve)
@@ -301,7 +324,8 @@ const props = defineProps({
   snap: { type: Boolean, default: true },
   height: { type: [Number, String], default: null },
   canPaste: { type: Boolean, default: false },
-  audioWaveformData: { type: Array, default: null }
+  audioWaveformData: { type: [Array, Object], default: null },
+  audioDuration: { type: Number, default: 0 }
 })
 
 const emit = defineEmits([
@@ -334,6 +358,29 @@ const tracksWrapperRef = ref(null)
 const ticksWrapperRef = ref(null)
 const scrollbarWrapperRef = ref(null)
 const waveformCanvasRef = ref(null)
+
+const waveformSamples = computed(() => {
+  const data = props.audioWaveformData
+  if (!data) return null
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.samples)) return data.samples
+  return null
+})
+
+const waveformDurationSeconds = computed(() => {
+  if (typeof props.audioDuration === 'number' && props.audioDuration > 0) {
+    return props.audioDuration
+  }
+  const duration = props.audioWaveformData && typeof props.audioWaveformData.duration === 'number'
+    ? props.audioWaveformData.duration
+    : 0
+  return duration > 0 ? duration : 0
+})
+
+const hasWaveform = computed(() => {
+  const samples = waveformSamples.value
+  return !!samples && samples.length > 0 && waveformDurationSeconds.value > 0
+})
 
 const widthPx = ref(1)
 // Force frames mode
@@ -370,13 +417,15 @@ const inspectorFrames = computed(() => {
     .filter(Boolean)
     .sort((a, b) => a.time - b.time)
   return frames.map((frame, index) => {
-    const curve = cloneCurve(frame.curve)
+    const curves = cloneCurves(frame.curves || {})
+    const curve = cloneCurve(frame.curve || curves.all?.curve)
     return {
       id: frame.id,
       time: frame.time,
       frameLabel: formatFrameLabelFromTime(frame.time),
       timeLabel: formatTimeLabel(frame.time),
       curve,
+      curves,
       isFirst: index === 0,
       isLast: index === frames.length - 1
     }
@@ -657,7 +706,10 @@ watch(
 watch([viewStart, visibleDuration], () => {
   clampView()
   saveViewState()
-  nextTick(() => syncScrollPositions())
+  nextTick(() => {
+    syncScrollPositions()
+    drawWaveform()
+  })
 })
 
 // lock mode; no-op persistence
@@ -688,38 +740,62 @@ onUnmounted(() => {
 
 // 波形描画関数
 function drawWaveform() {
-  if (!waveformCanvasRef.value || !props.audioWaveformData || props.audioWaveformData.length === 0) {
-    return
-  }
-
   const canvas = waveformCanvasRef.value
+  if (!canvas) return
+
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const width = canvas.width
-  const height = canvas.height
-
-  // キャンバスをクリア
+  const width = Math.max(canvas.width, 1)
+  const height = Math.max(canvas.height, 1)
   ctx.clearRect(0, 0, width, height)
 
-  // 波形データを描画
-  const data = props.audioWaveformData
-  const step = width / data.length
+  const samples = waveformSamples.value
+  const duration = waveformDurationSeconds.value
+  if (!samples || samples.length === 0 || duration <= 0) {
+    return
+  }
+
+  const sampleCount = samples.length
+  const lastIndex = sampleCount - 1
+  const viewStartTime = viewStart.value
+  const viewDuration = visibleDuration.value
+  const timelineStart = props.startTime || 0
+  const audioStart = timelineStart
+  const audioEnd = audioStart + duration
+
+  if (viewDuration <= 0) return
 
   ctx.fillStyle = 'rgba(100, 180, 255, 0.15)'
   ctx.beginPath()
   ctx.moveTo(0, height / 2)
 
-  for (let i = 0; i < data.length; i++) {
-    const x = i * step
-    const amplitude = data[i] // 0〜1の正規化された値
+  for (let x = 0; x < width; x++) {
+    const ratio = width <= 1 ? 0 : x / (width - 1)
+    const time = viewStartTime + ratio * viewDuration
+    let amplitude = 0
+
+    if (time >= audioStart && time <= audioEnd) {
+      const relativeTime = time - audioStart
+      const index = Math.min(lastIndex, Math.max(0, Math.round((relativeTime / duration) * lastIndex)))
+      amplitude = samples[index] ?? 0
+    }
+
     const y = height / 2 - (amplitude * height / 2)
     ctx.lineTo(x, y)
   }
 
-  for (let i = data.length - 1; i >= 0; i--) {
-    const x = i * step
-    const amplitude = data[i]
+  for (let x = width - 1; x >= 0; x--) {
+    const ratio = width <= 1 ? 0 : x / (width - 1)
+    const time = viewStartTime + ratio * viewDuration
+    let amplitude = 0
+
+    if (time >= audioStart && time <= audioEnd) {
+      const relativeTime = time - audioStart
+      const index = Math.min(lastIndex, Math.max(0, Math.round((relativeTime / duration) * lastIndex)))
+      amplitude = samples[index] ?? 0
+    }
+
     const y = height / 2 + (amplitude * height / 2)
     ctx.lineTo(x, y)
   }
@@ -735,6 +811,18 @@ watch(() => props.audioWaveformData, () => {
 
 // コンテンツ幅が変更されたら再描画
 watch(() => contentWidth.value, () => {
+  nextTick(() => drawWaveform())
+})
+
+watch(() => props.audioDuration, () => {
+  nextTick(() => drawWaveform())
+})
+
+watch(() => props.startTime, () => {
+  nextTick(() => drawWaveform())
+})
+
+watch(() => props.endTime, () => {
   nextTick(() => drawWaveform())
 })
 

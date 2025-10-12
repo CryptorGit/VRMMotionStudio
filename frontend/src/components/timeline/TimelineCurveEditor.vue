@@ -155,7 +155,7 @@ const EPSILON = 1e-4
 
 const props = defineProps({
   frames: { type: Array, default: () => [] },
-  trackerKey: { type: String, default: 'all' },
+  trackerKey: { type: String, default: 'default' },
   curveColor: { type: String, default: '#5c8cff' }
 })
 
@@ -194,14 +194,30 @@ const isCurveModified = curve => {
   )
 }
 
-// トラッカー切り替え時にカーブを更新
+// トラッカー切り替え時にカーブを更新し、defaultの設定をコピー
 watch(() => props.trackerKey, (newTrackerKey) => {
-  // 選択されているトラッカーのカーブを取得
   const next = new Map()
   props.frames.forEach(frame => {
     // フレームからトラッカー固有のカーブデータを取得
     const curves = frame.curves || {}
-    const trackerCurveData = curves[newTrackerKey] || { curve: DEFAULT_CURVE, color: props.curveColor }
+    let trackerCurveData = curves[newTrackerKey]
+    
+    // トラッカー固有の設定がない場合は、defaultの設定をコピー
+    if (!trackerCurveData && newTrackerKey !== 'default') {
+      const defaultCurveData = curves.default || { curve: DEFAULT_CURVE, color: props.curveColor }
+      trackerCurveData = {
+        curve: cloneCurve(defaultCurveData.curve || DEFAULT_CURVE),
+        color: defaultCurveData.color || props.curveColor
+      }
+    } else if (!trackerCurveData) {
+      // defaultも存在しない場合（旧データ互換性のため'all'もチェック）
+      const allCurveData = curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
+      trackerCurveData = {
+        curve: cloneCurve(allCurveData.curve || DEFAULT_CURVE),
+        color: allCurveData.color || props.curveColor
+      }
+    }
+    
     const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
     next.set(frame.id, curve)
   })
@@ -218,7 +234,19 @@ watch(
     frames.forEach(frame => {
       // 選択されているトラッカーのカーブを取得
       const curves = frame.curves || {}
-      const trackerCurveData = curves[props.trackerKey] || { curve: DEFAULT_CURVE, color: props.curveColor }
+      let trackerCurveData = curves[props.trackerKey]
+      
+      // トラッカー固有の設定がない場合は、defaultの設定をコピー
+      if (!trackerCurveData && props.trackerKey !== 'default') {
+        const defaultCurveData = curves.default || curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
+        trackerCurveData = {
+          curve: cloneCurve(defaultCurveData.curve || DEFAULT_CURVE),
+          color: defaultCurveData.color || props.curveColor
+        }
+      } else if (!trackerCurveData) {
+        trackerCurveData = curves.default || curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
+      }
+      
       const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
       next.set(frame.id, curve)
     })

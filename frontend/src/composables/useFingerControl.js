@@ -270,8 +270,28 @@ export function useFingerControl(fingerStates, getActiveModel) {
     const humanoid = model.vrm.humanoid
     const leftHandBone = humanoid.getRawBoneNode?.('leftHand') || humanoid.getBoneNode?.('leftHand') || humanoid.getNormalizedBoneNode?.('leftHand')
     const rightHandBone = humanoid.getRawBoneNode?.('rightHand') || humanoid.getBoneNode?.('rightHand') || humanoid.getNormalizedBoneNode?.('rightHand')
-    
-    // Capture initial rotations on first call for this model
+
+    const readFingerValue = key => {
+      if (fingerStates?.value && typeof fingerStates.value === 'object') {
+        const raw = fingerStates.value[key]
+        if (Number.isFinite(raw)) return raw
+      }
+      const fallback = fingerStates?.[key]
+      return Number.isFinite(fallback) ? fallback : 0
+    }
+
+    const trackedFingerKeys = [
+      ...Object.keys(FINGER_BONES.left).map(finger => `left_${finger}`),
+      ...Object.keys(FINGER_BONES.right).map(finger => `right_${finger}`)
+    ]
+
+    const hasActiveCurl = trackedFingerKeys.some(key => Math.abs(readFingerValue(key)) > 1e-3)
+
+    if (!hasActiveCurl && initialRotations.has(model)) {
+      initialRotations.delete(model)
+    }
+
+    // Capture initial rotations using current pose as baseline
     captureInitialRotations(model, humanoid)
     
     // 解決されたボーンマッピングを取得
@@ -306,17 +326,17 @@ export function useFingerControl(fingerStates, getActiveModel) {
     // Apply left hand fingers
     Object.keys(FINGER_BONES.left).forEach(finger => {
       const key = `left_${finger}`
-      const value = fingerStates.value?.[key] || fingerStates[key] || 0
-      if (value > 0.01) {
+      const value = readFingerValue(key)
+      if (mapping.left[finger]) {
         applyFingerCurl(model, 'left', finger, value, mapping.left[finger], leftHandBone)
       }
     })
-    
+
     // Apply right hand fingers
     Object.keys(FINGER_BONES.right).forEach(finger => {
       const key = `right_${finger}`
-      const value = fingerStates.value?.[key] || fingerStates[key] || 0
-      if (value > 0.01) {
+      const value = readFingerValue(key)
+      if (mapping.right[finger]) {
         applyFingerCurl(model, 'right', finger, value, mapping.right[finger], rightHandBone)
       }
     })
@@ -416,13 +436,16 @@ export function useFingerControl(fingerStates, getActiveModel) {
   
   function computeCurlWeights(count) {
     if (!count || count <= 0) return []
-    const weights = []
-    const decay = 0.7
-    for (let i = 0; i < count; i++) {
-      weights.push(Math.pow(decay, i))
+    // 最大3つの関節を均等に曲げる（第一、第二、第三関節）
+    const activeCount = Math.min(3, count)
+    if (activeCount <= 0) return new Array(count).fill(0)
+    // 各関節に均等に分配
+    const perJoint = 1 / activeCount
+    const weights = new Array(count).fill(0)
+    for (let i = 0; i < activeCount; i++) {
+      weights[i] = perJoint
     }
-    const sum = weights.reduce((acc, v) => acc + v, 0) || 1
-    return weights.map(v => v / sum)
+    return weights
   }
 
   function applyFingerCurl(model, hand, finger, amount, bones, handBone) {
@@ -439,9 +462,10 @@ export function useFingerControl(fingerStates, getActiveModel) {
 
     const weights = computeCurlWeights(bones.length)
 
-    const maxAngleDeg = 90
+    // 各関節に最大90度まで曲げる（合計で270度）
+    const maxAngleDegPerJoint = 90
     const normalizedAmount = THREE.MathUtils.clamp(amount ?? 0, 0, 1)
-    const targetAngleRad = THREE.MathUtils.degToRad(maxAngleDeg * normalizedAmount)
+    const targetAngleRad = THREE.MathUtils.degToRad(maxAngleDegPerJoint * normalizedAmount)
 
     bones.forEach((bone, index) => {
       if (!bone) return

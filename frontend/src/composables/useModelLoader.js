@@ -30,7 +30,8 @@ export default function useModelLoader(ctx) {
     getModels: () => ops.models,
     timelineController: ctx.timelineController,
     trackerController: ctx.trackerController,
-    showNotice: ctx.showNotice
+    showNotice: ctx.showNotice,
+    getFingerStates: ctx.getFingerStates
   })
   
   // Update ops with pose data
