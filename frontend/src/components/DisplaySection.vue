@@ -147,15 +147,6 @@ watch(selectedOutlineModelIndex, (newIndex) => {
   emit('load-model-outline', newIndex)
 }, { immediate: false })
 
-// propsの変更を監視してローカル値を更新
-watch(() => props.outlineWidth, (newWidth) => {
-  // 外部からの変更を反映
-}, { immediate: true })
-
-watch(() => props.outlineColor, (newColor) => {
-  // 外部からの変更を反映
-}, { immediate: true })
-
 const emit = defineEmits([
   'update:showLightMarker',
   'update:markerColor',

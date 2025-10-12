@@ -195,12 +195,13 @@ const isCurveModified = curve => {
 }
 
 // トラッカー切り替え時にカーブを更新
-watch(() => props.trackerKey, () => {
+watch(() => props.trackerKey, (newTrackerKey) => {
   // 選択されているトラッカーのカーブを取得
   const next = new Map()
   props.frames.forEach(frame => {
-    const curves = frame.curves || (frame.curve ? { all: { curve: frame.curve, color: '#5c8cff' } } : {})
-    const trackerCurveData = curves[props.trackerKey] || curves.all || { curve: DEFAULT_CURVE, color: '#5c8cff' }
+    // フレームからトラッカー固有のカーブデータを取得
+    const curves = frame.curves || {}
+    const trackerCurveData = curves[newTrackerKey] || { curve: DEFAULT_CURVE, color: props.curveColor }
     const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
     next.set(frame.id, curve)
   })
@@ -210,20 +211,26 @@ watch(() => props.trackerKey, () => {
 watch(
   () => props.frames,
   frames => {
+    // ドラッグ中は更新しない（完全にスキップ）
+    if (dragState.value?.active) return
+    
     const next = new Map(curvesState.value)
-    const activeId = dragState.value?.frameId
     frames.forEach(frame => {
-      if (activeId && activeId === frame.id) return
       // 選択されているトラッカーのカーブを取得
-      const curves = frame.curves || (frame.curve ? { all: { curve: frame.curve, color: '#5c8cff' } } : {})
-      const trackerCurveData = curves[props.trackerKey] || curves.all || { curve: DEFAULT_CURVE, color: '#5c8cff' }
+      const curves = frame.curves || {}
+      const trackerCurveData = curves[props.trackerKey] || { curve: DEFAULT_CURVE, color: props.curveColor }
       const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
       next.set(frame.id, curve)
     })
     curvesState.value = next
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
+
+// カーブ色の変更を監視
+watch(() => props.curveColor, () => {
+  // カーブ色が変わってもカーブ自体は維持
+}, { immediate: false })
 
 const normalizedFrames = computed(() => {
   const frames = Array.isArray(props.frames) ? [...props.frames].sort((a, b) => a.time - b.time) : []
@@ -376,6 +383,7 @@ function startHandleDrag(event, handle) {
   const svg = svgRef.value
   if (!svg) return
   dragState.value = {
+    active: true,
     frameId: handle.frameId,
     type: handle.type,
     anchorStart: handle.anchorStart,

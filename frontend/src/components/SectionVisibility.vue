@@ -95,6 +95,12 @@
     @remove-selected="() => emit('remove-selected-keyframes')"
     @update-curves="payload => emit('update-keyframe-curves', payload)"
   />
+  <AudioSection
+    v-else-if="active === 'audio'"
+    :audio-duration="audioDuration"
+    :audio-buffer="audioBuffer"
+    @remove-audio="() => emit('remove-audio')"
+  />
   <CameraSection
     v-else-if="active === 'camera'"
     :camera-fov="cameraFov"
@@ -128,6 +134,7 @@ import ModelSection from './ModelSection.vue'
 import DisplaySection from './DisplaySection.vue'
 import CameraSection from './CameraSection.vue'
 import KeySettingsSection from './KeySettingsSection.vue'
+import AudioSection from './AudioSection.vue'
 import TrackerSection from './TrackerSection.vue'
 import FingerControlSection from './FingerControlSection.vue'
 
@@ -179,7 +186,9 @@ const props = defineProps({
   timelineSelection: { type: Object, default: () => ({}) },
   timelineSnap: { type: Boolean, default: true },
   timelineLoop: { type: Boolean, default: false },
-  availableTrackers: { type: Array, default: () => [] }
+  availableTrackers: { type: Array, default: () => [] },
+  audioDuration: { type: Number, default: 0 },
+  audioBuffer: { type: Object, default: null }
 })
 
 const emit = defineEmits([
@@ -234,7 +243,8 @@ const emit = defineEmits([
   'update:timelineLoop',
   'remove-selected-keyframes',
   'update-keyframe-curves',
-  'load-model-outline'
+  'load-model-outline',
+  'remove-audio'
 ])
 
 function handleFingerUpdate({ hand, finger, value }) {

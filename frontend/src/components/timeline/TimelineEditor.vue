@@ -169,6 +169,13 @@
           @wheel="handleWheel"
         >
           <div class="timeline__content" :style="contentStyle">
+            <canvas
+              v-if="audioWaveformData && audioWaveformData.length > 0"
+              ref="waveformCanvasRef"
+              class="timeline__waveform"
+              :width="contentWidth"
+              :height="CURVE_VIEWBOX_HEIGHT"
+            ></canvas>
             <div class="timeline__gridlines" aria-hidden="true">
               <div
                 v-for="tick in ticks"
@@ -293,7 +300,8 @@ const props = defineProps({
   loop: { type: Boolean, default: false },
   snap: { type: Boolean, default: true },
   height: { type: [Number, String], default: null },
-  canPaste: { type: Boolean, default: false }
+  canPaste: { type: Boolean, default: false },
+  audioWaveformData: { type: Array, default: null }
 })
 
 const emit = defineEmits([
@@ -325,6 +333,7 @@ const timelineRef = ref(null)
 const tracksWrapperRef = ref(null)
 const ticksWrapperRef = ref(null)
 const scrollbarWrapperRef = ref(null)
+const waveformCanvasRef = ref(null)
 
 const widthPx = ref(1)
 // Force frames mode
@@ -665,7 +674,10 @@ onMounted(() => {
     snapToFrame.value = true
     emit('update:snap', true)
   }
-  nextTick(() => syncScrollPositions())
+  nextTick(() => {
+    syncScrollPositions()
+    drawWaveform()
+  })
 })
 
 onUnmounted(() => {
@@ -673,6 +685,59 @@ onUnmounted(() => {
   resizeObserver = null
   if (resizeRaf !== null) cancelAnimationFrame(resizeRaf)
 })
+
+// 波形描画関数
+function drawWaveform() {
+  if (!waveformCanvasRef.value || !props.audioWaveformData || props.audioWaveformData.length === 0) {
+    return
+  }
+
+  const canvas = waveformCanvasRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const width = canvas.width
+  const height = canvas.height
+
+  // キャンバスをクリア
+  ctx.clearRect(0, 0, width, height)
+
+  // 波形データを描画
+  const data = props.audioWaveformData
+  const step = width / data.length
+
+  ctx.fillStyle = 'rgba(100, 180, 255, 0.15)'
+  ctx.beginPath()
+  ctx.moveTo(0, height / 2)
+
+  for (let i = 0; i < data.length; i++) {
+    const x = i * step
+    const amplitude = data[i] // 0〜1の正規化された値
+    const y = height / 2 - (amplitude * height / 2)
+    ctx.lineTo(x, y)
+  }
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    const x = i * step
+    const amplitude = data[i]
+    const y = height / 2 + (amplitude * height / 2)
+    ctx.lineTo(x, y)
+  }
+
+  ctx.closePath()
+  ctx.fill()
+}
+
+// 波形データが変更されたら再描画
+watch(() => props.audioWaveformData, () => {
+  nextTick(() => drawWaveform())
+}, { deep: true })
+
+// コンテンツ幅が変更されたら再描画
+watch(() => contentWidth.value, () => {
+  nextTick(() => drawWaveform())
+})
+
 
 let resizeObserver
 let resizeRaf = null
@@ -1396,6 +1461,15 @@ function keyTitle(frame) {
   position: relative;
   min-height: 100%;
   padding: 0 0 10px;
+}
+
+.timeline__waveform {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.8;
 }
 
 .timeline__gridlines {

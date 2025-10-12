@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import TimelineCurveEditor from './timeline/TimelineCurveEditor.vue'
 
 const props = defineProps({
@@ -80,7 +80,61 @@ const props = defineProps({
 const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
 
 const selectedTracker = ref('all')
-const curveColor = ref('#5c8cff')
+// トラッカーごとのカーブ色を保持
+const trackerCurveColors = ref(new Map())
+
+// デフォルトカラー（バーチャルトラッカーの色と一致）
+const getDefaultColor = (trackerKey) => {
+  const defaultColors = {
+    'all': '#5c8cff',
+    'head': '#3aa6ff',
+    'chest': '#00c853',
+    'hips': '#ff7043',
+    'leftUpperArm': '#1e88e5',
+    'rightUpperArm': '#e53935',
+    'leftHand': '#2979ff',
+    'rightHand': '#ff1744',
+    'leftElbow': '#1565c0',
+    'rightElbow': '#d50000',
+    'leftFoot': '#009688',
+    'rightFoot': '#00796b',
+    'leftKnee': '#26a69a',
+    'rightKnee': '#004d40',
+    'gaze': '#ffeb3b'
+  }
+  return defaultColors[trackerKey] || '#5c8cff'
+}
+
+// 現在選択されているトラッカーのカーブ色
+const curveColor = computed({
+  get() {
+    if (!trackerCurveColors.value.has(selectedTracker.value)) {
+      // 初回取得時はフレームデータから色を取得、なければデフォルト色
+      const firstFrame = props.selection?.frames?.[0]
+      if (firstFrame?.curves?.[selectedTracker.value]?.color) {
+        return firstFrame.curves[selectedTracker.value].color
+      }
+      return getDefaultColor(selectedTracker.value)
+    }
+    return trackerCurveColors.value.get(selectedTracker.value)
+  },
+  set(newColor) {
+    trackerCurveColors.value.set(selectedTracker.value, newColor)
+  }
+})
+
+// トラッカー切り替え時にカーブ色を更新
+watch(selectedTracker, (newTracker) => {
+  if (!trackerCurveColors.value.has(newTracker)) {
+    // フレームデータから色を取得
+    const firstFrame = props.selection?.frames?.[0]
+    if (firstFrame?.curves?.[newTracker]?.color) {
+      trackerCurveColors.value.set(newTracker, firstFrame.curves[newTracker].color)
+    } else {
+      trackerCurveColors.value.set(newTracker, getDefaultColor(newTracker))
+    }
+  }
+})
 
 const selectionCount = computed(() => Number(props.selection?.frames?.length ?? 0))
 const hasSelection = computed(() => selectionCount.value > 0)

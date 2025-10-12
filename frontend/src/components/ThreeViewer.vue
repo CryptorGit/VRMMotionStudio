@@ -7,6 +7,8 @@
       @import="openFile"
       @import-audio="openAudioFile"
       @export="exportPose"
+      @capture-image="captureImage"
+      @capture-video="captureVideo"
       @clear-cache="clearAllCache"
       @toggle-theme="toggleTheme"
       @toggle-captions="toggleCaptions"
@@ -107,6 +109,7 @@
                     :loop="timelineLoop"
                     :snap="timelineSnap"
                     :can-paste="timelineClipboardReady"
+                    :audio-waveform-data="audioWaveformData"
                     @import-timeline="handleTimelineRequestImport"
                     @export-timeline="handleTimelineExport"
                     @seek="handleTimelineSeek"
@@ -200,6 +203,8 @@
                 :timeline-snap="timelineSnap"
                 :timeline-loop="timelineLoop"
                 :available-trackers="availableTrackers"
+                :audio-duration="audioDuration"
+                :audio-buffer="audioBuffer"
                 @update-timeline-snap="handleTimelineSnapSetting"
                 @update-timeline-loop="handleTimelineLoopSetting"
                 @remove-selected-keyframes="handleSettingsRemoveSelectedKeyframes"
@@ -215,6 +220,7 @@
                 @reset-outline="handleResetOutlineDefaults"
                 @load-model-outline="handleLoadModelOutline"
                 @capture-render="captureRenderImage"
+                @remove-audio="removeAudio"
               />
             </div>
           </aside>
@@ -316,6 +322,7 @@ let outlineDefaultsCaptured = false
 
 // モデルごとのアウトライン設定キャッシュ
 const modelOutlineCache = new WeakMap()
+const currentOutlineModelIndex = ref(0)
 
 const virtualTrackersEnabled = ref(false)
 const virtualTrackerDisplayVisible = ref(true)
@@ -378,6 +385,10 @@ const audioSource = ref(null)
 const audioStartTime = ref(0)
 const audioDuration = ref(0)
 const audioPlaying = ref(false)
+const audioWaveformData = ref(null)
+const audioFileName = ref('')
+const audioSampleRate = ref(0)
+const audioChannels = ref(0)
 
 const renderCameraFov = ref(45)
 const renderCameraNear = ref(0.1)
@@ -447,6 +458,16 @@ const fingerStates = reactive({
 
 function updateFingerStates(updated) {
   Object.assign(fingerStates, updated)
+  // 指の状態が更新されたら、すぐにポーズを適用
+  if (typeof applyFingerPose === 'function') {
+    requestAnimationFrame(() => {
+      try {
+        applyFingerPose()
+      } catch (error) {
+        console.warn('[FingerControl] Failed to apply finger pose:', error)
+      }
+    })
+  }
 }
 
 const CAPTION_STORAGE_KEY = 'ui.captions.enabled'
@@ -2593,11 +2614,15 @@ async function clearAllCache() {
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
+    // タイムラインのEndを3分(180秒、60FPS=10800フレーム)に初期化
+    if (timelineController) {
+      timelineController.setRangeFromFrames(0, 10800) // 3分 = 180秒 * 60FPS
+    }
     // Clear audio
     stopAudio()
     audioBuffer.value = null
     audioDuration.value = 0
-    showNotice('キャッシュ: キャッシュとタイムラインをリセットしました', 3600)
+    showNotice('キャッシュ: キャッシュとタイムラインをリセットしました (End=3分)', 3600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
@@ -2630,6 +2655,34 @@ async function onAudioFileChange(event) {
     
     audioBuffer.value = decodedBuffer
     audioDuration.value = decodedBuffer.duration
+    audioFileName.value = file.name
+    audioSampleRate.value = decodedBuffer.sampleRate
+    audioChannels.value = decodedBuffer.numberOfChannels
+    
+    // 波形データを生成（デシベル）
+    const channelData = decodedBuffer.getChannelData(0) // モノラルまたは左チャンネル
+    const samples = 2000 // 2000サンプルに間引き
+    const blockSize = Math.floor(channelData.length / samples)
+    const waveform = []
+    
+    for (let i = 0; i < samples; i++) {
+      const start = i * blockSize
+      const end = start + blockSize
+      let sum = 0
+      
+      for (let j = start; j < end && j < channelData.length; j++) {
+        sum += channelData[j] * channelData[j]
+      }
+      
+      const rms = Math.sqrt(sum / blockSize)
+      // RMSをデシベルに変換 (-60dB to 0dB)
+      const db = rms > 0 ? 20 * Math.log10(rms) : -60
+      // -60dBを0、0dBを1に正規化
+      const normalized = Math.max(0, Math.min(1, (db + 60) / 60))
+      waveform.push(normalized)
+    }
+    
+    audioWaveformData.value = waveform
     
     // Auto-adjust timeline end to match audio duration (60 FPS)
     if (timelineController && audioDuration.value > 0) {
@@ -2646,6 +2699,74 @@ async function onAudioFileChange(event) {
   } finally {
     if (input) input.value = ''
   }
+}
+
+function removeAudio() {
+  stopAudio()
+  audioBuffer.value = null
+  audioDuration.value = 0
+  audioWaveformData.value = null
+  audioFileName.value = ''
+  audioSampleRate.value = 0
+  audioChannels.value = 0
+  showNotice('オーディオ: MP3を削除しました', 2600)
+}
+
+function captureImage() {
+  if (!renderer?.value || !sceneRef.value || !renderCamera.value) {
+    showNotice('画像書き出し: レンダラーが初期化されていません', 3000)
+    return
+  }
+
+  try {
+    captureBusy.value = true
+
+    // 現在の背景色を保存
+    const originalBackground = sceneRef.value.background
+    
+    // GB（緑背景）に設定
+    sceneRef.value.background = new THREE.Color(0x00ff00)
+
+    // レンダラーのサイズを一時的に変更
+    const originalSize = new THREE.Vector2()
+    renderer.value.getSize(originalSize)
+    
+    const captureWidth = renderCameraWidth.value
+    const captureHeight = renderCameraHeight.value
+    
+    renderer.value.setSize(captureWidth, captureHeight)
+    
+    // レンダリング
+    renderer.value.render(sceneRef.value, renderCamera.value)
+    
+    // キャンバスから画像データを取得
+    const canvas = renderer.value.domElement
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        link.download = `capture_${timestamp}.png`
+        link.href = url
+        link.click()
+        URL.revokeObjectURL(url)
+        showNotice(`画像書き出し: ${link.download}`, 3000)
+      }
+      
+      // 元のサイズと背景に戻す
+      renderer.value.setSize(originalSize.x, originalSize.y)
+      sceneRef.value.background = originalBackground
+      captureBusy.value = false
+    }, 'image/png')
+  } catch (error) {
+    console.error('Image capture failed:', error)
+    showNotice('画像書き出し: 失敗しました', 3000)
+    captureBusy.value = false
+  }
+}
+
+function captureVideo() {
+  showNotice('動画書き出し: この機能は今後実装予定です', 3000)
 }
 
 function playAudio(startTime = 0) {
@@ -2985,6 +3106,18 @@ watch(models, (arr) => {
       try { trackerController.rebuild?.() } catch {}
       // Frame avatar front unless overridden by timeline camera track
       try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
+      // カメラモードの場合、viewCameraもrenderCameraと同じ位置に設定
+      if (isCameraMode.value && renderCamera.value && viewCamera.value) {
+        try {
+          viewCamera.value.position.copy(renderCamera.value.position)
+          viewCamera.value.rotation.copy(renderCamera.value.rotation)
+          viewCamera.value.updateMatrixWorld(true)
+          if (orbitControls.value) {
+            orbitControls.value.target.copy(cameraTarget)
+            orbitControls.value.update()
+          }
+        } catch {}
+      }
       // 初期アウトライン幅をVRMマテリアルから取得（ユーザーがまだ変更していない場合のみ）
       try { initOutlineWidthFromModel() } catch {}
     }
@@ -3009,26 +3142,59 @@ function handleLoadModelOutline(modelIndex) {
   const targetModel = models.value[modelIndex]
   if (!targetModel) return
 
+  // 現在選択されているモデルインデックスを更新
+  currentOutlineModelIndex.value = modelIndex
+
   // WeakMapからモデル固有の設定を取得
   const cached = modelOutlineCache.get(targetModel)
   if (cached) {
     outlineWidth.value = cached.width
     outlineColor.value = cached.color
   } else {
-    // キャッシュがない場合はモデルのデフォルト値を取得
-    const defaults = outlineDefaultsCache.get(targetModel)
-    if (defaults) {
-      outlineWidth.value = defaults.width || 0.002
-      outlineColor.value = defaults.color || '#000000'
-    } else {
-      // デフォルト値にリセット
-      outlineWidth.value = 0.002
-      outlineColor.value = '#000000'
-    }
+    // キャッシュがない場合は、モデルから最初のマテリアルの設定を読み取る
+    let foundWidth = null
+    let foundColor = null
+    
+    try {
+      targetModel?.vrm?.scene?.traverse(obj => {
+        if (foundWidth !== null) return
+        if (!obj.isMesh || !obj.material) return
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+        for (const mat of materials) {
+          if (!(mat.isMToonMaterial || mat.type === 'MToonMaterial')) continue
+          
+          // 幅を取得
+          if (typeof mat.outlineWidthFactor === 'number') {
+            foundWidth = mat.outlineWidthFactor
+          } else if (mat.uniforms?.outlineWidthFactor?.value != null) {
+            foundWidth = mat.uniforms.outlineWidthFactor.value
+          }
+          
+          // 色を取得
+          let baseColor = null
+          if (mat.outlineColorFactor?.isColor) {
+            baseColor = mat.outlineColorFactor
+          } else if (mat.uniforms?.outlineColorFactor?.value) {
+            baseColor = mat.uniforms.outlineColorFactor.value
+          }
+          if (baseColor) {
+            const tempColor = baseColor.isColor
+              ? baseColor.clone()
+              : new THREE.Color(baseColor.r ?? baseColor.x ?? 0, baseColor.g ?? baseColor.y ?? 0, baseColor.b ?? baseColor.z ?? 0)
+            foundColor = `#${tempColor.getHexString()}`
+          }
+          
+          if (foundWidth !== null) break
+        }
+      })
+    } catch {}
+    
+    outlineWidth.value = foundWidth !== null ? Math.min(0.005, Math.max(0, foundWidth)) : 0.002
+    outlineColor.value = foundColor || '#000000'
+    
+    // 読み取った設定をキャッシュに保存
+    modelOutlineCache.set(targetModel, { width: outlineWidth.value, color: outlineColor.value })
   }
-  
-  // 選択したモデルのアウトライン設定を適用
-  updateOutlineSettingsForModel(targetModel, outlineWidth.value, outlineColor.value)
 }
 
 function updateOutlineSettingsForModel(model, width, colorHex) {
@@ -3055,9 +3221,14 @@ function updateOutlineSettings() {
   try {
     const width = outlineWidth.value
     const colorHex = outlineColor.value
-    models.value.forEach(model => {
-      updateOutlineSettingsForModel(model, width, colorHex)
-    })
+    // 現在選択されているモデルのみ更新
+    // DisplaySectionで選択されているモデルインデックスを取得する必要がある
+    // ここでは全モデルではなく、選択されたモデルのみを更新するように修正
+    const selectedModelIndex = currentOutlineModelIndex.value || 0
+    const targetModel = models.value[selectedModelIndex]
+    if (targetModel) {
+      updateOutlineSettingsForModel(targetModel, width, colorHex)
+    }
   } catch {}
 }
 

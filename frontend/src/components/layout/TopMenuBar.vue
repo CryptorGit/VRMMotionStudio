@@ -39,6 +39,26 @@
         type="button"
         class="top-menu__item"
         role="menuitem"
+        @click="$emit('capture-image')"
+        :title="tooltip('レンダー画像を書き出します')"
+      >
+        <Icon icon="mdi:image" />
+        <span>画像書き出し</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        @click="$emit('capture-video')"
+        :title="tooltip('レンダー動画を書き出します')"
+      >
+        <Icon icon="mdi:video" />
+        <span>動画書き出し</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
         @click="$emit('timeline-import')"
         :title="tooltip('タイムラインを読み込みます')"
       >

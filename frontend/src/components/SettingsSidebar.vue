@@ -68,6 +68,8 @@
           :timeline-snap="timelineSnap"
           :timeline-loop="timelineLoop"
           :available-trackers="availableTrackers"
+          :audio-duration="audioDuration"
+          :audio-buffer="audioBuffer"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
@@ -120,6 +122,7 @@
           @reset-outline="(i) => emit('reset-outline', i)"
           @load-model-outline="(i) => emit('load-model-outline', i)"
           @update:fingerStates="v => emit('update:fingerStates', v)"
+          @remove-audio="() => emit('remove-audio')"
         />
       </div>
     </div>
@@ -180,7 +183,9 @@ const props = defineProps({
   timelineSelection: { type: Object, default: () => ({}) },
   timelineSnap: { type: Boolean, default: true },
   timelineLoop: { type: Boolean, default: false },
-  availableTrackers: { type: Array, default: () => [] }
+  availableTrackers: { type: Array, default: () => [] },
+  audioDuration: { type: Number, default: 0 },
+  audioBuffer: { type: Object, default: null }
 })
 
 const emit = defineEmits([
@@ -235,7 +240,8 @@ const emit = defineEmits([
   'update-timeline-snap',
   'update-timeline-loop',
   'remove-selected-keyframes',
-  'update-keyframe-curves'
+  'update-keyframe-curves',
+  'remove-audio'
 ])
 
 const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')

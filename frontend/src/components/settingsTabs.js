@@ -36,6 +36,12 @@ export const SECTION_TABS = [
     icon: 'mdi:vector-curve'
   },
   {
+    id: 'audio',
+    label: 'MP3',
+    description: 'MP3オーディオの設定',
+    icon: 'mdi:music-note'
+  },
+  {
     id: 'camera',
     label: 'カメラ',
     description: 'レンダーカメラと出力設定',

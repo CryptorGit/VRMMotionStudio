@@ -11,7 +11,8 @@ export function usePoseControls({
   applyIKUpdate,
   getModels,
   timelineController,
-  trackerController
+  trackerController,
+  showNotice
 }) {
   const poses = ref([])
   const selectedPose = ref(null)
@@ -42,27 +43,33 @@ export function usePoseControls({
       
       if (!timeline) {
         console.warn('[Export] エクスポート失敗: タイムラインコントローラーが利用できません')
-        if (typeof logToServer === 'function') {
-          logToServer('エクスポート: タイムラインコントローラーが見つかりません', 'error')
+        if (typeof showNotice === 'function') {
+          showNotice('エクスポート: タイムラインが利用できません', 4200)
         }
         return
       }
       
       if (!modelList || modelList.length === 0) {
         console.warn('[Export] エクスポート失敗: モデルが読み込まれていません')
-        if (typeof logToServer === 'function') {
-          logToServer('エクスポート: モデルを先に読み込んでください', 'warn')
+        if (typeof showNotice === 'function') {
+          showNotice('エクスポート: モデルを先に読み込んでください', 4200)
         }
         return
       }
 
       // Get timeline data
-      const timelineData = timeline.serialize()
+      const timelineData = timeline.serialize ? timeline.serialize() : null
       
       if (!timelineData || !timelineData.keyframes || timelineData.keyframes.length === 0) {
-        console.warn('[Export] エクスポート失敗: タイムラインにキーフレームがありません')
-        if (typeof logToServer === 'function') {
-          logToServer('エクスポート: キーフレームを追加してください', 'warn')
+        console.warn('[Export] タイムラインが空です: 現在のポーズのみエクスポートします')
+        // 現在のポーズのみをエクスポート
+        const currentPose = exportCurrentPose(modelList, tracker)
+        if (currentPose) {
+          downloadJSON(currentPose, 'vrm-pose')
+          console.log('[Export] 現在のポーズをエクスポートしました')
+          if (typeof showNotice === 'function') {
+            showNotice('エクスポート: 現在のポーズをエクスポートしました', 3200)
+          }
         }
         return
       }
@@ -88,7 +95,7 @@ export function usePoseControls({
           time: kf.time,
           frame: Math.round(kf.time * (timelineData.frameRate || 60)),
           values: kf.values || {},
-          curves: kf.curves || kf.curve ? { all: { curve: kf.curve, color: '#5c8cff' } } : {}
+          curves: kf.curves || kf.curve ? (kf.curves || { all: { curve: kf.curve, color: '#5c8cff' } }) : {}
         })),
         trackers: trackerData || [],
         models: modelList.map((m, index) => ({
@@ -100,30 +107,60 @@ export function usePoseControls({
       }
 
       // Export as JSON
-      const json = JSON.stringify(motionData, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)
-      const filename = `vrm-motion-${timestamp}.json`
-      
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = filename
-      document.body.appendChild(anchor)
-      anchor.click()
-      document.body.removeChild(anchor)
-      URL.revokeObjectURL(url)
-      
-      console.log('[Export] モーションエクスポート成功:', filename)
-      if (typeof logToServer === 'function') {
-        logToServer(`モーションをエクスポートしました: ${filename}`, 'success')
+      downloadJSON(motionData, 'vrm-motion')
+      console.log('[Export] モーションエクスポート成功')
+      if (typeof showNotice === 'function') {
+        showNotice('エクスポート: VRMモーションをエクスポートしました', 3200)
       }
+      
     } catch (error) {
       console.error('[Export] エクスポート失敗:', error)
-      if (typeof logToServer === 'function') {
-        logToServer('エクスポート: エラーが発生しました', 'error')
+      if (typeof showNotice === 'function') {
+        showNotice('エクスポート: エラーが発生しました', 4800)
       }
     }
+  }
+
+  function exportCurrentPose(modelList, tracker) {
+    try {
+      let trackerData = null
+      if (tracker && tracker.getAllTrackerStates) {
+        trackerData = tracker.getAllTrackerStates()
+      }
+
+      return {
+        version: '1.0',
+        type: 'vrm-pose',
+        format: 'mmd-web',
+        exportDate: new Date().toISOString(),
+        trackers: trackerData || [],
+        models: modelList.map((m, index) => ({
+          index,
+          name: m.name || `Model ${index + 1}`,
+          visible: m.visible !== false,
+          url: m.url || null
+        }))
+      }
+    } catch (error) {
+      console.error('[Export] 現在のポーズのエクスポート失敗:', error)
+      return null
+    }
+  }
+
+  function downloadJSON(data, prefix) {
+    const json = JSON.stringify(data, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19)
+    const filename = `${prefix}-${timestamp}.json`
+    
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(url)
   }
 
   // IK 連動の変換イベントは VRM 最適化のため削除

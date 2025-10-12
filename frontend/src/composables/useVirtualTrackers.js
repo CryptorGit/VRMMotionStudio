@@ -3,21 +3,23 @@ import * as THREE from 'three'
 
 // VRChat-like trackers + upper arms and gaze
 // head, chest, hips, L/R upperArm, L/R hand, L/R elbow, L/R foot, L/R knee, gaze
+// すべて異なる色に変更し、四足は似た色グループに
 export const TRACKER_DEFS = [
-  { key: 'head', label: 'Head', color: 0x3aa6ff },
-  { key: 'chest', label: 'Chest', color: 0x00c853 },
-  { key: 'hips', label: 'Hips', color: 0xff7043 },
-  { key: 'leftUpperArm', label: 'L Upper Arm', color: 0x1e88e5 },
-  { key: 'rightUpperArm', label: 'R Upper Arm', color: 0xe53935 },
-  { key: 'leftHand', label: 'L Hand', color: 0x2979ff },
-  { key: 'rightHand', label: 'R Hand', color: 0xff1744 },
-  { key: 'leftElbow', label: 'L Elbow', color: 0x1565c0 },
-  { key: 'rightElbow', label: 'R Elbow', color: 0xd50000 },
-  { key: 'leftFoot', label: 'L Foot', color: 0x009688 },
-  { key: 'rightFoot', label: 'R Foot', color: 0x8d6e63 },
-  { key: 'leftKnee', label: 'L Knee', color: 0x26a69a },
-  { key: 'rightKnee', label: 'R Knee', color: 0x6d4c41 },
-  { key: 'gaze', label: 'Gaze Target', color: 0xffeb3b }
+  { key: 'head', label: 'Head', color: 0x3aa6ff },           // 青
+  { key: 'chest', label: 'Chest', color: 0x00c853 },         // 緑
+  { key: 'hips', label: 'Hips', color: 0xff7043 },           // オレンジ
+  { key: 'leftUpperArm', label: 'L Upper Arm', color: 0x1e88e5 },  // 濃い青
+  { key: 'rightUpperArm', label: 'R Upper Arm', color: 0xe53935 }, // 濃い赤
+  { key: 'leftHand', label: 'L Hand', color: 0x2979ff },     // 明るい青
+  { key: 'rightHand', label: 'R Hand', color: 0xff1744 },    // 明るい赤
+  { key: 'leftElbow', label: 'L Elbow', color: 0x1565c0 },   // 中間青
+  { key: 'rightElbow', label: 'R Elbow', color: 0xd50000 },  // 中間赤
+  // 四足グループ - 似た色（緑青系）
+  { key: 'leftFoot', label: 'L Foot', color: 0x009688 },     // ティール
+  { key: 'rightFoot', label: 'R Foot', color: 0x00796b },    // ダークティール
+  { key: 'leftKnee', label: 'L Knee', color: 0x26a69a },     // ライトティール
+  { key: 'rightKnee', label: 'R Knee', color: 0x004d40 },    // 最濃ティール
+  { key: 'gaze', label: 'Gaze Target', color: 0xffeb3b }     // 黄色
 ]
 
 export const TRACKER_ROTATION_ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX']
@@ -1862,6 +1864,19 @@ export function useVirtualTrackers({
       const upperLength = boneLength(upperArm, lowerArm)
       const lowerLength = boneLength(lowerArm, hand)
       
+      // 手首トラッカーの位置を手首ボーンの末端位置に合わせるため、
+      // 手首ボーンの長さを考慮して調整
+      const handLength = hand.children.length > 0 
+        ? hand.getWorldPosition(new THREE.Vector3()).distanceTo(
+            hand.children[0].getWorldPosition(new THREE.Vector3())
+          )
+        : 0.05 // デフォルトの手首の長さ
+      
+      // 手首ボーンの開始位置（前腕の末端）がトラッカー位置になるよう調整
+      // トラッカー位置から手首の方向に少し戻った位置をターゲットにする
+      const handBoneDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(handTargetRot)
+      const adjustedHandTargetPos = handTargetPos.clone().sub(handBoneDirection.multiplyScalar(handLength * 0.5))
+      
       // 2. 肘ヒント（ポールベクトル）の位置を取得
       let elbowHintPos = null
       if (elbowTrackerKey && trackerIsIndividuallyEnabled(elbowTrackerKey)) {
@@ -1879,34 +1894,28 @@ export function useVirtualTrackers({
         elbowHintPos = shoulderPos.clone().add(new THREE.Vector3(sideDir * 0.3, -0.2, 0.5))
       }
       
-      // 3. 2ボーンIKで肘の位置を計算
-      const elbowPos = computeElbowPos(shoulderPos, handTargetPos, elbowHintPos, upperLength, lowerLength)
+      // 3. 2ボーンIKで肘の位置を計算（調整後の手首位置を使用）
+      const elbowPos = computeElbowPos(shoulderPos, adjustedHandTargetPos, elbowHintPos, upperLength, lowerLength)
       
-      // 4. 上腕（shoulder → upperArm）の回転を計算
-      // 肩から肘への方向に向ける
+      // 4. 上腕ボーンの回転を計算（肩から肘への方向）
+      // VRChatのIKでは、shoulderボーンは回転させず、upperArmボーンだけを回転させる
       const shoulderToElbow = elbowPos.clone().sub(shoulderPos)
       if (shoulderToElbow.lengthSq() > 1e-8) {
         shoulderToElbow.normalize()
-        rotateBoneToward(shoulder, shoulderToElbow, 1.0)
-        shoulder.updateMatrixWorld(true)
-      }
-      
-      // 5. 上腕ボーンの回転を計算
-      upperArm.updateWorldMatrix(true, false)
-      if (shoulderToElbow.lengthSq() > 1e-8) {
+        upperArm.updateWorldMatrix(true, false)
         rotateBoneToward(upperArm, shoulderToElbow, 1.0)
         upperArm.updateMatrixWorld(true)
       }
       
-      // 6. 前腕の基本回転を計算（肘から手首への方向）
-      const elbowToHand = handTargetPos.clone().sub(elbowPos)
+      // 5. 前腕の基本回転を計算（肘から手首への方向）
+      const elbowToHand = adjustedHandTargetPos.clone().sub(elbowPos)
       if (elbowToHand.lengthSq() > 1e-8) {
         elbowToHand.normalize()
         rotateBoneToward(lowerArm, elbowToHand, 1.0)
         lowerArm.updateMatrixWorld(true)
       }
       
-      // 7. 前腕のツイスト（Roll）を手首トラッカーの回転から計算
+      // 6. 前腕のツイスト（Roll）を手首トラッカーの回転から計算
       const forearmAxis = elbowToHand.clone()
       const handTrackerUp = new THREE.Vector3(0, 1, 0).applyQuaternion(handTargetRot)
       
@@ -1950,160 +1959,7 @@ export function useVirtualTrackers({
           lowerArm.quaternion.copy(newLowerArmLocalQ)
           lowerArm.updateMatrixWorld(true)
           
-          // 8. 手首の回転を計算（トラッカーの回転 + 手首分のツイスト）
-          hand.updateWorldMatrix(true, false)
-          const handParentQ = hand.parent
-            ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
-            : new THREE.Quaternion()
-          const invHandParentQ = handParentQ.clone().invert()
-          
-          // 手首分のツイストを追加
-          const handTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, handTwistAngle)
-          const handWorldQ = handTwistQ.clone().multiply(handTargetRot)
-          
-          const handLocalQ = invHandParentQ.multiply(handWorldQ)
-          hand.quaternion.copy(handLocalQ)
-          hand.updateMatrixWorld(true)
-          
-          return
-        }
-      }
-      
-      // ツイスト計算に失敗した場合は、トラッカーの回転をそのまま適用
-      hand.updateWorldMatrix(true, false)
-      const handParentQ = hand.parent
-        ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
-        : new THREE.Quaternion()
-      const invHandParentQ = handParentQ.clone().invert()
-      const handLocalQ = invHandParentQ.multiply(handTargetRot)
-      
-      hand.quaternion.copy(handLocalQ)
-      hand.updateMatrixWorld(true)
-      
-    } catch (err) {
-      console.warn('[solveVRChatArmIK] Error:', err)
-    }
-  }
-
-  // ===== VRChat-style Arm IK Implementation =====
-  
-  /**
-   * VRChat準拠の腕IK実装
-   * 手首トラッカーの位置と回転を直接使用し、2ボーンIKで肘を計算
-   * 前腕のツイストは手首の回転から自動的に分配
-   */
-  function solveVRChatArmIK(shoulder, upperArm, lowerArm, hand, handTrackerKey, elbowTrackerKey) {
-    if (!shoulder || !upperArm || !lowerArm || !hand) return
-    if (!trackerIsIndividuallyEnabled(handTrackerKey)) return
-    
-    const handTracker = trackers.value.find(t => t.key === handTrackerKey)
-    if (!handTracker?.mesh) return
-    
-    try {
-      // 全ボーンのワールド行列を更新
-      shoulder.updateWorldMatrix(true, false)
-      upperArm.updateWorldMatrix(true, false)
-      lowerArm.updateWorldMatrix(true, false)
-      hand.updateWorldMatrix(true, false)
-      handTracker.mesh.updateWorldMatrix(true, false)
-      
-      // 1. 基本的な位置とボーン長を取得
-      const shoulderPos = shoulder.getWorldPosition(new THREE.Vector3())
-      const handTargetPos = handTracker.mesh.position.clone()
-      const handTargetRot = handTracker.mesh.getWorldQuaternion(new THREE.Quaternion())
-      
-      const upperLength = boneLength(upperArm, lowerArm)
-      const lowerLength = boneLength(lowerArm, hand)
-      
-      // 2. 肘ヒント（ポールベクトル）の位置を取得
-      let elbowHintPos = null
-      if (elbowTrackerKey && trackerIsIndividuallyEnabled(elbowTrackerKey)) {
-        const elbowTracker = trackers.value.find(t => t.key === elbowTrackerKey)
-        if (elbowTracker?.mesh) {
-          elbowHintPos = elbowTracker.mesh.position.clone()
-        }
-      }
-      
-      // 肘ヒントがない場合はデフォルト方向を使用
-      if (!elbowHintPos) {
-        // VRChatのデフォルト: 前方やや下方向
-        const isLeft = handTrackerKey === 'leftHand'
-        const sideDir = isLeft ? -1 : 1
-        elbowHintPos = shoulderPos.clone().add(new THREE.Vector3(sideDir * 0.3, -0.2, 0.5))
-      }
-      
-      // 3. 2ボーンIKで肘の位置を計算
-      const elbowPos = computeElbowPos(shoulderPos, handTargetPos, elbowHintPos, upperLength, lowerLength)
-      
-      // 4. 上腕（shoulder → upperArm）の回転を計算
-      // 肩から肘への方向に向ける
-      const shoulderToElbow = elbowPos.clone().sub(shoulderPos)
-      if (shoulderToElbow.lengthSq() > 1e-8) {
-        shoulderToElbow.normalize()
-        rotateBoneToward(shoulder, shoulderToElbow, 1.0)
-        shoulder.updateMatrixWorld(true)
-      }
-      
-      // 5. 上腕ボーンの回転を計算
-      upperArm.updateWorldMatrix(true, false)
-      if (shoulderToElbow.lengthSq() > 1e-8) {
-        rotateBoneToward(upperArm, shoulderToElbow, 1.0)
-        upperArm.updateMatrixWorld(true)
-      }
-      
-      // 6. 前腕の基本回転を計算（肘から手首への方向）
-      const elbowToHand = handTargetPos.clone().sub(elbowPos)
-      if (elbowToHand.lengthSq() > 1e-8) {
-        elbowToHand.normalize()
-        rotateBoneToward(lowerArm, elbowToHand, 1.0)
-        lowerArm.updateMatrixWorld(true)
-      }
-      
-      // 7. 前腕のツイスト（Roll）を手首トラッカーの回転から計算
-      const forearmAxis = elbowToHand.clone()
-      const handTrackerUp = new THREE.Vector3(0, 1, 0).applyQuaternion(handTargetRot)
-      
-      // 前腕軸に垂直な平面でのUp方向を計算
-      const projectedTrackerUp = handTrackerUp.clone().projectOnPlane(forearmAxis)
-      
-      if (projectedTrackerUp.lengthSq() > 1e-6) {
-        projectedTrackerUp.normalize()
-        
-        // 現在の前腕のUp方向
-        const currentLowerArmQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
-        const currentUp = new THREE.Vector3(0, 1, 0).applyQuaternion(currentLowerArmQ)
-        const projectedCurrentUp = currentUp.clone().projectOnPlane(forearmAxis)
-        
-        if (projectedCurrentUp.lengthSq() > 1e-6) {
-          projectedCurrentUp.normalize()
-          
-          // ツイスト角度を計算
-          const twistDot = THREE.MathUtils.clamp(projectedCurrentUp.dot(projectedTrackerUp), -1, 1)
-          let twistAngle = Math.acos(twistDot)
-          
-          // 符号を決定
-          const twistCross = new THREE.Vector3().crossVectors(projectedCurrentUp, projectedTrackerUp)
-          if (twistCross.dot(forearmAxis) < 0) twistAngle = -twistAngle
-          
-          // ツイストを前腕と手首に分配
-          const forearmTwistAngle = twistAngle * forearmTwistShareRatio
-          const handTwistAngle = twistAngle * (1 - forearmTwistShareRatio)
-          
-          // 前腕にツイストを適用
-          const forearmTwistQ = new THREE.Quaternion().setFromAxisAngle(forearmAxis, forearmTwistAngle)
-          const lowerArmWorldQ = lowerArm.getWorldQuaternion(new THREE.Quaternion())
-          const newLowerArmWorldQ = forearmTwistQ.clone().multiply(lowerArmWorldQ)
-          
-          const lowerArmParentQ = lowerArm.parent
-            ? lowerArm.parent.getWorldQuaternion(new THREE.Quaternion())
-            : new THREE.Quaternion()
-          const invLowerArmParentQ = lowerArmParentQ.clone().invert()
-          const newLowerArmLocalQ = invLowerArmParentQ.multiply(newLowerArmWorldQ)
-          
-          lowerArm.quaternion.copy(newLowerArmLocalQ)
-          lowerArm.updateMatrixWorld(true)
-          
-          // 8. 手首の回転を計算（トラッカーの回転 + 手首分のツイスト）
+          // 7. 手首の回転を計算（トラッカーの回転 + 手首分のツイスト）
           hand.updateWorldMatrix(true, false)
           const handParentQ = hand.parent
             ? hand.parent.getWorldQuaternion(new THREE.Quaternion())
@@ -2203,21 +2059,36 @@ export function useVirtualTrackers({
         
         // ===== UpperArm位置反映（回転は反映しない） =====
         // UpperArmトラッカーの位置をボーンに反映（ボーンの制約に従って）
+        // 肩ボーンの角度を変更してUpperArmボーンの位置を変更する
         if (bones.leftShoulder && bones.leftUpperArm) {
           const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
           if (leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
             try {
-              const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
+              // UpperArmボーンの現在位置を取得
+              bones.leftUpperArm.updateWorldMatrix(true, false)
+              const currentUpperArmPos = bones.leftUpperArm.getWorldPosition(new THREE.Vector3())
+              
+              // トラッカーの目標位置
               const targetPos = leftUpperArmTracker.mesh.position.clone()
+              
+              // 肩ボーンから目標位置への方向を計算
+              bones.leftShoulder.updateWorldMatrix(true, false)
+              const shoulderPos = bones.leftShoulder.getWorldPosition(new THREE.Vector3())
               const direction = targetPos.clone().sub(shoulderPos)
               
               if (direction.lengthSq() > 1e-8) {
                 direction.normalize()
-                // 肩ボーンの方向をUpperArmトラッカーの位置に向ける
+                // 肩ボーンをUpperArmトラッカーの位置に向ける
+                // これによりUpperArmボーンの位置が変わる
                 rotateBoneToward(bones.leftShoulder, direction, 1.0)
                 bones.leftShoulder.updateMatrixWorld(true)
+                
+                // UpperArmボーンの位置を更新
+                bones.leftUpperArm.updateMatrixWorld(true)
               }
-            } catch {}
+            } catch (err) {
+              console.warn('[VirtualTrackers] Left UpperArm positioning error:', err)
+            }
           }
         }
         
@@ -2225,17 +2096,31 @@ export function useVirtualTrackers({
           const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
           if (rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
             try {
-              const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
+              // UpperArmボーンの現在位置を取得
+              bones.rightUpperArm.updateWorldMatrix(true, false)
+              const currentUpperArmPos = bones.rightUpperArm.getWorldPosition(new THREE.Vector3())
+              
+              // トラッカーの目標位置
               const targetPos = rightUpperArmTracker.mesh.position.clone()
+              
+              // 肩ボーンから目標位置への方向を計算
+              bones.rightShoulder.updateWorldMatrix(true, false)
+              const shoulderPos = bones.rightShoulder.getWorldPosition(new THREE.Vector3())
               const direction = targetPos.clone().sub(shoulderPos)
               
               if (direction.lengthSq() > 1e-8) {
                 direction.normalize()
-                // 肩ボーンの方向をUpperArmトラッカーの位置に向ける
+                // 肩ボーンをUpperArmトラッカーの位置に向ける
+                // これによりUpperArmボーンの位置が変わる
                 rotateBoneToward(bones.rightShoulder, direction, 1.0)
                 bones.rightShoulder.updateMatrixWorld(true)
+                
+                // UpperArmボーンの位置を更新
+                bones.rightUpperArm.updateMatrixWorld(true)
               }
-            } catch {}
+            } catch (err) {
+              console.warn('[VirtualTrackers] Right UpperArm positioning error:', err)
+            }
           }
         }
         
@@ -2263,7 +2148,9 @@ export function useVirtualTrackers({
           'rightElbow'
         )
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[VirtualTrackers] Arm IK error:', err)
+    }
     // Legs IK
     try {
       solveLimb(bones.leftUpperLeg, bones.leftLowerLeg, bones.leftFoot, 'leftFoot', 'leftKnee')

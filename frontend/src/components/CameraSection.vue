@@ -90,17 +90,6 @@
           <input type="checkbox" v-model="showHelperLocal" />
           <span>カメラフラスタムを表示</span>
         </label>
-        <div class="actions">
-          <button
-            type="button"
-            class="action-button"
-            :disabled="captureBusy"
-            @click="emit('capture')"
-          >
-            <span v-if="!captureBusy">レンダー画像を書き出し</span>
-            <span v-else>書き出し中…</span>
-          </button>
-        </div>
       </fieldset>
 </template>
 
@@ -116,8 +105,7 @@ const props = defineProps({
   showCameraHelper: { type: Boolean, default: false },
   cameraWheelSensitivity: { type: Number, default: 1.0 },
   cameraTranslateSensitivity: { type: Number, default: 1.0 },
-  cameraRotateSensitivity: { type: Number, default: 1.0 },
-  captureBusy: { type: Boolean, default: false }
+  cameraRotateSensitivity: { type: Number, default: 1.0 }
 })
 
 const emit = defineEmits([
@@ -129,8 +117,7 @@ const emit = defineEmits([
   'update:showCameraHelper',
   'update:cameraWheelSensitivity',
   'update:cameraTranslateSensitivity',
-  'update:cameraRotateSensitivity',
-  'capture'
+  'update:cameraRotateSensitivity'
 ])
 
 const fovLocal = computed({

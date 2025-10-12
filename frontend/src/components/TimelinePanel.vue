@@ -42,6 +42,12 @@
       ref="bodyRef"
       @scroll="onScroll"
     >
+      <canvas
+        v-if="audioWaveformData"
+        ref="waveformCanvas"
+        class="waveform-canvas"
+        :style="waveformCanvasStyle"
+      ></canvas>
       <div
         class="timeline-grid"
         :style="gridStyle"
@@ -115,7 +121,8 @@ const props = defineProps({
   keyframes: { type: Object, required: true },
   duration: { type: Number, required: true },
   currentTime: { type: Number, required: true },
-  isPlaying: { type: Boolean, required: true }
+  isPlaying: { type: Boolean, required: true },
+  audioWaveformData: { type: Array, default: null }
 })
 
 const emit = defineEmits([
@@ -131,6 +138,7 @@ const emit = defineEmits([
 
 const headerRef = ref(null)
 const bodyRef = ref(null)
+const waveformCanvas = ref(null)
 const headerHeight = ref(48)
 const scrollLeft = ref(0)
 
@@ -138,11 +146,22 @@ onMounted(() => {
   nextTick(() => {
     headerHeight.value = headerRef.value?.offsetHeight || 48
     notifyHeight()
+    drawWaveform()
   })
 })
 
 onUnmounted(() => {
   teardownDrag()
+})
+
+// 波形が変わったら再描画
+watch(() => props.audioWaveformData, () => {
+  nextTick(() => drawWaveform())
+}, { deep: true })
+
+// タイムライン幅が変わったら再描画
+watch(timelineWidth, () => {
+  nextTick(() => drawWaveform())
 })
 
 const displayDuration = computed(() => Math.max(props.duration, MIN_DURATION_FOR_DISPLAY))
@@ -160,6 +179,12 @@ const bodyStyle = computed(() => ({ height: `${bodyHeight.value}px` }))
 const gridStyle = computed(() => ({ gridTemplateColumns: `${NAME_COLUMN_WIDTH}px ${timelineWidth.value}px` }))
 const timeScaleStyle = computed(() => ({ width: `${timelineWidth.value}px` }))
 const trackContentStyle = computed(() => ({ width: `${timelineWidth.value}px` }))
+
+const waveformCanvasStyle = computed(() => ({
+  width: `${timelineWidth.value}px`,
+  height: `${bodyHeight.value}px`,
+  left: `${NAME_COLUMN_WIDTH}px`
+}))
 
 const actualHeight = computed(() => (props.collapsed ? headerHeight.value : headerHeight.value + bodyHeight.value))
 
@@ -303,9 +328,76 @@ function formatTime(value) {
 function tickStyle(time) {
   return { transform: `translateX(${time * PIXELS_PER_SECOND}px)` }
 }
+
+function drawWaveform() {
+  const canvas = waveformCanvas.value
+  if (!canvas || !props.audioWaveformData || props.audioWaveformData.length === 0) return
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const width = timelineWidth.value
+  const height = bodyHeight.value
+  
+  // デバイスピクセル比を考慮
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = width * dpr
+  canvas.height = height * dpr
+  canvas.style.width = `${width}px`
+  canvas.style.height = `${height}px`
+  ctx.scale(dpr, dpr)
+
+  // 背景をクリア（透明）
+  ctx.clearRect(0, 0, width, height)
+
+  // 波形を描画
+  const waveData = props.audioWaveformData
+  const centerY = height / 2
+
+  // 実際のduration（オーディオの長さ）に対して波形を正確に配置
+  const audioDuration = props.duration
+  const displayDur = displayDuration.value
+  
+  // 波形の各サンプルを正確な時間位置に配置
+  ctx.beginPath()
+  ctx.strokeStyle = 'rgba(92, 140, 255, 0.25)'
+  ctx.lineWidth = 1
+
+  for (let i = 0; i < waveData.length; i++) {
+    // サンプルの時間位置を計算（0〜audioDuration）
+    const sampleTime = (i / (waveData.length - 1)) * audioDuration
+    
+    // その時間位置を画面上のX座標に変換
+    const x = (sampleTime / displayDur) * width
+    
+    if (x < 0 || x > width) continue
+    
+    const amplitude = waveData[i]
+    const y = centerY + (amplitude * centerY * 0.8)
+    
+    if (i === 0) {
+      ctx.moveTo(x, y)
+    } else {
+      ctx.lineTo(x, y)
+    }
+  }
+
+  ctx.stroke()
+}
+
+function tickStyle(time) {
+  return { transform: `translateX(${time * PIXELS_PER_SECOND}px)` }
+}
 </script>
 
 <style scoped>
+.waveform-canvas {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .timeline-panel {
   position: absolute;
   left: 0;

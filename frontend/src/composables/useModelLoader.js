@@ -29,7 +29,8 @@ export default function useModelLoader(ctx) {
     applyIKUpdate: undefined,
     getModels: () => ops.models,
     timelineController: ctx.timelineController,
-    trackerController: ctx.trackerController
+    trackerController: ctx.trackerController,
+    showNotice: ctx.showNotice
   })
   
   // Update ops with pose data
