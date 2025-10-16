@@ -1,71 +1,77 @@
 <template>
   <div class="row">
     <label class="checkbox">
+      <input type="checkbox" v-model="showGridLocal" />
+      <span>グリチE表示</span>
+    </label>
+  </div>
+  <div class="row">
+    <label class="checkbox">
       <input type="checkbox" v-model="showLightMarkerLocal" />
-      <span>ライトマーカー表示</span>
+      <span>ライトEーカー表示</span>
     </label>
     <label>
-      <span>マーカー色</span>
+      <span>マEカー色</span>
       <input type="color" v-model="markerColorLocal" />
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBonesVisible" />
-      <span>ボーン表示（人型）</span>
+      <span>ボEン表示E人型！E/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBoneNamesVisible" />
-      <span>ボーン名表示</span>
+      <span>ボEン名表示</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showPhysicalBonesLocal" />
-      <span>ボーン表示（物理）</span>
+      <span>ボEン表示E物琁EE/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showOtherBonesLocal" />
-      <span>ボーン表示（その他）</span>
+      <span>ボEン表示Eその他！E/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showExtendedBonesLocal" />
-      <span>ボーン表示（拡張）</span>
+      <span>ボEン表示E拡張EE/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showColliderNodesLocal" />
-      <span>ボーン表示（コライダー）</span>
+      <span>ボEン表示EコライダーEE/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showNonDeformingBonesLocal" />
-      <span>ボーン表示（非変形）</span>
+      <span>ボEン表示E非変形EE/span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="highlightConstraintLocal" />
-      <span>制約ハイライト</span>
+      <span>制紁EイライチE/span>
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボーン表示サイズ
+      ボEン表示サイズ
       <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボーン名表示サイズ（大きさ）
+      ボEン名表示サイズE大きさEE
       <input
         type="range"
         min="0.05"
@@ -77,12 +83,12 @@
   </div>
   <hr />
   <div class="row">
-    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設定</h4>
+    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設宁E/h4>
   </div>
   <div class="row">
     <label class="stretch">
-      <span>対象モデル</span>
-      <select v-model="selectedOutlineModelIndex" class="model-select">
+      <span>対象モチE</span>
+      <select v-model="selectedOutlineModelIndex" class="model-select" :disabled="!hasModels">
         <option v-for="(model, index) in models" :key="model.id" :value="index">
           {{ model.name }}
         </option>
@@ -91,7 +97,7 @@
   </div>
   <div class="row">
     <label class="stretch">
-      アウトライン太さ
+      アウトライン太ぁE
       <input
         type="range"
         min="0"
@@ -114,16 +120,17 @@
       :disabled="!hasModels"
       @click="emit('reset-outline', selectedOutlineModelIndex)"
     >
-      デフォルトにリセット
+      チEォルトにリセチE
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
+  showGrid: { type: Boolean, default: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   showPhysicalBones: { type: Boolean, required: true },
@@ -134,20 +141,17 @@ const props = defineProps({
   highlightConstraint: { type: Boolean, required: true },
   boneDotSize: { type: Number, required: true },
   boneLabelScale: { type: Number, required: true },
+  outlineModelIndex: { type: Number, default: 0 },
   outlineWidth: { type: Number, default: 0.002 },
   outlineColor: { type: String, default: '#000000' }
 })
 
-const selectedOutlineModelIndex = ref(0)
 
-// モデル選択時にそのモデルのアウトライン設定を読み込む
-watch(selectedOutlineModelIndex, (newIndex) => {
-  // 親コンポーネントにモデル選択変更を通知し、
-  // 親側でWeakMapキャッシュから設定を読み込む
-  emit('load-model-outline', newIndex)
-}, { immediate: false })
+// モチE選択時にそEモチEのアウトライン設定を読み込む
+  // 親コンポEネントにモチE選択変更を通知し、E
 
 const emit = defineEmits([
+  'update:showGrid',
   'update:showLightMarker',
   'update:markerColor',
   'update:showPhysicalBones',
@@ -158,6 +162,7 @@ const emit = defineEmits([
   'update:highlightConstraint',
   'update:boneDotSize',
   'update:boneLabelScale',
+  'update:outlineModelIndex',
   'update:outlineWidth',
   'update:outlineColor',
   'toggle-all-bones',
@@ -167,6 +172,50 @@ const emit = defineEmits([
 ])
 
 const hasModels = computed(() => Array.isArray(props.models) && props.models.length > 0)
+
+const clampModelIndex = (value) => {
+  const length = props.models?.length || 0
+  if (!length) return 0
+  const max = length - 1
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.min(Math.max(0, Math.trunc(numeric)), max)
+}
+
+const selectedOutlineModelIndex = computed({
+  get: () => clampModelIndex(props.outlineModelIndex ?? 0),
+  set: value => emit('update:outlineModelIndex', clampModelIndex(value))
+})
+
+watch(
+  () => props.models?.length || 0,
+  (len) => {
+    if (!len) {
+      if ((props.outlineModelIndex ?? 0) !== 0) {
+        emit('update:outlineModelIndex', 0)
+      }
+      return
+    }
+    const current = props.outlineModelIndex ?? 0
+    const clamped = clampModelIndex(current)
+    if (clamped !== current) {
+      emit('update:outlineModelIndex', clamped)
+      return
+    }
+    emit('load-model-outline', clamped)
+  },
+  { immediate: true }
+)
+
+watch(selectedOutlineModelIndex, (newIndex) => {
+  if (!hasModels.value) return
+  emit('load-model-outline', clampModelIndex(newIndex))
+})
+
+const showGridLocal = computed({
+  get: () => props.showGrid,
+  set: v => emit('update:showGrid', v)
+})
 
 const showLightMarkerLocal = computed({
   get: () => props.showLightMarker,
@@ -271,8 +320,8 @@ input[type='range'] {
 }
 
 .btn-outline-reset {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   color: inherit;
   padding: 0.35rem 0.9rem;
@@ -287,7 +336,7 @@ input[type='range'] {
 
 .btn-outline-reset:not(:disabled):hover,
 .btn-outline-reset:not(:disabled):focus-visible {
-  background: color-mix(in srgb, var(--accent, #2d8cff) 20%, rgba(255, 255, 255, 0.15));
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
   border-color: rgba(100, 160, 255, 0.45);
   color: #fff;
   outline: none;
@@ -295,7 +344,7 @@ input[type='range'] {
 
 button {
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   color: inherit;
   padding: 0.35rem 0.75rem;
@@ -304,7 +353,7 @@ button {
 
 button:hover,
 button:focus-visible {
-  background: color-mix(in srgb, var(--accent, #2d8cff) 25%, rgba(255, 255, 255, 0.1));
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
   outline: none;
 }
 
@@ -331,3 +380,5 @@ hr {
   background: rgba(12, 16, 28, 0.8);
 }
 </style>
+
+

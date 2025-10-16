@@ -2460,6 +2460,13 @@ export function useVirtualTrackers({
     }
   }
 
+  function getAllTrackerStates() {
+    return trackers.value
+      .filter(tracker => tracker.key !== CAMERA_TRACKER_KEY)
+      .map(tracker => getTrackerSnapshot(tracker.key))
+      .filter(Boolean)
+  }
+
   // 回転軸の可視性を設定
   function setRotationAxesVisible(visible) {
     rotationAxesGlobalVisible = !!visible
@@ -2565,6 +2572,7 @@ export function useVirtualTrackers({
     saveCameraState,
     saveCameraStateFromObject,
   getTrackerSnapshot,
+  getAllTrackerStates,
   setRotationAxesVisible,
   updateRotationAxesLength,
   setForearmTwistShareRatio,

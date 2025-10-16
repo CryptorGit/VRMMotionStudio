@@ -353,105 +353,99 @@ label.disabled input {
 input[type="range"] {
   width: 100%;
   height: 6px;
-  background: linear-gradient(90deg, rgba(92, 140, 255, 0.15) 0%, rgba(92, 140, 255, 0.08) 100%);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
   outline: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
 }
 
 input[type="range"]:hover {
-  background: linear-gradient(90deg, rgba(92, 140, 255, 0.25) 0%, rgba(92, 140, 255, 0.12) 100%);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
 }
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
   height: 16px;
-  background: linear-gradient(135deg, var(--accent, #5c8cff) 0%, color-mix(in srgb, var(--accent, #5c8cff) 30%, #1f2b5b) 100%);
+  background: var(--accent, #5c8cff);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(92, 140, 255, 0.4), 0 0 0 0 rgba(92, 140, 255, 0);
+  transition: transform 0.2s ease, background 0.2s ease;
+  box-shadow: none;
   border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #5c8cff) 20%, #ffffff) 0%, var(--accent, #5c8cff) 100%);
+  background: color-mix(in srgb, var(--accent, #5c8cff) 80%, #ffffff 20%);
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(92, 140, 255, 0.6), 0 0 0 4px rgba(92, 140, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
-  background: linear-gradient(135deg, var(--accent, #5c8cff) 0%, color-mix(in srgb, var(--accent, #5c8cff) 30%, #1f2b5b) 100%);
+  background: var(--accent, #5c8cff);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(92, 140, 255, 0.4);
+  transition: transform 0.2s ease, background 0.2s ease;
+  box-shadow: none;
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #5c8cff) 20%, #ffffff) 0%, var(--accent, #5c8cff) 100%);
+  background: color-mix(in srgb, var(--accent, #5c8cff) 80%, #ffffff 20%);
   transform: scale(1.2);
-  box-shadow: 0 4px 12px rgba(92, 140, 255, 0.6);
-  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* ===== ボタン ===== */
 .ghost {
-  background: linear-gradient(135deg, rgba(66, 165, 245, 0.08) 0%, rgba(30, 136, 229, 0.06) 100%);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
   color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(66, 165, 245, 0.25);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   padding: 0.4rem 0.75rem;
   border-radius: 8px;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  box-shadow: none;
 }
 
 .ghost:hover {
-  background: linear-gradient(135deg, rgba(66, 165, 245, 0.18) 0%, rgba(30, 136, 229, 0.12) 100%);
-  border-color: rgba(100, 181, 246, 0.4);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
   color: #fff;
-  box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
   transform: translateY(-1px);
 }
 
-.ghost:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
 .ghost:focus-visible {
-  outline: 2px solid rgba(66, 165, 245, 0.5);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 2px rgba(79, 111, 184, 0.35));
 }
 
 .settings-title {
   margin: 0 0 1.25rem;
   font-size: 1rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-strong, rgba(255, 255, 255, 0.95));
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid rgba(66, 165, 245, 0.2);
+  border-bottom: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   letter-spacing: 0.02em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: none;
 }
 
 .setting-group {
   margin-bottom: 1.25rem;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
 }
 
 .setting-group__header {
@@ -472,9 +466,9 @@ input[type="range"]::-moz-range-thumb:hover {
 
 /* ===== リセットボタン ===== */
 .btn-reset-small {
-  background: linear-gradient(135deg, rgba(255, 87, 34, 0.08) 0%, rgba(244, 67, 54, 0.06) 100%);
-  border: 1px solid rgba(255, 87, 34, 0.25);
-  color: rgba(255, 152, 0, 0.9);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  color: rgba(255, 176, 120, 0.9);
   padding: 0.3rem 0.5rem;
   border-radius: 6px;
   cursor: pointer;
@@ -483,21 +477,15 @@ input[type="range"]::-moz-range-thumb:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  box-shadow: none;
 }
 
 .btn-reset-small:hover {
-  background: linear-gradient(135deg, rgba(255, 87, 34, 0.15) 0%, rgba(244, 67, 54, 0.12) 100%);
-  border-color: rgba(255, 152, 0, 0.4);
-  color: rgba(255, 193, 7, 1);
-  box-shadow: 0 2px 6px rgba(255, 87, 34, 0.3);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: rgba(255, 176, 120, 0.4);
+  color: rgba(255, 196, 140, 1);
   transform: translateY(-1px);
-}
-
-.btn-reset-small:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 /* ===== 入力フィールド ===== */
@@ -522,27 +510,27 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .xyz-item input[type="number"] {
   padding: 0.4rem 0.6rem;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.25) 100%);
-  border: 1px solid rgba(92, 140, 255, 0.25);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   color: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .xyz-item input[type="number"]:focus {
   outline: none;
   border-color: rgba(92, 140, 255, 0.45);
-  box-shadow: 0 0 0 3px rgba(92, 140, 255, 0.15);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 .tracker-settings {
   margin-top: 1.5rem;
   padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(36, 40, 52, 0.6) 0%, rgba(30, 34, 45, 0.6) 100%);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border-radius: 12px;
-  border: 1px solid rgba(92, 140, 255, 0.18);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  box-shadow: none;
 }
 
 .input-row {
@@ -561,25 +549,27 @@ input[type="range"]::-moz-range-thumb:hover {
 .input-row input[type="number"] {
   margin-top: 0.25rem;
   padding: 0.3rem 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 4px;
   color: #fff;
   font-size: 0.8rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .input-row input[type="number"]:focus {
   outline: none;
   border-color: rgba(92, 140, 255, 0.6);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 /* ===== オイラー角回転順序選択 ===== */
 .euler-order-row {
   margin-bottom: 0.75rem;
   padding: 0.5rem;
-  background: rgba(66, 165, 245, 0.05);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border-radius: 6px;
-  border: 1px solid rgba(66, 165, 245, 0.15);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
 }
 
 .euler-order-label {
@@ -593,26 +583,26 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .euler-order-select {
   padding: 0.4rem 0.6rem;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.3) 100%);
-  border: 1px solid rgba(66, 165, 245, 0.25);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  box-shadow: none;
 }
 
 .euler-order-select:hover {
-  border-color: rgba(66, 165, 245, 0.4);
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.35) 100%);
+  border-color: rgba(92, 140, 255, 0.4);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 .euler-order-select:focus {
   outline: none;
   border-color: rgba(66, 165, 245, 0.6);
-  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--focus-ring, 0 0 0 2px rgba(79, 111, 184, 0.35));
 }
 
 /* ===== 角度スライダー ===== */
@@ -665,9 +655,9 @@ input[type="range"]::-moz-range-thumb:hover {
   gap: 1rem;
   font-size: 0.85rem;
   padding: 0.5rem;
-  background: rgba(66, 165, 245, 0.05);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border-radius: 6px;
-  border: 1px solid rgba(66, 165, 245, 0.15);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
 }
 
 .color-label span {
@@ -678,18 +668,18 @@ input[type="range"]::-moz-range-thumb:hover {
 .color-label input[type="color"] {
   width: 3.5rem;
   height: 2.5rem;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   cursor: pointer;
   background: transparent;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  box-shadow: none;
 }
 
 .color-label input[type="color"]:hover {
-  border-color: rgba(66, 165, 245, 0.5);
+  border-color: rgba(92, 140, 255, 0.45);
   transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(66, 165, 245, 0.3);
+  box-shadow: none;
 }
 
 .color-label input[type="color"]::-webkit-color-swatch-wrapper {

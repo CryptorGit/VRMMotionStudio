@@ -17,6 +17,7 @@
   <DisplaySection
     v-else-if="active === 'display'"
     :models="models"
+    :show-grid="showGrid"
     :show-light-marker="showLightMarker"
     :marker-color="markerColor"
     :show-extended-bones="showExtendedBones"
@@ -29,6 +30,7 @@
     :bone-label-scale="boneLabelScale"
     :outline-width="outlineWidth"
     :outline-color="outlineColor"
+    @update:show-grid="v => emit('update:showGrid', v)"
     @update:show-light-marker="v => emit('update:showLightMarker', v)"
     @update:marker-color="v => emit('update:markerColor', v)"
     @update:show-extended-bones="v => emit('update:showExtendedBones', v)"
@@ -144,6 +146,7 @@ const props = defineProps({
   mesh: Object,
   models: { type: Array, required: true },
   lookAtEnabled: { type: Boolean, default: true },
+  showGrid: { type: Boolean, default: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
@@ -192,6 +195,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'update:showGrid',
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
@@ -247,10 +251,11 @@ const emit = defineEmits([
   'remove-audio'
 ])
 
-function handleFingerUpdate({ hand, finger, value }) {
-  const key = `${hand}_${finger}`
-  const updated = { ...props.fingerStates, [key]: value }
-  emit('update:fingerStates', updated)
+function handleFingerUpdate(updated) {
+  // FingerControlSectionから全体のfingerStatesオブジェクトを受け取る
+  if (updated && typeof updated === 'object') {
+    emit('update:fingerStates', updated)
+  }
 }
 </script>
 

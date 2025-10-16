@@ -47,7 +47,7 @@ const props = defineProps({
   fingerStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['update:finger'])
+const emit = defineEmits(['update:fingerStates'])
 
 const fingers = [
   { key: 'thumb', label: '親指' },
@@ -68,14 +68,21 @@ function getFingerValue(hand, finger) {
 function setFingerValue(hand, finger, value) {
   const key = `${hand}_${finger}`
   const numValue = Math.max(0, Math.min(1, Number(value) || 0))
-  emit('update:finger', { hand, finger, value: numValue })
+  
+  // 更新されたfingerStatesオブジェクト全体を送信
+  const updated = { ...props.fingerStates, [key]: numValue }
+  console.log(`[FingerControl] Setting ${key} to ${(numValue * 100).toFixed(0)}%`)
+  emit('update:fingerStates', updated)
 }
 
 function resetAllFingers() {
+  const reset = {}
   fingers.forEach(f => {
-    setFingerValue('left', f.key, 0)
-    setFingerValue('right', f.key, 0)
+    reset[`left_${f.key}`] = 0
+    reset[`right_${f.key}`] = 0
   })
+  console.log('[FingerControl] Resetting all fingers')
+  emit('update:fingerStates', reset)
 }
 </script>
 
@@ -179,14 +186,14 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--accent, #42a5f5);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, background 0.2s ease;
+  box-shadow: none;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
   background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
   transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -196,14 +203,14 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, background 0.2s ease;
+  box-shadow: none;
 }
 
 input[type="range"]::-moz-range-thumb:hover {
   background: color-mix(in srgb, var(--accent, #42a5f5) 100%, white 20%);
   transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
 }
 
 .actions {
@@ -217,21 +224,21 @@ input[type="range"]::-moz-range-thumb:hover {
 .btn {
   padding: 0.45rem 1rem;
   font-size: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   font-weight: 500;
 }
 
 .btn--secondary {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   color: rgba(255, 255, 255, 0.8);
 }
 
 .btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
   color: rgba(255, 255, 255, 0.95);
 }
 </style>

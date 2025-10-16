@@ -77,8 +77,9 @@ function formatDuration(seconds) {
   gap: 0.75rem;
   padding: 1rem;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(28, 32, 44, 0.85), rgba(20, 22, 32, 0.92));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  box-shadow: none;
 }
 
 .audio-section__header {
@@ -100,7 +101,7 @@ function formatDuration(seconds) {
 .audio-section__empty {
   padding: 1rem;
   border-radius: 8px;
-  background: rgba(24, 28, 40, 0.7);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.8));
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.82rem;
   text-align: center;
@@ -122,8 +123,9 @@ function formatDuration(seconds) {
   gap: 0.5rem;
   padding: 0.75rem;
   border-radius: 10px;
-  background: rgba(18, 22, 30, 0.66);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  box-shadow: none;
 }
 
 .info-row {
@@ -162,23 +164,25 @@ function formatDuration(seconds) {
   gap: 0.5rem;
   padding: 0.5rem 0.9rem;
   border-radius: 10px;
-  border: none;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
   flex: 1;
 }
 
 .btn--danger {
   color: #fff;
-  background: linear-gradient(180deg, rgba(255, 112, 128, 0.92), rgba(255, 80, 112, 0.82));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), 0 12px 24px rgba(255, 68, 102, 0.35);
+  background: rgba(198, 77, 98, 0.85);
+  border-color: rgba(198, 77, 98, 0.45);
+  box-shadow: none;
 }
 
 .btn--danger:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4), 0 14px 32px rgba(255, 68, 102, 0.45);
+  transform: translateY(-1px);
+  background: rgba(210, 90, 110, 0.9);
+  border-color: rgba(210, 90, 110, 0.55);
 }
 
 .btn i {

@@ -1,733 +1,3 @@
-/* legacy timeline implementation retained for reference.
-import { computed, ref, reactive, watch } from 'vue'
-import * as THREE from 'three'
-
-let nextKeyframeId = 1
-let nextMarkerId = 1
-const TIMELINE_SERIAL_VERSION = 1
-const STORAGE_KEY_STATE = 'timeline.state.v1'
-
-let saveTimer = null
-let restoringState = false
-
-function clonePosition(pos) {
-  if (!pos) return [0, 0, 0]
-  if (Array.isArray(pos)) return pos.slice(0, 3)
-  if (pos.isVector3) return [pos.x, pos.y, pos.z]
-  return [Number(pos?.x) || 0, Number(pos?.y) || 0, Number(pos?.z) || 0]
-}
-
-function lerpVector(a, b, t) {
-  const out = [0, 0, 0]
-  for (let i = 0; i < 3; i++) {
-    const av = Array.isArray(a) ? a[i] : a?.[i]
-    const bv = Array.isArray(b) ? b[i] : b?.[i]
-    out[i] = (av ?? 0) + ((bv ?? 0) - (av ?? 0)) * t
-  }
-  return out
-}
-
-const tempQuatA = new THREE.Quaternion()
-const tempQuatB = new THREE.Quaternion()
-const tempQuatSlerp = new THREE.Quaternion()
-
-function cloneQuaternion(rot) {
-  if (!rot) return [0, 0, 0, 1]
-  if (Array.isArray(rot)) {
-    const [x = 0, y = 0, z = 0, w = 1] = rot
-    tempQuatA.set(x, y, z, w).normalize()
-    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-  }
-  if (rot.isQuaternion || rot instanceof THREE.Quaternion) {
-    tempQuatA.copy(rot).normalize()
-    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-  }
-  const x = Number(rot?.x) || 0
-  const y = Number(rot?.y) || 0
-  const z = Number(rot?.z) || 0
-  const w = Number(rot?.w) || 1
-  tempQuatA.set(x, y, z, w).normalize()
-  return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-}
-
-function normalizeTransform(value, { positionFallback, rotationFallback } = {}) {
-  let position = null
-  let rotation = null
-
-  if (value !== undefined && value !== null) {
-    if (Array.isArray(value)) {
-      position = clonePosition(value)
-    } else if (typeof value === 'object') {
-      if (Array.isArray(value.position) || value.position?.isVector3) {
-        position = clonePosition(value.position)
-      } else if (Array.isArray(value.value) || value.value?.isVector3) {
-        position = clonePosition(value.value)
-      }
-
-      if (Array.isArray(value.rotation) || value.rotation?.isQuaternion) {
-        rotation = cloneQuaternion(value.rotation)
-      } else if (Array.isArray(value.quaternion) || value.quaternion?.isQuaternion) {
-        rotation = cloneQuaternion(value.quaternion)
-      }
-    }
-  }
-
-  if (!position && positionFallback) {
-    position = clonePosition(positionFallback)
-  }
-  if (!rotation && rotationFallback) {
-    rotation = cloneQuaternion(rotationFallback)
-  }
-
-  if (!position) position = [0, 0, 0]
-  if (!rotation) rotation = [0, 0, 0, 1]
-
-  return { position, rotation }
-}
-
-function cloneSnapshotEntry(entry, options) {
-  return normalizeTransform(entry, options)
-}
-
-function transformsEqual(a, b, epsilon = 1e-5) {
-  if (!a || !b) return false
-  for (let i = 0; i < 3; i++) {
-    const av = a.position?.[i] ?? 0
-    const bv = b.position?.[i] ?? 0
-    if (Math.abs(av - bv) > epsilon) return false
-  }
-  for (let i = 0; i < 4; i++) {
-    const av = a.rotation?.[i] ?? (i === 3 ? 1 : 0)
-    const bv = b.rotation?.[i] ?? (i === 3 ? 1 : 0)
-    if (Math.abs(av - bv) > epsilon) return false
-  }
-  return true
-}
-
-function slerpQuaternionArrays(a, b, t) {
-  const alpha = THREE.MathUtils.clamp(t ?? 0, 0, 1)
-  const qa = cloneQuaternion(a)
-  const qb = cloneQuaternion(b)
-  tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
-  tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
-  // Use instance slerp to avoid relying on static THREE.Quaternion.slerp
-  tempQuatSlerp.copy(tempQuatA).slerp(tempQuatB, alpha)
-  return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
-}
-
-const tempQuatA = new THREE.Quaternion()
-const tempQuatB = new THREE.Quaternion()
-const tempQuatSlerp = new THREE.Quaternion()
-
-function cloneQuaternion(rot) {
-  if (!rot) return [0, 0, 0, 1]
-  if (Array.isArray(rot)) {
-    const [x = 0, y = 0, z = 0, w = 1] = rot
-    tempQuatA.set(x, y, z, w).normalize()
-    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-  }
-  if (rot.isQuaternion || rot instanceof THREE.Quaternion) {
-    tempQuatA.copy(rot).normalize()
-    return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-  }
-  const x = Number(rot?.x) || 0
-  const y = Number(rot?.y) || 0
-  const z = Number(rot?.z) || 0
-  const w = Number(rot?.w) || 1
-  tempQuatA.set(x, y, z, w).normalize()
-  return [tempQuatA.x, tempQuatA.y, tempQuatA.z, tempQuatA.w]
-}
-
-function normalizeTransform(value, { positionFallback, rotationFallback } = {}) {
-  let position = null
-  let rotation = null
-
-  if (value !== undefined && value !== null) {
-    if (Array.isArray(value)) {
-      position = clonePosition(value)
-    } else if (typeof value === 'object') {
-      if (Array.isArray(value.position) || value.position?.isVector3) {
-        position = clonePosition(value.position)
-      } else if (Array.isArray(value.value) || value.value?.isVector3) {
-        position = clonePosition(value.value)
-      }
-
-      if (Array.isArray(value.rotation) || value.rotation?.isQuaternion) {
-        rotation = cloneQuaternion(value.rotation)
-      } else if (Array.isArray(value.quaternion) || value.quaternion?.isQuaternion) {
-        rotation = cloneQuaternion(value.quaternion)
-      }
-    }
-  }
-
-  if (!position && positionFallback) {
-    position = clonePosition(positionFallback)
-  }
-  if (!rotation && rotationFallback) {
-    rotation = cloneQuaternion(rotationFallback)
-  }
-
-  if (!position) position = [0, 0, 0]
-  if (!rotation) rotation = [0, 0, 0, 1]
-
-  return { position, rotation }
-}
-
-function cloneSnapshotEntry(entry, options) {
-  return normalizeTransform(entry, options)
-}
-
-function transformsEqual(a, b, epsilon = 1e-5) {
-  if (!a || !b) return false
-  for (let i = 0; i < 3; i++) {
-    const av = a.position?.[i] ?? 0
-    const bv = b.position?.[i] ?? 0
-    if (Math.abs(av - bv) > epsilon) return false
-  }
-  for (let i = 0; i < 4; i++) {
-    const av = a.rotation?.[i] ?? (i === 3 ? 1 : 0)
-    const bv = b.rotation?.[i] ?? (i === 3 ? 1 : 0)
-    if (Math.abs(av - bv) > epsilon) return false
-  }
-  return true
-}
-
-function slerpQuaternionArrays(a, b, t) {
-  const alpha = THREE.MathUtils.clamp(t ?? 0, 0, 1)
-  const qa = cloneQuaternion(a)
-  const qb = cloneQuaternion(b)
-  tempQuatA.set(qa[0], qa[1], qa[2], qa[3])
-  tempQuatB.set(qb[0], qb[1], qb[2], qb[3])
-  tempQuatSlerp.copy(tempQuatA).slerp(tempQuatB, alpha)
-  return [tempQuatSlerp.x, tempQuatSlerp.y, tempQuatSlerp.z, tempQuatSlerp.w]
-}
-
-export function useTimeline({ trackers, renderCamera }) {
-  const startTime = ref(0)
-  const endTime = ref(30)
-  const currentTime = ref(0)
-  const isPlaying = ref(false)
-  const loopPlayback = ref(false)
-  const frameRate = ref(60)
-  const keyframes = reactive({})
-  const lastAppliedValues = reactive({})
-  const markers = ref([])
-
-  let lastStepTime = performance.now()
-
-  function scheduleSave() {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
-    if (restoringState) return
-    if (saveTimer !== null) return
-    saveTimer = window.setTimeout(() => {
-      saveTimer = null
-      persistState()
-    }, 150)
-  }
-
-  function persistState() {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
-    try {
-      localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(serialize()))
-    } catch {}
-  }
-
-  function restoreState() {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_STATE)
-      if (!raw) return false
-      const parsed = JSON.parse(raw)
-      return deserialize(parsed, { skipSave: true })
-    } catch {
-      return false
-    }
-  }
-
-  const duration = computed(() => Math.max(0, endTime.value - startTime.value))
-
-  function ensureTrackKey(key) {
-    if (!keyframes[key]) keyframes[key] = []
-    return keyframes[key]
-  }
-
-  function addKeyframe({ trackerKey, time, position }) {
-    if (!trackerKey || typeof time !== 'number') return null
-    const arr = ensureTrackKey(trackerKey)
-    const safePos = clonePosition(position)
-    const clampedTime = Math.min(Math.max(time, startTime.value), endTime.value)
-    const entry = { id: nextKeyframeId++, time: clampedTime, value: safePos }
-    arr.push(entry)
-    arr.sort((a, b) => a.time - b.time)
-    lastAppliedValues[trackerKey] = safePos
-    scheduleSave()
-    return entry
-  }
-
-  function addSnapshotAtTime(time) {
-    const result = []
-    const list = trackers?.value || []
-    for (const t of list) {
-      if (!t?.key || !t?.mesh) continue
-      const position = clonePosition(t.mesh.position)
-      const entry = addKeyframe({ trackerKey: t.key, time, position })
-      if (entry) result.push(entry)
-    }
-    return result
-  }
-
-  function removeKeyframe(trackerKey, id) {
-    const arr = keyframes[trackerKey]
-    if (!arr?.length) return
-    const idx = arr.findIndex(k => k.id === id)
-    if (idx === -1) return
-    arr.splice(idx, 1)
-    scheduleSave()
-    applyCurrentPose()
-  }
-
-  function updateKeyframe(trackerKey, id, payload = {}) {
-    const arr = keyframes[trackerKey]
-    if (!arr?.length) return null
-    const target = arr.find(k => k.id === id)
-    if (!target) return null
-    let changed = false
-
-    if (payload.time !== undefined && Number.isFinite(payload.time)) {
-      const next = Math.min(Math.max(payload.time, startTime.value), endTime.value)
-      if (Math.abs(next - target.time) > 1e-6) {
-        target.time = next
-        changed = true
-      }
-    }
-
-    if (payload.value && Array.isArray(payload.value)) {
-      const nextValue = clonePosition(payload.value)
-      if (
-        !target.value ||
-        target.value[0] !== nextValue[0] ||
-        target.value[1] !== nextValue[1] ||
-        target.value[2] !== nextValue[2]
-      ) {
-        target.value = nextValue
-        lastAppliedValues[trackerKey] = nextValue
-        changed = true
-      }
-    }
-
-    if (changed) {
-      arr.sort((a, b) => a.time - b.time)
-      scheduleSave()
-      applyCurrentPose()
-    }
-
-    return target
-  }
-
-  function updateKeyframeTime(trackerKey, id, nextTime) {
-    if (!Number.isFinite(nextTime)) return
-    updateKeyframe(trackerKey, id, { time: nextTime })
-  }
-
-  function clearTrack(trackerKey) {
-    if (!keyframes[trackerKey]) return
-    keyframes[trackerKey] = []
-    scheduleSave()
-    applyCurrentPose()
-  }
-
-  function clearAll() {
-    for (const key of Object.keys(keyframes)) keyframes[key] = []
-    markers.value = []
-    scheduleSave()
-    applyCurrentPose()
-  }
-
-  function getTrackAtTime(trackerKey, time) {
-    const arr = keyframes[trackerKey]
-    if (!arr?.length) return null
-    if (time <= arr[0].time) return arr[0].value
-    const last = arr[arr.length - 1]
-    if (time >= last.time) return last.value
-    for (let i = 0; i < arr.length - 1; i++) {
-      const a = arr[i]
-      const b = arr[i + 1]
-      if (time >= a.time && time <= b.time) {
-        const span = b.time - a.time || 1
-        const alpha = (time - a.time) / span
-        return lerpVector(a.value, b.value, alpha)
-      }
-    }
-    return last.value
-  }
-
-  function applyPoseAt(time) {
-    const list = trackers?.value || []
-    for (const t of list) {
-      if (!t?.key || !t?.mesh) continue
-      const pos = getTrackAtTime(t.key, time)
-      if (!pos) continue
-      const cached = lastAppliedValues[t.key]
-      if (cached && cached[0] === pos[0] && cached[1] === pos[1] && cached[2] === pos[2]) continue
-      t.mesh.position.set(pos[0], pos[1], pos[2])
-      lastAppliedValues[t.key] = pos
-    }
-  }
-
-  function applyCurrentPose() {
-    applyPoseAt(currentTime.value)
-  }
-
-  function step() {
-    const now = performance.now()
-    const delta = (now - lastStepTime) / 1000
-    lastStepTime = now
-    if (isPlaying.value) {
-      let next = currentTime.value + delta
-      const rangeEnd = endTime.value
-      const rangeStart = startTime.value
-      if (loopPlayback.value && duration.value > 0) {
-        if (next > rangeEnd) {
-          const span = duration.value
-          const overflow = (next - rangeStart) % span
-          next = rangeStart + overflow
-        }
-      } else if (next >= rangeEnd) {
-        next = rangeEnd
-        isPlaying.value = false
-      }
-      currentTime.value = Math.min(Math.max(next, rangeStart), rangeEnd)
-    }
-    applyCurrentPose()
-  }
-
-  function setCurrentTime(time) {
-    const clamped = Math.min(Math.max(time, startTime.value), endTime.value)
-    currentTime.value = clamped
-    applyCurrentPose()
-    lastStepTime = performance.now()
-  }
-
-  function play() {
-    if (currentTime.value >= endTime.value) currentTime.value = startTime.value
-    isPlaying.value = true
-    lastStepTime = performance.now()
-  }
-
-  function pause() {
-    isPlaying.value = false
-  }
-
-  function stop() {
-    isPlaying.value = false
-    setCurrentTime(startTime.value)
-  }
-
-  function setDuration(seconds) {
-    if (!Number.isFinite(seconds) || seconds <= 0) return
-    endTime.value = startTime.value + seconds
-    if (currentTime.value > endTime.value) currentTime.value = endTime.value
-    scheduleSave()
-  }
-
-  function setFrameRate(fps) {
-    if (!Number.isFinite(fps) || fps <= 0) return
-    frameRate.value = fps
-    scheduleSave()
-  }
-
-  function setRange(start, end) {
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return
-    const s = Math.min(start, end)
-    const e = Math.max(start, end)
-    if (e === s) return
-    startTime.value = s
-    endTime.value = e
-    if (currentTime.value < s) currentTime.value = s
-    if (currentTime.value > e) currentTime.value = e
-    scheduleSave()
-  }
-
-  function setRangeFromFrames(startFrame, endFrame) {
-    if (!Number.isFinite(startFrame) || !Number.isFinite(endFrame)) return
-    const s = Math.min(startFrame, endFrame)
-    const e = Math.max(startFrame, endFrame)
-    if (e === s) return
-    const fps = frameRate.value || 60
-    setRange(s / fps, e / fps)
-  }
-
-  function stepByFrames(deltaFrames) {
-    if (!Number.isFinite(deltaFrames)) return
-    const fps = frameRate.value || 60
-    const offset = deltaFrames / fps
-    setCurrentTime(currentTime.value + offset)
-  }
-
-  function jumpToFrame(frame) {
-    if (!Number.isFinite(frame)) return
-    const fps = frameRate.value || 60
-    const time = frame / fps
-    setCurrentTime(time)
-  }
-
-  function addMarker({ time, label }) {
-    if (!Number.isFinite(time)) return null
-    const safeLabel = typeof label === 'string' ? label.trim() : ''
-    const entry = {
-      id: nextMarkerId++,
-      time: Math.min(Math.max(time, startTime.value), endTime.value),
-      label: safeLabel
-    }
-    markers.value = [...markers.value, entry].sort((a, b) => a.time - b.time)
-    scheduleSave()
-    return entry
-  }
-
-  function updateMarker(id, payload) {
-    let changed = false
-    markers.value = markers.value.map(marker => {
-      if (marker.id !== id) return marker
-      const next = { ...marker }
-      if (payload?.time !== undefined && Number.isFinite(payload.time)) {
-        next.time = Math.min(Math.max(payload.time, startTime.value), endTime.value)
-        if (next.time !== marker.time) changed = true
-      }
-      if (payload?.label !== undefined) {
-        next.label = typeof payload.label === 'string' ? payload.label.trim() : ''
-      }
-      if (next.label !== marker.label) changed = true
-      return next
-    }).sort((a, b) => a.time - b.time)
-    if (changed) scheduleSave()
-  }
-
-  function removeMarker(id) {
-    const next = markers.value.filter(marker => marker.id !== id)
-    if (next.length === markers.value.length) return
-    markers.value = next
-    scheduleSave()
-  }
-
-  function importKeyframes(snapshot) {
-    if (!snapshot || typeof snapshot !== 'object') return
-    for (const key of Object.keys(snapshot)) {
-      const frames = Array.isArray(snapshot[key]) ? snapshot[key] : []
-      keyframes[key] = frames.map(frame => ({
-        id: nextKeyframeId++,
-        time: Math.max(0, Number(frame.time) || 0),
-        value: clonePosition(frame.value)
-      })).sort((a, b) => a.time - b.time)
-    }
-    applyCurrentPose()
-    scheduleSave()
-  }
-
-  function exportKeyframes() {
-    const out = {}
-    for (const key of Object.keys(keyframes)) {
-      out[key] = keyframes[key].map(frame => ({
-        time: frame.time,
-        value: clonePosition(frame.value)
-      }))
-    }
-    return out
-  }
-
-  function serialize() {
-    const tracks = {}
-    let maxKeyId = 0
-    for (const key of Object.keys(keyframes)) {
-      const frames = keyframes[key] || []
-      tracks[key] = frames.map(frame => {
-        const id = Number(frame.id) || 0
-        if (id > maxKeyId) maxKeyId = id
-        return {
-          id,
-          time: frame.time,
-          value: clonePosition(frame.value)
-        }
-      })
-    }
-
-    let maxMarkerId = 0
-    const markerList = markers.value.map(marker => {
-      const id = Number(marker.id) || 0
-      if (id > maxMarkerId) maxMarkerId = id
-      return {
-        id,
-        time: marker.time,
-        label: marker.label
-      }
-    })
-
-    return {
-      version: TIMELINE_SERIAL_VERSION,
-      frameRate: frameRate.value,
-      startTime: startTime.value,
-      endTime: endTime.value,
-      currentTime: currentTime.value,
-      loop: loopPlayback.value,
-      nextIds: {
-        keyframe: Math.max(nextKeyframeId, maxKeyId + 1),
-        marker: Math.max(nextMarkerId, maxMarkerId + 1)
-      },
-      markers: markerList,
-      tracks
-    }
-  }
-
-  function deserialize(snapshot, { skipSave = false } = {}) {
-    if (!snapshot || typeof snapshot !== 'object') return false
-    restoringState = true
-    try {
-      const version = Number(snapshot.version) || TIMELINE_SERIAL_VERSION
-      if (version > TIMELINE_SERIAL_VERSION) {
-        // proceed but warn in dev (silently)
-      }
-
-      if (Number.isFinite(snapshot.frameRate) && snapshot.frameRate > 0) {
-        frameRate.value = snapshot.frameRate
-      }
-
-      let newStart = Number(snapshot.startTime)
-      let newEnd = Number(snapshot.endTime)
-      if (!Number.isFinite(newStart)) newStart = 0
-      if (!Number.isFinite(newEnd)) newEnd = newStart + 30
-      if (newEnd <= newStart) newEnd = newStart + 1
-      startTime.value = newStart
-      endTime.value = newEnd
-
-      loopPlayback.value = !!snapshot.loop
-
-      const trackEntries = snapshot.tracks && typeof snapshot.tracks === 'object' ? snapshot.tracks : {}
-      for (const key of Object.keys(keyframes)) keyframes[key] = []
-
-      let maxKeyId = 0
-      for (const [key, frames] of Object.entries(trackEntries)) {
-        if (!Array.isArray(frames)) continue
-        keyframes[key] = frames
-          .map(frame => {
-            let assignedId = Number(frame.id)
-            if (!Number.isFinite(assignedId) || assignedId <= 0) {
-              assignedId = ++maxKeyId
-            } else {
-              maxKeyId = Math.max(maxKeyId, assignedId)
-            }
-            const rawTime = Number(frame.time)
-            const time = Number.isFinite(rawTime) ? rawTime : startTime.value
-            return {
-              id: assignedId,
-              time: Math.min(Math.max(time, startTime.value), endTime.value),
-              value: clonePosition(frame.value)
-            }
-          })
-          .sort((a, b) => a.time - b.time)
-      }
-      nextKeyframeId = Math.max(
-        maxKeyId + 1,
-        Number(snapshot?.nextIds?.keyframe) || 1
-      )
-
-      const markerInput = Array.isArray(snapshot.markers) ? snapshot.markers : []
-      let maxMarkerId = 0
-      markers.value = markerInput
-        .map(marker => {
-          let assignedId = Number(marker.id)
-          if (!Number.isFinite(assignedId) || assignedId <= 0) {
-            assignedId = ++maxMarkerId
-          } else {
-            maxMarkerId = Math.max(maxMarkerId, assignedId)
-          }
-          const rawTime = Number(marker.time)
-          const time = Number.isFinite(rawTime) ? rawTime : startTime.value
-          return {
-            id: assignedId,
-            time: Math.min(Math.max(time, startTime.value), endTime.value),
-            label: typeof marker.label === 'string' ? marker.label : `Marker ${assignedId}`
-          }
-        })
-        .sort((a, b) => a.time - b.time)
-      nextMarkerId = Math.max(
-        maxMarkerId + 1,
-        Number(snapshot?.nextIds?.marker) || 1
-      )
-
-      if (Number.isFinite(snapshot.currentTime)) {
-        setCurrentTime(Math.min(Math.max(snapshot.currentTime, startTime.value), endTime.value))
-      } else {
-        setCurrentTime(startTime.value)
-      }
-    } catch (error) {
-      if (import.meta?.env?.DEV) {
-        console.error('Failed to deserialize timeline snapshot', error)
-      }
-      return false
-    } finally {
-      restoringState = false
-    }
-
-    applyCurrentPose()
-    if (!skipSave) scheduleSave()
-    return true
-  }
-
-  watch(currentTime, () => {
-    applyCurrentPose()
-    scheduleSave()
-  })
-
-  watch(loopPlayback, () => {
-    scheduleSave()
-  })
-
-  restoreState()
-
-  return {
-    startTime,
-    endTime,
-    duration,
-    frameRate,
-    currentTime,
-    isPlaying,
-    loopPlayback,
-    keyframes,
-    markers,
-    step,
-    play,
-    pause,
-    stop,
-    setCurrentTime,
-    setDuration,
-    setFrameRate,
-    setRange,
-    setRangeFromFrames,
-    stepByFrames,
-    jumpToFrame,
-    addMarker,
-    updateMarker,
-    removeMarker,
-    addKeyframe,
-    addSnapshotAtTime,
-    removeKeyframe,
-  removeKeyframes,
-    updateKeyframe,
-  moveKeyframes,
-    updateKeyframeTime,
-    clearTrack,
-    clearAll,
-    getTrackAtTime,
-    applyCurrentPose,
-    importKeyframes,
-    exportKeyframes,
-    serialize,
-    deserialize,
-    restoreState
-  }
-}
-
-*/
-
 import { computed, reactive, ref, watch } from 'vue'
 import * as THREE from 'three'
 
@@ -769,33 +39,34 @@ const DEFAULT_CURVE = Object.freeze({
   out: { x: 1 / 3, y: 1 / 3 }
 })
 
-// トラッカーごとのカーブとカラーを保存する構造
+// トラチE��ーごとのカーブとカラーを保存する構造
 // curves: { trackerKey: { curve: {...}, color: '#hex' } }
-// 'default' キーは未設定トラッカーのデフォルトカーブ
+// 'default' キーは未設定トラチE��ーのチE��ォルトカーチE
 
-// トラッカーごとのカーブとカラーを保存する構造
+// トラチE��ーごとのカーブとカラーを保存する構造
 // curves: { trackerKey: { curve: {...}, color: '#hex' } }
-// 'default' キーは未設定トラッカーのデフォルトカーブ
+// 'default' キーは未設定トラチE��ーのチE��ォルトカーチE
 
 function sanitizeCurves(curves) {
   if (!curves || typeof curves !== 'object') {
-    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff', modified: false } }
   }
   const result = {}
   for (const [key, data] of Object.entries(curves)) {
     result[key] = {
       curve: sanitizeCurve(data?.curve, DEFAULT_CURVE),
-      color: typeof data?.color === 'string' ? data.color : '#5c8cff'
+      color: typeof data?.color === 'string' ? data.color : '#5c8cff',
+      modified: !!data?.modified
     }
   }
-  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  // 'default' キーがなぁE��合�E追加�E�以前�E'all'は'default'に変換�E�E
   if (!result.default) {
-    // 互換性: 'all' キーがある場合は 'default' に移行
+    // 互換性: 'all' キーがある場合�E 'default' に移衁E
     if (result.all) {
-      result.default = result.all
+      result.default = { ...result.all, modified: !!result.all.modified }
       delete result.all
     } else {
-      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff', modified: false }
     }
   }
   return result
@@ -803,25 +74,27 @@ function sanitizeCurves(curves) {
 
 function cloneCurves(curves) {
   if (!curves || typeof curves !== 'object') {
-    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' } }
+    return { default: { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff', modified: false } }
   }
   const result = {}
   for (const [key, data] of Object.entries(curves)) {
     result[key] = {
       curve: cloneCurve(data?.curve || DEFAULT_CURVE),
-      color: typeof data?.color === 'string' ? data.color : '#5c8cff'
+      color: typeof data?.color === 'string' ? data.color : '#5c8cff',
+      modified: !!data?.modified
     }
   }
-  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  // 'default' キーがなぁE��合�E追加�E�以前�E'all'は'default'に変換�E�E
   if (!result.default) {
     if (result.all) {
       result.default = {
         curve: cloneCurve(result.all.curve || DEFAULT_CURVE),
-        color: result.all.color || '#5c8cff'
+        color: result.all.color || '#5c8cff',
+        modified: !!result.all.modified
       }
       delete result.all
     } else {
-      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff' }
+      result.default = { curve: cloneCurve(DEFAULT_CURVE), color: '#5c8cff', modified: false }
     }
   }
   return result
@@ -1166,29 +439,43 @@ export function useTimeline({ trackers, renderCamera }) {
     const nextFrames = keyframes.value.map(frame => {
       if (timeToFrame(frame.time) !== targetFrame) return frame
       
-      // curvesパラメータがある場合はそれを使用、なければ既存のcurvesを保持
+      // curvesパラメータがある場合�Eそれを使用、なければ既存�Ecurvesを保持
       let nextCurves
       if (curves) {
         nextCurves = sanitizeCurves(curves)
       } else if (trackerKey && curve) {
-        // 特定のトラッカーのカーブを更新
+        // 特定�EトラチE��ーのカーブを更新
         nextCurves = cloneCurves(frame.curves || {})
+        const sanitizedCurve = sanitizeCurve(curve, DEFAULT_CURVE)
+        const isModified = 
+          Math.abs(sanitizedCurve.in.x - DEFAULT_CURVE.in.x) > 1e-4 ||
+          Math.abs(sanitizedCurve.in.y - DEFAULT_CURVE.in.y) > 1e-4 ||
+          Math.abs(sanitizedCurve.out.x - DEFAULT_CURVE.out.x) > 1e-4 ||
+          Math.abs(sanitizedCurve.out.y - DEFAULT_CURVE.out.y) > 1e-4
         nextCurves[trackerKey] = {
-          curve: sanitizeCurve(curve, DEFAULT_CURVE),
-          color: curveColor || nextCurves[trackerKey]?.color || '#5c8cff'
+          curve: sanitizedCurve,
+          color: curveColor || nextCurves[trackerKey]?.color || '#5c8cff',
+          modified: isModified
         }
       } else if (curve) {
-        // 下位互換性のため、curveのみの場合は'all'キーに設定
+        // 下位互換性のため、curveのみの場合�E'default'キーに設宁E
         nextCurves = cloneCurves(frame.curves || {})
-        nextCurves.all = {
-          curve: sanitizeCurve(curve, DEFAULT_CURVE),
-          color: curveColor || nextCurves.all?.color || '#5c8cff'
+        const sanitizedCurve = sanitizeCurve(curve, DEFAULT_CURVE)
+        const isModified = 
+          Math.abs(sanitizedCurve.in.x - DEFAULT_CURVE.in.x) > 1e-4 ||
+          Math.abs(sanitizedCurve.in.y - DEFAULT_CURVE.in.y) > 1e-4 ||
+          Math.abs(sanitizedCurve.out.x - DEFAULT_CURVE.out.x) > 1e-4 ||
+          Math.abs(sanitizedCurve.out.y - DEFAULT_CURVE.out.y) > 1e-4
+        nextCurves.default = {
+          curve: sanitizedCurve,
+          color: curveColor || nextCurves.default?.color || '#5c8cff',
+          modified: isModified
         }
       } else {
         nextCurves = cloneCurves(frame.curves || {})
       }
       
-      const baseCurve = sanitizeCurve(nextCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
+      const baseCurve = sanitizeCurve(nextCurves.default?.curve || nextCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
       updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curves: nextCurves, curve: baseCurve }
       return updatedEntry
     })
@@ -1203,8 +490,22 @@ export function useTimeline({ trackers, renderCamera }) {
 
     const sanitizedCurves = curves
       ? sanitizeCurves(curves)
-      : sanitizeCurves({ all: { curve: sanitizeCurve(curve, DEFAULT_CURVE), color: curveColor || '#5c8cff' } })
-    const baseCurve = sanitizeCurve(sanitizedCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
+      : (() => {
+          const c = sanitizeCurve(curve, DEFAULT_CURVE)
+          const isModified = 
+            Math.abs(c.in.x - DEFAULT_CURVE.in.x) > 1e-4 ||
+            Math.abs(c.in.y - DEFAULT_CURVE.in.y) > 1e-4 ||
+            Math.abs(c.out.x - DEFAULT_CURVE.out.x) > 1e-4 ||
+            Math.abs(c.out.y - DEFAULT_CURVE.out.y) > 1e-4
+          return sanitizeCurves({ 
+            default: { 
+              curve: c, 
+              color: curveColor || '#5c8cff',
+              modified: isModified
+            } 
+          })
+        })()
+    const baseCurve = sanitizeCurve(sanitizedCurves.default?.curve || sanitizedCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
 
     const entry = {
       id: nextKeyframeId++,
@@ -1260,33 +561,51 @@ export function useTimeline({ trackers, renderCamera }) {
         changed = true
       }
       
-      // curvesの更新処理
+      // curvesの更新処琁E
       if (payload.curves) {
         updated.curves = sanitizeCurves(payload.curves)
         changed = true
       } else if (payload.trackerKey && payload.curve) {
-        // 特定のトラッカーのカーブを更新
+        // 特定�EトラチE��ーのカーブを更新
         if (!updated.curves) updated.curves = sanitizeCurves({})
         updated.curves = cloneCurves(updated.curves)
+        
+        // modifiedフラグを計算（デフォルトカーブと異なるかチェック）
+        const isModified = 
+          Math.abs((payload.curve.in?.x ?? DEFAULT_CURVE.in.x) - DEFAULT_CURVE.in.x) > 1e-4 ||
+          Math.abs((payload.curve.in?.y ?? DEFAULT_CURVE.in.y) - DEFAULT_CURVE.in.y) > 1e-4 ||
+          Math.abs((payload.curve.out?.x ?? DEFAULT_CURVE.out.x) - DEFAULT_CURVE.out.x) > 1e-4 ||
+          Math.abs((payload.curve.out?.y ?? DEFAULT_CURVE.out.y) - DEFAULT_CURVE.out.y) > 1e-4
+        
         updated.curves[payload.trackerKey] = {
           curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
-          color: payload.curveColor || updated.curves[payload.trackerKey]?.color || '#5c8cff'
+          color: payload.curveColor || updated.curves[payload.trackerKey]?.color || '#5c8cff',
+          modified: isModified
         }
         changed = true
       } else if (payload.curve) {
-        // 下位互換性のため、curveのみの場合は'all'キーに設定
+        // 下位互換性のため、curveのみの場合�E'default'キーに設宁E
         if (!updated.curves) updated.curves = sanitizeCurves({})
         updated.curves = cloneCurves(updated.curves)
-        updated.curves.all = {
+        
+        // modifiedフラグを計算
+        const isModified = 
+          Math.abs((payload.curve.in?.x ?? DEFAULT_CURVE.in.x) - DEFAULT_CURVE.in.x) > 1e-4 ||
+          Math.abs((payload.curve.in?.y ?? DEFAULT_CURVE.in.y) - DEFAULT_CURVE.in.y) > 1e-4 ||
+          Math.abs((payload.curve.out?.x ?? DEFAULT_CURVE.out.x) - DEFAULT_CURVE.out.x) > 1e-4 ||
+          Math.abs((payload.curve.out?.y ?? DEFAULT_CURVE.out.y) - DEFAULT_CURVE.out.y) > 1e-4
+        
+        updated.curves.default = {
           curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
-          color: payload.curveColor || updated.curves.all?.color || '#5c8cff'
+          color: payload.curveColor || updated.curves.default?.color || '#5c8cff',
+          modified: isModified
         }
         changed = true
       }
       
-      // 古いcurveプロパティのサポート（下位互換性）
+      // 古ぁEurveプロパティのサポ�Eト（下位互換性�E�E
       if (!updated.curves && updated.curve) {
-        updated.curves = sanitizeCurves({ all: { curve: updated.curve, color: '#5c8cff' } })
+        updated.curves = sanitizeCurves({ default: { curve: updated.curve, color: '#5c8cff' } })
         delete updated.curve
         changed = true
       }
@@ -1294,7 +613,7 @@ export function useTimeline({ trackers, renderCamera }) {
       if (!updated.curves) {
         updated.curves = sanitizeCurves({})
       }
-      updated.curve = sanitizeCurve(updated.curves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
+      updated.curve = sanitizeCurve(updated.curves.default?.curve || updated.curves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
       return updated
     })
     if (!changed) return keyframes.value.find(frame => frame.id === id) || null
@@ -1467,11 +786,30 @@ export function useTimeline({ trackers, renderCamera }) {
     return clamp01(y)
   }
 
-  function applyCurveAlpha(previous, next, t) {
+  function applyCurveAlpha(previous, next, t, trackerKey = 'default') {
     if (!previous || !next) return clamp01(t)
     const normalized = clamp01(t)
-    const prevCurve = sanitizeCurve(previous.curve, DEFAULT_CURVE)
-    const nextCurve = sanitizeCurve(next.curve, DEFAULT_CURVE)
+    
+    // トラチE��ー固有�Eカーブを優先的に使用
+    let prevCurve = DEFAULT_CURVE
+    let nextCurve = DEFAULT_CURVE
+    
+    // previous のトラチE��ー固有カーブを取征E
+    if (previous.curves && previous.curves[trackerKey]?.curve) {
+      prevCurve = sanitizeCurve(previous.curves[trackerKey].curve, DEFAULT_CURVE)
+    } else if (previous.curve) {
+      // フォールバック: 従来の単一カーチE
+      prevCurve = sanitizeCurve(previous.curve, DEFAULT_CURVE)
+    }
+    
+    // next のトラチE��ー固有カーブを取征E
+    if (next.curves && next.curves[trackerKey]?.curve) {
+      nextCurve = sanitizeCurve(next.curves[trackerKey].curve, DEFAULT_CURVE)
+    } else if (next.curve) {
+      // フォールバック: 従来の単一カーチE
+      nextCurve = sanitizeCurve(next.curve, DEFAULT_CURVE)
+    }
+    
     return cubicBezierYFromX(normalized, prevCurve.out, nextCurve.in)
   }
 
@@ -1495,8 +833,45 @@ export function useTimeline({ trackers, renderCamera }) {
     }
     const span = next.time - previous.time || 1
     const rawAlpha = (clampTime(time) - previous.time) / span
-    const easedAlpha = applyCurveAlpha(previous, next, rawAlpha)
-    return interpolateSnapshots(previous.values, next.values, easedAlpha, trackers)
+    
+    // トラチE��ーごとに異なるイージングカーブを適用
+    const result = {}
+    const trackerList = trackers?.value || []
+    const keys = new Set([
+      ...Object.keys(previous.values || {}),
+      ...Object.keys(next.values || {}),
+      ...trackerList.map(item => item.key).filter(Boolean)
+    ])
+    
+    for (const trackerKey of keys) {
+      const start = previous.values?.[trackerKey]
+      const end = next.values?.[trackerKey]
+      if (!start && !end) continue
+      if (!start) {
+        result[trackerKey] = normalizeTransform(end)
+        continue
+      }
+      if (!end) {
+        result[trackerKey] = normalizeTransform(start)
+        continue
+      }
+      
+      // こ�EトラチE��ー専用のイージングカーブを適用
+      const easedAlpha = applyCurveAlpha(previous, next, rawAlpha, trackerKey)
+      
+      const startT = normalizeTransform(start)
+      const endT = normalizeTransform(end, {
+        positionFallback: startT.position,
+        rotationFallback: startT.rotation
+      })
+      
+      result[trackerKey] = {
+        position: lerpVector(startT.position, endT.position, easedAlpha),
+        rotation: slerpQuaternionArrays(startT.rotation, endT.rotation, easedAlpha)
+      }
+    }
+    
+    return result
   }
 
   function getTrackAtTime(trackerKey, time) {
@@ -1716,12 +1091,12 @@ export function useTimeline({ trackers, renderCamera }) {
         const sanitizedCurve = sanitizeCurve(entry.curve, DEFAULT_CURVE)
         const sanitizedCurves = entry.curves
           ? sanitizeCurves(entry.curves)
-          : sanitizeCurves({ all: { curve: sanitizedCurve, color: entry.curveColor || '#5c8cff' } })
+          : sanitizeCurves({ default: { curve: sanitizedCurve, color: entry.curveColor || '#5c8cff' } })
         return {
           id,
           time: Number.isFinite(time) ? clampTime(time) : startTime.value,
           values: sanitizeSnapshotValues(entry.values, trackers, lastAppliedValues, renderCamera),
-          curve: sanitizeCurve(sanitizedCurves.all?.curve || sanitizedCurve, DEFAULT_CURVE),
+          curve: sanitizeCurve(sanitizedCurves.default?.curve || sanitizedCurves.all?.curve || sanitizedCurve, DEFAULT_CURVE),
           curves: sanitizedCurves
         }
       })
@@ -1736,7 +1111,7 @@ export function useTimeline({ trackers, renderCamera }) {
       id: frame.id,
       time: frame.time,
       values: cloneSnapshot(frame.values),
-      curve: cloneCurve(frame.curve || frame.curves?.all?.curve || DEFAULT_CURVE),
+      curve: cloneCurve(frame.curve || frame.curves?.default?.curve || frame.curves?.all?.curve || DEFAULT_CURVE),
       curves: cloneCurves(frame.curves || {})
     }))
   }

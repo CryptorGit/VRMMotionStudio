@@ -3,10 +3,10 @@
     <header class="key-settings__header">
       <div class="key-settings__title">
         <p v-if="hasSelection" class="key-settings__subtitle">
-          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">（複数）</span>
+          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">�E�褁E���E�E/span>
         </p>
         <p v-else class="key-settings__subtitle">
-          タイムラインでキーを選択すると詳細が表示されます。
+          タイムラインでキーを選択すると詳細が表示されます、E
         </p>
       </div>
       <div v-if="hasSelection && rangeLabel" class="key-settings__range">
@@ -21,29 +21,29 @@
       </div>
     </div>
     <div v-else class="key-settings__empty">
-      <p>選択されたキーはありません。</p>
+      <p>選択されたキーはありません、E/p>
     </div>
 
     <p v-if="hasSelection && !hasMultiple" class="key-settings__hint">
-      複数のキーを選択するとイージングカーブを編集できます。
+      褁E��のキーを選択するとイージングカーブを編雁E��きます、E
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
-      <!-- トラッカー選択 -->
+      <!-- トラチE��ー選抁E-->
       <div class="curve-tracker-selector">
         <label class="tracker-label">
-          <span>対象トラッカー</span>
+          <span>対象トラチE��ー</span>
           <select v-model="selectedTracker" class="tracker-select">
-            <option value="all">まとめて（未設定トラッカー）</option>
+            <option value="default">まとめて�E�未設定トラチE��ー�E�E/option>
             <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
               {{ tracker.label }}
             </option>
           </select>
         </label>
-        <label class="color-label">
-          <span>カーブ色</span>
-          <input type="color" v-model="curveColor" class="color-input" />
-        </label>
+        <div class="color-display">
+          <span class="color-display__label">カーブ色</span>
+          <div class="color-display__swatch" :style="{ backgroundColor: curveColor }" :title="`トラチE��ー色: ${curveColor} (自動同朁E`"></div>
+        </div>
       </div>
       <TimelineCurveEditor 
         :frames="selection.frames" 
@@ -79,14 +79,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
 
-const selectedTracker = ref('all')
-// トラッカーごとのカーブ色を保持
+const selectedTracker = ref('default')
+// トラチE��ーごとのカーブ色を保持�E�トラチE��ー色と同期�E�E
 const trackerCurveColors = ref(new Map())
 
-// デフォルトカラー（バーチャルトラッカーの色と一致）
+// チE��ォルトカラー�E�バーチャルトラチE��ーの色と一致�E�E
 const getDefaultColor = (trackerKey) => {
   const defaultColors = {
-    'all': '#5c8cff',
+    default: '#5c8cff',
     'head': '#3aa6ff',
     'chest': '#00c853',
     'hips': '#ff7043',
@@ -105,36 +105,15 @@ const getDefaultColor = (trackerKey) => {
   return defaultColors[trackerKey] || '#5c8cff'
 }
 
-// 現在選択されているトラッカーのカーブ色
-const curveColor = computed({
-  get() {
-    if (!trackerCurveColors.value.has(selectedTracker.value)) {
-      // 初回取得時はフレームデータから色を取得、なければデフォルト色
-      const firstFrame = props.selection?.frames?.[0]
-      if (firstFrame?.curves?.[selectedTracker.value]?.color) {
-        return firstFrame.curves[selectedTracker.value].color
-      }
-      return getDefaultColor(selectedTracker.value)
-    }
-    return trackerCurveColors.value.get(selectedTracker.value)
-  },
-  set(newColor) {
-    trackerCurveColors.value.set(selectedTracker.value, newColor)
+// 現在選択されてぁE��トラチE��ーのカーブ色�E�読み取り専用 - トラチE��ー色と同期�E�E
+const curveColor = computed(() => {
+  // availableTrackersから該当トラチE��ーの色を取征E
+  const tracker = props.availableTrackers?.find(t => t.key === selectedTracker.value)
+  if (tracker?.color) {
+    return tracker.color
   }
-})
-
-// トラッカー切り替え時にカーブ色を更新
-watch(selectedTracker, (newTracker) => {
-  if (!trackerCurveColors.value.has(newTracker)) {
-    // フレームデータから色を取得
-    const firstFrame = props.selection?.frames?.[0]
-    const inherited = firstFrame?.curves?.[newTracker] || firstFrame?.curves?.all
-    if (inherited?.color) {
-      trackerCurveColors.value.set(newTracker, inherited.color)
-    } else {
-      trackerCurveColors.value.set(newTracker, getDefaultColor(newTracker))
-    }
-  }
+  // 見つからなぁE��合�EチE��ォルト色を使用
+  return getDefaultColor(selectedTracker.value)
 })
 
 const selectionCount = computed(() => Number(props.selection?.frames?.length ?? 0))
@@ -147,7 +126,7 @@ const rangeLabel = computed(() => {
   const end = props.selection?.endTime
   if (hasMultiple.value && Number.isFinite(start) && Number.isFinite(end)) {
     const span = Math.max(0, end - start)
-    return `${formatSeconds(start)} → ${formatSeconds(end)} (Δ ${formatSeconds(span)})`
+    return `${formatSeconds(start)} ↁE${formatSeconds(end)} (΁E${formatSeconds(span)})`
   }
   const single = props.selection?.frames?.[0]?.time
   return Number.isFinite(single) ? formatSeconds(single) : ''
@@ -171,9 +150,11 @@ function formatSeconds(seconds) {
 }
 
 function onCurvesUpdate(payload) {
+  // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�トラチE��ー刁E��時�E旧トラチE��ー保存用�E�E
+  const effectiveTrackerKey = payload?.trackerKey || selectedTracker.value
   emit('update-curves', {
     ...payload,
-    trackerKey: selectedTracker.value,
+    trackerKey: effectiveTrackerKey,
     curveColor: curveColor.value
   })
 }
@@ -210,11 +191,11 @@ function onCurvesUpdate(payload) {
 .key-settings__range {
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
-  background: rgba(90, 140, 255, 0.12);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   color: rgba(255, 255, 255, 0.85);
   font-size: 0.78rem;
   font-weight: 500;
-  box-shadow: inset 0 0 0 1px rgba(120, 160, 255, 0.2);
+  box-shadow: none;
 }
 
 .key-settings__controls {
@@ -230,10 +211,10 @@ function onCurvesUpdate(payload) {
   gap: 0.45rem;
   padding: 0.45rem 0.65rem;
   border-radius: 10px;
-  background: rgba(32, 36, 48, 0.65);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
   color: rgba(240, 244, 255, 0.8);
   font-size: 0.85rem;
-  box-shadow: inset 0 0 0 1px rgba(90, 120, 180, 0.22);
+  box-shadow: none;
 }
 
 .key-settings__toggle input {
@@ -242,13 +223,13 @@ function onCurvesUpdate(payload) {
   height: 18px;
   border-radius: 6px;
   border: 1px solid rgba(140, 168, 235, 0.55);
-  background: rgba(12, 16, 28, 0.4);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   position: relative;
   cursor: pointer;
 }
 
 .key-settings__toggle input:checked {
-  background: color-mix(in srgb, var(--accent, #5c8cff) 85%, rgba(255, 255, 255, 0.2));
+  background: rgba(79, 111, 184, 0.32);
   border-color: color-mix(in srgb, var(--accent, #5c8cff) 70%, rgba(255, 255, 255, 0.4));
 }
 
@@ -257,7 +238,7 @@ function onCurvesUpdate(payload) {
   position: absolute;
   inset: 4px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .key-settings__btn {
@@ -269,25 +250,25 @@ function onCurvesUpdate(payload) {
   font-weight: 600;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
   color: rgba(12, 16, 24, 0.92);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(220, 230, 255, 0.55));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 10px 24px rgba(18, 22, 36, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .key-settings__btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: none;
 }
 
 .key-settings__btn:not(:disabled):hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 14px 32px rgba(18, 22, 36, 0.45);
+  box-shadow: none;
 }
 
 .key-settings__btn--danger {
-  background: linear-gradient(180deg, rgba(255, 112, 128, 0.92), rgba(255, 80, 112, 0.82));
+  background: rgba(200, 80, 110, 0.85);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), 0 12px 24px rgba(255, 68, 102, 0.35);
+  box-shadow: none;
 }
 
 .key-settings__list {
@@ -296,8 +277,8 @@ function onCurvesUpdate(payload) {
   gap: 0.45rem;
   padding: 0.75rem 0.9rem;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(26, 30, 44, 0.85), rgba(18, 20, 30, 0.92));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  box-shadow: none;
 }
 
 .key-settings__row {
@@ -320,7 +301,7 @@ function onCurvesUpdate(payload) {
 .key-settings__empty {
   padding: 0.8rem 1rem;
   border-radius: 12px;
-  background: rgba(24, 28, 40, 0.7);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.82rem;
 }
@@ -334,8 +315,8 @@ function onCurvesUpdate(payload) {
 .key-settings__curve-editor {
   padding: 0.75rem;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(25, 28, 40, 0.92), rgba(20, 22, 32, 0.92));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 32px rgba(12, 15, 24, 0.35);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  box-shadow: none;
 }
 
 .curve-tracker-selector {
@@ -362,7 +343,7 @@ function onCurvesUpdate(payload) {
   padding: 0.5rem 0.65rem;
   border-radius: 8px;
   border: 1px solid rgba(140, 168, 235, 0.35);
-  background: rgba(12, 16, 28, 0.6);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   color: rgba(240, 244, 255, 0.9);
   font-size: 0.85rem;
   cursor: pointer;
@@ -371,24 +352,34 @@ function onCurvesUpdate(payload) {
 .tracker-select:focus {
   outline: none;
   border-color: rgba(140, 168, 235, 0.65);
-  background: rgba(12, 16, 28, 0.8);
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
 }
 
-.color-input {
+.color-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.color-display__label {
+  font-size: 0.85rem;
+  color: rgba(240, 244, 255, 0.85);
+}
+
+.color-display__swatch {
   width: 80px;
   height: 36px;
   border-radius: 8px;
   border: 1px solid rgba(140, 168, 235, 0.35);
-  background: rgba(12, 16, 28, 0.6);
-  cursor: pointer;
-}
-
-.color-input:focus {
-  outline: none;
-  border-color: rgba(140, 168, 235, 0.65);
+  box-shadow: none;
+  cursor: default;
 }
 
 .key-settings__curve-editor :deep(.curve-editor) {
   width: 100%;
 }
 </style>
+
+
+

@@ -14,7 +14,8 @@ export function useThreeViewerInit({
   onControlStart,
   onControlEnd,
   onPointerDown,
-  onWindowResize
+  onWindowResize,
+  gridHelper // グリッドヘルパーの参照を追加
 }) {
   let resizeObserver = null
 
@@ -32,6 +33,7 @@ export function useThreeViewerInit({
     scene.value.background = new THREE.Color(0x20232b)
 
     const grid = new THREE.GridHelper(40, 40, 0x4a5162, 0x2d323f)
+    grid.name = 'FloorGrid'
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material]
     gridMaterials.forEach(mat => {
       mat.opacity = 0.32
@@ -39,6 +41,11 @@ export function useThreeViewerInit({
       mat.depthWrite = false
     })
     scene.value.add(grid)
+    
+    // グリッドヘルパーの参照を保存
+    if (gridHelper) {
+      gridHelper.value = grid
+    }
 
     const floorMesh = new THREE.Mesh(
       new THREE.BoxGeometry(40, 1, 40),

@@ -220,10 +220,10 @@ function clampNumber(value, min, max) {
 }
 
 .group {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   padding: 0.75rem 0.75rem 0.65rem;
-  background: rgba(20, 24, 34, 0.65);
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
 }
 
 .group legend {
@@ -251,8 +251,8 @@ function clampNumber(value, min, max) {
   width: 100%;
   padding: 0.45rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(16, 19, 28, 0.82);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   color: inherit;
   text-align: right;
   font-size: 0.95rem;
@@ -271,8 +271,8 @@ function clampNumber(value, min, max) {
   flex: 1 1 auto;
   padding: 0.4rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(18, 22, 32, 0.85);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   color: inherit;
 }
 
@@ -297,8 +297,8 @@ function clampNumber(value, min, max) {
 .field label input[type='number'] {
   padding: 0.32rem 0.45rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(16, 19, 28, 0.8);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
   color: inherit;
 }
 
@@ -339,28 +339,29 @@ function clampNumber(value, min, max) {
 
 .action-button {
   appearance: none;
-  border: none;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   border-radius: 999px;
   padding: 0.55rem 1.2rem;
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   cursor: pointer;
-  color: rgba(12, 18, 32, 0.95);
-  background: linear-gradient(180deg, rgba(132, 186, 255, 0.95), rgba(92, 142, 240, 0.9));
-  box-shadow: 0 12px 24px rgba(30, 54, 102, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  color: var(--text-strong, rgba(245, 249, 255, 0.95));
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  box-shadow: none;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
 }
 
 .action-button:hover:not(:disabled),
 .action-button:focus-visible:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 28px rgba(26, 48, 96, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
   outline: none;
 }
 
 .action-button:disabled {
   cursor: default;
   opacity: 0.65;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: none;
 }
 </style>

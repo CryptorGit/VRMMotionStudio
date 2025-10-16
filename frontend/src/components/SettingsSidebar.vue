@@ -26,6 +26,7 @@
           :mesh="mesh"
           :models="models"
           :look-at-enabled="lookAtEnabled"
+          :show-grid="showGrid"
           :show-light-marker="showLightMarker"
           :marker-color="markerColor"
           :directional-intensity="directionalIntensity"
@@ -70,6 +71,7 @@
           :available-trackers="availableTrackers"
           :audio-duration="audioDuration"
           :audio-buffer="audioBuffer"
+          @update:showGrid="v => emit('update:showGrid', v)"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
           @update:directionalIntensity="v => emit('update:directionalIntensity', v)"
@@ -142,6 +144,7 @@ const props = defineProps({
   mesh: Object,
   models: { type: Array, required: true },
   lookAtEnabled: { type: Boolean, default: true },
+  showGrid: { type: Boolean, default: true },
   showLightMarker: { type: Boolean, required: true },
   markerColor: { type: String, required: true },
   directionalIntensity: { type: Number, required: true },
@@ -189,6 +192,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'update:showGrid',
   'update:showLightMarker',
   'update:markerColor',
   'update:directionalIntensity',
@@ -294,11 +298,11 @@ const {
   width: 100%;
   height: 100%;
   color: var(--text-strong, #f4f6ff);
-  background: linear-gradient(180deg, rgba(37, 41, 52, 0.98) 0%, rgba(28, 31, 40, 0.98) 100%);
+  background: var(--panel-surface);
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 18px 36px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
   overflow: hidden;
-  backdrop-filter: blur(6px);
 }
 
 .properties-body {
@@ -317,8 +321,8 @@ const {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  background: linear-gradient(180deg, rgba(22, 25, 32, 0.95) 0%, rgba(16, 19, 26, 0.98) 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--panel-surface-alt);
+  border-right: 1px solid var(--panel-border);
 }
 
 .tab-button {
@@ -328,29 +332,30 @@ const {
   justify-content: center;
   gap: 0.35rem;
   padding: 0.48rem 0.25rem;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 14px;
   color: rgba(220, 228, 248, 0.6);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  background: transparent;
   font-size: 0.64rem;
   line-height: 1;
   cursor: pointer;
-  transition: color 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  transition: color 0.16s ease, background 0.18s ease, border-color 0.18s ease;
+  box-shadow: none;
 }
 
 .tab-button:hover,
 .tab-button:focus-visible {
   color: rgba(245, 249, 255, 0.92);
-  transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(120, 160, 255, 0.4), 0 12px 24px rgba(18, 24, 40, 0.35);
+  background: var(--control-surface);
+  border-color: var(--panel-border);
   outline: none;
 }
 
 .tab-button.active {
-  color: #ffffff;
-  background: linear-gradient(180deg, rgba(110, 160, 255, 0.9) 0%, rgba(70, 120, 235, 0.95) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 14px 28px rgba(42, 72, 140, 0.45);
+  color: var(--text-strong, #ffffff);
+  background: rgba(79, 111, 184, 0.32);
+  border-color: rgba(79, 111, 184, 0.55);
+  box-shadow: none;
 }
 
 .tab-icon {
@@ -371,7 +376,7 @@ const {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  background: linear-gradient(180deg, rgba(24, 26, 33, 0.92), rgba(20, 21, 28, 0.96));
+  background: var(--panel-surface);
 }
 
 .properties-scroll::-webkit-scrollbar {
@@ -389,10 +394,10 @@ const {
 
 /* Unify inner section cards and controls */
 :deep(.section) {
-  background: rgba(36, 40, 52, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--control-surface);
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
-  box-shadow: 0 14px 28px rgba(10, 12, 18, 0.25);
+  box-shadow: none;
 }
 :deep(.section__header) {
   padding: 0.7rem 0.9rem 0.35rem;

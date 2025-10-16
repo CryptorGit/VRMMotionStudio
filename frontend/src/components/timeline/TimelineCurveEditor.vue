@@ -1,19 +1,19 @@
 <template>
   <div class="curve-editor">
     <div class="curve-editor__header">
-      <h3>イージングカーブ</h3>
+      <h3>イージングカーチE/h3>
       <button
         type="button"
         class="curve-editor__reset"
         :disabled="!canReset"
         @click="resetCurves"
       >
-        リセット
+        リセチE��
       </button>
     </div>
 
     <div v-if="normalizedFrames.length < 2" class="curve-editor__empty">
-      <p>曲線を編集するには、2つ以上のキーを選択してください。</p>
+      <p>曲線を編雁E��るには、Eつ以上�Eキーを選択してください、E/p>
     </div>
 
     <svg
@@ -194,70 +194,108 @@ const isCurveModified = curve => {
   )
 }
 
-// トラッカー切り替え時にカーブを更新し、defaultの設定をコピー
-watch(() => props.trackerKey, (newTrackerKey) => {
-  const next = new Map()
-  props.frames.forEach(frame => {
-    // フレームからトラッカー固有のカーブデータを取得
-    const curves = frame.curves || {}
-    let trackerCurveData = curves[newTrackerKey]
+// トラチE��ー刁E��替え時にカーブを保存！E��允E��完�E修正版！E
+watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
+  console.log(`[CurveEditor] Tracker changed from ${oldTrackerKey} to ${newTrackerKey}`)
+  
+  // 旧トラチE��ーのカーブをタイムラインへ即時保存（トラチE��ー刁E��替え前の編雁E�E容を確実に保存！E
+  if (oldTrackerKey && curvesState.value.size > 0) {
+    const updatesToEmit = []
     
-    // トラッカー固有の設定がない場合は、defaultの設定をコピー
-    if (!trackerCurveData && newTrackerKey !== 'default') {
-      const defaultCurveData = curves.default || { curve: DEFAULT_CURVE, color: props.curveColor }
-      trackerCurveData = {
-        curve: cloneCurve(defaultCurveData.curve || DEFAULT_CURVE),
-        color: defaultCurveData.color || props.curveColor
-      }
-    } else if (!trackerCurveData) {
-      // defaultも存在しない場合（旧データ互換性のため'all'もチェック）
-      const allCurveData = curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
-      trackerCurveData = {
-        curve: cloneCurve(allCurveData.curve || DEFAULT_CURVE),
-        color: allCurveData.color || props.curveColor
+    curvesState.value.forEach((curve, frameId) => {
+      // タイムラインへ反映するための更新リストに追加
+      updatesToEmit.push({ keyframeId: frameId, curve: cloneCurve(curve) })
+    })
+
+    // 旧トラチE��ー側のカーブをタイムラインへ即時反映
+    if (updatesToEmit.length > 0) {
+      try {
+        emit('update', {
+          updates: updatesToEmit,
+          trackerKey: oldTrackerKey,
+          curveColor: props.curveColor
+        })
+        console.log(`[CurveEditor] Emitted ${updatesToEmit.length} curve updates for tracker ${oldTrackerKey}`)
+      } catch (e) {
+        console.warn('[CurveEditor] Failed to emit updates for previous tracker on switch', e)
       }
     }
+  }
+  
+  // 新しいトラチE��ーのカーブを復允E��タイムラインから直接取得！E
+  const next = new Map()
+  props.frames.forEach(frame => {
+    // タイムラインから該当トラチE��ーのカーブを取征E
+    const trackerCurve = frame.curves?.[newTrackerKey]?.curve
     
-    const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
-    next.set(frame.id, curve)
+    if (trackerCurve) {
+      // トラチE��ー専用のカーブが存在する場合�Eそれを使用
+      const cloned = cloneCurve(trackerCurve)
+      next.set(frame.id, cloned)
+      console.log(`[CurveEditor] Loaded curve from timeline for frame ${frame.id}, tracker ${newTrackerKey}`)
+    } else if (newTrackerKey !== 'default') {
+      // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E�E�新規トラチE��ーの場合！E
+      const defaultCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
+      const copiedCurve = cloneCurve(defaultCurve)
+      next.set(frame.id, copiedCurve)
+      console.log(`[CurveEditor] Copied default curve to ${newTrackerKey} for frame ${frame.id}`)
+    } else {
+      // defaultトラチE��ー自身の場合�Edefaultカーブまた�Eフレームのカーブを使用
+      const baseCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
+      next.set(frame.id, cloneCurve(baseCurve))
+      console.log(`[CurveEditor] Loaded default curve for default tracker, frame ${frame.id}`)
+    }
   })
   curvesState.value = next
+  
+  console.log(`[CurveEditor] Loaded ${next.size} curves for tracker ${newTrackerKey}`)
 }, { immediate: true })
 
 watch(
   () => props.frames,
   frames => {
-    // ドラッグ中は更新しない（完全にスキップ）
-    if (dragState.value?.active) return
+    // ドラチE��中は更新しなぁE
+    if (dragState.value?.active) {
+      console.log('[CurveEditor] Skipping frame update during drag')
+      return
+    }
     
     const next = new Map(curvesState.value)
     frames.forEach(frame => {
-      // 選択されているトラッカーのカーブを取得
-      const curves = frame.curves || {}
-      let trackerCurveData = curves[props.trackerKey]
-      
-      // トラッカー固有の設定がない場合は、defaultの設定をコピー
-      if (!trackerCurveData && props.trackerKey !== 'default') {
-        const defaultCurveData = curves.default || curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
-        trackerCurveData = {
-          curve: cloneCurve(defaultCurveData.curve || DEFAULT_CURVE),
-          color: defaultCurveData.color || props.curveColor
-        }
-      } else if (!trackerCurveData) {
-        trackerCurveData = curves.default || curves.all || { curve: DEFAULT_CURVE, color: props.curveColor }
+      // 既存�E状態を優先的に使用�E�編雁E��態を保持�E�E
+      if (next.has(frame.id)) {
+        return
       }
       
-      const curve = cloneCurve(trackerCurveData.curve || DEFAULT_CURVE)
-      next.set(frame.id, curve)
+      // タイムラインから該当トラチE��ーのカーブを取征E
+      const trackerCurve = frame.curves?.[props.trackerKey]?.curve
+      
+      if (trackerCurve) {
+        // トラチE��ー専用のカーブが存在する場合�Eそれを使用
+        const cloned = cloneCurve(trackerCurve)
+        next.set(frame.id, cloned)
+        console.log(`[CurveEditor] Loaded curve from timeline for frame ${frame.id}, tracker ${props.trackerKey}`)
+      } else if (props.trackerKey !== 'default') {
+        // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E
+        const defaultCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
+        const copiedCurve = cloneCurve(defaultCurve)
+        next.set(frame.id, copiedCurve)
+        console.log(`[CurveEditor] Copied default curve to ${props.trackerKey} for frame ${frame.id}`)
+      } else {
+        // defaultトラチE��ー自身の場吁E
+        const baseCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
+        next.set(frame.id, cloneCurve(baseCurve))
+        console.log(`[CurveEditor] Loaded default curve for default tracker, frame ${frame.id}`)
+      }
     })
     curvesState.value = next
   },
   { immediate: true }
 )
 
-// カーブ色の変更を監視
+// カーブ色の変更を監要E
 watch(() => props.curveColor, () => {
-  // カーブ色が変わってもカーブ自体は維持
+  // カーブ色が変わってもカーブ�E体�E維持E
 }, { immediate: false })
 
 const normalizedFrames = computed(() => {
@@ -360,6 +398,7 @@ function updateCurve(frameId, handleType, handleValue, { silent = false } = {}) 
   }
   nextMap.set(frameId, currentCurve)
   curvesState.value = nextMap
+  
   if (!silent) {
     emit('update', {
       updates: [
@@ -367,7 +406,9 @@ function updateCurve(frameId, handleType, handleValue, { silent = false } = {}) 
           keyframeId: frameId,
           curve: cloneCurve(currentCurve)
         }
-      ]
+      ],
+      trackerKey: props.trackerKey,
+      curveColor: props.curveColor
     })
   }
 }
@@ -380,13 +421,16 @@ function onInput(frameId, handleType, axis, value) {
   const nextMap = new Map(curvesState.value)
   nextMap.set(frameId, nextCurve)
   curvesState.value = nextMap
+  
   emit('update', {
     updates: [
       {
         keyframeId: frameId,
         curve: cloneCurve(nextCurve)
       }
-    ]
+    ],
+    trackerKey: props.trackerKey,
+    curveColor: props.curveColor
   })
 }
 
@@ -398,10 +442,17 @@ function resetCurves() {
     const curve = cloneCurve(DEFAULT_CURVE)
     next.set(frame.id, curve)
     updates.push({ keyframeId: frame.id, curve: cloneCurve(curve) })
+    // リセチE��時�E永続ストレージもクリア
+    const storageKey = `${frame.id}-${props.trackerKey}`
+    persistentCurveStorage.delete(storageKey)
   })
   curvesState.value = next
   if (updates.length) {
-    emit('update', { updates })
+    emit('update', { 
+      updates, 
+      trackerKey: props.trackerKey,
+      curveColor: props.curveColor
+    })
     emit('reset')
   }
 }
@@ -461,13 +512,18 @@ function endHandleDrag() {
   }
   const curve = curvesState.value.get(state.frameId)
   if (curve) {
+    // 永続ストレージに保孁E
+    saveCurveToStorage(state.frameId, props.trackerKey, curve, props.curveColor)
+    
     emit('update', {
       updates: [
         {
           keyframeId: state.frameId,
           curve: cloneCurve(curve)
         }
-      ]
+      ],
+      trackerKey: props.trackerKey,
+      curveColor: props.curveColor
     })
   }
   dragState.value = null
@@ -533,7 +589,7 @@ function endHandleDrag() {
   aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: none;
   cursor: crosshair;
 }
 
@@ -608,7 +664,7 @@ function endHandleDrag() {
   padding: 0.55rem 0.65rem;
   border-radius: 10px;
   background: rgba(18, 22, 30, 0.66);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: none;
 }
 
 .curve-editor__detail-header {
@@ -662,6 +718,7 @@ function endHandleDrag() {
 .curve-editor__control-group input[type='number']:focus-visible {
   border-color: color-mix(in srgb, var(--accent, #2d8cff) 65%, rgba(255, 255, 255, 0.6));
   outline: none;
-  box-shadow: 0 0 0 2px rgba(45, 140, 255, 0.25);
+  box-shadow: none;
 }
 </style>
+

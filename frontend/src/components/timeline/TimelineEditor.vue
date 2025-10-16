@@ -8,7 +8,7 @@
             class="toolbar__button"
             :aria-pressed="props.loop"
             @click="emit('toggle-loop')"
-            :title="tooltip('ループ再生を切り替えます')"
+            :title="tooltip('ループ�E生を刁E��替えまぁE)"
           >
             <Icon icon="mdi:repeat" />
             <span>Loop</span>
@@ -17,16 +17,16 @@
             type="button"
             class="toolbar__button"
             @click="fitRange"
-            :title="tooltip('タイムラインの全範囲を表示します')"
+            :title="tooltip('タイムラインの全篁E��を表示しまぁE)"
           >
             <Icon icon="mdi:magnify-scan" />
-            <span>範囲フィット</span>
+            <span>篁E��フィチE��</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="emit('add-keyframe', { time: props.currentTime })"
-            :title="tooltip('現在のフレームにキーを追加します')"
+            :title="tooltip('現在のフレームにキーを追加しまぁE)"
           >
             <Icon icon="mdi:animation" />
             <span>キー追加</span>
@@ -36,27 +36,27 @@
             class="toolbar__button toolbar__button--secondary"
             :disabled="!hasSelection"
             @click="emit('copy-keyframes')"
-            :title="tooltip('選択したキーをクリップボードにコピーします')"
+            :title="tooltip('選択したキーをクリチE�Eボ�Eドにコピ�EしまぁE)"
           >
             <Icon icon="mdi:content-copy" />
-            <span>コピー</span>
+            <span>コピ�E</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--secondary"
             :disabled="!canPaste"
             @click="emit('paste-keyframes')"
-            :title="tooltip('現在位置にキーを貼り付けます')"
+            :title="tooltip('現在位置にキーを貼り付けまぁE)"
           >
             <Icon icon="mdi:content-paste" />
-            <span>ペースト</span>
+            <span>ペ�EスチE/span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--alert"
             @click="removeSelectedKeyframes"
             :disabled="!hasSelection"
-            :title="tooltip('選択したキーを削除します')"
+            :title="tooltip('選択したキーを削除しまぁE)"
           >
             <Icon icon="mdi:delete-forever" />
             <span>キー削除</span>
@@ -68,7 +68,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-start')"
-            :title="tooltip('開始フレームに移動します')"
+            :title="tooltip('開始フレームに移動しまぁE)"
           >
             <Icon icon="mdi:skip-backward" />
             <span>Start</span>
@@ -77,7 +77,7 @@
             type="button"
             class="toolbar__button"
             @click="togglePlayPause"
-            :title="tooltip(props.isPlaying ? '一時停止します' : '再生します')"
+            :title="tooltip(props.isPlaying ? '一時停止しまぁE : '再生しまぁE)"
           >
             <Icon :icon="props.isPlaying ? 'mdi:pause' : 'mdi:play'" />
             <span>{{ props.isPlaying ? 'Pause' : 'Play' }}</span>
@@ -86,7 +86,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-end')"
-            :title="tooltip('終了フレームに移動します')"
+            :title="tooltip('終亁E��レームに移動しまぁE)"
           >
             <Icon icon="mdi:skip-forward" />
             <span>End</span>
@@ -117,7 +117,7 @@
             class="toolbar__button toolbar__button--alert"
             :disabled="!hasTimelineContent"
             @click="emit('clear-timeline')"
-            :title="tooltip('タイムラインをクリアします')"
+            :title="tooltip('タイムラインをクリアしまぁE)"
           >
             <Icon icon="mdi:trash-can-outline" />
             <span>クリア</span>
@@ -181,8 +181,7 @@
 
             <div class="timeline__memory" :style="memoryStyle"></div>
 
-            <!-- 波形描画は非表示 -->
-            <!--
+            <!-- イージングカーブ�E表示�E�修正版！E-->
             <div class="timeline__curves" aria-hidden="true">
               <svg
                 class="timeline__curves-canvas"
@@ -193,12 +192,12 @@
                   v-for="segment in timelineCurvePaths"
                   :key="segment.id"
                   :d="segment.path"
+                  class="timeline__curve-path"
                   :class="{ 'is-modified': segment.modified }"
                   :style="{ stroke: segment.color || '#5c8cff' }"
                 />
               </svg>
             </div>
-            -->
 
             <div class="timeline__keys">
               <div
@@ -281,21 +280,24 @@ function cloneCurves(curves) {
   for (const [key, entry] of Object.entries(curves)) {
     result[key] = {
       curve: cloneCurve(entry?.curve),
-      color: typeof entry?.color === 'string' ? entry.color : '#5c8cff'
+      color: typeof entry?.color === 'string' ? entry.color : '#5c8cff',
+      modified: !!entry?.modified
     }
   }
-  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
+  // 'default' キーがなぁE��合�E追加�E�以前�E'all'は'default'に変換�E�E
   if (!result.default) {
     if (result.all) {
       result.default = {
         curve: cloneCurve(result.all.curve || DEFAULT_CURVE),
-        color: result.all.color || '#5c8cff'
+        color: result.all.color || '#5c8cff',
+        modified: !!result.all.modified
       }
       delete result.all
     } else {
       result.default = {
         curve: cloneCurve(DEFAULT_CURVE),
-        color: '#5c8cff'
+        color: '#5c8cff',
+        modified: false
       }
     }
   }
@@ -556,35 +558,67 @@ const timelineCurvePaths = computed(() => {
     const width = endX - startX
     if (!Number.isFinite(width) || width <= 0.5) continue
     
-    // 各トラッカーのカーブを取得
-    const currentCurves = current.curves || (current.curve ? { all: { curve: current.curve, color: '#5c8cff' } } : { all: { curve: sanitizeCurve({}), color: '#5c8cff' } })
-    const nextCurves = next.curves || (next.curve ? { all: { curve: next.curve, color: '#5c8cff' } } : { all: { curve: sanitizeCurve({}), color: '#5c8cff' } })
-    
-    // 両方のフレームに存在するトラッカーキーを取得
-    const trackerKeys = new Set([...Object.keys(currentCurves), ...Object.keys(nextCurves)])
-    
-    // 各トラッカーのカーブパスを生成
-    trackerKeys.forEach(trackerKey => {
-      const startCurveData = currentCurves[trackerKey] || { curve: sanitizeCurve({}), color: '#5c8cff' }
-      const endCurveData = nextCurves[trackerKey] || { curve: sanitizeCurve({}), color: '#5c8cff' }
-      
-      const startCurve = sanitizeCurve(startCurveData.curve)
-      const endCurve = sanitizeCurve(endCurveData.curve)
-      const curveColor = startCurveData.color || '#5c8cff'
-      
+    // 吁E��ラチE��ーのカーブを取征E
+    const buildCurveMap = (frame) => {
+      const map = { ...(frame.curves || {}) }
+      const normalizeEntry = (entry, fallbackCurve) => {
+        const curve = sanitizeCurve(entry?.curve || fallbackCurve)
+        return {
+          curve,
+          color: entry?.color || '#5c8cff',
+          modified: !!entry?.modified || isCurveModified(curve)
+        }
+      }
+
+      const baseCurve = sanitizeCurve(frame.curve || {})
+      map.default = normalizeEntry(map.default, baseCurve)
+
+      Object.keys(map).forEach(key => {
+        if (key === 'default') return
+        if (!map[key]) return
+        map[key] = normalizeEntry(map[key], map.default.curve)
+      })
+
+      return map
+    }
+
+    const currentCurves = buildCurveMap(current)
+    const nextCurves = buildCurveMap(next)
+
+    const drawCurve = (trackerKey, startEntry, endEntry) => {
+      const startCurve = sanitizeCurve(startEntry?.curve)
+      const endCurve = sanitizeCurve(endEntry?.curve)
+      const curveColor = startEntry?.color || '#5c8cff'
+
       const ctrl1X = startX + width * startCurve.out.x
       const ctrl2X = startX + width * endCurve.in.x
       const ctrl1Y = baseY - amplitude * (startCurve.out.y - 0.5) * 2
       const ctrl2Y = baseY - amplitude * (endCurve.in.y - 0.5) * 2
       const path = `M ${startX} ${baseY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${baseY}`
-      
+
       result.push({
         id: `${current.id}-${next.id}-${trackerKey}`,
         path,
         color: curveColor,
         trackerKey,
-        modified: isCurveModified(startCurve) || isCurveModified(endCurve)
+        modified: !!startEntry?.modified || !!endEntry?.modified || isCurveModified(startCurve) || isCurveModified(endCurve)
       })
+    }
+
+    // まずデフォルトカーブを描画
+  drawCurve('default', currentCurves.default, nextCurves.default)
+
+    // 吁E��ラチE��ーのカーブパスを生成！Eefaultは除外！E
+    const trackerKeys = new Set([
+      ...Object.keys(currentCurves).filter(key => key !== 'default'),
+      ...Object.keys(nextCurves).filter(key => key !== 'default')
+    ])
+
+    trackerKeys.forEach(trackerKey => {
+      const startEntry = currentCurves[trackerKey] || currentCurves.default
+      const endEntry = nextCurves[trackerKey] || nextCurves.default
+      if (!startEntry || !endEntry) return
+      drawCurve(trackerKey, startEntry, endEntry)
     })
   }
   return result
@@ -597,7 +631,19 @@ const easedKeyframeIds = computed(() => {
     const current = frames[i]
     const next = frames[i + 1]
     if (!current || !next) continue
-    const modified = isCurveModified(current.curve) || isCurveModified(next.curve)
+    // consider base curve first
+    let modified = isCurveModified(current.curve) || isCurveModified(next.curve)
+    // also consider per-tracker curves when present
+    const currentCurves = current.curves || {}
+    const nextCurves = next.curves || {}
+    const keys = new Set([...Object.keys(currentCurves), ...Object.keys(nextCurves)])
+    for (const key of keys) {
+      const c = currentCurves[key]?.curve
+      const n = nextCurves[key]?.curve
+      if (c && isCurveModified(c)) modified = true
+      if (n && isCurveModified(n)) modified = true
+      if (modified) break
+    }
     if (modified) {
       result.add(current.id)
       result.add(next.id)
@@ -804,12 +850,12 @@ function drawWaveform() {
   ctx.fill()
 }
 
-// 波形データが変更されたら再描画
+// 波形チE�Eタが変更されたら再描画
 watch(() => props.audioWaveformData, () => {
   nextTick(() => drawWaveform())
 }, { deep: true })
 
-// コンテンツ幅が変更されたら再描画
+// コンチE��チE��E��変更されたら再描画
 watch(() => contentWidth.value, () => {
   nextTick(() => drawWaveform())
 })
@@ -1460,7 +1506,7 @@ function keyTitle(frame) {
   border-radius: 6px;
   background: rgba(17, 21, 31, 0.88);
   color: rgba(240, 244, 255, 0.96);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
   min-width: 48px;
 }
 
@@ -1519,7 +1565,7 @@ function keyTitle(frame) {
   color: #0e1018;
   font-weight: 700;
   font-size: 0.72rem;
-  box-shadow: 0 0 18px rgba(255, 97, 90, 0.45);
+  box-shadow: none;
   border: 2px solid rgba(255, 255, 255, 0.85);
 }
 
@@ -1580,7 +1626,7 @@ function keyTitle(frame) {
 .timeline__gridline--major {
   width: 2px;
   background: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.32);
+  box-shadow: none;
 }
 
 .timeline__memory {
@@ -1609,17 +1655,17 @@ function keyTitle(frame) {
   height: 100%;
 }
 
-.timeline__curves-canvas path {
+.timeline__curve-path {
   fill: none;
-  stroke: rgba(90, 160, 255, 0.6);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 8px rgba(45, 140, 255, 0.35));
+  opacity: 0.5;
+  transition: opacity 0.2s ease, stroke-width 0.2s ease;
 }
 
-.timeline__curves-canvas path.is-modified {
-  stroke: color-mix(in srgb, var(--accent, #2d8cff) 80%, rgba(255, 255, 255, 0.92));
+.timeline__curve-path.is-modified {
+  opacity: 0.75;
   stroke-width: 2.2;
 }
 
@@ -1666,14 +1712,14 @@ function keyTitle(frame) {
 .timeline__keyframe:hover,
 .timeline__keyframe.is-selected {
   transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
-  box-shadow: 0 0 12px rgba(45, 140, 255, 0.85);
+  box-shadow: none;
   background: color-mix(in srgb, var(--accent, #2d8cff) 90%, rgba(255, 255, 255, 0.3));
 }
 
 .timeline__keyframe.has-curve {
   background: color-mix(in srgb, var(--accent, #2d8cff) 85%, rgba(255, 255, 255, 0.35));
   border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 14px rgba(45, 140, 255, 0.9);
+  box-shadow: none;
 }
 
 .timeline__playhead {
@@ -1683,7 +1729,7 @@ function keyTitle(frame) {
   width: 2px;
   background: var(--timeline-playhead-color);
   pointer-events: none;
-  box-shadow: 0 0 18px rgba(255, 97, 90, 0.55);
+  box-shadow: none;
   z-index: 5;
   transform: translateX(-50%);
 }
@@ -1691,7 +1737,7 @@ function keyTitle(frame) {
 .timeline__playhead--header {
   top: 0;
   bottom: 0;
-  box-shadow: 0 0 12px rgba(255, 97, 90, 0.4);
+  box-shadow: none;
 }
 
 .timeline__playhead--header::after {
@@ -1704,13 +1750,13 @@ function keyTitle(frame) {
   background: var(--timeline-playhead-color);
   border-radius: 2px;
   transform: translate(-50%, -50%) rotate(45deg);
-  box-shadow: 0 0 12px rgba(255, 97, 90, 0.45);
+  box-shadow: none;
 }
 
 .timeline__playhead--body {
   top: 2px;
   bottom: 12px;
-  box-shadow: 0 0 18px rgba(255, 97, 90, 0.55);
+  box-shadow: none;
 }
 
 .timeline__selection {
@@ -1788,3 +1834,4 @@ function keyTitle(frame) {
   }
 }
 </style>
+
