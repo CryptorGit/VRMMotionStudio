@@ -37,12 +37,12 @@
             :secondary-min-pixels="160"
           >
             <template #primary>
-              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポ�Eト領域">
+              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポのト領域">
                 <div class="workspace-panel__body workspace-panel__body--viewport">
                   <div class="viewport-frame">
                     <div class="viewport-overlay viewport-overlay--top-left top-left-controls">
-                      <label class="mode-switch" aria-label="ビューモード�E替">
-                        <span>モーチE/span>
+                      <label class="mode-switch" aria-label="ビューモード切替">
+                        <span>モード</span>
                         <select v-model="viewportMode">
                           <option v-for="mode in viewportModes" :key="mode.value" :value="mode.value">
                             {{ mode.label }}
@@ -50,24 +50,24 @@
                         </select>
                       </label>
                       <div class="round-buttons">
-                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip('允E��戻ぁE(Undo)')">⟲</button>
-                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip('めE��直ぁE(Redo)')">⟳</button>
+                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip('元に戻す(Undo)')">⟲</button>
+                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip('やり直し(Redo)')">⟳</button>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--top-right">
                       <div class="camera-status">
                         <span class="camera-status__label">RenderCam</span>
-                        <span class="camera-status__resolution">{{ renderCameraWidth }} ÁE{{ renderCameraHeight }}</span>
+                        <span class="camera-status__resolution">{{ renderCameraWidth }} ×{{ renderCameraHeight }}</span>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="camera-hint">
-                        左ドラチE��: 平行移勁E�E�E右ドラチE��: パン・チルチE�E�Eホイール: 前後移勁E
+                        左ドラッグ: 平行移動／右ドラッグ: パン・チルト／ホイール: 前後移動
                       </p>
                     </div>
                     <div v-else-if="virtualTrackersEnabled" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="tracker-hint">
-                        左ドラチE��: 位置移勁E�E�EShift: 微調整
+                        左ドラッグ: 位置移動／Shift: 微調整
                       </p>
                     </div>
                     <div class="viewport-overlay viewport-overlay--bottom-right">
@@ -316,7 +316,7 @@ const boneDotSize = ref(0.02)
 const boneLabelScale = ref(1.0)
 const showGrid = ref(true)
 
-// VRMアウトライン設宁E
+// VRMアウトライン設定
 const outlineWidth = ref(0.002)
 const outlineColor = ref('#000000')
 const outlineDefaultWidth = ref(0.002)
@@ -324,9 +324,9 @@ const outlineDefaultColor = ref('#000000')
 const outlineDefaultsCache = new WeakMap()
 const outlineAutoResetModels = new WeakSet()
 
-// モチE��ごとのアウトライン設定キャチE��ュ
+// モデルごとのアウトライン設定キャッシュ
 const modelOutlineCache = new WeakMap()
-// モチE��ごとのチE��ォルト値キャチE��ュ (マテリアルからキャプチャした初期値)
+// モデルごとのデフォルト値キャッシュ (マテリアルからキャプチャした初期値)
 const modelDefaultsCache = new WeakMap()
 const currentOutlineModelIndex = ref(0)
 
@@ -336,17 +336,17 @@ const showVirtualTrackerLabels = ref(true)
 const virtualTrackerSize = ref(0.08)
 const virtualTrackerLabelScale = ref(1.0)
 
-// 選択されたトラチE��ーの状慁E
+// 選択されたトラッカーの状態
 const selectedTrackerKey = ref(null)
 const selectedTrackerPosition = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotation = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotationOrder = ref('YXZ')
-// トラチE��ー回転軸の表示設宁E
+// トラッカー回転軸の表示設定
 const showTrackerAxes = ref(false)
 const trackerAxesLength = ref(0.05)
 const forearmTwistShare = ref(0.7)
 
-// 選択されたトラチE��ーのラベル
+// 選択されたトラッカーのラベル
 const selectedTrackerLabel = computed(() => {
   if (!selectedTrackerKey.value) return ''
   const def = TRACKER_DEFS.find(d => d.key === selectedTrackerKey.value)
@@ -413,8 +413,8 @@ const cameraRotateSensitivity = ref(1.0) // multiplier for right-drag yaw/pitch
 
 const rollRingRef = ref(null)
 const viewportModes = [
-  { value: 'view', label: 'ビューモーチE },
-  { value: 'camera', label: 'カメラモーチE }
+  { value: 'view', label: 'ビューモード' },
+  { value: 'camera', label: 'カメラモード' }
 ]
 
 const cameraInteraction = reactive({
@@ -465,7 +465,7 @@ const fingerStates = reactive({
 function updateFingerStates(updated) {
   if (!updated || typeof updated !== 'object') return
   
-  // 更新されたデータでfingerStatesを完�Eに置き換ぁE
+  // 更新されたデータでfingerStatesを完全に置き換え
   Object.keys(updated).forEach(key => {
     if (key in fingerStates) {
       fingerStates[key] = updated[key]
@@ -474,8 +474,8 @@ function updateFingerStates(updated) {
   
   console.log('[FingerControl] Updated finger states:', fingerStates)
   
-  // 持E�E状態が更新されたら、すぐにポ�Eズを適用
-  // applyFingerPoseは毎フレーム呼ばれるが、即座に反映させるため�E示皁E��呼ぶ
+  // 持Eの状態が更新されたら、すぐにポーズを適用
+  // applyFingerPoseは毎フレーム呼ばれるが、即座に反映させるため明示的に呼ぶ
   if (typeof applyFingerPose === 'function') {
     try {
       applyFingerPose()
@@ -821,13 +821,13 @@ function loadDisplaySettings() {
     if (Number.isFinite(data.cameraWheelSensitivity)) cameraWheelSensitivity.value = clamp0to2(data.cameraWheelSensitivity)
     if (Number.isFinite(data.cameraTranslateSensitivity)) cameraTranslateSensitivity.value = clamp0to2(data.cameraTranslateSensitivity)
     if (Number.isFinite(data.cameraRotateSensitivity)) cameraRotateSensitivity.value = clamp0to2(data.cameraRotateSensitivity)
-    // 持E��態�E復允E
+    // 指の状態の復元
     if (data.fingerStates && typeof data.fingerStates === 'object') {
       try { Object.assign(fingerStates, data.fingerStates) } catch {}
     }
-    // アウトライン太さ値をスライダー篁E��へ正規化
+    // アウトライン太さ値をスライダー範囲へ正規化
     outlineWidth.value = Math.min(0.005, Math.max(0, Number(outlineWidth.value) || 0.002))
-    // 回転軸表示再適用�E�コントローラ生�E済みの場合！E
+    // 回転軸表示再適用（コントローラ生成済みの場合）
     try {
       if (trackerController) {
         trackerController.setRotationAxesVisible?.(showTrackerAxes.value)
@@ -870,7 +870,7 @@ function toggleCaptions() {
       localStorage.setItem(CAPTION_STORAGE_KEY, '0')
     }
   } catch {}
-  showNotice(`設宁E ボタンキャプション ${showCaptions.value ? '表示' : '非表示'}`, 3200)
+  showNotice(`設定 ボタンキャプション ${showCaptions.value ? '表示' : '非表示'}`, 3200)
 }
 
 async function logToServer(data) {
@@ -923,14 +923,14 @@ function handleCachePersisted(event = {}) {
   if (event.ok) {
     const successReasons = ['load', 'restore', 'visibilitychange', 'pagehide', 'remove']
     if (!cacheSavedToastShown && successReasons.includes(event.reason)) {
-      showNotice('キャチE��ュ: 保存しました', 2800)
+      showNotice('キャッシュ: 保存しました', 2800)
       cacheSavedToastShown = true
       try { sessionStorage.setItem(CACHE_SAVED_TOAST_KEY, '1') } catch {}
     }
   } else if (event.ok === false && event.reason !== 'clear') {
     const now = Date.now()
     if (!lastCacheErrorToastAt || now - lastCacheErrorToastAt > 10000) {
-      showNotice('キャチE��ュ: 保存に失敗しました。ブラウザのストレージ設定をご確認ください、E, 5600)
+      showNotice('キャッシュ: 保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 5600)
       lastCacheErrorToastAt = now
     }
   }
@@ -1086,7 +1086,7 @@ function handleTrackerTransformEvent(event = {}) {
   }
 }
 
-// 選択されたトラチE��ーの状態を更新
+// 選択されたトラッカーの状態を更新
 function updateSelectedTrackerState(key) {
   if (!key || !trackerController) return
   
@@ -1111,13 +1111,13 @@ function updateSelectedTrackerState(key) {
     }
   }
   
-  // 回転頁E��を更新
+  // 回転軸を更新
   if (snapshot.order) {
     selectedTrackerRotationOrder.value = snapshot.order
   }
 }
 
-// トラチE��ー位置を更新
+// トラッカー位置を更新
 function handleTrackerPositionUpdate({ axis, value }) {
   if (!selectedTrackerKey.value || !trackerController) return
   
@@ -1128,7 +1128,7 @@ function handleTrackerPositionUpdate({ axis, value }) {
   trackerController.setTrackerPosition(selectedTrackerKey.value, newPosition)
 }
 
-// トラチE��ー角度を更新
+// トラッカー角度を更新
 function handleTrackerRotationUpdate({ axis, value }) {
   if (!selectedTrackerKey.value || !trackerController) return
   
@@ -1139,16 +1139,16 @@ function handleTrackerRotationUpdate({ axis, value }) {
   trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, newRotation, selectedTrackerRotationOrder.value)
 }
 
-// トラチE��ー回転頁E��を更新
+// トラッカー回転軸を更新
 function handleTrackerRotationOrderUpdate(order) {
   selectedTrackerRotationOrder.value = order
-  // 現在の回転角度で新しい頁E��を適用
+  // 現在の回転角度で新しい軸を適用
   if (selectedTrackerKey.value && trackerController) {
     trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, order)
   }
 }
 
-// トラチE��ー位置をリセチE��
+// トラッカー位置をリセット
 function handleResetTrackerPosition() {
   if (!selectedTrackerKey.value || !trackerController) return
   
@@ -1157,7 +1157,7 @@ function handleResetTrackerPosition() {
   trackerController.setTrackerPosition(selectedTrackerKey.value, defaultPosition)
 }
 
-// トラチE��ー角度をリセチE��
+// トラッカー角度をリセット
 function handleResetTrackerRotation() {
   if (!selectedTrackerKey.value || !trackerController) return
   
@@ -1581,15 +1581,15 @@ const frameStatus = computed(() => {
 })
 
 const storageStatus = computed(() => {
-  if (!storageSupported.value) return 'キャチE��ュ: 標準保孁E
+  if (!storageSupported.value) return 'キャッシュ: 標準保存'
   const usageBytes = storageUsage.value || 0
   const quotaBytes = storageQuota.value || 0
   const guard = storagePersisted.value ? '保護' : '未保護'
   if (!quotaBytes) {
-    return `キャチE��ュ ${formatStorage(usageBytes)} (${guard})`
+    return `キャッシュ ${formatStorage(usageBytes)} (${guard})`
   }
   const percent = quotaBytes > 0 ? Math.min(100, Math.max(0, Math.round((usageBytes / quotaBytes) * 100))) : 0
-  return `キャチE��ュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
+  return `キャッシュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
 })
 
 const statusMessage = computed(() => {
@@ -1738,7 +1738,7 @@ trackerController = useVirtualTrackers({
   onTrackerTransform: handleTrackerTransformEvent
 })
 
-// 復允E��み設定から回転軸表示/長さを適用
+// 復元��み設定から回転軸表示/長さを適用
 try {
   trackerController.setRotationAxesVisible?.(showTrackerAxes.value)
   trackerController.updateRotationAxesLength?.(trackerAxesLength.value)
@@ -2010,7 +2010,7 @@ watch(virtualTrackersEnabled, v => {
   scheduleDisplaySettingsSave()
 })
 
-// 回転軸の可視性を監要E
+// 回転軸の可視性を監視
 watch(showTrackerAxes, (visible) => {
   if (trackerController) {
     try {
@@ -2020,7 +2020,7 @@ watch(showTrackerAxes, (visible) => {
   scheduleDisplaySettingsSave()
 })
 
-// 回転軸の長さを監要E
+// 回転軸の長さを監視
 watch(trackerAxesLength, (length) => {
   if (trackerController) {
     try {
@@ -2051,7 +2051,7 @@ watch(virtualTrackerDisplayVisible, v => {
   scheduleDisplaySettingsSave()
 })
 
-// グリチE��表示の監要E
+// グリッド表示の監要E
 watch(showGrid, (visible) => {
   if (gridHelper.value) {
     gridHelper.value.visible = visible
@@ -2073,7 +2073,7 @@ watch(lastTrackerKey, key => {
   if (key) refreshTrackerAdjustState(key)
 })
 
-// タイムライン再生状態とMP3オーチE��オを同朁E
+// タイムライン再生状態とMP3オーディオを同期
 watch(timelinePlaying, (isPlaying, wasPlaying) => {
   if (isPlaying === wasPlaying) return
   
@@ -2091,10 +2091,10 @@ watch(timelinePlaying, (isPlaying, wasPlaying) => {
 
 // タイムライン時刻変更時、MP3もシーク
 watch(timelineCurrentTime, (newTime, oldTime) => {
-  // タイムライン再生中で、時刻が大きく変わった場合（シーク操作！E
+  // タイムライン再生中で、時刻が大きく変わった場合（シーク操作）
   if (timelinePlaying.value && audioBuffer.value && audioContext.value) {
     const delta = Math.abs(newTime - oldTime)
-    // 0.1秒以上�E変化があったらシークとみなぁE
+    // 0.1秒以上の変化があったらシークとみなす
     if (delta > 0.1) {
       stopAudio()
       playAudio(newTime)
@@ -2105,7 +2105,7 @@ watch(timelineCurrentTime, (newTime, oldTime) => {
 function resetVirtualTrackers() {
   try {
     trackerController.reset()
-    showNotice('トラチE��ー: バ�EチャルトラチE��ーをリセチE��しました', 3200)
+    showNotice('トラッカー: バーチャルトラッカーをリセットしました', 3200)
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
   } catch {}
@@ -2124,7 +2124,7 @@ function applyTimelinePoseImmediate() {
 
 function handleTimelineAddKey(payload) {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されてぁE��せん', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   ensureVirtualTrackers()
@@ -2142,7 +2142,7 @@ function handleTimelineAddKey(payload) {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('add-key')
-    showNotice('タイムライン: 現在のポ�Eズをキーに追加しました', 2200)
+    showNotice('タイムライン: 現在のポーズをキーに追加しました', 2200)
   } catch (error) {
     showNotice('タイムライン: キーの追加に失敗しました', 4200)
   }
@@ -2285,32 +2285,32 @@ function pasteClipboardFallback(clipboard, anchorTime) {
 
 function handleTimelineCopyKeyframes() {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されてぁE��せん', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   const ids = Array.isArray(timelineSelection.selectedIds) && timelineSelection.selectedIds.length
     ? timelineSelection.selectedIds
     : timelineSelection.frames.map(frame => frame.id)
   if (!ids.length) {
-    showNotice('タイムライン: コピ�Eするキーを選択してください', 3200)
+    showNotice('タイムライン: コピのするキーを選択してください', 3200)
     return
   }
   try {
     const clipboardPayload = captureTimelineClipboard(ids)
     if (!clipboardPayload) {
-      showNotice('タイムライン: キーのコピ�Eに失敗しました', 4200)
+      showNotice('タイムライン: キーのコピのに失敗しました', 4200)
       return
     }
     timelineClipboard.value = clipboardPayload
-    showNotice(`タイムライン: ${clipboardPayload.frames.length}個�Eキーをコピ�Eしました`, 2200)
+    showNotice(`タイムライン: ${clipboardPayload.frames.length}個のキーをコピのしました`, 2200)
   } catch {
-    showNotice('タイムライン: キーのコピ�Eに失敗しました', 4200)
+    showNotice('タイムライン: キーのコピのに失敗しました', 4200)
   }
 }
 
 function handleTimelinePasteKeyframes() {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されてぁE��せん', 4200)
+    showNotice('タイムライン: 初期化されていません', 4200)
     return
   }
   const normalizedClipboard = normalizeClipboardPayload(timelineClipboard.value, timelineFrameRate.value || 60)
@@ -2333,7 +2333,7 @@ function handleTimelinePasteKeyframes() {
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('paste-keys')
-    showNotice(`タイムライン: ${pasted.length}個�Eキーを貼り付けました`, 2200)
+    showNotice(`タイムライン: ${pasted.length}個のキーを貼り付けました`, 2200)
   } catch {
     showNotice('タイムライン: キーの貼り付けに失敗しました', 4200)
   }
@@ -2411,7 +2411,7 @@ function handleTimelineCurveUpdate(payload) {
   try {
     pushHistory('curve')
     updates.forEach(({ keyframeId, curve, trackerKey, curveColor }) => {
-      // 既存�Emodifiedフラグを確認（一度trueになったらtrueのまま�E�E
+      // 既存のmodifiedフラグを確認（一度trueになったらtrueのまま）
       const isCurveModified = 
         Math.abs(curve.in.x - DEFAULT_TIMELINE_CURVE.in.x) > 1e-4 ||
         Math.abs(curve.in.y - DEFAULT_TIMELINE_CURVE.in.y) > 1e-4 ||
@@ -2573,9 +2573,9 @@ function handleTimelineExport() {
     anchor.click()
     document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
-    showNotice('タイムライン: エクスポ�Eトしました', 2600)
+    showNotice('タイムライン: エクスポのトしました', 2600)
   } catch {
-    showNotice('タイムライン: エクスポ�Eトに失敗しました', 4800)
+    showNotice('タイムライン: エクスポのトに失敗しました', 4800)
   }
 }
 
@@ -2586,12 +2586,12 @@ function handleTimelineClear() {
     timelineController.clearAll()
     timelineController.stop()
     timelineClipboard.value = null
-    showNotice('タイムライン: リセチE��しました', 2600)
+    showNotice('タイムライン: リセットしました', 2600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    showNotice('タイムライン: リセチE��に失敗しました', 4800)
+    showNotice('タイムライン: リセットに失敗しました', 4800)
   }
 }
 
@@ -2604,28 +2604,28 @@ async function captureRenderImageToFile() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('画像書き�EぁE レンダラーが�E期化されてぁE��せん', 3000)
+    showNotice('画像書き出し レンダラーが初期化されていません', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureImage] Capture already in progress')
-    showNotice('画像書き�EぁE 処琁E��でぁE, 2000)
+    showNotice('画像書き出し 処理中です', 2000)
     return
   }
   
   captureBusy.value = true
 
-  // 現在の背景色を保孁E
+  // 現在の背景色を保存
   const originalBackground = scene.value.background
   
-  // バ�EチャルトラチE��ーの表示状態を保孁E
+  // バーチャルトラッカーの表示状態を保存
   const wasTrackersVisible = virtualTrackerDisplayVisible.value
   
-  // グリチE��の表示状態を保孁E
+  // グリッドの表示状態を保存
   const wasGridVisible = showGrid.value
   
-  // バ�EチャルトラチE��ーとグリチE��を即座に非表示にする
+  // バーチャルトラッカーとグリッドを即座に非表示にする
   if (wasTrackersVisible) {
     virtualTrackerDisplayVisible.value = false
   }
@@ -2633,15 +2633,15 @@ async function captureRenderImageToFile() {
     showGrid.value = false
   }
   
-  // グリチE��ヘルパ�Eを直接非表示にする�E�念のため�E�E
+  // グリッドヘルパのを直接非表示にする（念のため）
   if (gridHelper.value) {
     gridHelper.value.visible = false
   }
   
-  // すべてのグリチE��、�Eルパ�E、トラチE��ーを探して非表示にする
+  // すべてのグリッド、ヘルパー、トラッカーを探して非表示にする
   const hiddenObjects = []
   scene.value.traverse((obj) => {
-    // グリチE��、�Eルパ�E、トラチE��ー、ラベルなど、モチE��以外�Eすべてを非表示
+    // グリッド、ヘルパー、トラッカー、ラベルなど、モデル以外のすべてを非表示
     if (obj.isGridHelper || 
         obj.isAxesHelper || 
         obj.isArrowHelper ||
@@ -2662,11 +2662,11 @@ async function captureRenderImageToFile() {
   })
   
   try {
-    // 完�Eな緑背景�E�グリーンバック�E�に設宁E
+    // 完全な緑背景（グリーンバック（に設定
     scene.value.background = new THREE.Color(0x00ff00)
     console.log('[CaptureImage] Background set to chroma key green (0x00ff00)')
 
-    // 非表示が反映されるまで征E��し、実際にレンダリングを実衁E
+    // 非表示が反映されるまで待機し、実際にレンダリングを実衁E
     // renderer.value で通常のレンダリングを行うことで、変更を確実に反映
     await new Promise(resolve => requestAnimationFrame(resolve))
     if (renderer.value && scene.value && renderCamera.value) {
@@ -2678,12 +2678,12 @@ async function captureRenderImageToFile() {
     }
     await new Promise(resolve => requestAnimationFrame(resolve))
     
-    // オフスクリーンキャンバスを作�Eしてバックグラウンドでレンダリング
+    // オフスクリーンキャンバスを作のしてバックグラウンドでレンダリング
     const captureWidth = renderCameraWidth.value
     const captureHeight = renderCameraHeight.value
     console.log('[CaptureImage] Capture size:', captureWidth, 'x', captureHeight)
     
-    // 一時的なレンダラーを作�E�E�バチE��グラウンド�E琁E���E�E
+    // 一時的なレンダラーを作）�バックグラウンドの理）
     const offscreenCanvas = document.createElement('canvas')
     offscreenCanvas.width = captureWidth
     offscreenCanvas.height = captureHeight
@@ -2715,7 +2715,7 @@ async function captureRenderImageToFile() {
     
     console.log('[CaptureImage] Blob created, size:', blob.size)
     
-    // ファイル名を生�E
+    // ファイル名を生の
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const suggestedName = `capture_${timestamp}.png`
     
@@ -2727,7 +2727,7 @@ async function captureRenderImageToFile() {
           suggestedName,
           types: [
             {
-              description: 'PNG画僁E,
+              description: 'PNG画像',
               accept: { 'image/png': ['.png'] }
             }
           ]
@@ -2736,7 +2736,7 @@ async function captureRenderImageToFile() {
         await writable.write(blob)
         await writable.close()
         console.log('[CaptureImage] File saved via File System Access API:', handle.name)
-        showNotice(`画像書き�EぁE ${handle.name || suggestedName}`, 3000)
+        showNotice(`画像書き出し ${handle.name || suggestedName}`, 3000)
       } else {
         console.log('[CaptureImage] Falling back to download link')
         // フォールバック: 従来のダウンロード方弁E
@@ -2747,36 +2747,36 @@ async function captureRenderImageToFile() {
         link.click()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
         console.log('[CaptureImage] File downloaded:', suggestedName)
-        showNotice(`画像書き�EぁE ${suggestedName}`, 3000)
+        showNotice(`画像書き出し ${suggestedName}`, 3000)
       }
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureImage] User cancelled save dialog')
-        showNotice('画像書き�EぁE キャンセルされました', 2000)
+        showNotice('画像書き出し キャンセルされました', 2000)
       } else {
         console.error('[CaptureImage] Save failed:', saveError)
-        showNotice('画像書き�EぁE 保存に失敗しました', 3000)
+        showNotice('画像書き出し 保存に失敗しました', 3000)
       }
     }
     
   } catch (error) {
     console.error('[CaptureImage] Capture failed:', error)
-    showNotice('画像書き�EぁE 失敗しました', 3000)
+    showNotice('画像書き出し 失敗しました', 3000)
   } finally {
-    // 允E�E背景色に戻ぁE
+    // 元の背景色に戻す
     scene.value.background = originalBackground
     
-    // 非表示にしたオブジェクトを允E��戻ぁE
+    // 非表示にしたオブジェクトを元に戻す
     hiddenObjects.forEach(obj => {
       obj.visible = true
     })
     
-    // グリチE��ヘルパ�Eを�Eに戻ぁE
+    // グリッドヘルパのをのに戻す
     if (gridHelper.value && wasGridVisible) {
       gridHelper.value.visible = true
     }
     
-    // トラチE��ーとグリチE��を�Eに戻ぁE
+    // トラッカーとグリッドをのに戻す
     if (wasTrackersVisible) {
       virtualTrackerDisplayVisible.value = true
     }
@@ -2809,15 +2809,15 @@ async function clearAllCache() {
     virtualTrackerLabelScale.value = 1.0
     timelineController.clearAll()
     timelineController.stop()
-    // タイムラインのEndめE刁E180秒、E0FPS=10800フレーム)に初期匁E
+    // タイムラインのEnd＝3分（180秒、60FPS=10800フレーム）に初期設定
     if (timelineController) {
-      timelineController.setRangeFromFrames(0, 10800) // 3刁E= 180私E* 60FPS
+      timelineController.setRangeFromFrames(0, 10800) // 3分= 180私E* 60FPS
     }
     // Clear audio
     stopAudio()
     audioBuffer.value = null
     audioDuration.value = 0
-    showNotice('キャチE��ュ: キャチE��ュとタイムラインをリセチE��しました (End=3刁E', 3600)
+    showNotice('キャッシュ: キャッシュとタイムラインをリセットしました (End=3分', 3600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
@@ -2837,7 +2837,7 @@ async function onAudioFileChange(event) {
   if (!file) return
   
   try {
-    showNotice('オーチE��オ: 読み込み中...', 2000)
+    showNotice('オーディオ: 読み込み中...', 2000)
     
     // Initialize AudioContext if needed
     if (!audioContext.value) {
@@ -2854,8 +2854,8 @@ async function onAudioFileChange(event) {
     audioSampleRate.value = decodedBuffer.sampleRate
     audioChannels.value = decodedBuffer.numberOfChannels
     
-    // 波形チE�Eタを生成（デシベル�E�E
-    const channelData = decodedBuffer.getChannelData(0) // モノラルまた�E左チャンネル
+    // 波形データを生成（デシベル）
+    const channelData = decodedBuffer.getChannelData(0) // モノラルまたは左チャンネル
     const samples = 2000 // 2000サンプルに間引き
     const blockSize = Math.floor(channelData.length / samples)
     const waveform = []
@@ -2872,7 +2872,7 @@ async function onAudioFileChange(event) {
       const rms = Math.sqrt(sum / blockSize)
       // RMSをデシベルに変換 (-60dB to 0dB)
       const db = rms > 0 ? 20 * Math.log10(rms) : -60
-      // -60dBめE、EdBめEに正規化
+      // -60dBから0dBまでに正規化
       const normalized = Math.max(0, Math.min(1, (db + 60) / 60))
       waveform.push(normalized)
     }
@@ -2887,10 +2887,10 @@ async function onAudioFileChange(event) {
       markTimelineDirty('audio-import')
     }
     
-    showNotice(`オーチE��オ: ${file.name} を読み込みました (${audioDuration.value.toFixed(2)}私E`, 3200)
+    showNotice(`オーディオ: ${file.name} を読み込みました （${audioDuration.value.toFixed(2)}秒）`, 3200)
   } catch (error) {
     console.error('Audio load failed:', error)
-    showNotice('オーチE��オ: 読み込みに失敗しました', 4800)
+    showNotice('オーディオ: 読み込みに失敗しました', 4800)
   } finally {
     if (input) input.value = ''
   }
@@ -2904,7 +2904,7 @@ function removeAudio() {
   audioFileName.value = ''
   audioSampleRate.value = 0
   audioChannels.value = 0
-  showNotice('オーチE��オ: MP3を削除しました', 2600)
+  showNotice('オーディオ: MP3を削除しました', 2600)
 }
 
 async function captureImage() {
@@ -2916,29 +2916,29 @@ async function captureImage() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('画像書き�EぁE レンダラーが�E期化されてぁE��せん', 3000)
+    showNotice('画像書き出し レンダラーが初期化されていません', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureImage] Capture already in progress')
-    showNotice('画像書き�EぁE 処琁E��でぁE, 2000)
+    showNotice('画像書き出し 処理中です', 2000)
     return
   }
 
   captureBusy.value = true
-  showNotice('画像書き�EぁE 準備中...', 1000)
+  showNotice('画像書き出し 準備中...', 1000)
 
-  // 現在の背景色を保孁E
+  // 現在の背景色を保存
   const originalBackground = scene.value.background
   
-  // バ�EチャルトラチE��ーの表示状態を保孁E
+  // バーチャルトラッカーの表示状態を保存
   const wasTrackersVisible = virtualTrackerDisplayVisible.value
   
-  // グリチE��の表示状態を保孁E
+  // グリッドの表示状態を保存
   const wasGridVisible = showGrid.value
   
-  // すべてのグリチE��、�Eルパ�E、トラチE��ーを探して非表示にする�E�画像書き�Eし中は完�Eに隠す！E
+  // すべてのグリッド、ヘルパー、トラッカーを探して非表示にする（画像書き出力中は完全に隠す）
   const hiddenObjects = []
   scene.value.traverse((obj) => {
     if (
@@ -2959,24 +2959,24 @@ async function captureImage() {
       }
     }
   })
-  // バ�EチャルトラチE��ーとグリチE��のUIフラグもオチE
+  // バーチャルトラッカーとグリッドのUIフラグもオフ
   if (wasTrackersVisible) virtualTrackerDisplayVisible.value = false
   if (wasGridVisible) showGrid.value = false
   
   try {
-    // 完�Eな緑背景�E�グリーンバック�E�に設宁E
+    // 完全な緑背景（グリーンバック（に設定
     scene.value.background = new THREE.Color(0x00ff00)
     console.log('[CaptureImage] Background set to chroma key green (0x00ff00)')
 
-    // 非表示が反映されるまで征E��E
+    // 非表示が反映されるまで征E�の
     await new Promise(resolve => requestAnimationFrame(resolve))
     
-    // オフスクリーンキャンバスを作�Eしてバックグラウンドでレンダリング
+    // オフスクリーンキャンバスを作のしてバックグラウンドでレンダリング
     const captureWidth = renderCameraWidth.value
     const captureHeight = renderCameraHeight.value
     console.log('[CaptureImage] Capture size:', captureWidth, 'x', captureHeight)
     
-    // 一時的なレンダラーを作�E�E�バチE��グラウンド�E琁E���E�E
+    // 一時的なレンダラーを作）�バックグラウンドの理）
     const offscreenCanvas = document.createElement('canvas')
     offscreenCanvas.width = captureWidth
     offscreenCanvas.height = captureHeight
@@ -3008,7 +3008,7 @@ async function captureImage() {
     
     console.log('[CaptureImage] Blob created, size:', blob.size)
     
-    // ファイル名を生�E
+    // ファイル名を生の
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     const suggestedName = `capture_${timestamp}.png`
     
@@ -3020,7 +3020,7 @@ async function captureImage() {
           suggestedName,
           types: [
             {
-              description: 'PNG画僁E,
+              description: 'PNG画像',
               accept: { 'image/png': ['.png'] }
             }
           ]
@@ -3029,7 +3029,7 @@ async function captureImage() {
         await writable.write(blob)
         await writable.close()
         console.log('[CaptureImage] File saved via File System Access API:', handle.name)
-        showNotice(`画像書き�EぁE ${handle.name || suggestedName}`, 3000)
+        showNotice(`画像書き出し ${handle.name || suggestedName}`, 3000)
       } else {
         console.log('[CaptureImage] Falling back to download link')
         // フォールバック: 従来のダウンロード方弁E
@@ -3040,33 +3040,33 @@ async function captureImage() {
         link.click()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
         console.log('[CaptureImage] File downloaded:', suggestedName)
-        showNotice(`画像書き�EぁE ${suggestedName}`, 3000)
+        showNotice(`画像書き出し ${suggestedName}`, 3000)
       }
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureImage] User cancelled save dialog')
-        showNotice('画像書き�EぁE キャンセルされました', 2000)
+        showNotice('画像書き出し キャンセルされました', 2000)
       } else {
         console.error('[CaptureImage] Save failed:', saveError)
-        showNotice('画像書き�EぁE 保存に失敗しました', 3000)
+        showNotice('画像書き出し 保存に失敗しました', 3000)
       }
     }
     
   } catch (error) {
     console.error('[CaptureImage] Capture failed:', error)
-    showNotice('画像書き�EぁE 失敗しました', 3000)
+    showNotice('画像書き出し 失敗しました', 3000)
   } finally {
-    // 允E�E背景色に戻ぁE
+    // 元の背景色に戻す
     scene.value.background = originalBackground
     
-    // トラチE��ーとグリチE��を�Eに戻ぁE
+    // トラッカーとグリッドをのに戻す
     if (wasTrackersVisible) {
       virtualTrackerDisplayVisible.value = true
     }
     if (wasGridVisible) {
       showGrid.value = true
     }
-    // 非表示にしたヘルパ�E/トラチE��ー等を允E��戻ぁE
+    // 非表示にしたヘルパー/トラッカー等を元に戻す
     hiddenObjects.forEach(obj => { obj.visible = true })
     
     captureBusy.value = false
@@ -3083,32 +3083,32 @@ async function captureVideo() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('動画書き�EぁE レンダラーが�E期化されてぁE��せん', 3000)
+    showNotice('動画書き出し レンダラーが初期化されていません', 3000)
     return
   }
   
   if (!timelineController || !timelineController.getKeyframes || timelineController.getKeyframes().length === 0) {
     console.warn('[CaptureVideo] No keyframes in timeline')
-    showNotice('動画書き�EぁE タイムラインにキーフレームがありません', 3000)
+    showNotice('動画書き出し タイムラインにキーフレームがありません', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureVideo] Capture already in progress')
-    showNotice('動画書き�EぁE 処琁E��でぁE, 2000)
+    showNotice('動画書き出し 処理中です', 2000)
     return
   }
   
   captureBusy.value = true
   
-  // 状態を保孁E
+  // 状態を保存
   const originalBackground = scene.value.background
   const wasTrackersVisible = virtualTrackerDisplayVisible.value
   
-  // すべてのグリチE��、�Eルパ�E、トラチE��ーを探して非表示にする
+  // すべてのグリッド、ヘルパー、トラッカーを探して非表示にする
   const hiddenObjects = []
   scene.value.traverse((obj) => {
-    // グリチE��、�Eルパ�E、トラチE��ー、ラベルなど、モチE��以外�Eすべてを非表示
+    // グリッド、ヘルパー、トラッカー、ラベルなど、モデル以外のすべてを非表示
     if (obj.isGridHelper || 
         obj.isAxesHelper || 
         obj.isArrowHelper ||
@@ -3134,7 +3134,7 @@ async function captureVideo() {
     wasPlaying
   })
   
-  // 状態復允E��数
+  // 状態復元��数
   const restoreVideoState = () => {
     console.log('[CaptureVideo] Restoring state')
     scene.value.background = originalBackground
@@ -3147,18 +3147,18 @@ async function captureVideo() {
   }
   
   try {
-    showNotice('動画書き�EぁE 準備中...', 2000)
+    showNotice('動画書き出し 準備中...', 2000)
     console.log('[CaptureVideo] Preparing frame-by-frame rendering')
     
-    // 完�Eな緑背景�E�グリーンバック�E�に設宁E
+    // 完全な緑背景（グリーンバック（に設定
     scene.value.background = new THREE.Color(0x00ff00)
     if (wasTrackersVisible) virtualTrackerDisplayVisible.value = false
     
-    // 非表示が反映されるまで征E��E
+    // 非表示が反映されるまで征E�の
     await new Promise(resolve => requestAnimationFrame(resolve))
     await new Promise(resolve => requestAnimationFrame(resolve))
     
-    // タイムライン惁E��を取征E
+    // タイムライン情報を取得
     const startTime = timelineController.getStartTime()
     const endTime = timelineController.getEndTime()
     const fps = 60 // 60 FPS
@@ -3193,7 +3193,7 @@ async function captureVideo() {
     // MediaRecorder を使用して動画をキャプチャ
     const stream = offscreenCanvas.captureStream(fps)
     
-    // サポ�EトされてぁE��MIMEタイプを確誁E
+    // サポートされているMIMEタイプを確認
     let mimeType = 'video/webm;codecs=vp9'
     if (!MediaRecorder.isTypeSupported(mimeType)) {
       console.warn('[CaptureVideo] VP9 not supported, trying VP8')
@@ -3239,42 +3239,42 @@ async function captureVideo() {
     for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
       const currentTime = startTime + frameIndex * frameDuration
       
-      // タイムラインを指定時刻に移勁E
+      // タイムラインを指定時刻に移動
       timelineController.jumpToTime(currentTime)
       
-      // シーンを更新�E�トラチE��ー位置など�E�E
+      // シーンを更新（トラッカー位置など）
       timelineController.applyCurrentPose?.()
       
       // レンダリング
       offscreenRenderer.render(scene.value, renderCamera.value)
       
-      // 進捗表示�E�E0%ごと�E�E
+      // 進捗表示）0%ごと）
       const progress = Math.floor((frameIndex / totalFrames) * 100)
       if (frameIndex % Math.floor(totalFrames / 10) === 0 || frameIndex === totalFrames - 1) {
-        showNotice(`動画書き�EぁE ${progress}% (${frameIndex + 1}/${totalFrames} フレーム)`, 1000)
+        showNotice(`動画書き出し ${progress}% (${frameIndex + 1}/${totalFrames} フレーム)`, 1000)
         console.log(`[CaptureVideo] Progress: ${progress}% (frame ${frameIndex + 1}/${totalFrames})`)
       }
       
-      // フレーム間�E征E��！EediaRecorderが追ぁE��くよぁE���E�E
+      // フレーム間の待機）ediaRecorderが追いつくように）
       await new Promise(resolve => setTimeout(resolve, 1000 / fps))
     }
     
     // 録画停止
     mediaRecorder.stop()
     console.log('[CaptureVideo] All frames rendered, stopping recording')
-    showNotice('動画書き�EぁE 録画完亁E��保存中...', 2000)
+    showNotice('動画書き出し 録画完了、保存中...', 2000)
     
-    // 録画完亁E��征E��
+    // 録画完了、待機
     await recordingComplete
     
     // オフスクリーンレンダラーを破棁E
     offscreenRenderer.dispose()
     
-    // Blobを作�E
+    // Blobを作の
     const blob = new Blob(chunks, { type: mimeType })
     console.log('[CaptureVideo] Blob created, size:', blob.size)
     
-    // ファイル保孁E
+    // ファイル保存
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
       const suggestedName = `video_${timestamp}.webm`
@@ -3294,7 +3294,7 @@ async function captureVideo() {
         await writable.write(blob)
         await writable.close()
         console.log('[CaptureVideo] File saved via File System Access API:', handle.name)
-        showNotice(`動画書き�EぁE ${handle.name || suggestedName}`, 3000)
+        showNotice(`動画書き出し ${handle.name || suggestedName}`, 3000)
       } else {
         console.log('[CaptureVideo] Falling back to download link')
         const url = URL.createObjectURL(blob)
@@ -3304,24 +3304,24 @@ async function captureVideo() {
         link.click()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
         console.log('[CaptureVideo] File downloaded:', suggestedName)
-        showNotice(`動画書き�EぁE ${suggestedName}`, 3000)
+        showNotice(`動画書き出し ${suggestedName}`, 3000)
       }
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureVideo] User cancelled save dialog')
-        showNotice('動画書き�EぁE キャンセルされました', 2000)
+        showNotice('動画書き出し キャンセルされました', 2000)
       } else {
         console.error('[CaptureVideo] Save failed:', saveError)
-        showNotice('動画書き�EぁE 保存に失敗しました', 3000)
+        showNotice('動画書き出し 保存に失敗しました', 3000)
       }
     }
     
-    // 允E�E状態に戻ぁE
+    // 元の状態に戻す
     restoreVideoState()
     
   } catch (error) {
     console.error('[CaptureVideo] Capture failed:', error)
-    showNotice('動画書き�EぁE 失敗しました', 3000)
+    showNotice('動画書き出し 失敗しました', 3000)
     restoreVideoState()
   }
 }
@@ -3359,12 +3359,12 @@ function pauseAudio() {
 }
 
 function handleError(e) {
-  const msg = e?.error?.message || e?.message || '不�Eなエラーが発生しました'
+  const msg = e?.error?.message || e?.message || '不のなエラーが発生しました'
   showNotice(`エラー: ${msg}`, 5200)
 }
 
 function handleUnhandledRejection(e) {
-  const msg = e?.reason?.message || e?.reason || '未処琁E�EPromise拒否が発生しました'
+  const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
   showNotice(`エラー: ${msg}`, 5200)
 }
 
@@ -3399,7 +3399,7 @@ watch([
 
 watch(models, () => {
   if (virtualTrackersEnabled.value) {
-    // 既存�E保存データを尊重し、完�EリセチE��は行わなぁE
+    // 既存の保存データを尊重し、完全リセットは行わない
     try { trackerController.rebuild?.() } catch {}
     applyTimelinePoseImmediate()
   }
@@ -3432,12 +3432,12 @@ onMounted(async () => {
   if (storageSupported.value) {
     if (persistedGranted) {
       if (storagePersistToastState !== 'granted') {
-        showNotice('キャチE��ュ: 永続化が有効になりました', 3600)
+        showNotice('キャッシュ: 永続化が有効になりました', 3600)
         storagePersistToastState = 'granted'
         try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'granted') } catch {}
       }
     } else if (storagePersistToastState !== 'denied') {
-      showNotice('キャチE��ュ: 永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください、E, 5600)
+      showNotice('キャッシュ: 永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 5600)
       storagePersistToastState = 'denied'
       try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'denied') } catch {}
     }
@@ -3625,14 +3625,14 @@ function resetOutlineToDefaults(modelIndex = null) {
         })
       })
       
-      // モチE��ごとのチE��ォルト値を保孁E
+      // モデルごとのデフォルト値を保存
       const modelDefaults = {
         width: Number.isFinite(firstWidth) ? Math.min(0.005, Math.max(0, firstWidth)) : fallbackWidth,
         color: firstColor || fallbackColor
       }
       modelDefaultsCache.set(model, modelDefaults)
       
-      // 現在のモチE��インチE��クスと一致する場合、UI表示を更新
+      // 現在のモデルインデックスと一致する場合、UI表示を更新
       if (modelIndex !== null && modelIndex === currentOutlineModelIndex.value) {
         outlineWidth.value = modelDefaults.width
         outlineColor.value = modelDefaults.color
@@ -3657,12 +3657,12 @@ watch(models, (arr) => {
         const model = arr[i]
         if (model?.vrm && !outlineAutoResetModels.has(model)) {
           outlineAutoResetModels.add(model)
-          // モチE��ごとにチE��ォルト値をキャプチャして保孁E
+          // モデルごとにデフォルト値をキャプチャして保存
           resetOutlineToDefaults(i)
           shouldAutoResetOutline = true
         }
       }
-      // 初回モチE��読み込み時�E最初�EモチE��の設定をUIに反映
+      // 初回モデル読み込み時の最初のモデルの設定をUIに反映
       if (shouldAutoResetOutline && arr.length > 0) {
         const firstModel = arr[0]
         const defaults = modelDefaultsCache.get(firstModel)
@@ -3676,7 +3676,7 @@ watch(models, (arr) => {
       try { trackerController.rebuild?.() } catch {}
       // Frame avatar front unless overridden by timeline camera track
       try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
-      // カメラモード�E場合、viewCameraもrenderCameraと同じ位置に設宁E
+      // カメラモードの場合、viewCameraもrenderCameraと同じ位置に設定
       if (isCameraMode.value && renderCamera.value && viewCamera.value) {
         try {
           viewCamera.value.position.copy(renderCamera.value.position)
@@ -3688,7 +3688,7 @@ watch(models, (arr) => {
           }
         } catch {}
       }
-      // 初期アウトライン幁E��VRMマテリアルから取得（ユーザーがまだ変更してぁE��ぁE��合�Eみ�E�E
+      // 初期アウトライン値をVRMマテリアルから取得（ユーザーがまだ変更していない場合のみ）
       try { initOutlineWidthFromModel() } catch {}
     }
     // アウトライン設定を適用
@@ -3696,7 +3696,7 @@ watch(models, (arr) => {
   } catch {}
 })
 
-// アウトライン設定�E変更を監要E
+// アウトライン設定の変更を監視
 watch([outlineWidth, outlineColor], () => {
   updateOutlineSettings()
   scheduleDisplaySettingsSave()
@@ -3707,34 +3707,34 @@ function handleResetOutlineDefaults(modelIndex = 0) {
 }
 
 function handleLoadModelOutline(modelIndex) {
-  // モチE��選択時に、そのモチE��のアウトライン設定を読み込む
+  // モデル選択時に、そのモデルのアウトライン設定を読み込む
   if (!Array.isArray(models.value) || models.value.length === 0) return
   const targetModel = models.value[modelIndex]
   if (!targetModel) return
 
-  // 現在選択されてぁE��モチE��インチE��クスを更新
+  // 現在選択されているモデルインデックスを更新
   currentOutlineModelIndex.value = modelIndex
 
-  // まずモチE��ごとのチE��ォルト値を確誁E
+  // まずモデルごとのデフォルト値を確認
   const modelDefaults = modelDefaultsCache.get(targetModel)
   if (modelDefaults) {
-    // チE��ォルト値をUIのチE��ォルトに設宁E
+    // デフォルト値をUIのデフォルトに設定
     outlineDefaultWidth.value = modelDefaults.width
     outlineDefaultColor.value = modelDefaults.color
   }
 
-  // WeakMapからモチE��固有�E設定を取得（ユーザーが変更した値�E�E
+  // WeakMapからモデル固有の設定を取得（ユーザーが変更した値）
   const cached = modelOutlineCache.get(targetModel)
   if (cached) {
     outlineWidth.value = cached.width
     outlineColor.value = cached.color
   } else {
-    // キャチE��ュがなぁE��合�E、デフォルト値を使用
+    // キャッシュがない場合の、デフォルト値を使用
     if (modelDefaults) {
       outlineWidth.value = modelDefaults.width
       outlineColor.value = modelDefaults.color
     } else {
-      // チE��ォルト値もなぁE��合�E、モチE��から最初�Eマテリアルの設定を読み取る
+      // デフォルト値もない場合の、モデルから最初のマテリアルの設定を読み取る
       let foundWidth = null
       let foundColor = null
       
@@ -3765,7 +3765,7 @@ function handleLoadModelOutline(modelIndex) {
       outlineDefaultWidth.value = width
       outlineDefaultColor.value = color
       
-      // チE��ォルト値として保孁E
+      // デフォルト値として保存
       modelDefaultsCache.set(targetModel, { width, color })
     }
   }
@@ -3775,7 +3775,7 @@ function updateOutlineSettingsForModel(model, width, colorHex) {
   if (!model?.vrm?.scene) return
   
   try {
-    // モチE��ごとに現在の設定をキャチE��ュ
+    // モデルごとに現在の設定をキャッシュ
     modelOutlineCache.set(model, { width, color: colorHex })
     
     model.vrm.scene.traverse(obj => {
@@ -3795,9 +3795,9 @@ function updateOutlineSettings() {
   try {
     const width = outlineWidth.value
     const colorHex = outlineColor.value
-    // 現在選択されてぁE��モチE��のみ更新
-    // DisplaySectionで選択されてぁE��モチE��インチE��クスを取得する忁E��がある
-    // ここでは全モチE��ではなく、E��択されたモチE��のみを更新するように修正
+    // 現在選択されているモデルのみ更新
+    // DisplaySectionで選択されているモデルインデックスを取得する必要がある
+    // ここでは全モデルではなく、選択されたモデルのみを更新するように修正
     const selectedModelIndex = currentOutlineModelIndex.value || 0
     const targetModel = models.value[selectedModelIndex]
     if (targetModel) {
@@ -3806,11 +3806,11 @@ function updateOutlineSettings() {
   } catch {}
 }
 
-// VRMの最初�EMToonマテリアルからoutlineWidthFactor/outlineColorFactorを取得し初期値に反映
-// すでにユーザーが値を動かしてぁE��(= default 0.002 以夁Eor persisted でロード渁E場合�E上書きしなぁE
+// VRMの最初のMToonマテリアルからoutlineWidthFactor/outlineColorFactorを取得し初期値に反映
+// すでにユーザーが値を動かしている(= default 0.002 以外or persisted でロードされた場合の上書きしない
 const outlineInitializedFromModel = new WeakSet()
 function initOutlineWidthFromModel() {
-  // 許容誤差冁E��初期チE��ォルトなら取得を試衁E
+  // 許容誤差内なら初期デフォルトなら取得を試みる
   const current = Number(outlineWidth.value)
   if (Math.abs(current - 0.002) > 1e-6) {
     return

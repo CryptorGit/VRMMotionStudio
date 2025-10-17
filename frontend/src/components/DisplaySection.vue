@@ -2,7 +2,7 @@
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showGridLocal" />
-      <span>グリチE表示</span>
+      <span>グリッド表示</span>
     </label>
   </div>
   <div class="row">
@@ -18,60 +18,60 @@
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBonesVisible" />
-      <span>ボEン表示E人型！E/span>
+      <span>ボーン表示（人型）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBoneNamesVisible" />
-      <span>ボEン名表示</span>
+      <span>ボーン名表示</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showPhysicalBonesLocal" />
-      <span>ボEン表示E物琁EE/span>
+      <span>ボーン表示（物理）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showOtherBonesLocal" />
-      <span>ボEン表示Eその他！E/span>
+      <span>ボーン表示（その他）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showExtendedBonesLocal" />
-      <span>ボEン表示E拡張EE/span>
+      <span>ボーン表示（拡張）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showColliderNodesLocal" />
-      <span>ボEン表示EコライダーEE/span>
+      <span>ボーン表示（コライダー）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showNonDeformingBonesLocal" />
-      <span>ボEン表示E非変形EE/span>
+      <span>ボーン表示（非変形）</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="highlightConstraintLocal" />
-      <span>制紁EイライチE/span>
+      <span>制約ハイライト</span>
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボEン表示サイズ
+      ボーン表示サイズ
       <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボEン名表示サイズE大きさEE
+      ボーン名表示サイズ（大きさ）
       <input
         type="range"
         min="0.05"
@@ -83,11 +83,11 @@
   </div>
   <hr />
   <div class="row">
-    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設宁E/h4>
+    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設定</h4>
   </div>
   <div class="row">
     <label class="stretch">
-      <span>対象モチE</span>
+      <span>対象モデル</span>
       <select v-model="selectedOutlineModelIndex" class="model-select" :disabled="!hasModels">
         <option v-for="(model, index) in models" :key="model.id" :value="index">
           {{ model.name }}
@@ -120,7 +120,7 @@
       :disabled="!hasModels"
       @click="emit('reset-outline', selectedOutlineModelIndex)"
     >
-      チEォルトにリセチE
+      デフォルトにリセット
     </button>
   </div>
 </template>
@@ -147,8 +147,8 @@ const props = defineProps({
 })
 
 
-// モチE選択時にそEモチEのアウトライン設定を読み込む
-  // 親コンポEネントにモチE選択変更を通知し、E
+// モデル選択時にそのモデルのアウトライン設定を読み込む
+  // 親コンポーネントにモデル選択変更を通知し、
 
 const emit = defineEmits([
   'update:showGrid',

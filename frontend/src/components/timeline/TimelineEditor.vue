@@ -8,7 +8,7 @@
             class="toolbar__button"
             :aria-pressed="props.loop"
             @click="emit('toggle-loop')"
-            :title="tooltip('ループ�E生を刁E��替えまぁE)"
+            :title="tooltip('ループ再生を切り替えます')"
           >
             <Icon icon="mdi:repeat" />
             <span>Loop</span>
@@ -17,16 +17,16 @@
             type="button"
             class="toolbar__button"
             @click="fitRange"
-            :title="tooltip('タイムラインの全篁E��を表示しまぁE)"
+            :title="tooltip('タイムラインの全範囲を表示します')"
           >
             <Icon icon="mdi:magnify-scan" />
-            <span>篁E��フィチE��</span>
+            <span>全範囲フィット</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="emit('add-keyframe', { time: props.currentTime })"
-            :title="tooltip('現在のフレームにキーを追加しまぁE)"
+            :title="tooltip('現在のフレームにキーを追加します')"
           >
             <Icon icon="mdi:animation" />
             <span>キー追加</span>
@@ -36,27 +36,27 @@
             class="toolbar__button toolbar__button--secondary"
             :disabled="!hasSelection"
             @click="emit('copy-keyframes')"
-            :title="tooltip('選択したキーをクリチE�Eボ�Eドにコピ�EしまぁE)"
+            :title="tooltip('選択したキーをクリップボードにコピーします')"
           >
             <Icon icon="mdi:content-copy" />
-            <span>コピ�E</span>
+            <span>コピー</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--secondary"
             :disabled="!canPaste"
             @click="emit('paste-keyframes')"
-            :title="tooltip('現在位置にキーを貼り付けまぁE)"
+            :title="tooltip('現在位置にキーを貼り付けます')"
           >
             <Icon icon="mdi:content-paste" />
-            <span>ペ�EスチE/span>
+            <span>ペースト</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--alert"
             @click="removeSelectedKeyframes"
             :disabled="!hasSelection"
-            :title="tooltip('選択したキーを削除しまぁE)"
+            :title="tooltip('選択したキーを削除します')"
           >
             <Icon icon="mdi:delete-forever" />
             <span>キー削除</span>
@@ -68,7 +68,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-start')"
-            :title="tooltip('開始フレームに移動しまぁE)"
+            :title="tooltip('開始フレームに移動します')"
           >
             <Icon icon="mdi:skip-backward" />
             <span>Start</span>
@@ -77,7 +77,7 @@
             type="button"
             class="toolbar__button"
             @click="togglePlayPause"
-            :title="tooltip(props.isPlaying ? '一時停止しまぁE : '再生しまぁE)"
+            :title="tooltip(props.isPlaying ? '一時停止します' : '再生します')"
           >
             <Icon :icon="props.isPlaying ? 'mdi:pause' : 'mdi:play'" />
             <span>{{ props.isPlaying ? 'Pause' : 'Play' }}</span>
@@ -86,7 +86,7 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-end')"
-            :title="tooltip('終亁E��レームに移動しまぁE)"
+            :title="tooltip('終了フレームに移動します')"
           >
             <Icon icon="mdi:skip-forward" />
             <span>End</span>
@@ -117,7 +117,7 @@
             class="toolbar__button toolbar__button--alert"
             :disabled="!hasTimelineContent"
             @click="emit('clear-timeline')"
-            :title="tooltip('タイムラインをクリアしまぁE)"
+            :title="tooltip('タイムラインをクリアします')"
           >
             <Icon icon="mdi:trash-can-outline" />
             <span>クリア</span>
@@ -181,7 +181,7 @@
 
             <div class="timeline__memory" :style="memoryStyle"></div>
 
-            <!-- イージングカーブ�E表示�E�修正版！E-->
+            <!-- イージングカーブの表示（修正版） -->
             <div class="timeline__curves" aria-hidden="true">
               <svg
                 class="timeline__curves-canvas"
@@ -284,7 +284,7 @@ function cloneCurves(curves) {
       modified: !!entry?.modified
     }
   }
-  // 'default' キーがなぁE��合�E追加�E�以前�E'all'は'default'に変換�E�E
+  // 'default' キーがない場合は追加（以前の'all'は'default'に変換）
   if (!result.default) {
     if (result.all) {
       result.default = {
@@ -558,7 +558,7 @@ const timelineCurvePaths = computed(() => {
     const width = endX - startX
     if (!Number.isFinite(width) || width <= 0.5) continue
     
-    // 吁E��ラチE��ーのカーブを取征E
+    // 各トラッカーのカーブを取得
     const buildCurveMap = (frame) => {
       const map = { ...(frame.curves || {}) }
       const normalizeEntry = (entry, fallbackCurve) => {

@@ -1,19 +1,19 @@
 <template>
   <div class="curve-editor">
     <div class="curve-editor__header">
-      <h3>イージングカーチE/h3>
+      <h3>イージングカーブ</h3>
       <button
         type="button"
         class="curve-editor__reset"
         :disabled="!canReset"
         @click="resetCurves"
       >
-        リセチE��
+        リセット
       </button>
     </div>
 
     <div v-if="normalizedFrames.length < 2" class="curve-editor__empty">
-      <p>曲線を編雁E��るには、Eつ以上�Eキーを選択してください、E/p>
+      <p>曲線を編集するには、2つ以上のキーを選択してください。</p>
     </div>
 
     <svg
@@ -194,11 +194,11 @@ const isCurveModified = curve => {
   )
 }
 
-// トラチE��ー刁E��替え時にカーブを保存！E��允E��完�E修正版！E
+// トラチE��ー刁E��替え時にカーブを保存！E��允E��完�E修正版！E
 watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
   console.log(`[CurveEditor] Tracker changed from ${oldTrackerKey} to ${newTrackerKey}`)
   
-  // 旧トラチE��ーのカーブをタイムラインへ即時保存（トラチE��ー刁E��替え前の編雁E�E容を確実に保存！E
+  // 旧トラチE��ーのカーブをタイムラインへ即時保存（トラチE��ー刁E��替え前の編雁E�E容を確実に保存！E
   if (oldTrackerKey && curvesState.value.size > 0) {
     const updatesToEmit = []
     
@@ -207,7 +207,7 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
       updatesToEmit.push({ keyframeId: frameId, curve: cloneCurve(curve) })
     })
 
-    // 旧トラチE��ー側のカーブをタイムラインへ即時反映
+    // 旧トラチE��ー側のカーブをタイムラインへ即時反映
     if (updatesToEmit.length > 0) {
       try {
         emit('update', {
@@ -222,25 +222,25 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
     }
   }
   
-  // 新しいトラチE��ーのカーブを復允E��タイムラインから直接取得！E
+  // 新しいトラチE��ーのカーブを復允E��タイムラインから直接取得！E
   const next = new Map()
   props.frames.forEach(frame => {
-    // タイムラインから該当トラチE��ーのカーブを取征E
+    // タイムラインから該当トラチE��ーのカーブを取征E
     const trackerCurve = frame.curves?.[newTrackerKey]?.curve
     
     if (trackerCurve) {
-      // トラチE��ー専用のカーブが存在する場合�Eそれを使用
+      // トラチE��ー専用のカーブが存在する場合�Eそれを使用
       const cloned = cloneCurve(trackerCurve)
       next.set(frame.id, cloned)
       console.log(`[CurveEditor] Loaded curve from timeline for frame ${frame.id}, tracker ${newTrackerKey}`)
     } else if (newTrackerKey !== 'default') {
-      // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E�E�新規トラチE��ーの場合！E
+      // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E�E�新規トラチE��ーの場合！E
       const defaultCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
       const copiedCurve = cloneCurve(defaultCurve)
       next.set(frame.id, copiedCurve)
       console.log(`[CurveEditor] Copied default curve to ${newTrackerKey} for frame ${frame.id}`)
     } else {
-      // defaultトラチE��ー自身の場合�Edefaultカーブまた�Eフレームのカーブを使用
+      // defaultトラチE��ー自身の場合�Edefaultカーブまた�Eフレームのカーブを使用
       const baseCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
       next.set(frame.id, cloneCurve(baseCurve))
       console.log(`[CurveEditor] Loaded default curve for default tracker, frame ${frame.id}`)
@@ -254,7 +254,7 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
 watch(
   () => props.frames,
   frames => {
-    // ドラチE��中は更新しなぁE
+    // ドラチE��中は更新しなぁE
     if (dragState.value?.active) {
       console.log('[CurveEditor] Skipping frame update during drag')
       return
@@ -262,27 +262,27 @@ watch(
     
     const next = new Map(curvesState.value)
     frames.forEach(frame => {
-      // 既存�E状態を優先的に使用�E�編雁E��態を保持�E�E
+      // 既存�E状態を優先的に使用�E�編雁E��態を保持�E�E
       if (next.has(frame.id)) {
         return
       }
       
-      // タイムラインから該当トラチE��ーのカーブを取征E
+      // タイムラインから該当トラチE��ーのカーブを取征E
       const trackerCurve = frame.curves?.[props.trackerKey]?.curve
       
       if (trackerCurve) {
-        // トラチE��ー専用のカーブが存在する場合�Eそれを使用
+        // トラチE��ー専用のカーブが存在する場合�Eそれを使用
         const cloned = cloneCurve(trackerCurve)
         next.set(frame.id, cloned)
         console.log(`[CurveEditor] Loaded curve from timeline for frame ${frame.id}, tracker ${props.trackerKey}`)
       } else if (props.trackerKey !== 'default') {
-        // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E
+        // トラチE��ー専用カーブがなぁE��合�Edefaultカーブをコピ�E
         const defaultCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
         const copiedCurve = cloneCurve(defaultCurve)
         next.set(frame.id, copiedCurve)
         console.log(`[CurveEditor] Copied default curve to ${props.trackerKey} for frame ${frame.id}`)
       } else {
-        // defaultトラチE��ー自身の場吁E
+        // defaultトラチE��ー自身の場吁E
         const baseCurve = frame.curves?.default?.curve || frame.curve || DEFAULT_CURVE
         next.set(frame.id, cloneCurve(baseCurve))
         console.log(`[CurveEditor] Loaded default curve for default tracker, frame ${frame.id}`)
@@ -295,7 +295,7 @@ watch(
 
 // カーブ色の変更を監要E
 watch(() => props.curveColor, () => {
-  // カーブ色が変わってもカーブ�E体�E維持E
+  // カーブ色が変わってもカーブ�E体�E維持E
 }, { immediate: false })
 
 const normalizedFrames = computed(() => {
@@ -442,7 +442,7 @@ function resetCurves() {
     const curve = cloneCurve(DEFAULT_CURVE)
     next.set(frame.id, curve)
     updates.push({ keyframeId: frame.id, curve: cloneCurve(curve) })
-    // リセチE��時�E永続ストレージもクリア
+    // リセチE��時�E永続ストレージもクリア
     const storageKey = `${frame.id}-${props.trackerKey}`
     persistentCurveStorage.delete(storageKey)
   })

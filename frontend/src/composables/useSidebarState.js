@@ -21,7 +21,19 @@ export function useSidebarState({
   virtualTrackersEnabled,
   showVirtualTrackerLabels,
   virtualTrackerSize,
-  virtualTrackerLabelScale
+  virtualTrackerLabelScale,
+  // 新規追加: トラッカー関連設定
+  showTrackerAxes,
+  trackerAxesLength,
+  forearmTwistShare,
+  // カメラ設定
+  renderCameraFov,
+  renderCameraNear,
+  renderCameraFar,
+  renderCameraWidth,
+  renderCameraHeight,
+  // 指の状態
+  fingerStates
 }) {
   const collapsed = ref(false)
   const visibleSections = reactive({
@@ -47,47 +59,59 @@ export function useSidebarState({
   )
 
   function saveState() {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        collapsed: collapsed.value,
-        width: width?.value,
-        visibleSections: { ...visibleSections },
-  masterBonesVisible: masterBonesVisible.value,
-  masterBoneNamesVisible: masterBoneNamesVisible.value,
-        showLightMarker: showLightMarker?.value,
-        springBoneEnabled: springBoneEnabled?.value,
-  lookAtEnabled: lookAtEnabled?.value,
-  showExtendedBones: showExtendedBones?.value,
-  showColliderNodes: showColliderNodes?.value,
-  showNonDeformingBones: showNonDeformingBones?.value,
-  highlightConstraint: highlightConstraint?.value,
-        showPhysicalBones: showPhysicalBones?.value,
-        showOtherBones: showOtherBones?.value,
-        boneDotSize: boneDotSize?.value,
-        boneLabelScale: boneLabelScale?.value,
-  virtualTrackersEnabled: virtualTrackersEnabled?.value,
-  showVirtualTrackerLabels: showVirtualTrackerLabels?.value,
-  virtualTrackerSize: virtualTrackerSize?.value,
-  virtualTrackerLabelScale: virtualTrackerLabelScale?.value,
-        markerColor: markerColor?.value,
-        directionalIntensity: directionalIntensity?.value,
-        directional: directional
-          ? {
-              position: {
-                x: directional.value.position.x,
-                y: directional.value.position.y,
-                z: directional.value.position.z
-              },
-              target: {
-                x: directional.value.target.position.x,
-                y: directional.value.target.position.y,
-                z: directional.value.target.position.z
-              }
-            }
-          : undefined
-      })
-    )
+    const state = {
+      collapsed: collapsed.value,
+      width: width?.value,
+      visibleSections: { ...visibleSections },
+      masterBonesVisible: masterBonesVisible.value,
+      masterBoneNamesVisible: masterBoneNamesVisible.value,
+      showLightMarker: showLightMarker?.value,
+      springBoneEnabled: springBoneEnabled?.value,
+      lookAtEnabled: lookAtEnabled?.value,
+      showExtendedBones: showExtendedBones?.value,
+      showColliderNodes: showColliderNodes?.value,
+      showNonDeformingBones: showNonDeformingBones?.value,
+      highlightConstraint: highlightConstraint?.value,
+      showPhysicalBones: showPhysicalBones?.value,
+      showOtherBones: showOtherBones?.value,
+      boneDotSize: boneDotSize?.value,
+      boneLabelScale: boneLabelScale?.value,
+      virtualTrackersEnabled: virtualTrackersEnabled?.value,
+      showVirtualTrackerLabels: showVirtualTrackerLabels?.value,
+      virtualTrackerSize: virtualTrackerSize?.value,
+      virtualTrackerLabelScale: virtualTrackerLabelScale?.value,
+      // 新規追加項目
+      showTrackerAxes: showTrackerAxes?.value,
+      trackerAxesLength: trackerAxesLength?.value,
+      forearmTwistShare: forearmTwistShare?.value,
+      // カメラ設定
+      renderCameraFov: renderCameraFov?.value,
+      renderCameraNear: renderCameraNear?.value,
+      renderCameraFar: renderCameraFar?.value,
+      renderCameraWidth: renderCameraWidth?.value,
+      renderCameraHeight: renderCameraHeight?.value,
+      // 指の状態
+      fingerStates: fingerStates ? { ...fingerStates } : undefined,
+      markerColor: markerColor?.value,
+      directionalIntensity: directionalIntensity?.value
+    }
+    
+    if (directional?.value) {
+      state.directional = {
+        position: {
+          x: directional.value.position.x,
+          y: directional.value.position.y,
+          z: directional.value.position.z
+        },
+        target: {
+          x: directional.value.target.position.x,
+          y: directional.value.target.position.y,
+          z: directional.value.target.position.z
+        }
+      }
+    }
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }
 
   let saveStateTimeout
@@ -113,11 +137,22 @@ export function useSidebarState({
           showColliderNodes: savedShowColliderNodes,
           showNonDeformingBones: savedShowNonDeformingBones,
           highlightConstraint: savedHighlightConstraint,
-          // virtual tracker UI state
           virtualTrackersEnabled: savedVirtualTrackersEnabled,
           showVirtualTrackerLabels: savedShowVirtualTrackerLabels,
           virtualTrackerSize: savedVirtualTrackerSize,
           virtualTrackerLabelScale: savedVirtualTrackerLabelScale,
+          // 新規追加項目
+          showTrackerAxes: savedShowTrackerAxes,
+          trackerAxesLength: savedTrackerAxesLength,
+          forearmTwistShare: savedForearmTwistShare,
+          // カメラ設定
+          renderCameraFov: savedRenderCameraFov,
+          renderCameraNear: savedRenderCameraNear,
+          renderCameraFar: savedRenderCameraFar,
+          renderCameraWidth: savedRenderCameraWidth,
+          renderCameraHeight: savedRenderCameraHeight,
+          // 指の状態
+          fingerStates: savedFingerStates,
           showPhysicalBones: savedShowPhysicalBones,
           showOtherBones: savedShowOtherBones,
           boneDotSize: savedBoneDotSize,
@@ -136,8 +171,10 @@ export function useSidebarState({
           visibleSections.display = savedVisible.display ?? false
           visibleSections.physics = savedVisible.physics ?? false
         }
-  masterBonesVisible.value = savedMasterBonesVisible
-  masterBoneNamesVisible.value = savedMasterBoneNamesVisible
+        masterBonesVisible.value = savedMasterBonesVisible
+        masterBoneNamesVisible.value = savedMasterBoneNamesVisible
+        
+        // 既存の設定復元
         if (showLightMarker && savedShowMarker !== undefined)
           showLightMarker.value = savedShowMarker
         if (springBoneEnabled && savedSpringBoneEnabled !== undefined)
@@ -160,6 +197,32 @@ export function useSidebarState({
           virtualTrackerSize.value = savedVirtualTrackerSize
         if (virtualTrackerLabelScale && savedVirtualTrackerLabelScale !== undefined)
           virtualTrackerLabelScale.value = savedVirtualTrackerLabelScale
+        
+        // 新規追加項目の復元
+        if (showTrackerAxes && savedShowTrackerAxes !== undefined)
+          showTrackerAxes.value = savedShowTrackerAxes
+        if (trackerAxesLength && savedTrackerAxesLength !== undefined)
+          trackerAxesLength.value = savedTrackerAxesLength
+        if (forearmTwistShare && savedForearmTwistShare !== undefined)
+          forearmTwistShare.value = savedForearmTwistShare
+        
+        // カメラ設定の復元
+        if (renderCameraFov && savedRenderCameraFov !== undefined)
+          renderCameraFov.value = savedRenderCameraFov
+        if (renderCameraNear && savedRenderCameraNear !== undefined)
+          renderCameraNear.value = savedRenderCameraNear
+        if (renderCameraFar && savedRenderCameraFar !== undefined)
+          renderCameraFar.value = savedRenderCameraFar
+        if (renderCameraWidth && savedRenderCameraWidth !== undefined)
+          renderCameraWidth.value = savedRenderCameraWidth
+        if (renderCameraHeight && savedRenderCameraHeight !== undefined)
+          renderCameraHeight.value = savedRenderCameraHeight
+        
+        // 指の状態の復元
+        if (fingerStates && savedFingerStates) {
+          Object.assign(fingerStates, savedFingerStates)
+        }
+        
         if (showPhysicalBones && savedShowPhysicalBones !== undefined)
           showPhysicalBones.value = savedShowPhysicalBones
         if (showOtherBones && savedShowOtherBones !== undefined)
@@ -200,14 +263,26 @@ export function useSidebarState({
     showLightMarker && showLightMarker.value
     springBoneEnabled && springBoneEnabled.value
     lookAtEnabled && lookAtEnabled.value
-  showExtendedBones && showExtendedBones.value
-  showColliderNodes && showColliderNodes.value
-  showNonDeformingBones && showNonDeformingBones.value
-  highlightConstraint && highlightConstraint.value
-  virtualTrackersEnabled && virtualTrackersEnabled.value
-  showVirtualTrackerLabels && showVirtualTrackerLabels.value
-  virtualTrackerSize && virtualTrackerSize.value
-  virtualTrackerLabelScale && virtualTrackerLabelScale.value
+    showExtendedBones && showExtendedBones.value
+    showColliderNodes && showColliderNodes.value
+    showNonDeformingBones && showNonDeformingBones.value
+    highlightConstraint && highlightConstraint.value
+    virtualTrackersEnabled && virtualTrackersEnabled.value
+    showVirtualTrackerLabels && showVirtualTrackerLabels.value
+    virtualTrackerSize && virtualTrackerSize.value
+    virtualTrackerLabelScale && virtualTrackerLabelScale.value
+    // 新規追加項目
+    showTrackerAxes && showTrackerAxes.value
+    trackerAxesLength && trackerAxesLength.value
+    forearmTwistShare && forearmTwistShare.value
+    // カメラ設定
+    renderCameraFov && renderCameraFov.value
+    renderCameraNear && renderCameraNear.value
+    renderCameraFar && renderCameraFar.value
+    renderCameraWidth && renderCameraWidth.value
+    renderCameraHeight && renderCameraHeight.value
+    // 指の状態（reactiveオブジェクトなのでJSON文字列化して変更検知）
+    fingerStates && JSON.stringify(fingerStates)
     showPhysicalBones && showPhysicalBones.value
     showOtherBones && showOtherBones.value
     boneDotSize && boneDotSize.value

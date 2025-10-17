@@ -3,10 +3,10 @@
     <header class="key-settings__header">
       <div class="key-settings__title">
         <p v-if="hasSelection" class="key-settings__subtitle">
-          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">�E�褁E���E�E/span>
+          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">（複数選択）</span>
         </p>
         <p v-else class="key-settings__subtitle">
-          タイムラインでキーを選択すると詳細が表示されます、E
+          タイムラインでキーを選択すると詳細が表示されます。
         </p>
       </div>
       <div v-if="hasSelection && rangeLabel" class="key-settings__range">
@@ -21,20 +21,20 @@
       </div>
     </div>
     <div v-else class="key-settings__empty">
-      <p>選択されたキーはありません、E/p>
+      <p>選択されたキーはありません。</p>
     </div>
 
     <p v-if="hasSelection && !hasMultiple" class="key-settings__hint">
-      褁E��のキーを選択するとイージングカーブを編雁E��きます、E
+      複数のキーを選択するとイージングカーブを編集できます。
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
-      <!-- トラチE��ー選抁E-->
+      <!-- トラッカー選択 -->
       <div class="curve-tracker-selector">
         <label class="tracker-label">
-          <span>対象トラチE��ー</span>
+          <span>対象トラッカー</span>
           <select v-model="selectedTracker" class="tracker-select">
-            <option value="default">まとめて�E�未設定トラチE��ー�E�E/option>
+            <option value="default">まとめて（未設定トラッカー）</option>
             <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
               {{ tracker.label }}
             </option>
@@ -42,7 +42,7 @@
         </label>
         <div class="color-display">
           <span class="color-display__label">カーブ色</span>
-          <div class="color-display__swatch" :style="{ backgroundColor: curveColor }" :title="`トラチE��ー色: ${curveColor} (自動同朁E`"></div>
+          <div class="color-display__swatch" :style="{ backgroundColor: curveColor }" :title="`トラッカー色: ${curveColor} (自動同期)`"></div>
         </div>
       </div>
       <TimelineCurveEditor 
@@ -80,10 +80,10 @@ const props = defineProps({
 const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
 
 const selectedTracker = ref('default')
-// トラチE��ーごとのカーブ色を保持�E�トラチE��ー色と同期�E�E
+// トラッカーごとのカーブ色を保持（トラッカー色と同期）
 const trackerCurveColors = ref(new Map())
 
-// チE��ォルトカラー�E�バーチャルトラチE��ーの色と一致�E�E
+// デフォルトカラー（バーチャルトラッカーの色と一致）
 const getDefaultColor = (trackerKey) => {
   const defaultColors = {
     default: '#5c8cff',
@@ -105,14 +105,14 @@ const getDefaultColor = (trackerKey) => {
   return defaultColors[trackerKey] || '#5c8cff'
 }
 
-// 現在選択されてぁE��トラチE��ーのカーブ色�E�読み取り専用 - トラチE��ー色と同期�E�E
+// 現在選択されているトラッカーのカーブ色（読み取り専用 - トラッカー色と同期）
 const curveColor = computed(() => {
-  // availableTrackersから該当トラチE��ーの色を取征E
+  // availableTrackersから該当トラッカーの色を取得
   const tracker = props.availableTrackers?.find(t => t.key === selectedTracker.value)
   if (tracker?.color) {
     return tracker.color
   }
-  // 見つからなぁE��合�EチE��ォルト色を使用
+  // 見つからない場合はデフォルト色を使用
   return getDefaultColor(selectedTracker.value)
 })
 
@@ -150,7 +150,7 @@ function formatSeconds(seconds) {
 }
 
 function onCurvesUpdate(payload) {
-  // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�トラチE��ー刁E��時�E旧トラチE��ー保存用�E�E
+  // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�トラチE��ー刁E��時�E旧トラチE��ー保存用�E�E
   const effectiveTrackerKey = payload?.trackerKey || selectedTracker.value
   emit('update-curves', {
     ...payload,
