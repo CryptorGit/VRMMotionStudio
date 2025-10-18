@@ -2,7 +2,10 @@
   <header class="top-menu" role="menubar">
     <div class="top-menu__brand">
       <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
-      <span class="top-menu__title">StellarMotion Studio</span>
+      <span class="top-menu__title">
+        StellarMotion Studio
+        <span class="top-menu__beta" aria-label="ベータ版">β</span>
+      </span>
     </div>
     <nav class="top-menu__nav" aria-label="メインメニュー">
       <button
@@ -95,13 +98,10 @@
         @click="$emit('toggle-captions')"
         :title="tooltip(showCaptions ? 'キャプション表示をOFFにします' : 'キャプション表示をONにします')"
       >
-  <Icon :icon="showCaptions ? 'mdi:tooltip-text-outline' : 'mdi:tooltip-outline'" />
+        <Icon :icon="showCaptions ? 'mdi:tooltip-text-outline' : 'mdi:tooltip-outline'" />
         <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
       </button>
     </nav>
-    <div class="top-menu__actions">
-      <span class="top-menu__badge" aria-label="ベータ版">BETA</span>
-    </div>
   </header>
 </template>
 
@@ -125,7 +125,7 @@ const tooltip = message => (props.showCaptions ? message : '')
 <style scoped>
 .top-menu {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: stretch;
   gap: 0.5rem;
   padding: 0 1rem;
@@ -159,7 +159,25 @@ const tooltip = message => (props.showCaptions ? message : '')
 }
 
 .top-menu__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
   font-size: 0.95rem;
+}
+
+.top-menu__beta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-on-accent, #ffffff);
+  background: color-mix(in srgb, var(--accent, #2d8cff) 75%, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .top-menu__nav {
@@ -168,29 +186,6 @@ const tooltip = message => (props.showCaptions ? message : '')
   justify-content: flex-start;
   -webkit-app-region: no-drag;
   gap: 0.35rem;
-}
-
-.top-menu__actions {
-  display: flex;
-  -webkit-app-region: no-drag;
-  align-items: center;
-  justify-content: flex-end;
-  padding-left: 0.75rem;
-}
-
-.top-menu__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-on-accent, #ffffff);
-  background: color-mix(in srgb, var(--accent, #2d8cff) 70%, rgba(255, 255, 255, 0.1));
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .top-menu__item {

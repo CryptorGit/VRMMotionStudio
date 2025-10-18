@@ -93,10 +93,22 @@
 
         <div class="tracker-angles">
           <div class="tracker-angles__header">
-            <div class="tracker-angles__order">
+            <label class="tracker-angles__order">
               <span class="tracker-angles__label">角度順序</span>
-              <span class="tracker-angles__value">{{ rotationOrderText }}</span>
-            </div>
+              <select
+                class="tracker-angles__select"
+                :value="currentRotationOrder"
+                @change="onRotationOrderChange($event.target.value)"
+              >
+                <option
+                  v-for="option in rotationOrderOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
             <button
               type="button"
               class="btn-reset-small tracker-angles__reset"
@@ -148,6 +160,7 @@ const props = defineProps({
   trackerPosition: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotation: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotationOrder: { type: String, default: 'YXZ' },
+  trackerRotationOrders: { type: Array, default: () => [] },
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 }
 })
@@ -214,10 +227,32 @@ const angleAxes = [
   { key: 'z', label: 'Z' }
 ]
 
-const rotationOrderText = computed(() => {
-  const order = (props.trackerRotationOrder || 'XYZ').toUpperCase().replace(/[^XYZ]/g, '')
-  return order ? order.split('').join(' → ') : 'X → Y → Z'
+const sanitizeOrder = value => {
+  if (typeof value !== 'string') return 'XYZ'
+  const upper = value.toUpperCase().replace(/[^XYZ]/g, '')
+  return upper.length === 3 ? upper : 'XYZ'
+}
+
+const rotationOrderOptions = computed(() => {
+  const base = Array.isArray(props.trackerRotationOrders) && props.trackerRotationOrders.length
+    ? props.trackerRotationOrders
+    : ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX']
+  return base.map(order => {
+    const value = sanitizeOrder(order)
+    return {
+      value,
+      label: value.split('').join(' → ')
+    }
+  })
 })
+
+const currentRotationOrder = computed(() => sanitizeOrder(props.trackerRotationOrder || 'XYZ'))
+
+const onRotationOrderChange = value => {
+  const next = sanitizeOrder(value)
+  if (!next) return
+  emit('update:tracker-rotation-order', next)
+}
 
 const formatAngle = axis => {
   const raw = props.trackerRotation?.[axis]
@@ -401,9 +436,9 @@ label.stretch {
 }
 
 .tracker-angles__order {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   font-size: 0.85rem;
   color: var(--text-muted, rgba(240, 245, 255, 0.78));
 }
@@ -414,10 +449,31 @@ label.stretch {
   letter-spacing: 0.05em;
 }
 
-.tracker-angles__value {
-  font-family: 'Consolas', 'Monaco', monospace;
+.tracker-angles__select {
+  appearance: none;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(32, 36, 48, 0.85);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 0.35rem 2.25rem 0.35rem 0.75rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(92, 140, 255, 0.92);
+  letter-spacing: 0.08em;
+  font-family: 'Consolas', 'Monaco', monospace;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.75) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.75) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.tracker-angles__select:hover,
+.tracker-angles__select:focus-visible {
+  outline: none;
+  border-color: rgba(92, 140, 255, 0.7);
+  background: rgba(36, 42, 58, 0.92);
 }
 
 .tracker-angles__reset {

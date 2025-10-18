@@ -345,11 +345,11 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     const readFingerValue = key => {
-      if (fingerStates && typeof fingerStates === 'object') {
-        const raw = fingerStates[key]
-        if (Number.isFinite(raw)) return raw
-      }
-      return 0
+      if (!fingerStates || typeof fingerStates !== 'object') return 0
+      const raw = fingerStates[key]
+      const num = Number(raw)
+      if (!Number.isFinite(num)) return 0
+      return THREE.MathUtils.clamp(num, 0, 1)
     }
 
     const trackedFingerKeys = [
