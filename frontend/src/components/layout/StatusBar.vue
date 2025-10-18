@@ -29,7 +29,7 @@ const props = defineProps({
   justify-content: space-between;
   padding: 0 1rem;
   min-height: 32px;
-  background: var(--surface, rgba(32, 36, 46, 0.9));
+  background: var(--surface, rgba(20, 22, 28, 0.9));
   color: var(--text-muted, rgba(255, 255, 255, 0.7));
   border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   backdrop-filter: blur(6px);

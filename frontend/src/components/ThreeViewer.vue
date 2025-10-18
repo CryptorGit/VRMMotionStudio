@@ -3960,7 +3960,7 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at top, rgba(120, 160, 255, 0.18), transparent 60%),
     radial-gradient(circle at bottom, rgba(40, 70, 140, 0.12), transparent 65%),
-    var(--surface-strong, #232730);
+    var(--surface-strong, rgba(24, 26, 32, 0.95));
   border: none;
   box-shadow: none;
   overflow: hidden;

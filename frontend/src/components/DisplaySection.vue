@@ -368,7 +368,7 @@ hr {
   padding: 0.35rem 0.65rem;
   border-radius: 6px;
   border: 1px solid rgba(140, 168, 235, 0.35);
-  background: rgba(12, 16, 28, 0.6);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
   color: rgba(240, 244, 255, 0.9);
   font-size: 0.85rem;
   cursor: pointer;
@@ -377,7 +377,7 @@ hr {
 .model-select:focus {
   outline: none;
   border-color: rgba(140, 168, 235, 0.65);
-  background: rgba(12, 16, 28, 0.8);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 </style>
 

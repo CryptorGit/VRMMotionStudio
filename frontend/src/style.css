@@ -4,9 +4,9 @@
   --accent: #2d7dd2;
   --accent-weak: rgba(45, 125, 210, 0.2);
   --accent-focus: #3d8ee3;
-  --surface: #1e1e1e;
-  --surface-strong: #2b2b2b;
-  --surface-raised: #323232;
+  --surface: rgba(20, 22, 28, 1);
+  --surface-strong: rgba(24, 26, 32, 0.95);
+  --surface-raised: rgba(30, 34, 42, 0.95);
   --workspace-panel-bg: rgba(37, 37, 37, 0.98);
   --workspace-panel-border: rgba(255, 255, 255, 0.1);
   --workspace-panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -22,10 +22,10 @@
   --workspace-gap: 1.1rem;
   --workspace-radius: 6px;
   --workspace-padding: 1.2rem;
-  --panel-surface: #2b2b2b;
-  --panel-surface-alt: #323232;
-  --control-surface: #3a3a3a;
-  --control-surface-hover: #4a4a4a;
+  --panel-surface: rgba(24, 26, 32, 0.95);
+  --panel-surface-alt: rgba(30, 34, 42, 0.95);
+  --control-surface: rgba(48, 54, 70, 0.9);
+  --control-surface-hover: rgba(58, 64, 81, 0.95);
   --panel-border: rgba(255, 255, 255, 0.12);
   --panel-border-strong: rgba(255, 255, 255, 0.22);
   --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);

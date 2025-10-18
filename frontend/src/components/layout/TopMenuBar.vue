@@ -144,7 +144,7 @@ const tooltip = message => (props.showCaptions ? message : '')
   gap: 0.5rem;
   padding: 0 1rem;
   height: var(--menubar-height, 48px);
-  background: var(--surface-strong, #1f2330);
+  background: var(--surface-strong, rgba(24, 26, 32, 0.95));
   color: var(--text-strong, #fdfcff);
   border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   user-select: none;

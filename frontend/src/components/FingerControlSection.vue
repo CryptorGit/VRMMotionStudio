@@ -88,7 +88,7 @@ function resetAllFingers() {
 
 <style scoped>
 .section {
-  background: rgba(36, 40, 52, 0.6);
+  background: var(--panel-surface, rgba(24, 26, 32, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   overflow: hidden;
