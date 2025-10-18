@@ -101,15 +101,37 @@ const getDefaultColor = (trackerKey) => {
   return defaultColors[trackerKey] || '#5c8cff'
 }
 
+const normalizeColor = (color, fallback = '#5c8cff') => {
+  if (typeof color === 'string' && color.trim()) {
+    const trimmed = color.trim()
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  }
+  return fallback
+}
+
 // 現在選択されているトラッカーのカーブ色（読み取り専用 - トラッカー色と同期）
 const curveColor = computed(() => {
+  const trackerKey = selectedTracker.value
+  const frames = Array.isArray(props.selection?.frames) ? props.selection.frames : []
+  if (frames.length) {
+    for (const frame of frames) {
+      const curves = frame?.curves || {}
+      if (trackerKey === 'default') {
+        const color = curves.default?.color || frame?.curve?.color
+        if (color) return normalizeColor(color, getDefaultColor(trackerKey))
+      } else {
+        const color = curves[trackerKey]?.color
+        if (color) return normalizeColor(color, getDefaultColor(trackerKey))
+      }
+    }
+  }
   // availableTrackersから該当トラッカーの色を取得
-  const tracker = props.availableTrackers?.find(t => t.key === selectedTracker.value)
+  const tracker = props.availableTrackers?.find(t => t.key === trackerKey)
   if (tracker?.color) {
-    return tracker.color
+    return normalizeColor(tracker.color, getDefaultColor(trackerKey))
   }
   // 見つからない場合はデフォルト色を使用
-  return getDefaultColor(selectedTracker.value)
+  return getDefaultColor(trackerKey)
 })
 
 const selectionCount = computed(() => Number(props.selection?.frames?.length ?? 0))

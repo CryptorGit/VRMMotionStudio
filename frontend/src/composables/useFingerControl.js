@@ -75,6 +75,10 @@ const FINGER_BONES = {
 
 const MAX_FINGER_JOINTS = 3
 
+const tempWorldVecA = new THREE.Vector3()
+const tempWorldVecB = new THREE.Vector3()
+const tempWorldVecC = new THREE.Vector3()
+
 function normalizeFingerChain(bones, handBone) {
   const filtered = Array.isArray(bones)
     ? bones.filter(bone => bone && bone.isBone)
@@ -211,9 +215,29 @@ export function useFingerControl(getFingerStates, getActiveModel) {
   // チE�E��E�チE�E��E�用: 検�Eされた�Eーンをログ出力（一度だけ！E
   let detectionLogged = false
 
+  function extractBoneNode(candidate) {
+    if (!candidate) return null
+    if (candidate.isBone) return candidate
+    if (candidate.node && candidate.node.isBone) return candidate.node
+    if (candidate.bone && candidate.bone.isBone) return candidate.bone
+    if (Array.isArray(candidate)) {
+      for (const entry of candidate) {
+        const resolved = extractBoneNode(entry)
+        if (resolved) return resolved
+      }
+    } else if (typeof candidate === 'object') {
+      // VRM 1.0 の VRMHumanBoneLike には `node` または `bone` プロパティが存在する
+      for (const value of Object.values(candidate)) {
+        const resolved = extractBoneNode(value)
+        if (resolved) return resolved
+      }
+    }
+    return null
+  }
+
   function getHumanoidBone(humanoid, boneName) {
     if (!humanoid || !boneName) return null
-    
+
     // VRM 1.0 の場合 - getRawBoneNode
     if (typeof humanoid.getRawBoneNode === 'function') {
       try {
@@ -223,7 +247,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
         console.debug(`[FingerControl] getRawBoneNode failed for ${boneName}:`, e)
       }
     }
-    
+
     // VRM 0.x の場合 - getBoneNode
     if (typeof humanoid.getBoneNode === 'function') {
       try {
@@ -233,7 +257,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
         console.debug(`[FingerControl] getBoneNode failed for ${boneName}:`, e)
       }
     }
-    
+
     // getNormalizedBoneNode も試す
     if (typeof humanoid.getNormalizedBoneNode === 'function') {
       try {
@@ -243,25 +267,27 @@ export function useFingerControl(getFingerStates, getActiveModel) {
         console.debug(`[FingerControl] getNormalizedBoneNode failed for ${boneName}:`, e)
       }
     }
-    
-    // humanBones経由で直接アクセス
-    if (humanoid.humanBones && humanoid.humanBones[boneName]) {
-      const boneRef = humanoid.humanBones[boneName]
-      if (boneRef && boneRef.node && boneRef.node.isBone) return boneRef.node
+
+    const fromCollection = (collection) => {
+      if (!collection) return null
+      if (typeof collection.get === 'function') {
+        const entry = collection.get(boneName)
+        const resolved = extractBoneNode(entry)
+        if (resolved) return resolved
+      }
+      if (collection[boneName]) {
+        const resolved = extractBoneNode(collection[boneName])
+        if (resolved) return resolved
+      }
+      return null
     }
-    
-    // rawHumanBones経由で直接アクセス
-    if (humanoid.rawHumanBones && humanoid.rawHumanBones[boneName]) {
-      const boneRef = humanoid.rawHumanBones[boneName]
-      if (boneRef && boneRef.node && boneRef.node.isBone) return boneRef.node
-    }
-    
-    // normalizedHumanBones経由でもアクセス試行
-    if (humanoid.normalizedHumanBones && humanoid.normalizedHumanBones[boneName]) {
-      const boneRef = humanoid.normalizedHumanBones[boneName]
-      if (boneRef && boneRef.node && boneRef.node.isBone) return boneRef.node
-    }
-    
+
+    const direct =
+      fromCollection(humanoid.humanBones) ||
+      fromCollection(humanoid.rawHumanBones) ||
+      fromCollection(humanoid.normalizedHumanBones)
+    if (direct) return direct
+
     return null
   }
   
@@ -686,11 +712,19 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       // 坁E�E��E��E�E刁E 吁E�E��E�節が同じ角度で曲がる
       const angle = THREE.MathUtils.degToRad(maxAngleDegPerJoint * normalizedAmount)
       
-      // ボ�Eンのローカル座標系での回転軸を決宁E
-      // 実際のボ�Eンの向きを老E�E�Eした動的な回転軸決宁E
-      let curlAxis = determineCurlAxis(bone, hand, finger, index, handBone)
-      if (!curlAxis || typeof curlAxis.clone !== "function") {
-        curlAxis = new THREE.Vector3(0, 0, hand === "left" ? -1 : 1)
+      let curlAxis = null
+      const storedAxis = bone?.userData?.__fingerCurlAxis
+      if (storedAxis && typeof storedAxis.clone === 'function') {
+        curlAxis = storedAxis.clone()
+      } else {
+        curlAxis = determineCurlAxis(bone, hand, finger, index, handBone)
+        if (curlAxis && curlAxis.lengthSq() > 1e-8) {
+          if (!bone.userData) bone.userData = {}
+          bone.userData.__fingerCurlAxis = curlAxis.clone()
+        }
+      }
+      if (!curlAxis || typeof curlAxis.clone !== 'function' || curlAxis.lengthSq() < 1e-8) {
+        curlAxis = new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
       }
       const normalizedAxis = curlAxis.clone().normalize()
       const rotationQuat = new THREE.Quaternion().setFromAxisAngle(normalizedAxis, angle)
@@ -722,59 +756,119 @@ export function useFingerControl(getFingerStates, getActiveModel) {
   
   // ボ�Eンの実際の構造に基づぁE�E��E�最適な回転軸を決宁E
   function determineCurlAxis(bone, hand, finger, jointIndex, handBone) {
-    // チE�E��E�ォルト�E回転軸: VRM標準ではZ軸周り�E回転が最も一般皁E
-    // 左手と右手で符号が送E�E��E�なめE
-    const defaultAxisZ = new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
-    
-    // 親持E�E�E場合�E特殊な処琁E
-    if (finger === 'thumb') {
-      // 親持E�E�E第一関節�E�E�E�中手骨�E�E�E��E�E通常Y軸周りで開閉
-      if (jointIndex === 0) {
-        return new THREE.Vector3(0, hand === 'left' ? 1 : -1, 0)
-      } else {
-        // 第二関節以降�EZ軸回転を基本とするが、Y軸成�Eも加える
-        return new THREE.Vector3(0, hand === 'left' ? 0.3 : -0.3, hand === 'left' ? -1 : 1).normalize()
-      }
+    if (!bone) return null
+
+    const defaultLocalAxis = new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
+
+    try { bone.updateWorldMatrix(true, false) } catch {}
+    if (handBone?.isBone) {
+      try { handBone.updateWorldMatrix(true, false) } catch {}
     }
-    
-    // 子�Eーンの方向から回転軸を推宁E
+
+    const boneWorldPos = bone.getWorldPosition(tempWorldVecA.set(0, 0, 0))
+
+    let furthestChild = null
+    let furthestDistance = 0
     if (bone.children && bone.children.length > 0) {
-      const child = bone.children[0]
-      if (child && child.position) {
-        // 子�Eーンへのローカル方向�Eクトルを取征E
-        const childDir = new THREE.Vector3().copy(child.position).normalize()
-        
-        // 持E�E�E長軸�E�E�E�子�Eーンへの方向）に垂直な軸で回転する
-        // childDirに最も近い主軸を見つけて、それに垂直な軸を選抁E
-        const absX = Math.abs(childDir.x)
-        const absY = Math.abs(childDir.y)
-        const absZ = Math.abs(childDir.z)
-        
-        let axis
-        if (absZ > absX && absZ > absY) {
-          // Z軸が主方向（最も一般皁E�E��E�EↁEX軸また�EY軸周りで回転
-          // 手�E左右で異なる軸を選抁E
-          if (hand === 'left') {
-            // 左扁E 通常X軸正方向周りで曲がる
-            axis = new THREE.Vector3(1, 0, 0)
-          } else {
-            // 右扁E 通常X軸負方向周りで曲がる
-            axis = new THREE.Vector3(-1, 0, 0)
-          }
-        } else if (absX > absY && absX > absZ) {
-          // X軸が主方吁EↁEZ軸周りで回転
-          axis = defaultAxisZ.clone()
-        } else {
-          // Y軸が主方吁EↁEZ軸周りで回転�E�E�E�Eallback�E�E�E�E
-          axis = defaultAxisZ.clone()
+      for (const child of bone.children) {
+        if (!child?.isBone) continue
+        const childPos = child.getWorldPosition(tempWorldVecB.set(0, 0, 0))
+        const distance = childPos.distanceTo(boneWorldPos)
+        if (distance > furthestDistance) {
+          furthestDistance = distance
+          furthestChild = child
         }
-        
-        return axis
       }
     }
-    
-    // 子�EーンがなぁE�E��E�合�EチE�E��E�ォルト�EZ軸回転を使用
-    return defaultAxisZ
+
+    let childDirection = null
+    if (furthestChild && furthestDistance > 1e-5) {
+      const childWorld = furthestChild.getWorldPosition(tempWorldVecB.set(0, 0, 0))
+      childDirection = childWorld.sub(boneWorldPos).normalize()
+    }
+
+    let palmDirection = null
+    if (handBone && handBone.isBone) {
+      const palmWorld = handBone.getWorldPosition(tempWorldVecC.set(0, 0, 0))
+      palmDirection = palmWorld.sub(boneWorldPos).normalize()
+    } else if (bone.parent && bone.parent.isBone) {
+      const parentWorld = bone.parent.getWorldPosition(tempWorldVecC.set(0, 0, 0))
+      palmDirection = parentWorld.sub(boneWorldPos).normalize()
+    }
+
+    const defaultWorldAxis = convertLocalAxisToWorld(bone, defaultLocalAxis) || new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
+
+    if (finger === 'thumb') {
+      if (jointIndex === 0 && palmDirection) {
+        // 親指の付け根は手の平法線と指方向の外積で開閉軸を決定
+        const referenceDirection = childDirection || defaultWorldAxis
+        const palmNormal = palmDirection.clone().cross(referenceDirection)
+        if (palmNormal.lengthSq() > 1e-6) {
+          const axisWorld = palmDirection.clone().cross(palmNormal).normalize()
+          const converted = convertWorldAxisToLocal(bone, boneWorldPos, axisWorld)
+          if (converted) return alignAxisWithDefault(converted, defaultLocalAxis)
+        }
+        return new THREE.Vector3(0, hand === 'left' ? 1 : -1, 0)
+      }
+      if (!childDirection && palmDirection) {
+        childDirection = palmDirection.clone().cross(defaultWorldAxis).normalize()
+      }
+    }
+
+    let axisWorld = null
+    if (childDirection && palmDirection) {
+      axisWorld = palmDirection.clone().cross(childDirection)
+      if (axisWorld.lengthSq() < 1e-6) {
+        axisWorld = childDirection.clone().cross(palmDirection)
+      }
+    }
+
+    if (!axisWorld || axisWorld.lengthSq() < 1e-6) {
+      const fallbackPalm = palmDirection || new THREE.Vector3(hand === 'left' ? -1 : 1, 0, 0)
+      if (childDirection) {
+        axisWorld = fallbackPalm.clone().cross(childDirection)
+      }
+    }
+
+    if (!axisWorld || axisWorld.lengthSq() < 1e-6) {
+      return defaultLocalAxis.clone()
+    }
+
+    axisWorld.normalize()
+    const converted = convertWorldAxisToLocal(bone, boneWorldPos, axisWorld)
+    if (!converted || converted.lengthSq() < 1e-6) {
+      return defaultLocalAxis.clone()
+    }
+
+    return alignAxisWithDefault(converted, defaultLocalAxis)
+  }
+
+  function convertWorldAxisToLocal(bone, boneWorldPos, axisWorld) {
+    if (!bone || !axisWorld) return null
+    const originLocal = bone.worldToLocal(boneWorldPos.clone())
+    const endWorld = boneWorldPos.clone().add(axisWorld.clone().multiplyScalar(0.1))
+    const endLocal = bone.worldToLocal(endWorld)
+    const localAxis = endLocal.sub(originLocal).normalize()
+    return localAxis.lengthSq() > 1e-6 ? localAxis : null
+  }
+
+  function alignAxisWithDefault(axis, defaultAxis) {
+    if (!axis || !defaultAxis) return axis
+    const dot = axis.dot(defaultAxis)
+    if (dot < 0) {
+      axis.multiplyScalar(-1)
+    }
+    return axis.normalize()
+  }
+
+  function convertLocalAxisToWorld(bone, localAxis) {
+    if (!bone || !localAxis) return null
+    const origin = new THREE.Vector3(0, 0, 0)
+    const originWorld = bone.localToWorld(origin.clone())
+    const endLocal = localAxis.clone().normalize().multiplyScalar(0.1)
+    const endWorld = bone.localToWorld(endLocal)
+    const worldAxis = endWorld.sub(originWorld).normalize()
+    return worldAxis.lengthSq() > 1e-6 ? worldAxis : null
   }
   
   return {
