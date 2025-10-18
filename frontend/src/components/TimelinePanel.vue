@@ -112,7 +112,7 @@ const PIXELS_PER_SECOND = 120
 const NAME_COLUMN_WIDTH = 200
 const MIN_DURATION_FOR_DISPLAY = 10
 const ROW_HEIGHT = 56
-const MIN_BODY_HEIGHT = 224
+const MIN_BODY_HEIGHT = 112
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
