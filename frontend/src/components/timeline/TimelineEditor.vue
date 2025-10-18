@@ -208,7 +208,7 @@
                   'is-selected': selectedKeyframes.has(frame.id),
                   'has-curve': easedKeyframeIds.has(frame.id)
                 }"
-                :style="{ left: `${timeToX(frame.time)}px`, '--keyframe-color': keyframeColorMap.get(frame.id) || DEFAULT_CURVE_COLOR }"
+                :style="{ left: `${timeToX(frame.time)}px`, '--keyframe-color': keyframeColorMap.get(frame.id) || TIMELINE_KEY_COLOR }"
                 @pointerdown.stop.prevent="startKeyframeDrag($event, frame)"
                 @contextmenu.prevent="emit('remove-keyframe', { keyframeId: frame.id })"
                 :title="tooltip(keyTitle(frame))"
@@ -243,6 +243,7 @@ const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
 const CURVE_VIEWBOX_HEIGHT = 64
 const DEFAULT_CURVE_COLOR = '#5c8cff'
+const TIMELINE_KEY_COLOR = 'var(--accent, #2d8cff)'
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -650,17 +651,8 @@ const timelineCurvePaths = computed(() => {
   return result
 })
 
-function resolveKeyframeColor(frame) {
-  if (!frame) return DEFAULT_CURVE_COLOR
-  const curves = frame.curves || {}
-  if (curves.default?.color) return curves.default.color
-  for (const key of Object.keys(curves)) {
-    if (key === 'default') continue
-    const candidate = curves[key]?.color
-    if (candidate) return candidate
-  }
-  if (frame.curve?.color) return frame.curve.color
-  return DEFAULT_CURVE_COLOR
+function resolveKeyframeColor() {
+  return TIMELINE_KEY_COLOR
 }
 
 const keyframeColorMap = computed(() => {
@@ -1374,9 +1366,9 @@ function keyTitle(frame) {
   user-select: none;
   -webkit-user-select: none;
   --timeline-ruler-height: 46px;
-  --timeline-key-lane-height: 88px;
+  --timeline-key-lane-height: 44px;
   --timeline-playhead-color: #ff615a;
-  --timeline-key-padding-y: 12px;
+  --timeline-key-padding-y: 6px;
   --timeline-curves-height: calc(var(--timeline-key-lane-height) - var(--timeline-key-padding-y) * 2);
 }
 
