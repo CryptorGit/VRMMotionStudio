@@ -194,7 +194,7 @@
                   :d="segment.path"
                   class="timeline__curve-path"
                   :class="{ 'is-modified': segment.modified }"
-                  :style="{ stroke: segment.color || '#5c8cff' }"
+                  :style="{ stroke: segment.color || DEFAULT_CURVE_COLOR }"
                 />
               </svg>
             </div>
@@ -208,7 +208,7 @@
                   'is-selected': selectedKeyframes.has(frame.id),
                   'has-curve': easedKeyframeIds.has(frame.id)
                 }"
-                :style="{ left: `${timeToX(frame.time)}px` }"
+                :style="{ left: `${timeToX(frame.time)}px`, '--keyframe-color': keyframeColorMap.get(frame.id) || DEFAULT_CURVE_COLOR }"
                 @pointerdown.stop.prevent="startKeyframeDrag($event, frame)"
                 @contextmenu.prevent="emit('remove-keyframe', { keyframeId: frame.id })"
                 :title="tooltip(keyTitle(frame))"
@@ -241,7 +241,8 @@ import { useCaptions } from '../../composables/useCaptions.js'
 
 const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
-const CURVE_VIEWBOX_HEIGHT = 52
+const CURVE_VIEWBOX_HEIGHT = 64
+const DEFAULT_CURVE_COLOR = '#5c8cff'
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -280,7 +281,7 @@ function cloneCurves(curves) {
   for (const [key, entry] of Object.entries(curves)) {
     result[key] = {
       curve: cloneCurve(entry?.curve),
-      color: typeof entry?.color === 'string' ? entry.color : '#5c8cff',
+      color: typeof entry?.color === 'string' ? entry.color : DEFAULT_CURVE_COLOR,
       modified: !!entry?.modified
     }
   }
@@ -289,14 +290,14 @@ function cloneCurves(curves) {
     if (result.all) {
       result.default = {
         curve: cloneCurve(result.all.curve || DEFAULT_CURVE),
-        color: result.all.color || '#5c8cff',
+        color: result.all.color || DEFAULT_CURVE_COLOR,
         modified: !!result.all.modified
       }
       delete result.all
     } else {
       result.default = {
         curve: cloneCurve(DEFAULT_CURVE),
-        color: '#5c8cff',
+        color: DEFAULT_CURVE_COLOR,
         modified: false
       }
     }
@@ -565,7 +566,7 @@ const timelineCurvePaths = computed(() => {
     const endAnchor = anchorForIndex(i + 1)
     const startY = startAnchor * CURVE_VIEWBOX_HEIGHT
     const endY = endAnchor * CURVE_VIEWBOX_HEIGHT
-    const baselineMid = (startY + endY) / 2
+    const baselineMid = CURVE_VIEWBOX_HEIGHT / 2
 
     const flattenPoint = (px, py) => {
       if (!Number.isFinite(width) || width <= 0) {
@@ -575,7 +576,8 @@ const timelineCurvePaths = computed(() => {
       const t = Math.min(1, Math.max(0, ratio))
       const baseline = startY + (endY - startY) * t
       const deviation = py - baseline
-      return { x: px, y: baselineMid + deviation }
+      const adjusted = baselineMid + deviation
+      return { x: px, y: Math.min(Math.max(adjusted, 0), CURVE_VIEWBOX_HEIGHT) }
     }
 
     // 各トラッカーのカーブを取得
@@ -585,7 +587,7 @@ const timelineCurvePaths = computed(() => {
         const curve = sanitizeCurve(entry?.curve || fallbackCurve)
         return {
           curve,
-          color: entry?.color || '#5c8cff',
+          color: entry?.color || DEFAULT_CURVE_COLOR,
           modified: !!entry?.modified || isCurveModified(curve)
         }
       }
@@ -608,7 +610,7 @@ const timelineCurvePaths = computed(() => {
     const drawCurve = (trackerKey, startEntry, endEntry) => {
       const startCurve = sanitizeCurve(startEntry?.curve)
       const endCurve = sanitizeCurve(endEntry?.curve)
-      const curveColor = startEntry?.color || '#5c8cff'
+      const curveColor = startEntry?.color || DEFAULT_CURVE_COLOR
 
       const ctrl1X = startX + width * startCurve.out.x
       const ctrl2X = startX + width * endCurve.in.x
@@ -646,6 +648,29 @@ const timelineCurvePaths = computed(() => {
     })
   }
   return result
+})
+
+function resolveKeyframeColor(frame) {
+  if (!frame) return DEFAULT_CURVE_COLOR
+  const curves = frame.curves || {}
+  if (curves.default?.color) return curves.default.color
+  for (const key of Object.keys(curves)) {
+    if (key === 'default') continue
+    const candidate = curves[key]?.color
+    if (candidate) return candidate
+  }
+  if (frame.curve?.color) return frame.curve.color
+  return DEFAULT_CURVE_COLOR
+}
+
+const keyframeColorMap = computed(() => {
+  const map = new Map()
+  keyframesList.value.forEach(frame => {
+    if (!frame || frame.id == null) return
+    const color = resolveKeyframeColor(frame)
+    map.set(frame.id, color)
+  })
+  return map
 })
 
 const easedKeyframeIds = computed(() => {
@@ -1349,10 +1374,10 @@ function keyTitle(frame) {
   user-select: none;
   -webkit-user-select: none;
   --timeline-ruler-height: 46px;
-  --timeline-key-lane-height: 52px;
+  --timeline-key-lane-height: 88px;
   --timeline-playhead-color: #ff615a;
-  --timeline-key-padding-y: 14px;
-  --timeline-curves-height: var(--timeline-key-lane-height);
+  --timeline-key-padding-y: 12px;
+  --timeline-curves-height: calc(var(--timeline-key-lane-height) - var(--timeline-key-padding-y) * 2);
 }
 
 .timeline__primary {
@@ -1666,7 +1691,7 @@ function keyTitle(frame) {
 
 .timeline__curves {
   position: absolute;
-  top: calc(var(--timeline-key-padding-y) + (var(--timeline-key-lane-height) / 2) - (var(--timeline-curves-height) / 2));
+  top: var(--timeline-key-padding-y);
   height: var(--timeline-curves-height);
   left: 0;
   right: 0;
@@ -1726,24 +1751,26 @@ function keyTitle(frame) {
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  background: color-mix(in srgb, var(--accent, #2d8cff) 82%, rgba(255, 255, 255, 0.08));
+  --key-color: var(--keyframe-color, var(--accent, #2d8cff));
+  border: 2px solid color-mix(in srgb, var(--key-color) 75%, rgba(255, 255, 255, 0.92));
+  background: color-mix(in srgb, var(--key-color) 82%, rgba(255, 255, 255, 0.08));
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
   pointer-events: auto;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--key-color) 25%, rgba(0, 0, 0, 0.45));
 }
 
 .timeline__keyframe:hover,
 .timeline__keyframe.is-selected {
   transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
-  box-shadow: none;
-  background: color-mix(in srgb, var(--accent, #2d8cff) 90%, rgba(255, 255, 255, 0.3));
+  box-shadow: 0 0 0 1.2px color-mix(in srgb, var(--key-color) 45%, rgba(0, 0, 0, 0.4));
+  background: color-mix(in srgb, var(--key-color) 90%, rgba(255, 255, 255, 0.3));
 }
 
 .timeline__keyframe.has-curve {
-  background: color-mix(in srgb, var(--accent, #2d8cff) 85%, rgba(255, 255, 255, 0.35));
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--key-color) 85%, rgba(255, 255, 255, 0.35));
+  border-color: color-mix(in srgb, var(--key-color) 70%, rgba(255, 255, 255, 0.95));
+  box-shadow: 0 0 0 1.2px color-mix(in srgb, var(--key-color) 38%, rgba(0, 0, 0, 0.5));
 }
 
 .timeline__playhead {

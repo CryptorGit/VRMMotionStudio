@@ -73,6 +73,135 @@ const FINGER_BONES = {
   }
 }
 
+const MAX_FINGER_JOINTS = 3
+
+function normalizeFingerChain(bones, handBone) {
+  const filtered = Array.isArray(bones)
+    ? bones.filter(bone => bone && bone.isBone)
+    : []
+  if (!filtered.length) return null
+
+  const unique = []
+  const seen = new Set()
+  for (const bone of filtered) {
+    const key = bone.uuid || bone.id || bone.name
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    unique.push(bone)
+  }
+  if (!unique.length) return null
+
+  let palmPosition = null
+  if (handBone?.isBone) {
+    try { handBone.updateWorldMatrix(true, false) } catch {}
+    palmPosition = handBone.getWorldPosition(new THREE.Vector3())
+  }
+
+  const distanceToPalm = (bone) => {
+    if (!bone || !palmPosition) return Number.POSITIVE_INFINITY
+    try { bone.updateWorldMatrix(true, false) } catch {}
+    const pos = bone.getWorldPosition(new THREE.Vector3())
+    return pos.distanceTo(palmPosition)
+  }
+
+  const candidateSet = new Set(unique)
+  const rootCandidates = unique
+    .filter(bone => {
+      const parent = bone.parent
+      if (!parent) return true
+      if (parent === handBone) return true
+      return !candidateSet.has(parent)
+    })
+    .sort((a, b) => distanceToPalm(a) - distanceToPalm(b))
+
+  let bestChain = []
+
+  const buildChainFromRoot = (rootBone) => {
+    if (!rootBone) return
+    const chain = []
+    const visitedLocal = new Set()
+    let current = rootBone
+    while (current && candidateSet.has(current) && !visitedLocal.has(current)) {
+      chain.push(current)
+      visitedLocal.add(current)
+      const children = (current.children || [])
+        .filter(child => candidateSet.has(child) && !visitedLocal.has(child))
+        .sort((a, b) => distanceToPalm(a) - distanceToPalm(b))
+      current = children[0] || null
+    }
+    if (chain.length > bestChain.length) {
+      bestChain = chain
+    }
+  }
+
+  if (rootCandidates.length) {
+    rootCandidates.forEach(buildChainFromRoot)
+  }
+
+  if (!bestChain.length) {
+    bestChain = unique.slice().sort((a, b) => distanceToPalm(a) - distanceToPalm(b))
+  }
+
+  const ordered = []
+  const appended = new Set()
+  const pushBone = bone => {
+    if (!bone) return
+    const key = bone.uuid || bone.id || bone.name
+    if (!key || appended.has(key)) return
+    appended.add(key)
+    ordered.push(bone)
+  }
+
+  bestChain.forEach(pushBone)
+  unique.forEach(pushBone)
+
+  let chain = ordered.filter(Boolean)
+
+  if (palmPosition) {
+    chain.sort((a, b) => distanceToPalm(a) - distanceToPalm(b))
+  }
+
+  const dropClosestToPalm = () => {
+    if (chain.length <= MAX_FINGER_JOINTS) return
+    let dropIndex = 0
+    let minDistance = Number.POSITIVE_INFINITY
+    chain.forEach((bone, index) => {
+      const dist = distanceToPalm(bone)
+      if (dist < minDistance) {
+        minDistance = dist
+        dropIndex = index
+      }
+    })
+    chain.splice(dropIndex, 1)
+  }
+
+  const dropMetacarpalIfPresent = () => {
+    if (chain.length < 2) return false
+    const first = chain[0]
+    const second = chain[1]
+    if (!first || !second) return false
+    if (second.parent === first) {
+      const name = (first.name || '').toLowerCase()
+      if (name.includes('metacarpal')) {
+        chain = chain.slice(1)
+        return true
+      }
+    }
+    return false
+  }
+
+  while (chain.length > MAX_FINGER_JOINTS) {
+    if (dropMetacarpalIfPresent()) continue
+    dropClosestToPalm()
+  }
+
+  if (chain.length < 2) {
+    return null
+  }
+
+  return chain
+}
+
 export function useFingerControl(getFingerStates, getActiveModel) {
   // Store initial bone rotations per model
   const initialRotations = new WeakMap()
@@ -153,9 +282,12 @@ export function useFingerControl(getFingerStates, getActiveModel) {
         }
       }
       if (bones.length >= 2) {
-        // 少なくとも2つのボーンが見つかれば成功
-        console.log(`[FingerControl] ✓ Found ${hand} ${finger} via Humanoid: ${bones.length} bones [${boneNames.slice(0, bones.length).join(', ')}]`)
-        return bones
+        const normalized = normalizeFingerChain(bones, handBone)
+        if (normalized?.length >= 2) {
+          const boneNamesList = normalized.map(b => b.name || '(unnamed)')
+          console.log(`[FingerControl] ✓ Found ${hand} ${finger} via Humanoid: ${normalized.length} bones [${boneNamesList.join(', ')}]`)
+          return normalized
+        }
       }
     }
 
@@ -242,7 +374,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       if (unique.length >= 4) break
     }
 
-    return unique.length >= 2 ? unique : null
+    const normalized = normalizeFingerChain(unique, handBone)
+    return normalized && normalized.length >= 2 ? normalized : null
   }
 
   // モチE�E��E�全体�E持E�E�Eーンマッピングを解決
@@ -501,7 +634,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     const normalizedAmount = THREE.MathUtils.clamp(amount ?? 0, 0, 1)
 
     // 第一〜第三関節�E�E�E�最大3関節�E�E�E�を曲げる
-    const jointsToRotate = Math.min(3, bones.length)
+    const jointsToRotate = Math.min(MAX_FINGER_JOINTS, bones.length)
     
     // チE�E��E�チE�E��E�: カールの適用をログ出力（�E回�Eみ�E�E�E�E
     const logKey = `${hand}_${finger}_curl_applied`
