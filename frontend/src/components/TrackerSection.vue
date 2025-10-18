@@ -277,8 +277,10 @@ const updateForearmTwistShare = value => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .row--header {
@@ -303,7 +305,7 @@ const updateForearmTwistShare = value => {
 label {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   font-size: 0.85rem;
   color: var(--text-muted, rgba(240, 245, 255, 0.82));
   font-weight: 400;
@@ -314,93 +316,11 @@ label:hover {
   color: var(--text-strong, #f4f6ff);
 }
 
-label.checkbox {
-  flex: 0 0 auto;
-  cursor: pointer;
-  user-select: none;
-}
-
 label.stretch {
   flex: 1 1 100%;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.6rem;
-}
-
-/* ===== チェックボックス ===== */
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--accent, #5c8cff);
-  transition: transform 0.15s ease;
-}
-
-input[type="checkbox"]:hover {
-  transform: scale(1.1);
-}
-
-label.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-label.disabled input {
-  cursor: not-allowed;
-}
-
-/* ===== レンジスライダー ===== */
-input[type="range"] {
-  width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
-}
-
-input[type="range"]:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--accent, #5c8cff);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
-  box-shadow: none;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-input[type="range"]::-webkit-slider-thumb:hover {
-  background: color-mix(in srgb, var(--accent, #5c8cff) 80%, #ffffff 20%);
-  transform: scale(1.2);
-  box-shadow: none;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--accent, #5c8cff);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
-  box-shadow: none;
-}
-
-input[type="range"]::-moz-range-thumb:hover {
-  background: color-mix(in srgb, var(--accent, #5c8cff) 80%, #ffffff 20%);
-  transform: scale(1.2);
-  box-shadow: none;
-  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* ===== ボタン ===== */
@@ -531,12 +451,15 @@ input[type="range"]::-moz-range-thumb:hover {
   border-radius: 12px;
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
 }
 
 .input-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.65rem;
 }
 
 .input-row label {
@@ -616,13 +539,13 @@ input[type="range"]::-moz-range-thumb:hover {
 .angle-slider,
 .axis-slider {
   display: grid;
-  grid-template-columns: 7rem 1fr 4rem;
+  grid-template-columns: minmax(8.5rem, 0.6fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
 }
 
 .twist-slider {
-  grid-template-columns: 9rem 1fr 4rem;
+  grid-template-columns: minmax(9rem, 0.65fr) minmax(0, 1fr) auto;
 }
 
 .angle-label,
@@ -640,6 +563,27 @@ input[type="range"]::-moz-range-thumb:hover {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   font-family: 'Consolas', 'Monaco', monospace;
+}
+
+@media (max-width: 520px) {
+  .angle-slider,
+  .axis-slider,
+  .twist-slider {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .angle-label,
+  .axis-label,
+  .axis-value,
+  .angle-value {
+    text-align: left;
+  }
+
+  .angle-value,
+  .axis-value {
+    order: 3;
+  }
 }
 
 /* ===== 色選択 ===== */

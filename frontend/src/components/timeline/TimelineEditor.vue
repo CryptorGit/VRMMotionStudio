@@ -546,10 +546,13 @@ const visibleFrames = computed(() => {
 const timelineCurvePaths = computed(() => {
   const frames = [...keyframesList.value].sort((a, b) => a.time - b.time)
   if (frames.length < 2) return []
-  const baseY = CURVE_VIEWBOX_HEIGHT / 2
-  const amplitude = CURVE_VIEWBOX_HEIGHT * 0.4
+  const total = frames.length
+  const anchorForIndex = index => {
+    if (total <= 1) return 0.5
+    return 1 - index / (total - 1)
+  }
   const result = []
-  
+
   for (let i = 0; i < frames.length - 1; i++) {
     const current = frames[i]
     const next = frames[i + 1]
@@ -557,7 +560,12 @@ const timelineCurvePaths = computed(() => {
     const endX = timeToX(next.time)
     const width = endX - startX
     if (!Number.isFinite(width) || width <= 0.5) continue
-    
+
+    const startAnchor = anchorForIndex(i)
+    const endAnchor = anchorForIndex(i + 1)
+    const startY = startAnchor * CURVE_VIEWBOX_HEIGHT
+    const endY = endAnchor * CURVE_VIEWBOX_HEIGHT
+
     // 各トラッカーのカーブを取得
     const buildCurveMap = (frame) => {
       const map = { ...(frame.curves || {}) }
@@ -592,9 +600,9 @@ const timelineCurvePaths = computed(() => {
 
       const ctrl1X = startX + width * startCurve.out.x
       const ctrl2X = startX + width * endCurve.in.x
-      const ctrl1Y = baseY - amplitude * (startCurve.out.y - 0.5) * 2
-      const ctrl2Y = baseY - amplitude * (endCurve.in.y - 0.5) * 2
-      const path = `M ${startX} ${baseY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${baseY}`
+      const ctrl1Y = (startAnchor + (endAnchor - startAnchor) * startCurve.out.y) * CURVE_VIEWBOX_HEIGHT
+      const ctrl2Y = (startAnchor + (endAnchor - startAnchor) * endCurve.in.y) * CURVE_VIEWBOX_HEIGHT
+      const path = `M ${startX} ${startY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${endY}`
 
       result.push({
         id: `${current.id}-${next.id}-${trackerKey}`,
@@ -606,7 +614,7 @@ const timelineCurvePaths = computed(() => {
     }
 
     // まずデフォルトカーブを描画
-  drawCurve('default', currentCurves.default, nextCurves.default)
+    drawCurve('default', currentCurves.default, nextCurves.default)
 
     // 吁E��ラチE��ーのカーブパスを生成！Eefaultは除外！E
     const trackerKeys = new Set([

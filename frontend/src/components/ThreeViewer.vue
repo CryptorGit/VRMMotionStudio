@@ -1,7 +1,6 @@
 <template>
   <div class="app-frame">
     <TopMenuBar
-      :theme="theme"
       :show-captions="showCaptions"
       :timeline-export-enabled="timelineHasContent"
       @import="openFile"
@@ -10,7 +9,6 @@
       @capture-image="captureImage"
       @capture-video="captureVideo"
       @clear-cache="clearAllCache"
-      @toggle-theme="toggleTheme"
       @toggle-captions="toggleCaptions"
       @timeline-import="handleTimelineRequestImport"
       @timeline-export="handleTimelineExport"
@@ -284,7 +282,6 @@ import { useErrorHandlers } from '../composables/useErrorHandlers.js'
 import { useVirtualTrackers, TRACKER_ROTATION_ORDERS, TRACKER_DEFS } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useHistory } from '../composables/useHistory.js'
-import { useTheme } from '../composables/useTheme.js'
 import { captionInjectionKey } from '../composables/useCaptions.js'
 import { useStoragePersistence } from '../composables/useStoragePersistence.js'
 import { useFingerControl } from '../composables/useFingerControl.js'
@@ -446,7 +443,6 @@ const tempEuler = new THREE.Euler()
 const MIN_RENDER_RESOLUTION = 64
 const MAX_RENDER_RESOLUTION = 16384
 
-const { theme, toggleTheme } = useTheme()
 
 // Finger control states
 const fingerStates = reactive({
@@ -464,11 +460,19 @@ const fingerStates = reactive({
 
 function updateFingerStates(updated) {
   if (!updated || typeof updated !== 'object') return
-  
+
+  const clampFingerValue = (value, fallback = 0) => {
+    const num = Number(value)
+    if (!Number.isFinite(num)) return fallback
+    if (num <= 0) return 0
+    if (num >= 1) return 1
+    return num
+  }
+
   // 更新されたデータでfingerStatesを完全に置き換え
   Object.keys(updated).forEach(key => {
     if (key in fingerStates) {
-      fingerStates[key] = updated[key]
+      fingerStates[key] = clampFingerValue(updated[key], fingerStates[key])
     }
   })
   

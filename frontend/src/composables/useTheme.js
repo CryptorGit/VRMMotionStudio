@@ -1,43 +1,24 @@
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, readonly, ref } from 'vue'
 
-const STORAGE_KEY = 'ui.theme'
+export function useTheme() {
+  const theme = ref('dark')
 
-export function useTheme(defaultTheme = 'dark') {
-  const theme = ref(defaultTheme)
-
-  function applyTheme(value) {
+  const applyTheme = () => {
+    if (typeof document === 'undefined') return
     const root = document.documentElement
-    root.dataset.theme = value
+    root.dataset.theme = 'dark'
   }
 
-  function setTheme(value) {
-    theme.value = value === 'light' ? 'light' : 'dark'
+  const setTheme = () => {
+    theme.value = 'dark'
+    applyTheme()
   }
 
-  function toggleTheme() {
-    setTheme(theme.value === 'dark' ? 'light' : 'dark')
-  }
-
-  onMounted(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved === 'dark' || saved === 'light') {
-        theme.value = saved
-      }
-    } catch {}
-    applyTheme(theme.value)
-  })
-
-  watch(theme, value => {
-    applyTheme(value)
-    try {
-      localStorage.setItem(STORAGE_KEY, value)
-    } catch {}
-  }, { immediate: false })
+  onMounted(setTheme)
 
   return {
-    theme,
+    theme: readonly(theme),
     setTheme,
-    toggleTheme
+    toggleTheme: setTheme
   }
 }
