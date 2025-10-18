@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -164,6 +164,8 @@ const emit = defineEmits(['update', 'reset'])
 const svgRef = ref(null)
 const dragState = ref(null)
 const curvesState = ref(new Map())
+const liveUpdateQueue = new Map()
+let liveUpdateRaf = null
 
 const clamp01 = value => {
   const num = Number(value)
@@ -194,10 +196,47 @@ const isCurveModified = curve => {
   )
 }
 
+const flushLiveUpdates = (trackerKeyOverride = props.trackerKey) => {
+  if (liveUpdateRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+    window.cancelAnimationFrame(liveUpdateRaf)
+    liveUpdateRaf = null
+  }
+  if (!liveUpdateQueue.size) return
+  const updates = []
+  liveUpdateQueue.forEach((curve, frameId) => {
+    updates.push({ keyframeId: frameId, curve: cloneCurve(curve) })
+  })
+  liveUpdateQueue.clear()
+  if (!updates.length) return
+  try {
+    emit('update', {
+      updates,
+      trackerKey: trackerKeyOverride,
+      curveColor: props.curveColor
+    })
+  } catch (error) {
+    console.warn('[CurveEditor] Failed to emit live curve updates', error)
+  }
+}
+
+const queueLiveCurveUpdate = (frameId, curve) => {
+  liveUpdateQueue.set(frameId, cloneCurve(curve))
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    if (liveUpdateRaf != null) return
+    liveUpdateRaf = window.requestAnimationFrame(() => {
+      liveUpdateRaf = null
+      flushLiveUpdates()
+    })
+  } else {
+    flushLiveUpdates()
+  }
+}
+
 // トラチE��ー刁E��替え時にカーブを保存！E��允E��完�E修正版！E
 watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
+  flushLiveUpdates(oldTrackerKey)
   console.log(`[CurveEditor] Tracker changed from ${oldTrackerKey} to ${newTrackerKey}`)
-  
+
   // 旧トラチE��ーのカーブをタイムラインへ即時保存（トラチE��ー刁E��替え前の編雁E�E容を確実に保存！E
   if (oldTrackerKey && curvesState.value.size > 0) {
     const updatesToEmit = []
@@ -254,6 +293,7 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
 watch(
   () => props.frames,
   frames => {
+    flushLiveUpdates()
     // ドラチE��中は更新しなぁE
     if (dragState.value?.active) {
       console.log('[CurveEditor] Skipping frame update during drag')
@@ -297,6 +337,15 @@ watch(
 watch(() => props.curveColor, () => {
   // カーブ色が変わってもカーブ�E体�E維持E
 }, { immediate: false })
+
+onBeforeUnmount(() => {
+  flushLiveUpdates()
+  liveUpdateQueue.clear()
+  if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function' && liveUpdateRaf != null) {
+    window.cancelAnimationFrame(liveUpdateRaf)
+  }
+  liveUpdateRaf = null
+})
 
 const normalizedFrames = computed(() => {
   const frames = Array.isArray(props.frames) ? [...props.frames].sort((a, b) => a.time - b.time) : []
@@ -398,19 +447,23 @@ function updateCurve(frameId, handleType, handleValue, { silent = false } = {}) 
   }
   nextMap.set(frameId, currentCurve)
   curvesState.value = nextMap
-  
-  if (!silent) {
-    emit('update', {
-      updates: [
-        {
-          keyframeId: frameId,
-          curve: cloneCurve(currentCurve)
-        }
-      ],
-      trackerKey: props.trackerKey,
-      curveColor: props.curveColor
-    })
+
+  const payloadCurve = cloneCurve(currentCurve)
+  if (silent) {
+    queueLiveCurveUpdate(frameId, payloadCurve)
+    return
   }
+
+  emit('update', {
+    updates: [
+      {
+        keyframeId: frameId,
+        curve: payloadCurve
+      }
+    ],
+    trackerKey: props.trackerKey,
+    curveColor: props.curveColor
+  })
 }
 
 function onInput(frameId, handleType, axis, value) {
@@ -510,11 +563,12 @@ function endHandleDrag() {
   if (svg && state.pointerId != null) {
     try { svg.releasePointerCapture?.(state.pointerId) } catch {}
   }
+  flushLiveUpdates()
   const curve = curvesState.value.get(state.frameId)
   if (curve) {
     // 永続ストレージに保孁E
     saveCurveToStorage(state.frameId, props.trackerKey, curve, props.curveColor)
-    
+
     emit('update', {
       updates: [
         {

@@ -258,7 +258,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch, watchEffect, provide, reactive } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, onBeforeUnmount, watch, watchEffect, provide, reactive } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import TimelineEditor from './timeline/TimelineEditor.vue'
 import TopMenuBar from './layout/TopMenuBar.vue'
@@ -337,7 +337,14 @@ const virtualTrackerLabelScale = ref(1.0)
 const selectedTrackerKey = ref(null)
 const selectedTrackerPosition = ref({ x: 0, y: 0, z: 0 })
 const selectedTrackerRotation = ref({ x: 0, y: 0, z: 0 })
-const selectedTrackerRotationOrder = ref('YXZ')
+const fallbackRotationOrder = TRACKER_ROTATION_ORDERS[0] || 'XYZ'
+const sanitizeTrackerRotationOrder = order => {
+  if (typeof order !== 'string') return fallbackRotationOrder
+  const normalized = order.toUpperCase().replace(/[^XYZ]/g, '')
+  if (normalized.length !== 3) return fallbackRotationOrder
+  return TRACKER_ROTATION_ORDERS.includes(normalized) ? normalized : normalized
+}
+const selectedTrackerRotationOrder = ref(sanitizeTrackerRotationOrder('YXZ'))
 // トラッカー回転軸の表示設定
 const showTrackerAxes = ref(false)
 const trackerAxesLength = ref(0.05)
@@ -994,6 +1001,47 @@ const getActiveModel = () => {
 const getFingerStates = () => fingerStates
 const { applyFingerPose } = useFingerControl(getFingerStates, getActiveModel)
 
+let pendingFingerPoseRaf = null
+const scheduleApplyFingerPose = () => {
+  if (typeof applyFingerPose !== 'function') return
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    if (pendingFingerPoseRaf != null) return
+    pendingFingerPoseRaf = window.requestAnimationFrame(() => {
+      pendingFingerPoseRaf = null
+      try {
+        applyFingerPose()
+      } catch (error) {
+        console.warn('[FingerControl] Failed to apply finger pose (scheduled):', error)
+      }
+    })
+  } else {
+    try {
+      applyFingerPose()
+    } catch (error) {
+      console.warn('[FingerControl] Failed to apply finger pose (scheduled):', error)
+    }
+  }
+}
+
+watch(
+  fingerStates,
+  () => scheduleApplyFingerPose(),
+  { deep: true }
+)
+
+watch(
+  () => models.value.map(model => model?.id ?? model),
+  () => scheduleApplyFingerPose(),
+  { deep: false }
+)
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function' && pendingFingerPoseRaf != null) {
+    window.cancelAnimationFrame(pendingFingerPoseRaf)
+  }
+  pendingFingerPoseRaf = null
+})
+
 // Initialize pose controls for export
 const { exportPose } = usePoseControls({
   getModels: () => models.value,
@@ -1055,7 +1103,7 @@ function refreshTrackerAdjustState(targetKey = lastTrackerKey.value) {
     trackerController.lastActiveTrackerKey.value = snapshot.key
   }
   trackerAdjustState.label = snapshot.label || snapshot.key
-  trackerAdjustState.order = snapshot.order || trackerAdjustState.order
+  trackerAdjustState.order = sanitizeTrackerRotationOrder(snapshot.order || trackerAdjustState.order)
   if (Array.isArray(snapshot.position)) {
     trackerAdjustState.position.x = roundTo(snapshot.position[0], 3)
     trackerAdjustState.position.y = roundTo(snapshot.position[1], 3)
@@ -1117,7 +1165,7 @@ function updateSelectedTrackerState(key) {
   
   // 回転軸を更新
   if (snapshot.order) {
-    selectedTrackerRotationOrder.value = snapshot.order
+    selectedTrackerRotationOrder.value = sanitizeTrackerRotationOrder(snapshot.order)
   }
 }
 
@@ -1145,10 +1193,12 @@ function handleTrackerRotationUpdate({ axis, value }) {
 
 // トラッカー回転軸を更新
 function handleTrackerRotationOrderUpdate(order) {
-  selectedTrackerRotationOrder.value = order
+  const next = sanitizeTrackerRotationOrder(order)
+  if (selectedTrackerRotationOrder.value === next) return
+  selectedTrackerRotationOrder.value = next
   // 現在の回転角度で新しい軸を適用
   if (selectedTrackerKey.value && trackerController) {
-    trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, order)
+    trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, next)
   }
 }
 

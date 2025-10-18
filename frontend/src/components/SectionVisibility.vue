@@ -62,6 +62,7 @@
     :tracker-position="trackerPosition"
     :tracker-rotation="trackerRotation"
     :tracker-rotation-order="trackerRotationOrder"
+    :tracker-rotation-orders="trackerRotationOrders"
     :show-tracker-axes="showTrackerAxes"
     :tracker-axes-length="trackerAxesLength"
     @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
@@ -172,6 +173,7 @@ const props = defineProps({
   trackerPosition: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotation: { type: Object, default: () => ({ x: 0, y: 0, z: 0 }) },
   trackerRotationOrder: { type: String, default: 'YXZ' },
+  trackerRotationOrders: { type: Array, default: () => [] },
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 },
   fingerStates: { type: Object, default: () => ({}) },

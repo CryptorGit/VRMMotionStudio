@@ -241,7 +241,7 @@ import { useCaptions } from '../../composables/useCaptions.js'
 
 const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
-const CURVE_VIEWBOX_HEIGHT = 44
+const CURVE_VIEWBOX_HEIGHT = 52
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -1352,7 +1352,7 @@ function keyTitle(frame) {
   --timeline-key-lane-height: 52px;
   --timeline-playhead-color: #ff615a;
   --timeline-key-padding-y: 14px;
-  --timeline-curves-height: 44px;
+  --timeline-curves-height: var(--timeline-key-lane-height);
 }
 
 .timeline__primary {
