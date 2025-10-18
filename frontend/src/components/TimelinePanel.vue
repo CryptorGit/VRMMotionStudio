@@ -111,8 +111,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 const PIXELS_PER_SECOND = 120
 const NAME_COLUMN_WIDTH = 200
 const MIN_DURATION_FOR_DISPLAY = 10
-const ROW_HEIGHT = 42
-const MIN_BODY_HEIGHT = 156
+const ROW_HEIGHT = 56
+const MIN_BODY_HEIGHT = 224
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },

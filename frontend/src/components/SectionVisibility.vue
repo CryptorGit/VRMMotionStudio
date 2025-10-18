@@ -84,7 +84,7 @@
   <FingerControlSection
     v-else-if="active === 'bones'"
     :finger-states="fingerStates"
-    @update:finger="handleFingerUpdate"
+    @update:fingerStates="handleFingerUpdate"
   />
   <KeySettingsSection
     v-else-if="active === 'keys'"

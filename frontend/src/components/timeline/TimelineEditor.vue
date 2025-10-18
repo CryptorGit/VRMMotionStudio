@@ -241,7 +241,7 @@ import { useCaptions } from '../../composables/useCaptions.js'
 
 const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
-const CURVE_VIEWBOX_HEIGHT = 36
+const CURVE_VIEWBOX_HEIGHT = 44
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -565,6 +565,18 @@ const timelineCurvePaths = computed(() => {
     const endAnchor = anchorForIndex(i + 1)
     const startY = startAnchor * CURVE_VIEWBOX_HEIGHT
     const endY = endAnchor * CURVE_VIEWBOX_HEIGHT
+    const baselineMid = (startY + endY) / 2
+
+    const flattenPoint = (px, py) => {
+      if (!Number.isFinite(width) || width <= 0) {
+        return { x: px, y: baselineMid }
+      }
+      const ratio = (px - startX) / width
+      const t = Math.min(1, Math.max(0, ratio))
+      const baseline = startY + (endY - startY) * t
+      const deviation = py - baseline
+      return { x: px, y: baselineMid + deviation }
+    }
 
     // 各トラッカーのカーブを取得
     const buildCurveMap = (frame) => {
@@ -602,7 +614,11 @@ const timelineCurvePaths = computed(() => {
       const ctrl2X = startX + width * endCurve.in.x
       const ctrl1Y = (startAnchor + (endAnchor - startAnchor) * startCurve.out.y) * CURVE_VIEWBOX_HEIGHT
       const ctrl2Y = (startAnchor + (endAnchor - startAnchor) * endCurve.in.y) * CURVE_VIEWBOX_HEIGHT
-      const path = `M ${startX} ${startY} C ${ctrl1X} ${ctrl1Y}, ${ctrl2X} ${ctrl2Y}, ${endX} ${endY}`
+      const startPoint = { x: startX, y: baselineMid }
+      const endPoint = { x: endX, y: baselineMid }
+      const ctrl1 = flattenPoint(ctrl1X, ctrl1Y)
+      const ctrl2 = flattenPoint(ctrl2X, ctrl2Y)
+      const path = `M ${startPoint.x} ${startPoint.y} C ${ctrl1.x} ${ctrl1.y}, ${ctrl2.x} ${ctrl2.y}, ${endPoint.x} ${endPoint.y}`
 
       result.push({
         id: `${current.id}-${next.id}-${trackerKey}`,
@@ -1333,10 +1349,10 @@ function keyTitle(frame) {
   user-select: none;
   -webkit-user-select: none;
   --timeline-ruler-height: 46px;
-  --timeline-key-lane-height: 36px;
+  --timeline-key-lane-height: 52px;
   --timeline-playhead-color: #ff615a;
-  --timeline-key-padding-y: 10px;
-  --timeline-curves-height: 36px;
+  --timeline-key-padding-y: 14px;
+  --timeline-curves-height: 44px;
 }
 
 .timeline__primary {
