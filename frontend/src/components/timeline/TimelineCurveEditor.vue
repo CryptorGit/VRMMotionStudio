@@ -196,6 +196,88 @@ const isCurveModified = curve => {
   )
 }
 
+const FALLBACK_CURVE_COLOR = '#5c8cff'
+const trackerColorCache = new Map()
+
+const normalizeColor = (color, fallback = FALLBACK_CURVE_COLOR) => {
+  if (typeof color !== 'string') return fallback
+  const trimmed = color.trim()
+  if (!trimmed) return fallback
+  const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  const lower = prefixed.toLowerCase()
+  if (/^#[0-9a-f]{3}$/.test(lower)) {
+    const expanded = lower
+      .slice(1)
+      .split('')
+      .map(char => `${char}${char}`)
+      .join('')
+    return `#${expanded}`
+  }
+  if (/^#[0-9a-f]{6}$/.test(lower)) return lower
+  if (/^#[0-9a-f]{8}$/.test(lower)) return `#${lower.slice(1, 7)}`
+  return fallback
+}
+
+const rememberTrackerColor = (trackerKey, color) => {
+  if (!trackerKey) return
+  const normalized = normalizeColor(color)
+  trackerColorCache.set(trackerKey, normalized)
+}
+
+const captureColorsFromFrames = (frames) => {
+  if (!Array.isArray(frames)) return
+  frames.forEach(frame => {
+    if (!frame) return
+    const defaultColor = frame.curves?.default?.color || frame.curve?.color
+    if (defaultColor) rememberTrackerColor('default', defaultColor)
+    const curveEntries = frame.curves
+    if (curveEntries && typeof curveEntries === 'object') {
+      Object.entries(curveEntries).forEach(([key, entry]) => {
+        if (!key || !entry) return
+        if (entry.color) rememberTrackerColor(key, entry.color)
+      })
+    }
+  })
+}
+
+const findColorInFrames = (trackerKey) => {
+  if (!trackerKey) return null
+  const frames = Array.isArray(props.frames) ? props.frames : []
+  if (!frames.length) return null
+  if (trackerKey === 'default') {
+    for (const frame of frames) {
+      if (!frame) continue
+      const color = frame.curves?.default?.color || frame.curve?.color
+      if (color) return normalizeColor(color)
+    }
+    return null
+  }
+  for (const frame of frames) {
+    if (!frame) continue
+    const color = frame.curves?.[trackerKey]?.color
+    if (color) return normalizeColor(color)
+  }
+  return null
+}
+
+const resolveTrackerColor = (trackerKey) => {
+  if (!trackerKey) return normalizeColor(props.curveColor)
+  const colorFromFrames = findColorInFrames(trackerKey)
+  if (colorFromFrames) {
+    rememberTrackerColor(trackerKey, colorFromFrames)
+    return colorFromFrames
+  }
+  if (trackerColorCache.has(trackerKey)) {
+    return trackerColorCache.get(trackerKey)
+  }
+  if (trackerKey === 'default') {
+    const normalized = normalizeColor(props.curveColor)
+    rememberTrackerColor(trackerKey, normalized)
+    return normalized
+  }
+  return FALLBACK_CURVE_COLOR
+}
+
 const flushLiveUpdates = (trackerKeyOverride = props.trackerKey) => {
   if (liveUpdateRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
     window.cancelAnimationFrame(liveUpdateRaf)
@@ -209,11 +291,13 @@ const flushLiveUpdates = (trackerKeyOverride = props.trackerKey) => {
   liveUpdateQueue.clear()
   if (!updates.length) return
   try {
+    const color = resolveTrackerColor(trackerKeyOverride)
     emit('update', {
       updates,
       trackerKey: trackerKeyOverride,
-      curveColor: props.curveColor
+      curveColor: color
     })
+    rememberTrackerColor(trackerKeyOverride, color)
   } catch (error) {
     console.warn('[CurveEditor] Failed to emit live curve updates', error)
   }
@@ -234,6 +318,7 @@ const queueLiveCurveUpdate = (frameId, curve) => {
 
 // トラチE��ー刁E��替え時にカーブを保存！E��允E��完�E修正版！E
 watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
+  captureColorsFromFrames(props.frames)
   flushLiveUpdates(oldTrackerKey)
   console.log(`[CurveEditor] Tracker changed from ${oldTrackerKey} to ${newTrackerKey}`)
 
@@ -248,13 +333,15 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
 
     // 旧トラチE��ー側のカーブをタイムラインへ即時反映
     if (updatesToEmit.length > 0) {
+      const color = resolveTrackerColor(oldTrackerKey)
       try {
         emit('update', {
           updates: updatesToEmit,
           trackerKey: oldTrackerKey,
-          curveColor: props.curveColor
+          curveColor: color
         })
         console.log(`[CurveEditor] Emitted ${updatesToEmit.length} curve updates for tracker ${oldTrackerKey}`)
+        rememberTrackerColor(oldTrackerKey, color)
       } catch (e) {
         console.warn('[CurveEditor] Failed to emit updates for previous tracker on switch', e)
       }
@@ -286,13 +373,18 @@ watch(() => props.trackerKey, (newTrackerKey, oldTrackerKey) => {
     }
   })
   curvesState.value = next
-  
+
   console.log(`[CurveEditor] Loaded ${next.size} curves for tracker ${newTrackerKey}`)
+  if (newTrackerKey) {
+    const color = resolveTrackerColor(newTrackerKey)
+    rememberTrackerColor(newTrackerKey, color)
+  }
 }, { immediate: true })
 
 watch(
   () => props.frames,
   frames => {
+    captureColorsFromFrames(frames)
     flushLiveUpdates()
     // ドラチE��中は更新しなぁE
     if (dragState.value?.active) {
@@ -329,14 +421,23 @@ watch(
       }
     })
     curvesState.value = next
+    if (props.trackerKey) {
+      const color = resolveTrackerColor(props.trackerKey)
+      rememberTrackerColor(props.trackerKey, color)
+    }
   },
   { immediate: true }
 )
 
-// カーブ色の変更を監要E
-watch(() => props.curveColor, () => {
-  // カーブ色が変わってもカーブ�E体�E維持E
-}, { immediate: false })
+// カーブ色の変更を監視し、最新色をキャッシュ
+watch(
+  () => props.curveColor,
+  value => {
+    if (!props.trackerKey) return
+    rememberTrackerColor(props.trackerKey, value)
+  },
+  { immediate: true }
+)
 
 onBeforeUnmount(() => {
   flushLiveUpdates()
@@ -454,6 +555,7 @@ function updateCurve(frameId, handleType, handleValue, { silent = false } = {}) 
     return
   }
 
+  const color = resolveTrackerColor(props.trackerKey)
   emit('update', {
     updates: [
       {
@@ -462,8 +564,9 @@ function updateCurve(frameId, handleType, handleValue, { silent = false } = {}) 
       }
     ],
     trackerKey: props.trackerKey,
-    curveColor: props.curveColor
+    curveColor: color
   })
+  rememberTrackerColor(props.trackerKey, color)
 }
 
 function onInput(frameId, handleType, axis, value) {
@@ -474,7 +577,8 @@ function onInput(frameId, handleType, axis, value) {
   const nextMap = new Map(curvesState.value)
   nextMap.set(frameId, nextCurve)
   curvesState.value = nextMap
-  
+
+  const color = resolveTrackerColor(props.trackerKey)
   emit('update', {
     updates: [
       {
@@ -483,8 +587,9 @@ function onInput(frameId, handleType, axis, value) {
       }
     ],
     trackerKey: props.trackerKey,
-    curveColor: props.curveColor
+    curveColor: color
   })
+  rememberTrackerColor(props.trackerKey, color)
 }
 
 function resetCurves() {
@@ -501,11 +606,13 @@ function resetCurves() {
   })
   curvesState.value = next
   if (updates.length) {
-    emit('update', { 
-      updates, 
+    const color = resolveTrackerColor(props.trackerKey)
+    emit('update', {
+      updates,
       trackerKey: props.trackerKey,
-      curveColor: props.curveColor
+      curveColor: color
     })
+    rememberTrackerColor(props.trackerKey, color)
     emit('reset')
   }
 }

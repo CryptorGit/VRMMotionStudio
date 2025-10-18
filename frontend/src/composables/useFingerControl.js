@@ -79,9 +79,14 @@ const tempWorldVecA = new THREE.Vector3()
 const tempWorldVecB = new THREE.Vector3()
 const tempWorldVecC = new THREE.Vector3()
 
+const isBoneLike = node => {
+  if (!node) return false
+  return !!(node.isBone || node.isObject3D)
+}
+
 function normalizeFingerChain(bones, handBone) {
   const filtered = Array.isArray(bones)
-    ? bones.filter(bone => bone && bone.isBone)
+    ? bones.filter(bone => isBoneLike(bone))
     : []
   if (!filtered.length) return null
 
@@ -96,7 +101,7 @@ function normalizeFingerChain(bones, handBone) {
   if (!unique.length) return null
 
   let palmPosition = null
-  if (handBone?.isBone) {
+  if (isBoneLike(handBone)) {
     try { handBone.updateWorldMatrix(true, false) } catch {}
     palmPosition = handBone.getWorldPosition(new THREE.Vector3())
   }
@@ -213,9 +218,9 @@ export function useFingerControl(getFingerStates, getActiveModel) {
 
   function extractBoneNode(candidate) {
     if (!candidate) return null
-    if (candidate.isBone) return candidate
-    if (candidate.node && candidate.node.isBone) return candidate.node
-    if (candidate.bone && candidate.bone.isBone) return candidate.bone
+    if (isBoneLike(candidate)) return candidate
+    if (candidate.node && isBoneLike(candidate.node)) return candidate.node
+    if (candidate.bone && isBoneLike(candidate.bone)) return candidate.bone
     if (Array.isArray(candidate)) {
       for (const entry of candidate) {
         const resolved = extractBoneNode(entry)
@@ -238,7 +243,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     if (typeof humanoid.getRawBoneNode === 'function') {
       try {
         const bone = humanoid.getRawBoneNode(boneName)
-        if (bone && bone.isBone) return bone
+        const resolved = extractBoneNode(bone) || (isBoneLike(bone) ? bone : null)
+        if (resolved) return resolved
       } catch (e) {
         console.debug(`[FingerControl] getRawBoneNode failed for ${boneName}:`, e)
       }
@@ -248,7 +254,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     if (typeof humanoid.getBoneNode === 'function') {
       try {
         const bone = humanoid.getBoneNode(boneName)
-        if (bone && bone.isBone) return bone
+        const resolved = extractBoneNode(bone) || (isBoneLike(bone) ? bone : null)
+        if (resolved) return resolved
       } catch (e) {
         console.debug(`[FingerControl] getBoneNode failed for ${boneName}:`, e)
       }
@@ -258,7 +265,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     if (typeof humanoid.getNormalizedBoneNode === 'function') {
       try {
         const bone = humanoid.getNormalizedBoneNode(boneName)
-        if (bone && bone.isBone) return bone
+        const resolved = extractBoneNode(bone) || (isBoneLike(bone) ? bone : null)
+        if (resolved) return resolved
       } catch (e) {
         console.debug(`[FingerControl] getNormalizedBoneNode failed for ${boneName}:`, e)
       }
@@ -284,6 +292,12 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       fromCollection(humanoid.normalizedHumanBones)
     if (direct) return direct
 
+    if (humanoid.humanBonesMap && typeof humanoid.humanBonesMap.get === 'function') {
+      const mapped = humanoid.humanBonesMap.get(boneName)
+      const resolved = extractBoneNode(mapped)
+      if (resolved) return resolved
+    }
+
     return null
   }
   
@@ -299,8 +313,9 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       const bones = []
       for (const boneName of boneNames) {
         const bone = getHumanoidBone(humanoid, boneName)
-        if (bone && bone.isBone) {
-          bones.push(bone)
+        const resolved = extractBoneNode(bone) || (isBoneLike(bone) ? bone : null)
+        if (resolved) {
+          bones.push(resolved)
         }
       }
       if (bones.length >= 2) {
@@ -316,7 +331,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     console.log(`[FingerControl] Humanoid search failed for ${hand} ${finger}, trying hierarchy search...`)
 
     // Humanoidで見つからなければ、手のボーンの子孫から名前で検索
-    if (handBone && handBone.isBone) {
+    if (isBoneLike(handBone)) {
       const result = searchFingerBonesInHierarchy(handBone, hand, finger, handBone)
       if (result && result.length >= 1) {
         console.log(`[FingerControl] ✓ Found ${hand} ${finger} via hand hierarchy: ${result.length} bones`)
@@ -350,7 +365,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
 
     const collected = []
     rootNode.traverse(node => {
-      if (!node?.isBone || !node.name) return
+      if (!isBoneLike(node) || !node.name) return
       const lower = node.name.toLowerCase()
       const matchesHand = handAliases.some(alias => lower.includes(alias))
       const matchesFinger = Array.from(fingerAliases).some(alias => lower.includes(alias))
@@ -364,7 +379,9 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     try { handBone?.updateWorldMatrix(true, false) } catch {}
-    const palmPos = handBone ? handBone.getWorldPosition(new THREE.Vector3()) : null
+    const palmPos = isBoneLike(handBone)
+      ? handBone.getWorldPosition(new THREE.Vector3())
+      : null
 
     const ordered = collected
       .map(node => {
@@ -664,15 +681,15 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       if (!model.userData) model.userData = {}
       model.userData[logKey] = true
       console.log(`[FingerControl] Applying curl to ${hand} ${finger}: ${(normalizedAmount * 100).toFixed(0)}%, ${jointsToRotate} joints, ${bones.length} bones total`)
-      console.log(`[FingerControl] Bone names:`, bones.map((b, i) => `Joint${i + 1}:${b.name}`).join(', '))
+      console.log(`[FingerControl] Bone names:`, bones.map((b, i) => `Joint${i + 1}:${b?.name || '(unnamed)'}`).join(', '))
     }
-    
+
     if (normalizedAmount < 0.001) {
       // カールぁEの場合�E初期状態に戻ぁE
       for (let index = 0; index < jointsToRotate; index++) {
         const bone = bones[index]
-        if (!bone) continue
-        
+        if (!isBoneLike(bone)) continue
+
         const rotKey = `${hand}_${finger}_${index}`
         const initialRot = savedRotations[rotKey]
         if (initialRot) {
@@ -687,7 +704,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     // 吁E�E��E�節を曲げる
     for (let index = 0; index < jointsToRotate; index++) {
       const bone = bones[index]
-      if (!bone) continue
+      if (!isBoneLike(bone)) continue
       
       const rotKey = `${hand}_${finger}_${index}`
       let initialRot = savedRotations[rotKey]
@@ -741,7 +758,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     // すべてのボ�Eンの更新が完亁E�E��E�た後、ワールド�EトリチE�E��E�スを強制皁E�E��E�再計箁E
     for (let index = 0; index < jointsToRotate; index++) {
       const bone = bones[index]
-      if (!bone) continue
+      if (!isBoneLike(bone)) continue
       try {
         bone.updateMatrixWorld(true)
       } catch (e) {
@@ -757,7 +774,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     const defaultLocalAxis = new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
 
     try { bone.updateWorldMatrix(true, false) } catch {}
-    if (handBone?.isBone) {
+    if (isBoneLike(handBone)) {
       try { handBone.updateWorldMatrix(true, false) } catch {}
     }
 
@@ -767,7 +784,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     let furthestDistance = 0
 
     const chainNext = Array.isArray(chain) ? chain[jointIndex + 1] : null
-    if (chainNext && chainNext.isBone) {
+    if (isBoneLike(chainNext)) {
       furthestChild = chainNext
       try {
         furthestChild.updateWorldMatrix(true, false)
@@ -778,7 +795,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
 
     if (!furthestChild && bone.children && bone.children.length > 0) {
       for (const child of bone.children) {
-        if (!child?.isBone) continue
+        if (!isBoneLike(child)) continue
         const childPos = child.getWorldPosition(tempWorldVecB.set(0, 0, 0))
         const distance = childPos.distanceTo(boneWorldPos)
         if (distance > furthestDistance) {
@@ -794,7 +811,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       childDirection = childWorld.sub(boneWorldPos).normalize()
     }
 
-    if (!childDirection && bone.parent?.isBone) {
+    if (!childDirection && isBoneLike(bone.parent)) {
       try { bone.parent.updateWorldMatrix(true, false) } catch {}
       const parentWorld = bone.parent.getWorldPosition(tempWorldVecB.set(0, 0, 0))
       const fallbackDir = boneWorldPos.clone().sub(parentWorld)
@@ -804,10 +821,10 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     let palmDirection = null
-    if (handBone && handBone.isBone) {
+    if (isBoneLike(handBone)) {
       const palmWorld = handBone.getWorldPosition(tempWorldVecC.set(0, 0, 0))
       palmDirection = palmWorld.sub(boneWorldPos).normalize()
-    } else if (bone.parent && bone.parent.isBone) {
+    } else if (isBoneLike(bone.parent)) {
       const parentWorld = bone.parent.getWorldPosition(tempWorldVecC.set(0, 0, 0))
       palmDirection = parentWorld.sub(boneWorldPos).normalize()
     }
