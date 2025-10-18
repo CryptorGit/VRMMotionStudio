@@ -156,13 +156,13 @@ export function createAnimator({
     updateIKMarkers()
 
     const renderStart = performance.now()
-    if (scene.value && camera.value && renderer?.value?.render) {
-      renderer.value.render(scene.value, camera.value)
-    }
     if (typeof postRender === 'function') {
       try {
         postRender({ renderer: renderer.value, scene: scene.value, camera: camera.value, time, delta })
       } catch {}
+    }
+    if (scene.value && camera.value && renderer?.value?.render) {
+      renderer.value.render(scene.value, camera.value)
     }
     const renderDuration = performance.now() - renderStart
     avgRender =

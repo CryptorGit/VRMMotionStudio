@@ -207,7 +207,7 @@ function normalizeFingerChain(bones, handBone) {
   return chain
 }
 
-export function useFingerControl(getFingerStates, getActiveModel) {
+export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisOverrides) {
   // Store initial bone rotations per model
   const initialRotations = new WeakMap()
   // モチE�E��E�ごとに解決された�EーンマッピングをキャチE�E��E�ュ
@@ -522,12 +522,22 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       console.log('[FingerControl] fingerStates content:', JSON.stringify(fingerStates, null, 2))
     }
 
-    const readFingerValue = key => {
+    const axisOverrides = typeof getFingerAxisOverrides === 'function'
+      ? getFingerAxisOverrides?.()
+      : null
+
+    const readFingerAngle = key => {
       if (!fingerStates || typeof fingerStates !== 'object') return 0
       const raw = fingerStates[key]
       const num = Number(raw)
       if (!Number.isFinite(num)) return 0
-      return THREE.MathUtils.clamp(num, 0, 1)
+      return THREE.MathUtils.clamp(num, -90, 90)
+    }
+
+    const readAxisOverride = key => {
+      if (!axisOverrides || typeof axisOverrides !== 'object') return 'auto'
+      const raw = axisOverrides[key]
+      return typeof raw === 'string' ? raw : 'auto'
     }
 
     const trackedFingerKeys = [
@@ -535,7 +545,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       ...Object.keys(FINGER_BONES.right).map(finger => `right_${finger}`)
     ]
 
-    const hasActiveCurl = trackedFingerKeys.some(key => Math.abs(readFingerValue(key)) > 1e-3)
+    const hasActiveCurl = trackedFingerKeys.some(key => Math.abs(readFingerAngle(key)) > 0.1)
 
     // チE�E��E�チE�E��E�: 初回のみログを�E劁E
     if (hasActiveCurl && !model.userData?.__fingerControlDebugLogged) {
@@ -544,8 +554,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       console.log('[FingerControl] applyFingerPose called with active curl values')
       
       // アクチE�E��E�ブな持E�E��E�ログ出劁E
-      const activeFingers = trackedFingerKeys.filter(key => Math.abs(readFingerValue(key)) > 1e-3)
-      console.log('[FingerControl] Active fingers:', activeFingers.map(key => `${key}: ${(readFingerValue(key) * 100).toFixed(0)}%`))
+      const activeFingers = trackedFingerKeys.filter(key => Math.abs(readFingerAngle(key)) > 0.1)
+      console.log('[FingerControl] Active fingers:', activeFingers.map(key => `${key}: ${readFingerAngle(key).toFixed(1)}°`))
     }
 
     if (!hasActiveCurl) {
@@ -647,23 +657,37 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     // Apply left hand fingers
     Object.keys(FINGER_BONES.left).forEach(finger => {
       const key = `left_${finger}`
-      const value = readFingerValue(key)
+      const angleDeg = readFingerAngle(key)
       if (mapping.left[finger]) {
-        applyFingerCurl(model, 'left', finger, value, mapping.left[finger], leftHandBone)
+        applyFingerCurl(model, 'left', finger, angleDeg, mapping.left[finger], leftHandBone, readAxisOverride(key))
       }
     })
 
     // Apply right hand fingers
     Object.keys(FINGER_BONES.right).forEach(finger => {
       const key = `right_${finger}`
-      const value = readFingerValue(key)
+      const angleDeg = readFingerAngle(key)
       if (mapping.right[finger]) {
-        applyFingerCurl(model, 'right', finger, value, mapping.right[finger], rightHandBone)
+        applyFingerCurl(model, 'right', finger, angleDeg, mapping.right[finger], rightHandBone, readAxisOverride(key))
       }
     })
   }
 
-  function applyFingerCurl(model, hand, finger, amount, bones, handBone) {
+  function createAxisVectorFromOverride(override) {
+    if (typeof override !== 'string') return null
+    const value = override.trim().toLowerCase()
+    switch (value) {
+      case 'x+': return new THREE.Vector3(1, 0, 0)
+      case 'x-': return new THREE.Vector3(-1, 0, 0)
+      case 'y+': return new THREE.Vector3(0, 1, 0)
+      case 'y-': return new THREE.Vector3(0, -1, 0)
+      case 'z+': return new THREE.Vector3(0, 0, 1)
+      case 'z-': return new THREE.Vector3(0, 0, -1)
+      default: return null
+    }
+  }
+
+  function applyFingerCurl(model, hand, finger, angleDeg, bones, handBone, axisOverride) {
     if (!bones || bones.length === 0) {
       return
     }
@@ -675,22 +699,21 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     // 吁E�E��E�節に最大90度まで曲げる�E�E�E�第一〜第三関節を均等に�E�E�E�E
-    const maxAngleDegPerJoint = 90
-    const normalizedAmount = THREE.MathUtils.clamp(amount ?? 0, 0, 1)
+    const clampedAngleDeg = THREE.MathUtils.clamp(angleDeg ?? 0, -90, 90)
 
     // 第一〜第三関節�E�E�E�最大3関節�E�E�E�を曲げる
     const jointsToRotate = Math.min(MAX_FINGER_JOINTS, bones.length)
     
     // チE�E��E�チE�E��E�: カールの適用をログ出力（�E回�Eみ�E�E�E�E
     const logKey = `${hand}_${finger}_curl_applied`
-    if (normalizedAmount > 0.01 && !model.userData?.[logKey]) {
+    if (Math.abs(clampedAngleDeg) > 0.5 && !model.userData?.[logKey]) {
       if (!model.userData) model.userData = {}
       model.userData[logKey] = true
-      console.log(`[FingerControl] Applying curl to ${hand} ${finger}: ${(normalizedAmount * 100).toFixed(0)}%, ${jointsToRotate} joints, ${bones.length} bones total`)
+      console.log(`[FingerControl] Applying curl to ${hand} ${finger}: ${clampedAngleDeg.toFixed(1)}°, ${jointsToRotate} joints, ${bones.length} bones total`)
       console.log(`[FingerControl] Bone names:`, bones.map((b, i) => `Joint${i + 1}:${b?.name || '(unnamed)'}`).join(', '))
     }
 
-    if (normalizedAmount < 0.001) {
+    if (Math.abs(clampedAngleDeg) < 0.001) {
       // カールぁEの場合�E初期状態に戻ぁE
       for (let index = 0; index < jointsToRotate; index++) {
         const bone = bones[index]
@@ -708,6 +731,8 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     // 吁E�E��E�節を曲げる
+    const overrideAxisVec = createAxisVectorFromOverride(axisOverride)
+
     for (let index = 0; index < jointsToRotate; index++) {
       const bone = bones[index]
       if (!isBoneLike(bone)) continue
@@ -729,17 +754,21 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       bone.quaternion.copy(initialRot)
       
       // 坁E�E��E��E�E刁E 吁E�E��E�節が同じ角度で曲がる
-      const angle = THREE.MathUtils.degToRad(maxAngleDegPerJoint * normalizedAmount)
+      const angle = THREE.MathUtils.degToRad(clampedAngleDeg)
       
       let curlAxis = null
-      const storedAxis = bone?.userData?.__fingerCurlAxis
-      if (storedAxis && typeof storedAxis.clone === 'function') {
-        curlAxis = storedAxis.clone()
+      if (overrideAxisVec) {
+        curlAxis = overrideAxisVec.clone()
       } else {
-        curlAxis = determineCurlAxis(bone, hand, finger, index, handBone, bones)
-        if (curlAxis && curlAxis.lengthSq() > 1e-8) {
-          if (!bone.userData) bone.userData = {}
-          bone.userData.__fingerCurlAxis = curlAxis.clone()
+        const storedAxis = bone?.userData?.__fingerCurlAxis
+        if (storedAxis && typeof storedAxis.clone === 'function') {
+          curlAxis = storedAxis.clone()
+        } else {
+          curlAxis = determineCurlAxis(bone, hand, finger, index, handBone, bones)
+          if (curlAxis && curlAxis.lengthSq() > 1e-8) {
+            if (!bone.userData) bone.userData = {}
+            bone.userData.__fingerCurlAxis = curlAxis.clone()
+          }
         }
       }
       if (!curlAxis || typeof curlAxis.clone !== 'function' || curlAxis.lengthSq() < 1e-8) {
@@ -754,7 +783,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       
       // チE�E��E�チE�E��E�: 回転の適用をログ出力（�E回�Eみ�E�E�E�E
       const jointLogKey = `${hand}_${finger}_${index}_rotation_applied`
-      if (normalizedAmount > 0.01 && !model.userData?.[jointLogKey]) {
+      if (Math.abs(clampedAngleDeg) > 0.5 && !model.userData?.[jointLogKey]) {
         if (!model.userData) model.userData = {}
         model.userData[jointLogKey] = true
         console.log(`[FingerControl] Applied ${THREE.MathUtils.radToDeg(angle).toFixed(1)}° rotation to ${hand} ${finger} joint ${index + 1} around local axis (${normalizedAxis.x.toFixed(2)}, ${normalizedAxis.y.toFixed(2)}, ${normalizedAxis.z.toFixed(2)})`)

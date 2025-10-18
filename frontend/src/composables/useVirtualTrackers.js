@@ -61,6 +61,43 @@ function defaultCameraRotationArray() {
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 
+const TRACKER_KEY_SEPARATOR = '@'
+
+function makeTrackerKey(baseKey, modelIndex) {
+  if (!baseKey) return baseKey
+  const idx = Number(modelIndex) || 1
+  return idx <= 1 ? baseKey : `${baseKey}${TRACKER_KEY_SEPARATOR}${idx}`
+}
+
+function parseTrackerKey(key) {
+  if (typeof key !== 'string') {
+    return { baseKey: key, modelIndex: 1 }
+  }
+  const sepIndex = key.lastIndexOf(TRACKER_KEY_SEPARATOR)
+  if (sepIndex > 0) {
+    const baseKey = key.slice(0, sepIndex)
+    const suffix = Number(key.slice(sepIndex + 1))
+    if (Number.isFinite(suffix) && suffix >= 1) {
+      return { baseKey, modelIndex: suffix }
+    }
+  }
+  return { baseKey: key, modelIndex: 1 }
+}
+
+function trackerBaseKey(key) {
+  return parseTrackerKey(key).baseKey
+}
+
+function trackerModelIndex(key) {
+  return parseTrackerKey(key).modelIndex
+}
+
+function formatTrackerLabel(baseLabel, modelIndex) {
+  const idx = Number(modelIndex) || 1
+  const suffix = idx <= 1 ? 1 : idx
+  return `${baseLabel} ${suffix}`
+}
+
 /**
  * 角度を-180~180度の範囲に正規化
  */
@@ -329,12 +366,26 @@ export function useVirtualTrackers({
   }
 
   function ensureTrackerState(key) {
+    if (!key) return null
     let state = trackerStates[key]
     if (!state) {
-      const def = TRACKER_DEFS.find(d => d.key === key)
+      const { baseKey, modelIndex } = parseTrackerKey(key)
+      const def = TRACKER_DEFS.find(d => d.key === baseKey)
       if (!def) return null
-      state = createDefaultTrackerState(def)
+      const defaults = createDefaultTrackerState(def)
+      state = {
+        ...defaults,
+        key,
+        label: formatTrackerLabel(def.label, modelIndex)
+      }
       trackerStates[key] = state
+    } else {
+      state.key = key
+      if (typeof state.label !== 'string') {
+        const { baseKey, modelIndex } = parseTrackerKey(key)
+        const def = TRACKER_DEFS.find(d => d.key === baseKey)
+        state.label = formatTrackerLabel(def?.label || baseKey, modelIndex)
+      }
     }
     if (!state.angles) state.angles = { x: 0, y: 0, z: 0 }
     if (!state.axisScale) state.axisScale = { x: 1, y: 1, z: 1 }
@@ -343,7 +394,9 @@ export function useVirtualTrackers({
   }
 
   for (const def of TRACKER_DEFS) {
-    trackerStates[def.key] = createDefaultTrackerState(def)
+    const defaults = createDefaultTrackerState(def)
+    defaults.label = formatTrackerLabel(def.label, 1)
+    trackerStates[def.key] = defaults
   }
 
   // Track previous model state for proper enable/disable management
@@ -583,7 +636,11 @@ export function useVirtualTrackers({
   const STORAGE_KEY = 'vtPositions:v1'
 
   function modelKey(model) {
-    return model?.name || model?.vrm?.scene?.name || 'model'
+    if (!model) return 'model'
+    if (model.id != null) return `id:${model.id}`
+    const uuid = model?.vrm?.scene?.uuid || model?.vrm?.scene?.id
+    if (uuid) return `uuid:${uuid}`
+    return model.name || model?.vrm?.scene?.name || 'model'
   }
 
   function loadAllSaved() {

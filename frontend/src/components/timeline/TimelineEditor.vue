@@ -329,7 +329,8 @@ const props = defineProps({
   height: { type: [Number, String], default: null },
   canPaste: { type: Boolean, default: false },
   audioWaveformData: { type: [Array, Object], default: null },
-  audioDuration: { type: Number, default: 0 }
+  audioDuration: { type: Number, default: 0 },
+  availableTrackers: { type: Array, default: () => [] }  // 追加：利用可能なトラッカーのリスト
 })
 
 const emit = defineEmits([
@@ -584,22 +585,55 @@ const timelineCurvePaths = computed(() => {
     // 各トラッカーのカーブを取得
     const buildCurveMap = (frame) => {
       const map = { ...(frame.curves || {}) }
-      const normalizeEntry = (entry, fallbackCurve) => {
+      
+      // デバッグ：元のカーブデータを確認
+      if (frame.curves) {
+        console.log(`[TimelineEditor] buildCurveMap for frame ${frame.id}:`, JSON.stringify(frame.curves, null, 2))
+      }
+      
+      // トラッカーごとのデフォルト色を定義
+      const getDefaultColorForTracker = (trackerKey) => {
+        const defaultColors = {
+          default: '#5c8cff',
+          head: '#3aa6ff',
+          chest: '#00c853',
+          hips: '#ff7043',
+          leftUpperArm: '#1e88e5',
+          rightUpperArm: '#e53935',
+          leftHand: '#2979ff',
+          rightHand: '#ff1744',
+          leftElbow: '#1565c0',
+          rightElbow: '#d50000',
+          leftFoot: '#009688',
+          rightFoot: '#00796b',
+          leftKnee: '#26a69a',
+          rightKnee: '#004d40',
+          gaze: '#ffeb3b'
+        }
+        return defaultColors[trackerKey] || '#5c8cff'
+      }
+      
+      const normalizeEntry = (entry, fallbackCurve, trackerKey = 'default') => {
         const curve = sanitizeCurve(entry?.curve || fallbackCurve)
+        const color = entry?.color || getDefaultColorForTracker(trackerKey)
+        
+        // デバッグ：色の決定プロセス
+        console.log(`[TimelineEditor] normalizeEntry for ${trackerKey}: entry.color=${entry?.color}, resolved=${color}`)
+        
         return {
           curve,
-          color: entry?.color || DEFAULT_CURVE_COLOR,
+          color,
           modified: !!entry?.modified || isCurveModified(curve)
         }
       }
 
       const baseCurve = sanitizeCurve(frame.curve || {})
-      map.default = normalizeEntry(map.default, baseCurve)
+      map.default = normalizeEntry(map.default, baseCurve, 'default')
 
       Object.keys(map).forEach(key => {
         if (key === 'default') return
         if (!map[key]) return
-        map[key] = normalizeEntry(map[key], map.default.curve)
+        map[key] = normalizeEntry(map[key], map.default.curve, key)
       })
 
       return map
@@ -611,7 +645,11 @@ const timelineCurvePaths = computed(() => {
     const drawCurve = (trackerKey, startEntry, endEntry) => {
       const startCurve = sanitizeCurve(startEntry?.curve)
       const endCurve = sanitizeCurve(endEntry?.curve)
-      const curveColor = startEntry?.color || DEFAULT_CURVE_COLOR
+      // トラッカーごとの色を個別に管理：startEntryとendEntryの両方をチェック
+      // startEntryの色を優先するが、存在しない場合はendEntryの色を使う
+      const startColor = startEntry?.color
+      const endColor = endEntry?.color
+      const curveColor = startColor || endColor || DEFAULT_CURVE_COLOR
 
       const ctrl1X = startX + width * startCurve.out.x
       const ctrl2X = startX + width * endCurve.in.x
@@ -635,13 +673,23 @@ const timelineCurvePaths = computed(() => {
     // まずデフォルトカーブを描画
     drawCurve('default', currentCurves.default, nextCurves.default)
 
-    // 吁E��ラチE��ーのカーブパスを生成！Eefaultは除外！E
-    const trackerKeys = new Set([
-      ...Object.keys(currentCurves).filter(key => key !== 'default'),
-      ...Object.keys(nextCurves).filter(key => key !== 'default')
-    ])
+    // すべての利用可能なトラッカーのカーブを描画（キーフレームに存在しない場合でも）
+    const allTrackerKeys = new Set()
+    
+    // キーフレームに既に存在するトラッカー
+    Object.keys(currentCurves).filter(key => key !== 'default').forEach(key => allTrackerKeys.add(key))
+    Object.keys(nextCurves).filter(key => key !== 'default').forEach(key => allTrackerKeys.add(key))
+    
+    // 利用可能なすべてのトラッカー（props.availableTrackersから）
+    if (Array.isArray(props.availableTrackers)) {
+      props.availableTrackers.forEach(tracker => {
+        if (tracker?.key && tracker.key !== 'default') {
+          allTrackerKeys.add(tracker.key)
+        }
+      })
+    }
 
-    trackerKeys.forEach(trackerKey => {
+    allTrackerKeys.forEach(trackerKey => {
       const startEntry = currentCurves[trackerKey] || currentCurves.default
       const endEntry = nextCurves[trackerKey] || nextCurves.default
       if (!startEntry || !endEntry) return

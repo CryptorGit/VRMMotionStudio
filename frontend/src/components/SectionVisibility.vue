@@ -85,7 +85,9 @@
   <FingerControlSection
     v-else-if="active === 'bones'"
     :finger-states="fingerStates"
+    :axis-overrides="fingerAxisOverrides"
     @update:fingerStates="handleFingerUpdate"
+    @update:axisOverrides="v => emit('update:fingerAxisOverrides', v)"
   />
   <KeySettingsSection
     v-else-if="active === 'keys'"
@@ -177,6 +179,7 @@ const props = defineProps({
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 },
   fingerStates: { type: Object, default: () => ({}) },
+  fingerAxisOverrides: { type: Object, default: () => ({}) },
   cameraFov: { type: Number, required: true },
   cameraNear: { type: Number, required: true },
   cameraFar: { type: Number, required: true },
@@ -223,6 +226,7 @@ const emit = defineEmits([
   'update:showTrackerAxes',
   'update:trackerAxesLength',
   'update:fingerStates',
+  'update:fingerAxisOverrides',
   'update:tracker-position',
   'update:tracker-rotation',
   'update:tracker-rotation-order',

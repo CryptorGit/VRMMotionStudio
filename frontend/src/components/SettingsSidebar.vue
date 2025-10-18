@@ -56,6 +56,7 @@
           :show-tracker-axes="showTrackerAxes"
           :tracker-axes-length="trackerAxesLength"
           :finger-states="fingerStates"
+          :finger-axis-overrides="fingerAxisOverrides"
           :camera-fov="cameraFov"
           :camera-near="cameraNear"
           :camera-far="cameraFar"
@@ -125,6 +126,7 @@
           @reset-outline="(i) => emit('reset-outline', i)"
           @load-model-outline="(i) => emit('load-model-outline', i)"
           @update:fingerStates="v => emit('update:fingerStates', v)"
+          @update:fingerAxisOverrides="v => emit('update:fingerAxisOverrides', v)"
           @remove-audio="() => emit('remove-audio')"
         />
       </div>
@@ -175,6 +177,7 @@ const props = defineProps({
   showTrackerAxes: { type: Boolean, default: false },
   trackerAxesLength: { type: Number, default: 0.05 },
   fingerStates: { type: Object, default: () => ({}) },
+  fingerAxisOverrides: { type: Object, default: () => ({}) },
   cameraFov: { type: Number, required: true },
   cameraNear: { type: Number, required: true },
   cameraFar: { type: Number, required: true },
@@ -220,6 +223,7 @@ const emit = defineEmits([
   'update:showTrackerAxes',
   'update:trackerAxesLength',
   'update:fingerStates',
+  'update:fingerAxisOverrides',
   'update:tracker-position',
   'update:tracker-rotation',
   'update:tracker-rotation-order',

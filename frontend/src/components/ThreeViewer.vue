@@ -108,6 +108,7 @@
                     :snap="timelineSnap"
                     :can-paste="timelineClipboardReady"
                     :audio-waveform-data="audioWaveformData"
+                    :available-trackers="availableTrackers"
                     @import-timeline="handleTimelineRequestImport"
                     @export-timeline="handleTimelineExport"
                     @seek="handleTimelineSeek"
@@ -174,7 +175,9 @@
                 v-model:show-tracker-axes="showTrackerAxes"
                 v-model:tracker-axes-length="trackerAxesLength"
                 :finger-states="fingerStates"
+                :finger-axis-overrides="activeFingerAxisOverrides"
                 @update:fingerStates="updateFingerStates"
+                @update:fingerAxisOverrides="updateFingerAxisOverrides"
                 @update:tracker-position="handleTrackerPositionUpdate"
                 @update:tracker-rotation="handleTrackerRotationUpdate"
                 @update:tracker-rotation-order="handleTrackerRotationOrderUpdate"
@@ -485,7 +488,7 @@ const tempVec3C = new THREE.Vector3()
 const tempEuler = new THREE.Euler()
 const MIN_RENDER_RESOLUTION = 64
 const MAX_RENDER_RESOLUTION = 16384
-const TIMELINE_MIN_HEIGHT = 320
+const TIMELINE_MIN_HEIGHT = 160
 const DEFAULT_CURVE_COLOR = '#5c8cff'
 
 function normalizeCurveColor(color, fallback = DEFAULT_CURVE_COLOR) {
@@ -509,6 +512,19 @@ function normalizeCurveColor(color, fallback = DEFAULT_CURVE_COLOR) {
 
 
 // Finger control states
+const FINGER_STATE_KEYS = Object.freeze([
+  'left_thumb',
+  'left_index',
+  'left_middle',
+  'left_ring',
+  'left_little',
+  'right_thumb',
+  'right_index',
+  'right_middle',
+  'right_ring',
+  'right_little'
+])
+
 const fingerStates = reactive({
   left_thumb: 0,
   left_index: 0,
@@ -522,25 +538,59 @@ const fingerStates = reactive({
   right_little: 0
 })
 
+const ALLOWED_FINGER_AXIS_VALUES = new Set(['auto', 'x+', 'x-', 'y+', 'y-', 'z+', 'z-'])
+const fingerAxisOverridesByModel = reactive({})
+let pendingFingerAxisOverridesByName = null
+const fallbackFingerAxisOverrides = Object.freeze(createDefaultFingerAxisOverrides())
+
+function createDefaultFingerAxisOverrides() {
+  const defaults = {}
+  for (const key of FINGER_STATE_KEYS) {
+    defaults[key] = 'auto'
+  }
+  return defaults
+}
+
+function normalizeFingerAxisValue(value) {
+  if (typeof value !== 'string') return 'auto'
+  const normalized = value.trim().toLowerCase()
+  return ALLOWED_FINGER_AXIS_VALUES.has(normalized) ? normalized : 'auto'
+}
+
+function ensureFingerAxisOverridesEntry(modelId) {
+  if (modelId == null) return null
+  const key = String(modelId)
+  if (!fingerAxisOverridesByModel[key]) {
+    fingerAxisOverridesByModel[key] = createDefaultFingerAxisOverrides()
+  }
+  return fingerAxisOverridesByModel[key]
+}
+
 function updateFingerStates(updated) {
   if (!updated || typeof updated !== 'object') return
 
-  const clampFingerValue = (value, fallback = 0) => {
+  const clampFingerAngle = (value, fallback = 0) => {
     const num = Number(value)
     if (!Number.isFinite(num)) return fallback
-    if (num <= 0) return 0
-    if (num >= 1) return 1
-    return num
+    return Math.min(90, Math.max(-90, num))
   }
 
   // 更新されたデータでfingerStatesを完全に置き換え
-  Object.keys(updated).forEach(key => {
-    if (key in fingerStates) {
-      fingerStates[key] = clampFingerValue(updated[key], fingerStates[key])
+  let changed = false
+  for (const key of FINGER_STATE_KEYS) {
+    if (!(key in fingerStates)) continue
+    const next = clampFingerAngle(updated[key], fingerStates[key])
+    if (fingerStates[key] !== next) {
+      fingerStates[key] = next
+      changed = true
     }
-  })
+  }
   
-  console.log('[FingerControl] Updated finger states:', fingerStates)
+  if (changed) {
+    const snapshot = {}
+    FINGER_STATE_KEYS.forEach(key => { snapshot[key] = fingerStates[key] })
+    console.log('[FingerControl] Updated finger states (deg):', snapshot)
+  }
   
   // 持Eの状態が更新されたら、すぐにポーズを適用
   // applyFingerPoseは毎フレーム呼ばれるが、即座に反映させるため明示的に呼ぶ
@@ -651,7 +701,8 @@ function getDisplaySettingsSnapshot() {
     cameraWheelSensitivity: cameraWheelSensitivity.value,
     cameraTranslateSensitivity: cameraTranslateSensitivity.value,
     cameraRotateSensitivity: cameraRotateSensitivity.value,
-    fingerStates: { ...fingerStates }
+    fingerStates: { ...fingerStates },
+    fingerAxisOverrides: exportFingerAxisOverridesByName()
   }
 }
 
@@ -893,6 +944,10 @@ function loadDisplaySettings() {
     if (data.fingerStates && typeof data.fingerStates === 'object') {
       try { Object.assign(fingerStates, data.fingerStates) } catch {}
     }
+    if (data.fingerAxisOverrides && typeof data.fingerAxisOverrides === 'object') {
+      pendingFingerAxisOverridesByName = data.fingerAxisOverrides
+      applyPendingFingerAxisOverrides()
+    }
     // アウトライン太さ値をスライダー範囲へ正規化
     outlineWidth.value = Math.min(0.005, Math.max(0, Number(outlineWidth.value) || 0.002))
     // 回転軸表示再適用（コントローラ生成済みの場合）
@@ -1054,9 +1109,40 @@ const getActiveModel = () => {
   return active || models.value[0] || null
 }
 
+const activeFingerAxisOverrides = computed(() => {
+  const model = getActiveModel()
+  if (!model?.id) return fallbackFingerAxisOverrides
+  return ensureFingerAxisOverridesEntry(model.id) || fallbackFingerAxisOverrides
+})
+
 // fingerStatesを関数として渡すことで、常に最新の値を参照できるようにする
 const getFingerStates = () => fingerStates
-const { applyFingerPose } = useFingerControl(getFingerStates, getActiveModel)
+const getActiveFingerAxisOverrides = () => activeFingerAxisOverrides.value
+const { applyFingerPose } = useFingerControl(getFingerStates, getActiveModel, getActiveFingerAxisOverrides)
+
+function updateFingerAxisOverrides(updated) {
+  if (!updated || typeof updated !== 'object') return
+  const model = getActiveModel()
+  if (!model?.id) return
+
+  const entry = ensureFingerAxisOverridesEntry(model.id)
+  if (!entry) return
+
+  let changed = false
+  for (const key of FINGER_STATE_KEYS) {
+    const next = normalizeFingerAxisValue(updated[key] ?? entry[key])
+    if (entry[key] !== next) {
+      entry[key] = next
+      changed = true
+    }
+  }
+
+  if (changed) {
+    const label = model.name || `model-${model.id}`
+    console.log('[FingerControl] Updated axis overrides for', label, { ...entry })
+    scheduleApplyFingerPose()
+  }
+}
 
 let pendingFingerPoseRaf = null
 const scheduleApplyFingerPose = () => {
@@ -1080,6 +1166,48 @@ const scheduleApplyFingerPose = () => {
   }
 }
 
+function exportFingerAxisOverridesByName() {
+  const snapshot = {}
+  if (!Array.isArray(models?.value)) return snapshot
+  for (const model of models.value) {
+    if (!model?.id || !model?.name) continue
+    const entry = fingerAxisOverridesByModel[String(model.id)]
+    if (!entry) continue
+    snapshot[model.name] = { ...entry }
+  }
+  return snapshot
+}
+
+function applyPendingFingerAxisOverrides() {
+  if (!pendingFingerAxisOverridesByName || typeof pendingFingerAxisOverridesByName !== 'object') return
+  if (!Array.isArray(models?.value) || models.value.length === 0) return
+
+  let applied = false
+  const remaining = {}
+
+  for (const [name, overrides] of Object.entries(pendingFingerAxisOverridesByName)) {
+    const model = models.value.find(m => m?.name === name)
+    if (!model?.id) {
+      remaining[name] = overrides
+      continue
+    }
+    const entry = ensureFingerAxisOverridesEntry(model.id)
+    if (!entry) continue
+    for (const key of FINGER_STATE_KEYS) {
+      const next = normalizeFingerAxisValue(overrides?.[key] ?? entry[key])
+      if (entry[key] !== next) {
+        entry[key] = next
+        applied = true
+      }
+    }
+  }
+
+  pendingFingerAxisOverridesByName = Object.keys(remaining).length ? remaining : null
+  if (applied) {
+    scheduleApplyFingerPose()
+  }
+}
+
 watch(
   fingerStates,
   () => scheduleApplyFingerPose(),
@@ -1087,9 +1215,28 @@ watch(
 )
 
 watch(
-  () => models.value.map(model => model?.id ?? model),
+  () => activeFingerAxisOverrides.value,
   () => scheduleApplyFingerPose(),
-  { deep: false }
+  { deep: true }
+)
+
+watch(
+  () => models.value.map(model => ({ id: model?.id, name: model?.name })),
+  (entries) => {
+    const idSet = new Set(entries.filter(entry => entry?.id != null).map(entry => String(entry.id)))
+    Object.keys(fingerAxisOverridesByModel).forEach(id => {
+      if (!idSet.has(id)) {
+        delete fingerAxisOverridesByModel[id]
+      }
+    })
+    entries.forEach(entry => {
+      if (entry.id == null) return
+      ensureFingerAxisOverridesEntry(entry.id)
+    })
+    applyPendingFingerAxisOverrides()
+    scheduleApplyFingerPose()
+  },
+  { deep: true }
 )
 
 onBeforeUnmount(() => {
@@ -2469,6 +2616,35 @@ function handleTimelineSelectionChange(payload) {
           }
         }
       }
+
+      // Ensure default curve entry exists
+      if (!curves.default) {
+        const defaultCurve = cloneTimelineCurve(frame?.curve)
+        const isModified =
+          Math.abs(defaultCurve.in.x - DEFAULT_TIMELINE_CURVE.in.x) > 1e-4 ||
+          Math.abs(defaultCurve.in.y - DEFAULT_TIMELINE_CURVE.in.y) > 1e-4 ||
+          Math.abs(defaultCurve.out.x - DEFAULT_TIMELINE_CURVE.out.x) > 1e-4 ||
+          Math.abs(defaultCurve.out.y - DEFAULT_TIMELINE_CURVE.out.y) > 1e-4
+        curves.default = {
+          curve: defaultCurve,
+          color: normalizeCurveColor(frame?.curve?.color, DEFAULT_CURVE_COLOR),
+          modified: isModified
+        }
+      }
+
+      // Pre-populate per-tracker curves using available tracker definitions
+      const available = Array.isArray(availableTrackers.value) ? availableTrackers.value : []
+      const defaultCurveSource = curves.default?.curve || cloneTimelineCurve(frame?.curve)
+      available.forEach(tracker => {
+        const key = tracker?.key
+        if (!key || key === 'default' || curves[key]) return
+        curves[key] = {
+          curve: cloneTimelineCurve(defaultCurveSource),
+          color: normalizeCurveColor(tracker?.color, DEFAULT_CURVE_COLOR),
+          modified: false
+        }
+      })
+
       return {
         id,
         time: Number.isFinite(time) ? time : 0,

@@ -107,8 +107,39 @@ watch(trackerKeySet, keys => {
 watch(
   () => (Array.isArray(props.selection?.selectedIds) ? props.selection.selectedIds.join(',') : ''),
   () => {
+    // キーフレーム選択が変わった時、トラッカー選択をリセット
     selectedTracker.value = 'default'
+    // キャッシュをクリアして、新しい選択からカーブ色を取得し直す
+    resetTrackerColorCache()
+    // 現在のフレームから各トラッカーのカーブ色を再収集
+    const frames = Array.isArray(props.selection?.frames) ? props.selection.frames : []
+    frames.forEach(frame => {
+      const curves = frame?.curves || {}
+      Object.keys(curves).forEach(key => {
+        if (curves[key]?.color) {
+          rememberTrackerColor(key, curves[key].color)
+        }
+      })
+    })
   }
+)
+
+// フレームデータが変わった時もキャッシュを更新
+watch(
+  () => props.selection?.frames,
+  (frames) => {
+    if (!Array.isArray(frames)) return
+    // 各フレームから各トラッカーのカーブ色を収集してキャッシュを更新
+    frames.forEach(frame => {
+      const curves = frame?.curves || {}
+      Object.keys(curves).forEach(key => {
+        if (curves[key]?.color) {
+          rememberTrackerColor(key, curves[key].color)
+        }
+      })
+    })
+  },
+  { deep: true, immediate: true }
 )
 
 // デフォルトカラー（バーチャルトラッカーの色と一致）
@@ -144,26 +175,44 @@ const normalizeColor = (color, fallback = '#5c8cff') => {
 // 現在選択されているトラッカーのカーブ色（読み取り専用 - トラッカー色と同期）
 const curveColor = computed(() => {
   const trackerKey = selectedTracker.value
+  
+  // トラッカーごとのカーブ色をキャッシュから取得（優先）
+  if (trackerCurveColors.value.has(trackerKey)) {
+    return trackerCurveColors.value.get(trackerKey)
+  }
+  
   const frames = Array.isArray(props.selection?.frames) ? props.selection.frames : []
   if (frames.length) {
     for (const frame of frames) {
       const curves = frame?.curves || {}
       if (trackerKey === 'default') {
         const color = curves.default?.color || frame?.curve?.color
-        if (color) return normalizeColor(color, getDefaultColor(trackerKey))
+        if (color) {
+          const normalized = normalizeColor(color, getDefaultColor(trackerKey))
+          rememberTrackerColor(trackerKey, normalized)
+          return normalized
+        }
       } else {
         const color = curves[trackerKey]?.color
-        if (color) return normalizeColor(color, getDefaultColor(trackerKey))
+        if (color) {
+          const normalized = normalizeColor(color, getDefaultColor(trackerKey))
+          rememberTrackerColor(trackerKey, normalized)
+          return normalized
+        }
       }
     }
   }
   // availableTrackersから該当トラッカーの色を取得
   const tracker = props.availableTrackers?.find(t => t.key === trackerKey)
   if (tracker?.color) {
-    return normalizeColor(tracker.color, getDefaultColor(trackerKey))
+    const normalized = normalizeColor(tracker.color, getDefaultColor(trackerKey))
+    rememberTrackerColor(trackerKey, normalized)
+    return normalized
   }
   // 見つからない場合はデフォルト色を使用
-  return getDefaultColor(trackerKey)
+  const defaultColor = getDefaultColor(trackerKey)
+  rememberTrackerColor(trackerKey, defaultColor)
+  return defaultColor
 })
 
 const selectionCount = computed(() => Number(props.selection?.frames?.length ?? 0))
@@ -202,11 +251,30 @@ function formatSeconds(seconds) {
 function onCurvesUpdate(payload) {
   // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�トラチE��ー刁E��時�E旧トラチE��ー保存用�E�E
   const effectiveTrackerKey = payload?.trackerKey || selectedTracker.value
+  const providedColor = typeof payload?.curveColor === 'string' ? payload.curveColor : null
+  const normalizedProvided = providedColor ? normalizeColor(providedColor, getDefaultColor(effectiveTrackerKey)) : null
+  const finalColor = normalizedProvided ?? curveColor.value
+  rememberTrackerColor(effectiveTrackerKey, finalColor)
   emit('update-curves', {
     ...payload,
     trackerKey: effectiveTrackerKey,
-    curveColor: curveColor.value
+    curveColor: finalColor
   })
+}
+
+function resetTrackerColorCache() {
+  if (trackerCurveColors.value.size === 0) return
+  trackerCurveColors.value = new Map()
+}
+
+function rememberTrackerColor(key, color) {
+  if (!key) return
+  const normalized = normalizeColor(color, getDefaultColor(key))
+  const current = trackerCurveColors.value.get(key)
+  if (current === normalized) return
+  const next = new Map(trackerCurveColors.value)
+  next.set(key, normalized)
+  trackerCurveColors.value = next
 }
 </script>
 

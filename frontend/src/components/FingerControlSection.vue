@@ -2,41 +2,73 @@
   <div class="hand-group">
     <h4>左手</h4>
     <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
-      <label>
+      <div class="finger-control__header">
         <span class="finger-name">{{ finger.label }}</span>
+        <select
+          class="axis-select"
+          :value="getAxisValue('left', finger.key)"
+          @change="setAxisValue('left', finger.key, $event.target.value)"
+        >
+          <option
+            v-for="option in axisOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+      <div class="finger-control__slider">
         <input
           type="range"
-          min="0"
-          max="1"
-          step="0.01"
+          min="-90"
+          max="90"
+          step="1"
           :value="getFingerValue('left', finger.key)"
           @input="setFingerValue('left', finger.key, $event.target.value)"
         />
-        <span class="finger-value">{{ (getFingerValue('left', finger.key) * 100).toFixed(0) }}%</span>
-      </label>
+        <span class="finger-value">{{ formatDegrees(getFingerValue('left', finger.key)) }}</span>
+      </div>
     </div>
   </div>
 
   <div class="hand-group">
     <h4>右手</h4>
     <div class="finger-control" v-for="finger in rightFingers" :key="finger.key">
-      <label>
+      <div class="finger-control__header">
         <span class="finger-name">{{ finger.label }}</span>
+        <select
+          class="axis-select"
+          :value="getAxisValue('right', finger.key)"
+          @change="setAxisValue('right', finger.key, $event.target.value)"
+        >
+          <option
+            v-for="option in axisOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+      <div class="finger-control__slider">
         <input
           type="range"
-          min="0"
-          max="1"
-          step="0.01"
+          min="-90"
+          max="90"
+          step="1"
           :value="getFingerValue('right', finger.key)"
           @input="setFingerValue('right', finger.key, $event.target.value)"
         />
-        <span class="finger-value">{{ (getFingerValue('right', finger.key) * 100).toFixed(0) }}%</span>
-      </label>
+        <span class="finger-value">{{ formatDegrees(getFingerValue('right', finger.key)) }}</span>
+      </div>
     </div>
   </div>
 
   <div class="actions">
-    <button type="button" class="btn btn--secondary" @click="resetAllFingers">すべてリセット</button>
+    <button type="button" class="btn btn--secondary" @click="resetAllFingers">
+      すべてリセット
+    </button>
   </div>
 </template>
 
@@ -44,10 +76,23 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  fingerStates: { type: Object, default: () => ({}) }
+  fingerStates: { type: Object, default: () => ({}) },
+  axisOverrides: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['update:fingerStates'])
+const emit = defineEmits(['update:fingerStates', 'update:axisOverrides'])
+
+const axisOptions = [
+  { value: 'auto', label: '自動' },
+  { value: 'x+', label: 'X+' },
+  { value: 'x-', label: 'X-' },
+  { value: 'y+', label: 'Y+' },
+  { value: 'y-', label: 'Y-' },
+  { value: 'z+', label: 'Z+' },
+  { value: 'z-', label: 'Z-' }
+]
+
+const allowedAxisValues = new Set(axisOptions.map(option => option.value))
 
 const fingers = [
   { key: 'thumb', label: '親指' },
@@ -60,29 +105,65 @@ const fingers = [
 const leftFingers = computed(() => fingers)
 const rightFingers = computed(() => fingers)
 
+const clampDegrees = (value, fallback = 0) => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return fallback
+  return Math.max(-90, Math.min(90, num))
+}
+
+const normalizeAxis = (value) => {
+  if (typeof value !== 'string') return 'auto'
+  const normalized = value.trim().toLowerCase()
+  return allowedAxisValues.has(normalized) ? normalized : 'auto'
+}
+
+const getKey = (hand, finger) => `${hand}_${finger}`
+
 function getFingerValue(hand, finger) {
-  const key = `${hand}_${finger}`
-  return props.fingerStates?.[key] ?? 0
+  const key = getKey(hand, finger)
+  return clampDegrees(props.fingerStates?.[key] ?? 0, 0)
 }
 
 function setFingerValue(hand, finger, value) {
-  const key = `${hand}_${finger}`
-  const numValue = Math.max(0, Math.min(1, Number(value) || 0))
-  
-  // 更新されたfingerStatesオブジェクト全体を送信
-  const updated = { ...props.fingerStates, [key]: numValue }
-  console.log(`[FingerControl] Setting ${key} to ${(numValue * 100).toFixed(0)}%`)
+  const key = getKey(hand, finger)
+  const current = getFingerValue(hand, finger)
+  const next = clampDegrees(value, current)
+  if (next === current) return
+  const updated = { ...props.fingerStates, [key]: next }
+  console.log(`[FingerControl] Setting angle ${key} -> ${next.toFixed(0)}°`)
   emit('update:fingerStates', updated)
 }
 
+function getAxisValue(hand, finger) {
+  const key = getKey(hand, finger)
+  return normalizeAxis(props.axisOverrides?.[key])
+}
+
+function setAxisValue(hand, finger, value) {
+  const key = getKey(hand, finger)
+  const current = getAxisValue(hand, finger)
+  const next = normalizeAxis(value)
+  if (next === current) return
+  const updated = { ...props.axisOverrides, [key]: next }
+  console.log(`[FingerControl] Setting axis ${key} -> ${next}`)
+  emit('update:axisOverrides', updated)
+}
+
+function formatDegrees(value) {
+  const deg = clampDegrees(value, 0)
+  const rounded = Math.round(deg)
+  const sign = rounded > 0 ? '+' : ''
+  return `${sign}${rounded}°`
+}
+
 function resetAllFingers() {
-  const reset = {}
-  fingers.forEach(f => {
-    reset[`left_${f.key}`] = 0
-    reset[`right_${f.key}`] = 0
+  const resetStates = {}
+  fingers.forEach(finger => {
+    resetStates[`left_${finger.key}`] = 0
+    resetStates[`right_${finger.key}`] = 0
   })
-  console.log('[FingerControl] Resetting all fingers')
-  emit('update:fingerStates', reset)
+  console.log('[FingerControl] Resetting all finger angles')
+  emit('update:fingerStates', resetStates)
 }
 </script>
 
@@ -143,19 +224,39 @@ function resetAllFingers() {
 }
 
 .finger-control {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.finger-control label {
-  display: grid;
-  grid-template-columns: 5rem 1fr 3rem;
+.finger-control__header {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .finger-name {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.axis-select {
+  flex: 0 0 6rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--control-surface, rgba(48, 54, 70, 0.85));
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.finger-control__slider {
+  display: grid;
+  grid-template-columns: 1fr 3rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .finger-value {
@@ -240,5 +341,25 @@ input[type="range"]::-moz-range-thumb:hover {
   background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
   border-color: var(--panel-border-strong, rgba(255, 255, 255, 0.18));
   color: rgba(255, 255, 255, 0.95);
+}
+
+@media (max-width: 520px) {
+  .finger-control__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .axis-select {
+    width: 100%;
+  }
+
+  .finger-control__slider {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .finger-value {
+    text-align: left;
+  }
 }
 </style>

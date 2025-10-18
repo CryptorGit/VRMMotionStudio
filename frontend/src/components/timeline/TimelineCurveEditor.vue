@@ -285,20 +285,36 @@ const findColorInFrames = (trackerKey) => {
 
 const resolveTrackerColor = (trackerKey) => {
   const key = trackerKey || 'default'
+  
+  // デバッグ：色解決のプロセスをログ出力
+  console.log(`[CurveEditor] resolveTrackerColor for ${key}`)
+  
+  // 1. キャッシュを最優先（一度保存された色は変わらない）
+  if (trackerColorCache.has(key)) {
+    const cached = trackerColorCache.get(key)
+    console.log(`[CurveEditor]   -> Using cached color: ${cached}`)
+    return cached
+  }
+  
+  // 2. キーフレームから色を探す
   const colorFromFrames = findColorInFrames(key)
   if (colorFromFrames) {
+    console.log(`[CurveEditor]   -> Found color in frames: ${colorFromFrames}`)
     rememberTrackerColor(key, colorFromFrames)
     return colorFromFrames
   }
-  if (trackerColorCache.has(key)) {
-    return trackerColorCache.get(key)
-  }
+  
+  // 3. 現在のトラッカーの場合、props.curveColorを使う
   if (key === props.trackerKey) {
     const normalized = normalizeColor(props.curveColor, fallbackColorForTracker(key))
+    console.log(`[CurveEditor]   -> Using props.curveColor: ${normalized}`)
     rememberTrackerColor(key, normalized)
     return normalized
   }
+  
+  // 4. fallback色を使う
   const fallback = fallbackColorForTracker(key)
+  console.log(`[CurveEditor]   -> Using fallback color: ${fallback}`)
   rememberTrackerColor(key, fallback)
   return fallback
 }
