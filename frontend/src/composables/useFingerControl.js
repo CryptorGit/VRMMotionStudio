@@ -302,7 +302,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
   }
   
   // 指のボーンを厳密に特定する - より積極的な検索
-  function findFingerBones(humanoid, hand, finger, handBone) {
+  function findFingerBones(model, humanoid, hand, finger, handBone) {
     const candidates = FINGER_BONES[hand][finger]
     
     console.log(`[FingerControl] Searching bones for ${hand} ${finger}...`)
@@ -340,7 +340,13 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     // それでも見つからなければルート全体から検索
-    const root = humanoid?.vrm?.scene || humanoid?.scene || null
+    const root =
+      model?.scene ||
+      model?.originalScene ||
+      model?.vrm?.scene ||
+      humanoid?.vrm?.scene ||
+      humanoid?.scene ||
+      null
     if (root && root !== handBone) {
       const result = searchFingerBonesInHierarchy(root, hand, finger, handBone)
       if (result && result.length >= 1) {
@@ -432,12 +438,12 @@ export function useFingerControl(getFingerStates, getActiveModel) {
 
     // 左手�E持E
     for (const finger of Object.keys(FINGER_BONES.left)) {
-      mapping.left[finger] = findFingerBones(humanoid, 'left', finger, leftHandBone)
+      mapping.left[finger] = findFingerBones(model, humanoid, 'left', finger, leftHandBone)
     }
     
     // 右手�E持E
     for (const finger of Object.keys(FINGER_BONES.right)) {
-      mapping.right[finger] = findFingerBones(humanoid, 'right', finger, rightHandBone)
+      mapping.right[finger] = findFingerBones(model, humanoid, 'right', finger, rightHandBone)
     }
     
     resolvedBoneMappings.set(model, mapping)

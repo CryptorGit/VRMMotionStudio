@@ -199,6 +199,29 @@ const isCurveModified = curve => {
 const FALLBACK_CURVE_COLOR = '#5c8cff'
 const trackerColorCache = new Map()
 
+const DEFAULT_TRACKER_COLORS = Object.freeze({
+  default: '#5c8cff',
+  head: '#3aa6ff',
+  chest: '#00c853',
+  hips: '#ff7043',
+  leftUpperArm: '#1e88e5',
+  rightUpperArm: '#e53935',
+  leftHand: '#2979ff',
+  rightHand: '#ff1744',
+  leftElbow: '#1565c0',
+  rightElbow: '#d50000',
+  leftFoot: '#009688',
+  rightFoot: '#00796b',
+  leftKnee: '#26a69a',
+  rightKnee: '#004d40',
+  gaze: '#ffeb3b'
+})
+
+const fallbackColorForTracker = trackerKey => {
+  if (!trackerKey) return FALLBACK_CURVE_COLOR
+  return DEFAULT_TRACKER_COLORS[trackerKey] || FALLBACK_CURVE_COLOR
+}
+
 const normalizeColor = (color, fallback = FALLBACK_CURVE_COLOR) => {
   if (typeof color !== 'string') return fallback
   const trimmed = color.trim()
@@ -220,7 +243,7 @@ const normalizeColor = (color, fallback = FALLBACK_CURVE_COLOR) => {
 
 const rememberTrackerColor = (trackerKey, color) => {
   if (!trackerKey) return
-  const normalized = normalizeColor(color)
+  const normalized = normalizeColor(color, fallbackColorForTracker(trackerKey))
   trackerColorCache.set(trackerKey, normalized)
 }
 
@@ -261,21 +284,23 @@ const findColorInFrames = (trackerKey) => {
 }
 
 const resolveTrackerColor = (trackerKey) => {
-  if (!trackerKey) return normalizeColor(props.curveColor)
-  const colorFromFrames = findColorInFrames(trackerKey)
+  const key = trackerKey || 'default'
+  const colorFromFrames = findColorInFrames(key)
   if (colorFromFrames) {
-    rememberTrackerColor(trackerKey, colorFromFrames)
+    rememberTrackerColor(key, colorFromFrames)
     return colorFromFrames
   }
-  if (trackerColorCache.has(trackerKey)) {
-    return trackerColorCache.get(trackerKey)
+  if (trackerColorCache.has(key)) {
+    return trackerColorCache.get(key)
   }
-  if (trackerKey === 'default') {
-    const normalized = normalizeColor(props.curveColor)
-    rememberTrackerColor(trackerKey, normalized)
+  if (key === props.trackerKey) {
+    const normalized = normalizeColor(props.curveColor, fallbackColorForTracker(key))
+    rememberTrackerColor(key, normalized)
     return normalized
   }
-  return FALLBACK_CURVE_COLOR
+  const fallback = fallbackColorForTracker(key)
+  rememberTrackerColor(key, fallback)
+  return fallback
 }
 
 const flushLiveUpdates = (trackerKeyOverride = props.trackerKey) => {
