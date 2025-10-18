@@ -199,10 +199,6 @@ function normalizeFingerChain(bones, handBone) {
     dropClosestToPalm()
   }
 
-  if (chain.length < 2) {
-    return null
-  }
-
   return chain
 }
 
@@ -322,7 +318,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     // Humanoidで見つからなければ、手のボーンの子孫から名前で検索
     if (handBone && handBone.isBone) {
       const result = searchFingerBonesInHierarchy(handBone, hand, finger, handBone)
-      if (result && result.length >= 2) {
+      if (result && result.length >= 1) {
         console.log(`[FingerControl] ✓ Found ${hand} ${finger} via hand hierarchy: ${result.length} bones`)
         return result
       }
@@ -332,7 +328,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     const root = humanoid?.vrm?.scene || humanoid?.scene || null
     if (root && root !== handBone) {
       const result = searchFingerBonesInHierarchy(root, hand, finger, handBone)
-      if (result && result.length >= 2) {
+      if (result && result.length >= 1) {
         console.log(`[FingerControl] ✓ Found ${hand} ${finger} via root search: ${result.length} bones`)
         return result
       }
@@ -363,7 +359,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       }
     })
 
-    if (collected.length < 2) {
+    if (collected.length < 1) {
       return null
     }
 
@@ -401,7 +397,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     }
 
     const normalized = normalizeFingerChain(unique, handBone)
-    return normalized && normalized.length >= 2 ? normalized : null
+    return normalized && normalized.length >= 1 ? normalized : null
   }
 
   // モチE�E��E�全体�E持E�E�Eーンマッピングを解決
@@ -717,7 +713,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
       if (storedAxis && typeof storedAxis.clone === 'function') {
         curlAxis = storedAxis.clone()
       } else {
-        curlAxis = determineCurlAxis(bone, hand, finger, index, handBone)
+        curlAxis = determineCurlAxis(bone, hand, finger, index, handBone, bones)
         if (curlAxis && curlAxis.lengthSq() > 1e-8) {
           if (!bone.userData) bone.userData = {}
           bone.userData.__fingerCurlAxis = curlAxis.clone()
@@ -755,7 +751,7 @@ export function useFingerControl(getFingerStates, getActiveModel) {
   }
   
   // ボ�Eンの実際の構造に基づぁE�E��E�最適な回転軸を決宁E
-  function determineCurlAxis(bone, hand, finger, jointIndex, handBone) {
+  function determineCurlAxis(bone, hand, finger, jointIndex, handBone, chain) {
     if (!bone) return null
 
     const defaultLocalAxis = new THREE.Vector3(0, 0, hand === 'left' ? -1 : 1)
@@ -769,7 +765,18 @@ export function useFingerControl(getFingerStates, getActiveModel) {
 
     let furthestChild = null
     let furthestDistance = 0
-    if (bone.children && bone.children.length > 0) {
+
+    const chainNext = Array.isArray(chain) ? chain[jointIndex + 1] : null
+    if (chainNext && chainNext.isBone) {
+      furthestChild = chainNext
+      try {
+        furthestChild.updateWorldMatrix(true, false)
+        const childPos = furthestChild.getWorldPosition(tempWorldVecB.set(0, 0, 0))
+        furthestDistance = childPos.distanceTo(boneWorldPos)
+      } catch {}
+    }
+
+    if (!furthestChild && bone.children && bone.children.length > 0) {
       for (const child of bone.children) {
         if (!child?.isBone) continue
         const childPos = child.getWorldPosition(tempWorldVecB.set(0, 0, 0))
@@ -785,6 +792,15 @@ export function useFingerControl(getFingerStates, getActiveModel) {
     if (furthestChild && furthestDistance > 1e-5) {
       const childWorld = furthestChild.getWorldPosition(tempWorldVecB.set(0, 0, 0))
       childDirection = childWorld.sub(boneWorldPos).normalize()
+    }
+
+    if (!childDirection && bone.parent?.isBone) {
+      try { bone.parent.updateWorldMatrix(true, false) } catch {}
+      const parentWorld = bone.parent.getWorldPosition(tempWorldVecB.set(0, 0, 0))
+      const fallbackDir = boneWorldPos.clone().sub(parentWorld)
+      if (fallbackDir.lengthSq() > 1e-6) {
+        childDirection = fallbackDir.normalize()
+      }
     }
 
     let palmDirection = null

@@ -48,6 +48,31 @@ function colorNumberToHex(value) {
   return `#${clamped.toString(16).padStart(6, '0')}`
 }
 
+function normalizeCurveColor(input, fallback = DEFAULT_CURVE_COLOR) {
+  if (typeof input !== 'string') return fallback
+  let color = input.trim()
+  if (!color) return fallback
+  if (!color.startsWith('#')) {
+    color = `#${color}`
+  }
+  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i)
+  if (!hexMatch) {
+    return fallback
+  }
+  const hex = hexMatch[1]
+  if (hex.length === 3) {
+    const expanded = hex
+      .split('')
+      .map(char => `${char}${char}`)
+      .join('')
+    return `#${expanded.toLowerCase()}`
+  }
+  if (hex.length === 8) {
+    return `#${hex.slice(0, 6).toLowerCase()}`
+  }
+  return `#${hex.toLowerCase()}`
+}
+
 const trackerPresetColors = new Map()
 if (Array.isArray(TRACKER_DEFS)) {
   for (const def of TRACKER_DEFS) {
@@ -55,7 +80,7 @@ if (Array.isArray(TRACKER_DEFS)) {
     let color = null
     if (typeof def.color === 'number') color = colorNumberToHex(def.color)
     else if (typeof def.color === 'string') color = def.color
-    if (color) trackerPresetColors.set(def.key, color)
+    if (color) trackerPresetColors.set(def.key, normalizeCurveColor(color))
   }
 }
 
@@ -75,7 +100,7 @@ function sanitizeCurves(curves) {
   for (const [key, data] of Object.entries(curves)) {
     result[key] = {
       curve: sanitizeCurve(data?.curve, DEFAULT_CURVE),
-      color: typeof data?.color === 'string' ? data.color : DEFAULT_CURVE_COLOR,
+      color: normalizeCurveColor(data?.color, DEFAULT_CURVE_COLOR),
       modified: !!data?.modified
     }
   }
@@ -100,7 +125,7 @@ function cloneCurves(curves) {
   for (const [key, data] of Object.entries(curves)) {
     result[key] = {
       curve: cloneCurve(data?.curve || DEFAULT_CURVE),
-      color: typeof data?.color === 'string' ? data.color : DEFAULT_CURVE_COLOR,
+      color: normalizeCurveColor(data?.color, DEFAULT_CURVE_COLOR),
       modified: !!data?.modified
     }
   }
@@ -388,10 +413,7 @@ export function useTimeline({ trackers, renderCamera }) {
         }
       } catch {}
       if (resolved && typeof resolved === 'string' && resolved.length) {
-        if (!resolved.startsWith('#')) {
-          resolved = `#${resolved}`
-        }
-        map.set(tracker.key, resolved)
+        map.set(tracker.key, normalizeCurveColor(resolved))
       }
     }
     return map
@@ -400,9 +422,9 @@ export function useTimeline({ trackers, renderCamera }) {
   function resolveTrackerCurveColor(trackerKey) {
     if (!trackerKey || trackerKey === 'default') return DEFAULT_CURVE_COLOR
     const colorFromTrackers = trackerColorMap.value.get(trackerKey)
-    if (colorFromTrackers) return colorFromTrackers
+    if (colorFromTrackers) return normalizeCurveColor(colorFromTrackers)
     const preset = trackerPresetColors.get(trackerKey)
-    if (preset) return preset
+    if (preset) return normalizeCurveColor(preset)
     return DEFAULT_CURVE_COLOR
   }
 
@@ -514,7 +536,10 @@ export function useTimeline({ trackers, renderCamera }) {
           Math.abs(sanitizedCurve.out.y - DEFAULT_CURVE.out.y) > 1e-4
         nextCurves[trackerKey] = {
           curve: sanitizedCurve,
-          color: curveColor || nextCurves[trackerKey]?.color || resolveTrackerCurveColor(trackerKey),
+          color: normalizeCurveColor(
+            curveColor || nextCurves[trackerKey]?.color || resolveTrackerCurveColor(trackerKey),
+            DEFAULT_CURVE_COLOR
+          ),
           modified: isModified
         }
       } else if (curve) {
@@ -528,7 +553,10 @@ export function useTimeline({ trackers, renderCamera }) {
           Math.abs(sanitizedCurve.out.y - DEFAULT_CURVE.out.y) > 1e-4
         nextCurves.default = {
           curve: sanitizedCurve,
-          color: curveColor || nextCurves.default?.color || DEFAULT_CURVE_COLOR,
+          color: normalizeCurveColor(
+            curveColor || nextCurves.default?.color || DEFAULT_CURVE_COLOR,
+            DEFAULT_CURVE_COLOR
+          ),
           modified: isModified
         }
       } else {
@@ -557,13 +585,13 @@ export function useTimeline({ trackers, renderCamera }) {
             Math.abs(c.in.y - DEFAULT_CURVE.in.y) > 1e-4 ||
             Math.abs(c.out.x - DEFAULT_CURVE.out.x) > 1e-4 ||
             Math.abs(c.out.y - DEFAULT_CURVE.out.y) > 1e-4
-          return sanitizeCurves({ 
-            default: {
-              curve: c,
-              color: curveColor || DEFAULT_CURVE_COLOR,
-              modified: isModified
-            }
-          })
+        return sanitizeCurves({
+          default: {
+            curve: c,
+            color: normalizeCurveColor(curveColor, DEFAULT_CURVE_COLOR),
+            modified: isModified
+          }
+        })
         })()
     const baseCurve = sanitizeCurve(sanitizedCurves.default?.curve || sanitizedCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
 
@@ -639,7 +667,10 @@ export function useTimeline({ trackers, renderCamera }) {
         
         updated.curves[payload.trackerKey] = {
           curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
-          color: payload.curveColor || updated.curves[payload.trackerKey]?.color || resolveTrackerCurveColor(payload.trackerKey),
+          color: normalizeCurveColor(
+            payload.curveColor || updated.curves[payload.trackerKey]?.color || resolveTrackerCurveColor(payload.trackerKey),
+            DEFAULT_CURVE_COLOR
+          ),
           modified: isModified
         }
         changed = true
@@ -657,7 +688,10 @@ export function useTimeline({ trackers, renderCamera }) {
         
         updated.curves.default = {
           curve: sanitizeCurve(payload.curve, DEFAULT_CURVE),
-          color: payload.curveColor || updated.curves.default?.color || DEFAULT_CURVE_COLOR,
+          color: normalizeCurveColor(
+            payload.curveColor || updated.curves.default?.color || DEFAULT_CURVE_COLOR,
+            DEFAULT_CURVE_COLOR
+          ),
           modified: isModified
         }
         changed = true

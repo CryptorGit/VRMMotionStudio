@@ -32,7 +32,7 @@
             :min-primary-ratio="0.2"
             :max-primary-ratio="0.95"
             :primary-min-pixels="220"
-            :secondary-min-pixels="160"
+            :secondary-min-pixels="TIMELINE_MIN_HEIGHT"
           >
             <template #primary>
               <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポのト領域">
@@ -485,6 +485,27 @@ const tempVec3C = new THREE.Vector3()
 const tempEuler = new THREE.Euler()
 const MIN_RENDER_RESOLUTION = 64
 const MAX_RENDER_RESOLUTION = 16384
+const TIMELINE_MIN_HEIGHT = 320
+const DEFAULT_CURVE_COLOR = '#5c8cff'
+
+function normalizeCurveColor(color, fallback = DEFAULT_CURVE_COLOR) {
+  if (typeof color !== 'string') return fallback
+  let trimmed = color.trim()
+  if (!trimmed) return fallback
+  if (!trimmed.startsWith('#')) {
+    trimmed = `#${trimmed}`
+  }
+  const match = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i)
+  if (!match) return fallback
+  const hex = match[1]
+  if (hex.length === 3) {
+    return `#${hex.split('').map(ch => ch + ch).join('').toLowerCase()}`
+  }
+  if (hex.length === 8) {
+    return `#${hex.slice(0, 6).toLowerCase()}`
+  }
+  return `#${hex.toLowerCase()}`
+}
 
 
 // Finger control states
@@ -1965,7 +1986,7 @@ if (timelineController) {
         for (const [tKey, entry] of Object.entries(frame.curves)) {
           curves[tKey] = {
             curve: cloneTimelineCurve(entry?.curve),
-            color: typeof entry?.color === 'string' ? entry.color : '#5c8cff',
+            color: normalizeCurveColor(entry?.color, DEFAULT_CURVE_COLOR),
             modified: !!entry?.modified
           }
         }
@@ -2443,7 +2464,7 @@ function handleTimelineSelectionChange(payload) {
         for (const [trackerKey, entry] of Object.entries(frame.curves)) {
           curves[trackerKey] = {
             curve: cloneTimelineCurve(entry?.curve),
-            color: typeof entry?.color === 'string' ? entry.color : '#5c8cff',
+            color: normalizeCurveColor(entry?.color, DEFAULT_CURVE_COLOR),
             modified: !!entry?.modified
           }
         }
@@ -2486,7 +2507,7 @@ function handleTimelineCurveUpdate(payload) {
   if (!updatesSource.length || !timelineController) return
   
   const trackerKey = payload?.trackerKey || 'default'
-  const curveColor = payload?.curveColor || '#5c8cff'
+  const curveColor = normalizeCurveColor(payload?.curveColor, DEFAULT_CURVE_COLOR)
   
   const updates = updatesSource
     .map(entry => {
