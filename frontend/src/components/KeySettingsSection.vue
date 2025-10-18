@@ -40,10 +40,6 @@
             </option>
           </select>
         </label>
-        <div class="color-display">
-          <span class="color-display__label">カーブ色</span>
-          <div class="color-display__swatch" :style="{ backgroundColor: curveColor }" :title="`トラッカー色: ${curveColor} (自動同期)`"></div>
-        </div>
       </div>
       <TimelineCurveEditor 
         :frames="selection.frames" 
@@ -353,27 +349,6 @@ function onCurvesUpdate(payload) {
   outline: none;
   border-color: rgba(140, 168, 235, 0.65);
   background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
-}
-
-.color-display {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: flex-start;
-}
-
-.color-display__label {
-  font-size: 0.85rem;
-  color: rgba(240, 244, 255, 0.85);
-}
-
-.color-display__swatch {
-  width: 80px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(140, 168, 235, 0.35);
-  box-shadow: none;
-  cursor: default;
 }
 
 .key-settings__curve-editor :deep(.curve-editor) {

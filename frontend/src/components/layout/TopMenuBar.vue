@@ -99,19 +99,7 @@
         <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
       </button>
     </nav>
-    <div class="top-menu__actions">
-      <button
-        type="button"
-        class="top-menu__item top-menu__item--icon"
-        :aria-label="theme === 'dark' ? 'ライトテーマに切替' : 'ダークテーマに切替'"
-        role="switch"
-        :aria-checked="theme === 'dark'"
-        @click="$emit('toggle-theme')"
-        :title="tooltip(theme === 'dark' ? 'ライトテーマに切り替えます' : 'ダークテーマに切り替えます')"
-      >
-        <Icon :icon="theme === 'dark' ? 'mdi:weather-night' : 'mdi:white-balance-sunny'" />
-      </button>
-    </div>
+    <div class="top-menu__actions"></div>
   </header>
 </template>
 
@@ -119,10 +107,6 @@
 import { Icon } from '@iconify/vue'
 
 const props = defineProps({
-  theme: {
-    type: String,
-    default: 'dark'
-  },
   showCaptions: {
     type: Boolean,
     default: true
@@ -188,7 +172,6 @@ const tooltip = message => (props.showCaptions ? message : '')
   display: flex;
   -webkit-app-region: no-drag;
   align-items: center;
-  gap: 0.25rem;
 }
 
 .top-menu__item {

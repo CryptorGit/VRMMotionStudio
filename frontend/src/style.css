@@ -34,37 +34,6 @@
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
-:root[data-theme='light'] {
-  color-scheme: light;
-  --accent: #2d6acd;
-  --accent-weak: rgba(45, 106, 205, 0.18);
-  --accent-focus: #1f56b2;
-  --surface: #f4f6fb;
-  --surface-strong: #ffffff;
-  --surface-raised: #e9edf7;
-  --workspace-panel-bg: rgba(248, 250, 255, 0.98);
-  --workspace-panel-border: rgba(27, 34, 51, 0.12);
-  --workspace-panel-shadow: 0 16px 32px rgba(14, 18, 26, 0.12);
-  --border-soft: rgba(27, 34, 51, 0.14);
-  --border-strong: rgba(27, 34, 51, 0.3);
-  --text-strong: #1b2233;
-  --text-muted: rgba(27, 34, 51, 0.7);
-  --text-weaker: rgba(27, 34, 51, 0.52);
-  --shadow-soft: 0 14px 28px rgba(12, 18, 30, 0.12);
-  --workspace-gap: 1.1rem;
-  --workspace-radius: 16px;
-  --workspace-padding: 1.2rem;
-  --panel-surface: #f6f8fe;
-  --panel-surface-alt: #eef2fc;
-  --control-surface: #eef2fc;
-  --control-surface-hover: #e1e7fa;
-  --panel-border: rgba(27, 34, 51, 0.12);
-  --panel-border-strong: rgba(27, 34, 51, 0.2);
-  --panel-shadow: 0 12px 28px rgba(12, 18, 30, 0.12);
-  --panel-shadow-strong: 0 18px 36px rgba(12, 18, 30, 0.18);
-  --focus-ring: 0 0 0 2px rgba(45, 106, 205, 0.25);
-}
-
 *,
 *::before,
 *::after {
@@ -147,12 +116,6 @@ textarea {
   box-shadow: 0 16px 36px rgba(9, 12, 20, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(14px);
-}
-
-:root[data-theme='light'] .toast-item {
-  background: rgba(255, 255, 255, 0.92);
-  color: #1b2233;
-  border-color: rgba(27, 34, 51, 0.1);
 }
 
 .visually-hidden {
