@@ -363,11 +363,47 @@ const hasModelsLoaded = computed(() => {
 })
 
 // Available trackers for dropdown selection in Key Settings
+const DEFAULT_TRACKER_COLOR = '#5c8cff'
+
+function toHexColor(value, fallback = DEFAULT_TRACKER_COLOR) {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim().startsWith('#') ? value.trim() : `#${value.trim()}`
+  }
+  if (Number.isFinite(value)) {
+    const clamped = Math.max(0, Math.min(0xffffff, Math.floor(value)))
+    return `#${clamped.toString(16).padStart(6, '0')}`
+  }
+  return fallback
+}
+
 const availableTrackers = computed(() => {
-  return TRACKER_DEFS.map(def => ({
-    key: def.key,
-    label: def.label
-  }))
+  const trackerList = trackerController?.trackers?.value || []
+  const colorMap = new Map()
+  trackerList.forEach(tracker => {
+    if (!tracker?.key) return
+    let resolved = null
+    try {
+      const matColor = tracker.mesh?.material?.color
+      if (matColor && typeof matColor.getHexString === 'function') {
+        resolved = `#${matColor.getHexString()}`
+      } else if (typeof tracker.color === 'string' || Number.isFinite(tracker.color)) {
+        resolved = toHexColor(tracker.color, null)
+      }
+    } catch {}
+    if (resolved) {
+      colorMap.set(tracker.key, resolved)
+    }
+  })
+
+  return TRACKER_DEFS.map(def => {
+    const fallback = toHexColor(def.color, DEFAULT_TRACKER_COLOR)
+    const color = colorMap.get(def.key) || fallback
+    return {
+      key: def.key,
+      label: def.label,
+      color
+    }
+  })
 })
 
 const trackerAxes = ['x', 'y', 'z']

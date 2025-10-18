@@ -172,8 +172,9 @@ const naturalBodyHeight = computed(() => visibleTrackCount.value * ROW_HEIGHT)
 const requestedBodyHeight = computed(() => Math.max(props.height - headerHeight.value, 0))
 const bodyHeight = computed(() => {
   if (props.collapsed) return 0
-  const minHeight = Math.min(requestedBodyHeight.value, Math.max(naturalBodyHeight.value, MIN_BODY_HEIGHT))
-  return Math.max(0, minHeight)
+  const minimum = Math.max(MIN_BODY_HEIGHT, naturalBodyHeight.value)
+  const requested = Math.max(0, requestedBodyHeight.value)
+  return Math.max(minimum, requested)
 })
 const bodyStyle = computed(() => ({ height: `${bodyHeight.value}px` }))
 const gridStyle = computed(() => ({ gridTemplateColumns: `${NAME_COLUMN_WIDTH}px ${timelineWidth.value}px` }))

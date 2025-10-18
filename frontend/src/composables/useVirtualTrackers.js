@@ -24,6 +24,17 @@ export const TRACKER_DEFS = [
 
 export const TRACKER_ROTATION_ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX']
 
+function toColorHex(value, fallback = '#5c8cff') {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim().startsWith('#') ? value.trim() : `#${value.trim()}`
+  }
+  if (Number.isFinite(value)) {
+    const clamped = Math.max(0, Math.min(0xffffff, Math.floor(value)))
+    return `#${clamped.toString(16).padStart(6, '0')}`
+  }
+  return fallback
+}
+
 const DEFAULT_TRACKER_ROTATION_ORDER = 'YXZ'
 
 const CAMERA_TRACKER_KEY = '__disabled_renderCamera'
@@ -733,13 +744,15 @@ export function useVirtualTrackers({
       mesh.add(sprite)
       group.value.add(mesh)
       // camera tracker disabled
-      trackers.value.push({ 
-        key: def.key, 
-        name: def.label, 
-        mesh, 
-        labelSprite: sprite, 
+      const initialColor = toColorHex(def.color)
+      trackers.value.push({
+        key: def.key,
+        name: def.label,
+        mesh,
+        labelSprite: sprite,
         rotationRing,
-        rotationAxes
+        rotationAxes,
+        color: initialColor
       })
       ensureTrackerState(def.key)
       applyTrackerStateToMesh(def.key)
@@ -916,7 +929,11 @@ export function useVirtualTrackers({
             if (typeof savedEntry.color === 'number' && t.mesh?.material) {
               try {
                 t.mesh.material.color.setHex(savedEntry.color)
+                t.color = toColorHex(savedEntry.color, t.color)
               } catch {}
+            } else if (typeof savedEntry.color === 'string') {
+              t.color = toColorHex(savedEntry.color, t.color)
+              try { t.mesh?.material?.color?.setStyle?.(t.color) } catch {}
             }
             
             // 軸スケールの復元
