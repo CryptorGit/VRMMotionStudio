@@ -79,6 +79,38 @@ const selectedTracker = ref('default')
 // トラッカーごとのカーブ色を保持（トラッカー色と同期）
 const trackerCurveColors = ref(new Map())
 
+const trackerKeySet = computed(() => {
+  const keys = new Set(['default'])
+  if (Array.isArray(props.availableTrackers)) {
+    for (const tracker of props.availableTrackers) {
+      if (tracker?.key) keys.add(tracker.key)
+    }
+  }
+  if (Array.isArray(props.selection?.frames)) {
+    for (const frame of props.selection.frames) {
+      if (frame?.curves && typeof frame.curves === 'object') {
+        Object.keys(frame.curves).forEach(key => {
+          if (key) keys.add(key)
+        })
+      }
+    }
+  }
+  return keys
+})
+
+watch(trackerKeySet, keys => {
+  if (!keys.has(selectedTracker.value)) {
+    selectedTracker.value = 'default'
+  }
+})
+
+watch(
+  () => (Array.isArray(props.selection?.selectedIds) ? props.selection.selectedIds.join(',') : ''),
+  () => {
+    selectedTracker.value = 'default'
+  }
+)
+
 // デフォルトカラー（バーチャルトラッカーの色と一致）
 const getDefaultColor = (trackerKey) => {
   const defaultColors = {
