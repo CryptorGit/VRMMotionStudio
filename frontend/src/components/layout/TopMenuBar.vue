@@ -2,7 +2,7 @@
   <header class="top-menu" role="menubar">
     <div class="top-menu__brand">
       <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
-      <span class="top-menu__title">MokuMokuDance Web</span>
+      <span class="top-menu__title">StellarMotion Studio</span>
     </div>
     <nav class="top-menu__nav" aria-label="メインメニュー">
       <button
@@ -99,7 +99,9 @@
         <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
       </button>
     </nav>
-    <div class="top-menu__actions"></div>
+    <div class="top-menu__actions">
+      <span class="top-menu__badge" aria-label="ベータ版">BETA</span>
+    </div>
   </header>
 </template>
 
@@ -172,6 +174,23 @@ const tooltip = message => (props.showCaptions ? message : '')
   display: flex;
   -webkit-app-region: no-drag;
   align-items: center;
+  justify-content: flex-end;
+  padding-left: 0.75rem;
+}
+
+.top-menu__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-on-accent, #ffffff);
+  background: color-mix(in srgb, var(--accent, #2d8cff) 70%, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .top-menu__item {
