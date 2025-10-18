@@ -4,7 +4,7 @@
       <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
       <span class="top-menu__title">
         StellarMotion Studio
-        <span class="top-menu__beta" aria-label="ベータ版">β</span>
+        <span class="top-menu__beta" aria-label="ベータ版">BETA</span>
       </span>
     </div>
     <nav class="top-menu__nav" aria-label="メインメニュー">
