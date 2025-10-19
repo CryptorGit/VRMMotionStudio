@@ -2,46 +2,46 @@
   <div class="lighting-panel">
     <div class="lighting-panel__ambient">
       <label class="lighting-field">
-        <span>Ambient 色</span>
+        <span>{{ lightingTexts.ambientColor }}</span>
         <input type="color" v-model="ambientColor" />
       </label>
       <label class="lighting-field lighting-field--range">
-        <span>Ambient 強さ</span>
+        <span>{{ lightingTexts.ambientIntensity }}</span>
         <input type="range" min="0" max="5" step="0.1" v-model.number="ambientIntensity" />
       </label>
     </div>
     <div class="lighting-panel__directional">
       <div class="lighting-panel__heading">
-        <span class="lighting-panel__title">Directional Light</span>
-        <span class="lighting-panel__description">位置と向きを角度で調整できます</span>
+        <span class="lighting-panel__title">{{ lightingTexts.directionalTitle }}</span>
+        <span class="lighting-panel__description">{{ lightingTexts.directionalDescription }}</span>
       </div>
       <div class="lighting-panel__fields">
         <label class="lighting-field">
-          <span>色</span>
+          <span>{{ lightingTexts.color }}</span>
           <input type="color" v-model="directionalColor" />
         </label>
         <label class="lighting-field lighting-field--range">
-          <span>強さ</span>
+          <span>{{ lightingTexts.intensity }}</span>
           <input type="range" min="0" max="5" step="0.1" v-model.number="directionalIntensityProxy" />
         </label>
       </div>
       <div class="position-inputs">
         <label class="lighting-field">
-          <span>位置X</span>
+          <span>{{ lightingTexts.positionX }}</span>
           <input type="number" v-model.number="directionalX" />
         </label>
         <label class="lighting-field">
-          <span>位置Y</span>
+          <span>{{ lightingTexts.positionY }}</span>
           <input type="number" v-model.number="directionalY" />
         </label>
         <label class="lighting-field">
-          <span>位置Z</span>
+          <span>{{ lightingTexts.positionZ }}</span>
           <input type="number" v-model.number="directionalZ" />
         </label>
       </div>
       <div class="position-inputs">
         <label class="lighting-field lighting-field--range">
-          <span>方位角(°)</span>
+          <span>{{ lightingTexts.azimuth }}</span>
           <input
             type="range"
             min="0"
@@ -51,7 +51,7 @@
           />
         </label>
         <label class="lighting-field lighting-field--range">
-          <span>仰角(°)</span>
+          <span>{{ lightingTexts.elevation }}</span>
           <input
             type="range"
             min="-90"
@@ -62,12 +62,17 @@
         </label>
       </div>
     </div>
+    
+    <!-- Google AdSense広告 -->
+    <GoogleAdUnit variant="square" ad-slot="lighting-section" />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import * as THREE from 'three'
+import { useI18n } from '../locales/index.js'
+import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   ambient: { type: Object, required: true },
@@ -90,6 +95,9 @@ const directionalColor = computed({
   get: () => '#' + props.directional.color.getHexString(),
   set: v => props.directional.color.set(v)
 })
+
+const { t } = useI18n()
+const lightingTexts = computed(() => t.value?.lightingPanel ?? {})
 
 const directionalIntensityProxy = computed({
   get: () => props.directionalIntensity,

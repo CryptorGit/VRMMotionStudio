@@ -128,3 +128,36 @@ textarea {
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+/* ダークモード対応: selectとドロップダウン */
+select,
+.language-menu,
+.euler-order-select,
+.axis-select {
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: var(--text-strong, #e8e8e8);
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  transition: all 0.2s ease;
+}
+
+select:hover,
+.euler-order-select:hover,
+.axis-select:hover {
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.2));
+}
+
+select:focus,
+.euler-order-select:focus,
+.axis-select:focus {
+  outline: none;
+  border-color: var(--accent, #2d7dd2);
+  box-shadow: var(--focus-ring, 0 0 0 2px rgba(45, 125, 210, 0.4));
+}
+
+select option {
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: var(--text-strong, #e8e8e8);
+}

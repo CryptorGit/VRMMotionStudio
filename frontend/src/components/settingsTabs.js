@@ -1,56 +1,56 @@
 export const SECTION_TABS = [
   {
     id: 'lighting',
-    label: '照明',
-    description: 'ライト・環境光の調整',
-    icon: 'mdi:lightbulb-on-outline'
+    icon: 'mdi:lightbulb-on-outline',
+    labelKey: 'tabs.lighting',
+    descriptionKey: 'tabs.lightingDesc'
   },
   {
     id: 'model',
-    label: 'モデル',
-    description: 'モデルの表示・管理',
-    icon: 'mdi:account-outline'
+    icon: 'mdi:account-outline',
+    labelKey: 'tabs.model',
+    descriptionKey: 'tabs.modelDesc'
   },
   {
     id: 'display',
-    label: '表示',
-    description: 'ボーンやトラッカー表示の管理',
-    icon: 'mdi:monitor-eye'
+    icon: 'mdi:monitor-eye',
+    labelKey: 'tabs.display',
+    descriptionKey: 'tabs.displayDesc'
   },
   {
     id: 'trackers',
-    label: 'トラッカー',
-    description: 'バーチャルトラッカーの設定',
-    icon: 'mdi:axis-arrow'
+    icon: 'mdi:axis-arrow',
+    labelKey: 'tabs.trackers',
+    descriptionKey: 'tabs.trackersDesc'
   },
   {
     id: 'bones',
-    label: 'ボーン',
-    description: '指などのボーン制御',
-    icon: 'mdi:hand-pointing-up'
+    icon: 'mdi:hand-pointing-up',
+    labelKey: 'tabs.bones',
+    descriptionKey: 'tabs.bonesDesc'
   },
   {
     id: 'keys',
-    label: 'キー',
-    description: 'キーの詳細設定とイージング',
-    icon: 'mdi:vector-curve'
+    icon: 'mdi:vector-curve',
+    labelKey: 'tabs.keys',
+    descriptionKey: 'tabs.keysDesc'
   },
   {
     id: 'audio',
-    label: 'MP3',
-    description: 'MP3オーディオの設定',
-    icon: 'mdi:music-note'
+    icon: 'mdi:music-note',
+    labelKey: 'tabs.audio',
+    descriptionKey: 'tabs.audioDesc'
   },
   {
     id: 'camera',
-    label: 'カメラ',
-    description: 'レンダーカメラと出力設定',
-    icon: 'mdi:video-outline'
+    icon: 'mdi:video-outline',
+    labelKey: 'tabs.camera',
+    descriptionKey: 'tabs.cameraDesc'
   },
   {
     id: 'morph',
-    label: 'モーフ',
-    description: '表情/シェイプキーの制御',
-    icon: 'mdi:emoticon-outline'
+    icon: 'mdi:emoticon-outline',
+    labelKey: 'tabs.morph',
+    descriptionKey: 'tabs.morphDesc'
   }
 ]

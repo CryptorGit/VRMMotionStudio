@@ -1,19 +1,19 @@
 <template>
   <div class="curve-editor">
     <div class="curve-editor__header">
-      <h3>イージングカーブ</h3>
+      <h3>{{ curveTexts.title }}</h3>
       <button
         type="button"
         class="curve-editor__reset"
         :disabled="!canReset"
         @click="resetCurves"
       >
-        リセット
+        {{ curveTexts.reset }}
       </button>
     </div>
 
     <div v-if="normalizedFrames.length < 2" class="curve-editor__empty">
-      <p>曲線を編集するには、2つ以上のキーを選択してください。</p>
+      <p>{{ curveTexts.empty }}</p>
     </div>
 
     <svg
@@ -61,7 +61,7 @@
             r="0.018"
             tabindex="0"
             role="slider"
-            aria-label="カーブ制御点"
+            :aria-label="curveTexts.handleLabel || 'Curve handle'"
             @pointerdown.prevent="startHandleDrag($event, handle)"
           />
         </g>
@@ -90,7 +90,7 @@
           <span class="curve-editor__sublabel">{{ frame.timeLabel }}</span>
         </div>
         <div class="curve-editor__control-group" v-if="!frame.isFirst">
-          <span class="curve-editor__control-title">In</span>
+          <span class="curve-editor__control-title">{{ curveTexts.inLabel }}</span>
           <label>
             X
             <input
@@ -115,7 +115,7 @@
           </label>
         </div>
         <div class="curve-editor__control-group" v-if="!frame.isLast">
-          <span class="curve-editor__control-title">Out</span>
+          <span class="curve-editor__control-title">{{ curveTexts.outLabel }}</span>
           <label>
             X
             <input
@@ -146,6 +146,7 @@
 
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { useI18n } from '../../locales/index.js'
 
 const DEFAULT_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -158,6 +159,9 @@ const props = defineProps({
   trackerKey: { type: String, default: 'default' },
   curveColor: { type: String, default: '#5c8cff' }
 })
+
+const { t } = useI18n()
+const curveTexts = computed(() => t.value?.timelineCurveEditor ?? {})
 
 const emit = defineEmits(['update', 'reset'])
 

@@ -2,76 +2,76 @@
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showGridLocal" />
-      <span>グリッド表示</span>
+      <span>{{ displayTexts.grid }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showLightMarkerLocal" />
-      <span>ライトEーカー表示</span>
+      <span>{{ displayTexts.lightMarker }}</span>
     </label>
     <label>
-      <span>マEカー色</span>
+      <span>{{ displayTexts.markerColor }}</span>
       <input type="color" v-model="markerColorLocal" />
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBonesVisible" />
-      <span>ボーン表示（人型）</span>
+      <span>{{ displayTexts.bones }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="allBoneNamesVisible" />
-      <span>ボーン名表示</span>
+      <span>{{ displayTexts.boneNames }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showPhysicalBonesLocal" />
-      <span>ボーン表示（物理）</span>
+      <span>{{ displayTexts.physicalBones }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showOtherBonesLocal" />
-      <span>ボーン表示（その他）</span>
+      <span>{{ displayTexts.otherBones }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showExtendedBonesLocal" />
-      <span>ボーン表示（拡張）</span>
+      <span>{{ displayTexts.extendedBones }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showColliderNodesLocal" />
-      <span>ボーン表示（コライダー）</span>
+      <span>{{ displayTexts.colliderNodes }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="showNonDeformingBonesLocal" />
-      <span>ボーン表示（非変形）</span>
+      <span>{{ displayTexts.nonDeformingBones }}</span>
     </label>
   </div>
   <div class="row">
     <label class="checkbox">
       <input type="checkbox" v-model="highlightConstraintLocal" />
-      <span>制約ハイライト</span>
+      <span>{{ displayTexts.highlightConstraint }}</span>
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボーン表示サイズ
+      {{ displayTexts.boneDotSize }}
       <input type="range" min="0.005" max="0.06" step="0.001" v-model.number="boneDotSizeLocal" />
     </label>
   </div>
   <div class="row">
     <label class="stretch">
-      ボーン名表示サイズ（大きさ）
+      {{ displayTexts.boneLabelScale }}
       <input
         type="range"
         min="0.05"
@@ -83,11 +83,11 @@
   </div>
   <hr />
   <div class="row">
-    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">VRM アウトライン設定</h4>
+    <h4 style="margin: 0.5rem 0 0.25rem; font-size: 0.9rem;">{{ displayTexts.outlineSettings }}</h4>
   </div>
   <div class="row">
     <label class="stretch">
-      <span>対象モデル</span>
+      <span>{{ displayTexts.targetModel }}</span>
       <select v-model="selectedOutlineModelIndex" class="model-select" :disabled="!hasModels">
         <option v-for="(model, index) in models" :key="model.id" :value="index">
           {{ model.name }}
@@ -97,7 +97,7 @@
   </div>
   <div class="row">
     <label class="stretch">
-      アウトライン太ぁE
+      {{ displayTexts.outlineWidth }}
       <input
         type="range"
         min="0"
@@ -109,7 +109,7 @@
   </div>
   <div class="row">
     <label class="stretch">
-      アウトライン色
+      {{ displayTexts.outlineColor }}
       <input type="color" v-model="outlineColorLocal" style="width: 100%;" />
     </label>
   </div>
@@ -120,13 +120,14 @@
       :disabled="!hasModels"
       @click="emit('reset-outline', selectedOutlineModelIndex)"
     >
-      デフォルトにリセット
+      {{ displayTexts.reset }}
     </button>
   </div>
 </template>
 
 <script setup>
 import { computed, watch } from 'vue'
+import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   models: { type: Array, required: true },
@@ -170,6 +171,9 @@ const emit = defineEmits([
   'reset-outline',
   'load-model-outline'
 ])
+
+const { t } = useI18n()
+const displayTexts = computed(() => t.value?.display ?? {})
 
 const hasModels = computed(() => Array.isArray(props.models) && props.models.length > 0)
 

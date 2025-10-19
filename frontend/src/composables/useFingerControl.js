@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 // Finger bone mappings for VRM (using VRM humanoid bone names)
-// 吁E�E��E�に対して褁E�E��E�のボ�Eン名候補を用意！ERMモチE�E��E�によって異なる名前が使われる場合がある�E�E�E�E
+// 吁E�E�E�E��E�E�E�に対して褁E�E�E�E��E�E�E�のボ�Eン名候補を用意！ERMモチE�E�E�E��E�E�E�によって異なる名前が使われる場合がある�E�E�E�E�E�E�E�E
 const FINGER_BONES = {
   left: {
     thumb: [
@@ -210,10 +210,10 @@ function normalizeFingerChain(bones, handBone) {
 export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisOverrides) {
   // Store initial bone rotations per model
   const initialRotations = new WeakMap()
-  // モチE�E��E�ごとに解決された�EーンマッピングをキャチE�E��E�ュ
+  // モチE�E�E�E��E�E�E�ごとに解決された�EーンマッピングをキャチE�E�E�E��E�E�E�ュ
   const resolvedBoneMappings = new WeakMap()
   
-  // チE�E��E�チE�E��E�用: 検�Eされた�Eーンをログ出力（一度だけ！E
+  // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�用: 検�Eされた�Eーンをログ出力（一度だけ！E
   let detectionLogged = false
 
   function extractBoneNode(candidate) {
@@ -227,7 +227,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
         if (resolved) return resolved
       }
     } else if (typeof candidate === 'object') {
-      // VRM 1.0 の VRMHumanBoneLike には `node` または `bone` プロパティが存在する
+      // VRM 1.0 の VRMHumanBoneLike には `node` また�E `bone` プロパティが存在する
       for (const value of Object.values(candidate)) {
         const resolved = extractBoneNode(value)
         if (resolved) return resolved
@@ -239,7 +239,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
   function getHumanoidBone(humanoid, boneName) {
     if (!humanoid || !boneName) return null
 
-    // VRM 1.0 の場合 - getRawBoneNode
+    // VRM 1.0 の場吁E- getRawBoneNode
     if (typeof humanoid.getRawBoneNode === 'function') {
       try {
         const bone = humanoid.getRawBoneNode(boneName)
@@ -250,7 +250,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       }
     }
 
-    // VRM 0.x の場合 - getBoneNode
+    // VRM 0.x の場吁E- getBoneNode
     if (typeof humanoid.getBoneNode === 'function') {
       try {
         const bone = humanoid.getBoneNode(boneName)
@@ -261,7 +261,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       }
     }
 
-    // getNormalizedBoneNode も試す
+    // getNormalizedBoneNode も試ぁE
     if (typeof humanoid.getNormalizedBoneNode === 'function') {
       try {
         const bone = humanoid.getNormalizedBoneNode(boneName)
@@ -301,13 +301,13 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     return null
   }
   
-  // 指のボーンを厳密に特定する - より積極的な検索
+  // 持E�Eボ�Eンを厳寁E��特定すめE- より積極皁E��検索
   function findFingerBones(model, humanoid, hand, finger, handBone) {
     const candidates = FINGER_BONES[hand][finger]
     
     console.log(`[FingerControl] Searching bones for ${hand} ${finger}...`)
 
-    // まずVRM Humanoidから探す
+    // まずVRM Humanoidから探ぁE
     for (const boneNames of candidates) {
       if (!Array.isArray(boneNames) || !boneNames.length) continue
       const bones = []
@@ -322,7 +322,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
         const normalized = normalizeFingerChain(bones, handBone)
         if (normalized?.length >= 2) {
           const boneNamesList = normalized.map(b => b.name || '(unnamed)')
-          console.log(`[FingerControl] ✓ Found ${hand} ${finger} via Humanoid: ${normalized.length} bones [${boneNamesList.join(', ')}]`)
+          console.log(`[FingerControl] ✁EFound ${hand} ${finger} via Humanoid: ${normalized.length} bones [${boneNamesList.join(', ')}]`)
           return normalized
         }
       }
@@ -330,16 +330,16 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
 
     console.log(`[FingerControl] Humanoid search failed for ${hand} ${finger}, trying hierarchy search...`)
 
-    // Humanoidで見つからなければ、手のボーンの子孫から名前で検索
+    // Humanoidで見つからなければ、手のボ�Eンの子孫から名前で検索
     if (isBoneLike(handBone)) {
       const result = searchFingerBonesInHierarchy(handBone, hand, finger, handBone)
       if (result && result.length >= 1) {
-        console.log(`[FingerControl] ✓ Found ${hand} ${finger} via hand hierarchy: ${result.length} bones`)
+        console.log(`[FingerControl] ✁EFound ${hand} ${finger} via hand hierarchy: ${result.length} bones`)
         return result
       }
     }
 
-    // それでも見つからなければルート全体から検索
+    // それでも見つからなければルート�E体から検索
     const root =
       model?.scene ||
       model?.originalScene ||
@@ -350,16 +350,16 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     if (root && root !== handBone) {
       const result = searchFingerBonesInHierarchy(root, hand, finger, handBone)
       if (result && result.length >= 1) {
-        console.log(`[FingerControl] ✓ Found ${hand} ${finger} via root search: ${result.length} bones`)
+        console.log(`[FingerControl] ✁EFound ${hand} ${finger} via root search: ${result.length} bones`)
         return result
       }
     }
 
-    console.warn(`[FingerControl] ✗ Could not find bones for ${hand} ${finger}`)
+    console.warn(`[FingerControl] ✁ECould not find bones for ${hand} ${finger}`)
     return null
   }
 
-  // 階層構造から持E�E�Eボ�Eンを名前で検索
+  // 階層構造から持E�E�E�E�Eボ�Eンを名前で検索
   function searchFingerBonesInHierarchy(rootNode, hand, finger, handBone) {
     const fingerKey = finger.toLowerCase()
     const fingerAliases = new Set([fingerKey])
@@ -423,11 +423,11 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     return normalized && normalized.length >= 1 ? normalized : null
   }
 
-  // モチE�E��E�全体�E持E�E�Eーンマッピングを解決
+  // モチE�E�E�E��E�E�E�全体�E持E�E�E�E�Eーンマッピングを解決
   function resolveFingerBones(model, humanoid) {
     if (!model || !humanoid) return null
     
-    // キャチE�E��E�ュチェチE�E��E�
+    // キャチE�E�E�E��E�E�E�ュチェチE�E�E�E��E�E�E�
     let mapping = resolvedBoneMappings.get(model)
     if (mapping) return mapping
     
@@ -466,7 +466,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       if (bones) {
         bones.forEach((bone, index) => {
           const key = `left_${finger}_${index}`
-          // ワールド�EトリチE�E��E�スを更新してから回転を保孁E
+          // ワールド�EトリチE�E�E�E��E�E�E�スを更新してから回転を保孁E
           try { bone.updateWorldMatrix(true, false) } catch {}
           rotations[key] = bone.quaternion.clone()
           if (bone?.userData?.__fingerCurlAxis) {
@@ -482,7 +482,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       if (bones) {
         bones.forEach((bone, index) => {
           const key = `right_${finger}_${index}`
-          // ワールド�EトリチE�E��E�スを更新してから回転を保孁E
+          // ワールド�EトリチE�E�E�E��E�E�E�スを更新してから回転を保孁E
           try { bone.updateWorldMatrix(true, false) } catch {}
           rotations[key] = bone.quaternion.clone()
           if (bone?.userData?.__fingerCurlAxis) {
@@ -499,7 +499,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
   function applyFingerPose() {
     const model = getActiveModel?.()
     if (!model?.vrm?.humanoid) {
-      // モチE�E��E�がなぁE�E��E�合�E静かに終亁E�E��E�警告�E出さなぁE�E��E�E
+      // モチE�E�E�E��E�E�E�がなぁE�E�E�E��E�E�E�合�E静かに終亁E�E�E�E��E�E�E�警告�E出さなぁE�E�E�E��E�E�E�E
       return
     }
     
@@ -514,7 +514,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       return
     }
     
-    // チE�E��E�チE�E��E�: fingerStatesの冁E�E��E�を確認（�E回�Eみ�E�E�E�E
+    // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�: fingerStatesの冁E�E�E�E��E�E�E�を確認（�E回�Eみ�E�E�E�E�E�E�E�E
     if (!model.userData?.__fingerStatesLoggedOnce) {
       if (!model.userData) model.userData = {}
       model.userData.__fingerStatesLoggedOnce = true
@@ -535,11 +535,23 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     }
 
     const readAxisOverride = key => {
-      if (!axisOverrides || typeof axisOverrides !== 'object') return 'auto'
+      if (!axisOverrides || typeof axisOverrides !== 'object') return 'z+'
       const raw = axisOverrides[key]
-      return typeof raw === 'string' ? raw : 'auto'
+      if (typeof raw !== 'string') return 'z+'
+      const normalized = raw.trim().toLowerCase()
+      if (!normalized || normalized === 'auto') return 'z+'
+      switch (normalized) {
+        case 'x+':
+        case 'x-':
+        case 'y+':
+        case 'y-':
+        case 'z+':
+        case 'z-':
+          return normalized
+        default:
+          return 'z+'
+      }
     }
-
     const trackedFingerKeys = [
       ...Object.keys(FINGER_BONES.left).map(finger => `left_${finger}`),
       ...Object.keys(FINGER_BONES.right).map(finger => `right_${finger}`)
@@ -547,24 +559,24 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
 
     const hasActiveCurl = trackedFingerKeys.some(key => Math.abs(readFingerAngle(key)) > 0.1)
 
-    // チE�E��E�チE�E��E�: 初回のみログを�E劁E
+    // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�: 初回のみログを�E劁E
     if (hasActiveCurl && !model.userData?.__fingerControlDebugLogged) {
       if (!model.userData) model.userData = {}
       model.userData.__fingerControlDebugLogged = true
       console.log('[FingerControl] applyFingerPose called with active curl values')
       
-      // アクチE�E��E�ブな持E�E��E�ログ出劁E
+      // アクチE�E�E�E��E�E�E�ブな持E�E�E�E��E�E�E�ログ出劁E
       const activeFingers = trackedFingerKeys.filter(key => Math.abs(readFingerAngle(key)) > 0.1)
       console.log('[FingerControl] Active fingers:', activeFingers.map(key => `${key}: ${readFingerAngle(key).toFixed(1)}°`))
     }
 
     if (!hasActiveCurl) {
-      // カールが�Eて0の場合�E初期状態にリセチE�E��E�
+      // カールが�Eて0の場合�E初期状態にリセチE�E�E�E��E�E�E�
       if (initialRotations.has(model)) {
         const rotations = initialRotations.get(model)
         const mapping = resolveFingerBones(model, humanoid)
         if (mapping) {
-          // 左手�E持E�E��E�初期状態に戻ぁE
+          // 左手�E持E�E�E�E��E�E�E�初期状態に戻ぁE
           Object.keys(FINGER_BONES.left).forEach(finger => {
             const bones = mapping.left[finger]
             if (bones) {
@@ -578,7 +590,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
               })
             }
           })
-          // 右手�E持E�E��E�初期状態に戻ぁE
+          // 右手�E持E�E�E�E��E�E�E�初期状態に戻ぁE
           Object.keys(FINGER_BONES.right).forEach(finger => {
             const bones = mapping.right[finger]
             if (bones) {
@@ -594,10 +606,10 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
           })
         }
         initialRotations.delete(model)
-        // チE�E��E�チE�E��E�フラグもリセチE�E��E�
+        // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�フラグもリセチE�E�E�E��E�E�E�
         if (model.userData) {
           delete model.userData.__fingerControlDebugLogged
-          // 吁E�E��E�のチE�E��E�チE�E��E�フラグもリセチE�E��E�
+          // 吁E�E�E�E��E�E�E�のチE�E�E�E��E�E�E�チE�E�E�E��E�E�E�フラグもリセチE�E�E�E��E�E�E�
           Object.keys(model.userData).forEach(key => {
             if (key.includes('_curl_debug') || key.includes('_no_bones') || key.includes('_applied')) {
               delete model.userData[key]
@@ -613,7 +625,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     
     // 解決された�Eーンマッピングを取征E
     let mapping = resolveFingerBones(model, humanoid)
-    // もし未検�E持E�E��E�ある場合�EキャチE�E��E�ュを破棁E�E��E�て再探索�E�E�E�モチE�E��E�ロード後遅延生�Eケース対策！E
+    // もし未検�E持E�E�E�E��E�E�E�ある場合�EキャチE�E�E�E��E�E�E�ュを破棁E�E�E�E��E�E�E�て再探索�E�E�E�E�E�E�E�モチE�E�E�E��E�E�E�ロード後遅延生�Eケース対策！E
     const missing = mapping && (
       Object.values(mapping.left).some(v => !v) ||
       Object.values(mapping.right).some(v => !v)
@@ -628,7 +640,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       return
     }
     
-    // チE�E��E�チE�E��E�: 検�Eされた�Eーンを確認（�E回�Eみ�E�E�E�E
+    // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�: 検�Eされた�Eーンを確認（�E回�Eみ�E�E�E�E�E�E�E�E
     if (!model.userData?.__fingerBonesDetected) {
       if (!model.userData) model.userData = {}
       model.userData.__fingerBonesDetected = true
@@ -698,13 +710,13 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       initialRotations.set(model, savedRotations)
     }
 
-    // 吁E�E��E�節に最大90度まで曲げる�E�E�E�第一〜第三関節を均等に�E�E�E�E
+    // 吁E�E�E�E��E�E�E�節に最大90度まで曲げる�E�E�E�E�E�E�E�第一〜第三関節を均等に�E�E�E�E�E�E�E�E
     const clampedAngleDeg = THREE.MathUtils.clamp(angleDeg ?? 0, -90, 90)
 
-    // 第一〜第三関節�E�E�E�最大3関節�E�E�E�を曲げる
+    // 第一〜第三関節�E�E�E�E�E�E�E�最大3関節�E�E�E�E�E�E�E�を曲げる
     const jointsToRotate = Math.min(MAX_FINGER_JOINTS, bones.length)
     
-    // チE�E��E�チE�E��E�: カールの適用をログ出力（�E回�Eみ�E�E�E�E
+    // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�: カールの適用をログ出力（�E回�Eみ�E�E�E�E�E�E�E�E
     const logKey = `${hand}_${finger}_curl_applied`
     if (Math.abs(clampedAngleDeg) > 0.5 && !model.userData?.[logKey]) {
       if (!model.userData) model.userData = {}
@@ -730,7 +742,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       return
     }
 
-    // 吁E�E��E�節を曲げる
+    // 吁E�E�E�E��E�E�E�節を曲げる
     const overrideAxisVec = createAxisVectorFromOverride(axisOverride)
 
     for (let index = 0; index < jointsToRotate; index++) {
@@ -753,7 +765,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       // 初期回転に戻ぁE
       bone.quaternion.copy(initialRot)
       
-      // 坁E�E��E��E�E刁E 吁E�E��E�節が同じ角度で曲がる
+      // 坁E�E�E�E��E�E�E��E�E�E�E刁E 吁E�E�E�E��E�E�E�節が同じ角度で曲がる
       const angle = THREE.MathUtils.degToRad(clampedAngleDeg)
       
       let curlAxis = null
@@ -778,10 +790,10 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       const rotationQuat = new THREE.Quaternion().setFromAxisAngle(normalizedAxis, angle)
       bone.quaternion.multiply(rotationQuat)
       
-      // マトリチE�E��E�スを更新
+      // マトリチE�E�E�E��E�E�E�スを更新
       bone.updateMatrix()
       
-      // チE�E��E�チE�E��E�: 回転の適用をログ出力（�E回�Eみ�E�E�E�E
+      // チE�E�E�E��E�E�E�チE�E�E�E��E�E�E�: 回転の適用をログ出力（�E回�Eみ�E�E�E�E�E�E�E�E
       const jointLogKey = `${hand}_${finger}_${index}_rotation_applied`
       if (Math.abs(clampedAngleDeg) > 0.5 && !model.userData?.[jointLogKey]) {
         if (!model.userData) model.userData = {}
@@ -790,7 +802,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
       }
     }
     
-    // すべてのボ�Eンの更新が完亁E�E��E�た後、ワールド�EトリチE�E��E�スを強制皁E�E��E�再計箁E
+    // すべてのボ�Eンの更新が完亁E�E�E�E��E�E�E�た後、ワールド�EトリチE�E�E�E��E�E�E�スを強制皁E�E�E�E��E�E�E�再計箁E
     for (let index = 0; index < jointsToRotate; index++) {
       const bone = bones[index]
       if (!isBoneLike(bone)) continue
@@ -802,7 +814,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     }
   }
   
-  // ボ�Eンの実際の構造に基づぁE�E��E�最適な回転軸を決宁E
+  // ボ�Eンの実際の構造に基づぁE�E�E�E��E�E�E�最適な回転軸を決宁E
   function determineCurlAxis(bone, hand, finger, jointIndex, handBone, chain) {
     if (!bone) return null
 
@@ -868,7 +880,7 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
 
     if (finger === 'thumb') {
       if (jointIndex === 0 && palmDirection) {
-        // 親指の付け根は手の平法線と指方向の外積で開閉軸を決定
+        // 親持E�E付け根は手�E平法線と持E��向�E外積で開閉軸を決宁E
         const referenceDirection = childDirection || defaultWorldAxis
         const palmNormal = palmDirection.clone().cross(referenceDirection)
         if (palmNormal.lengthSq() > 1e-6) {
@@ -943,6 +955,8 @@ export function useFingerControl(getFingerStates, getActiveModel, getFingerAxisO
     applyFingerPose
   }
 }
+
+
 
 
 

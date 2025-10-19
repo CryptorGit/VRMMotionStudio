@@ -24,6 +24,20 @@ export const TRACKER_DEFS = [
 
 export const TRACKER_ROTATION_ORDERS = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX']
 
+// 回転軸の設定（デフォルトは+Z）
+export const ROTATION_AXIS_OPTIONS = [
+  { value: '+X', label: '+X' },
+  { value: '-X', label: '-X' },
+  { value: '+Y', label: '+Y' },
+  { value: '-Y', label: '-Y' },
+  { value: '+Z', label: '+Z' },
+  { value: '-Z', label: '-Z' }
+]
+
+export const DEFAULT_ROTATION_AXIS = '+Z'
+
+export const TRACKER_ROTATION_AXES = ROTATION_AXIS_OPTIONS.map(option => option.value)
+
 function toColorHex(value, fallback = '#5c8cff') {
   if (typeof value === 'string' && value.trim()) {
     return value.trim().startsWith('#') ? value.trim() : `#${value.trim()}`
@@ -94,8 +108,8 @@ function trackerModelIndex(key) {
 
 function formatTrackerLabel(baseLabel, modelIndex) {
   const idx = Number(modelIndex) || 1
-  const suffix = idx <= 1 ? 1 : idx
-  return `${baseLabel} ${suffix}`
+  // 常に番号を表示（1, 2, 3, ...）
+  return `${baseLabel} ${idx}`
 }
 
 /**
@@ -361,7 +375,8 @@ export function useVirtualTrackers({
       enabled: true,
       order: DEFAULT_ROTATION_ORDER,
       angles: { x: 0, y: 0, z: 0 },
-      axisScale: { x: 1, y: 1, z: 1 }
+      axisScale: { x: 1, y: 1, z: 1 },
+      rotationAxis: DEFAULT_ROTATION_AXIS
     }
   }
 
@@ -559,6 +574,7 @@ export function useVirtualTrackers({
         position: trackerLocalPos.toArray([]),
         rotation: mesh.quaternion.toArray([]),
         order: state?.order || DEFAULT_ROTATION_ORDER,
+        rotationAxis: state?.rotationAxis || DEFAULT_ROTATION_AXIS,
         enabled: state?.enabled !== false,
         color: colorHex // トラッカーの色を保存
       }
@@ -750,7 +766,10 @@ export function useVirtualTrackers({
     // If a group exists but isn't in the scene or trackers list is incomplete, rebuild
     if (group.value) {
       const inScene = !!scene.value && scene.value.children.includes(group.value)
-      const complete = trackers.value.length === TRACKER_DEFS.length
+      // モデル数に応じてトラッカー数を計算
+      const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+      const expectedTrackerCount = TRACKER_DEFS.length * modelCount
+      const complete = trackers.value.length === expectedTrackerCount
       if (inScene && complete) return
       // stale or incomplete -> dispose and recreate
       disposeGizmos()
@@ -758,61 +777,70 @@ export function useVirtualTrackers({
     group.value = markRaw(new THREE.Group())
     group.value.name = 'VirtualTrackers'
     scene.value.add(group.value)
-  const sphere = markRaw(new THREE.SphereGeometry(currentDotSize(), 16, 16))
-    for (const def of TRACKER_DEFS) {
-  const isCamera = def.key === CAMERA_TRACKER_KEY
-      const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
-      // Always draw on top of the model
-      mat.depthTest = false
-      mat.depthWrite = false
-      let geometry
-      if (isCamera) {
-        const baseSize = currentDotSize()
-        geometry = markRaw(new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24))
-        geometry.rotateX(Math.PI / 2)
-      } else {
-        // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
-        geometry = markRaw(sphere.clone())
-      }
-      const mesh = markRaw(new THREE.Mesh(geometry, mat))
-      mesh.renderOrder = 998 // labels use 999
-      mesh.name = `vt:${def.key}`
-      mesh.userData.__vt = true
-      mesh.userData.isCamera = isCamera
-      // start hidden
-      mesh.visible = false
-  const sprite = markRaw(createLabelSprite(def.label))
-      sprite.position.set(0, isCamera ? 0.45 : 0.15, 0)
-  sprite.visible = labelsVisible()
-  // capture base size to allow absolute scaling later
-  sprite.userData.baseScale = sprite.scale.clone()
-  sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
-      let rotationRing = null
-      let rotationAxes = null
-      if (!isCamera) {
-        rotationRing = markRaw(createRotationRing(def.color))
-  if (rotationRing) mesh.add(rotationRing)
-  rotationAxes = markRaw(createRotationAxesHelper(trackerAxesLengthState || 0.05))
-        if (rotationAxes) {
-          rotationAxes.visible = rotationAxesGlobalVisible
-          mesh.add(rotationAxes)
+    const sphere = markRaw(new THREE.SphereGeometry(currentDotSize(), 16, 16))
+    
+    // モデル数に応じてトラッカーを作成
+    const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+    
+    for (let modelIdx = 1; modelIdx <= modelCount; modelIdx++) {
+      for (const def of TRACKER_DEFS) {
+        const isCamera = def.key === CAMERA_TRACKER_KEY
+        const trackerKey = makeTrackerKey(def.key, modelIdx)
+        const trackerLabel = formatTrackerLabel(def.label, modelIdx)
+        
+        const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
+        // Always draw on top of the model
+        mat.depthTest = false
+        mat.depthWrite = false
+        let geometry
+        if (isCamera) {
+          const baseSize = currentDotSize()
+          geometry = markRaw(new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24))
+          geometry.rotateX(Math.PI / 2)
+        } else {
+          // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
+          geometry = markRaw(sphere.clone())
         }
+        const mesh = markRaw(new THREE.Mesh(geometry, mat))
+        mesh.renderOrder = 998 // labels use 999
+        mesh.name = `vt:${trackerKey}`
+        mesh.userData.__vt = true
+        mesh.userData.isCamera = isCamera
+        // start hidden
+        mesh.visible = false
+        const sprite = markRaw(createLabelSprite(trackerLabel))
+        sprite.position.set(0, isCamera ? 0.45 : 0.15, 0)
+        sprite.visible = labelsVisible()
+        // capture base size to allow absolute scaling later
+        sprite.userData.baseScale = sprite.scale.clone()
+        sprite.scale.copy(sprite.userData.baseScale.clone().multiplyScalar(currentLabelScale()))
+        let rotationRing = null
+        let rotationAxes = null
+        if (!isCamera) {
+          rotationRing = markRaw(createRotationRing(def.color))
+          if (rotationRing) mesh.add(rotationRing)
+          rotationAxes = markRaw(createRotationAxesHelper(trackerAxesLengthState || 0.05))
+          if (rotationAxes) {
+            rotationAxes.visible = rotationAxesGlobalVisible
+            mesh.add(rotationAxes)
+          }
+        }
+        mesh.add(sprite)
+        group.value.add(mesh)
+        // camera tracker disabled
+        const initialColor = toColorHex(def.color)
+        trackers.value.push({
+          key: trackerKey,
+          name: trackerLabel,
+          mesh,
+          labelSprite: sprite,
+          rotationRing,
+          rotationAxes,
+          color: initialColor
+        })
+        ensureTrackerState(trackerKey)
+        applyTrackerStateToMesh(trackerKey)
       }
-      mesh.add(sprite)
-      group.value.add(mesh)
-      // camera tracker disabled
-      const initialColor = toColorHex(def.color)
-      trackers.value.push({
-        key: def.key,
-        name: def.label,
-        mesh,
-        labelSprite: sprite,
-        rotationRing,
-        rotationAxes,
-        color: initialColor
-      })
-      ensureTrackerState(def.key)
-      applyTrackerStateToMesh(def.key)
     }
   }
 
@@ -866,6 +894,8 @@ export function useVirtualTrackers({
         setSavedPositions(model, null)
         // トラッカー回転オフセットもクリア
         trackerRotationOffsets.delete(model)
+        // 初期ポーズキャッシュもクリアして、現在のボーン位置ではなく初期位置を使用
+        initialWorldPose.delete(model)
       }
     } catch {}
     setSavedCameraTransform(null)
@@ -1558,6 +1588,25 @@ export function useVirtualTrackers({
     }
   }
 
+function setTrackerRotationAxis(key, axis) {
+  if (key === CAMERA_TRACKER_KEY) return
+  const state = ensureTrackerState(key)
+  if (!state) return
+  const normalized = typeof axis === 'string' ? axis.trim().toUpperCase() : DEFAULT_ROTATION_AXIS
+  const next = ROTATION_AXIS_OPTIONS.some(option => option.value === normalized)
+    ? normalized
+    : DEFAULT_ROTATION_AXIS
+  if (state.rotationAxis !== next) {
+    state.rotationAxis = next
+    markActiveKey(key)
+    persistTrackerTransforms()
+    notifyTrackerTransform(key, {
+      type: 'rotationAxis',
+      axis: next
+    })
+  }
+}
+
   function setTrackerAxisScale(key, axisScale, { persist = true } = {}) {
     if (key === CAMERA_TRACKER_KEY) return
     const state = ensureTrackerState(key)
@@ -1599,10 +1648,43 @@ export function useVirtualTrackers({
 
   function resetTrackerRotation(key, { keepEnabled = true, persist = true } = {}) {
     if (key === CAMERA_TRACKER_KEY) return
-    resetTrackerStateToDefault(key, { keepEnabled })
+    const tracker = trackers.value.find(t => t.key === key)
+    const state = ensureTrackerState(key)
+    if (!tracker?.mesh || !state) return
+    
+    // 初期回転を取得（初期ポーズから）
+    const model = getActiveModel()
+    const initMap = initialWorldPose.get(model)
+    const { baseKey } = parseTrackerKey(key)
+    
+    if (initMap && initMap.has(baseKey)) {
+      const entry = initMap.get(baseKey)
+      if (entry?.quaternion) {
+        // 初期回転を適用
+        tracker.mesh.quaternion.copy(entry.quaternion)
+        syncTrackerStateFromMesh(key)
+      } else {
+        // フォールバック: ゼロ回転
+        resetTrackerStateToDefault(key, { keepEnabled })
+      }
+    } else {
+      // 初期ポーズがない場合はゼロ回転
+      resetTrackerStateToDefault(key, { keepEnabled })
+    }
+    
     markActiveKey(key)
     if (persist) persistTrackerTransforms()
-    notifyTrackerTransform(key, { type: 'reset', persisted: persist !== false })
+    const snapshotAngles = {
+      x: sanitizeAngleInput(state.angles?.x || 0),
+      y: sanitizeAngleInput(state.angles?.y || 0),
+      z: sanitizeAngleInput(state.angles?.z || 0)
+    }
+    notifyTrackerTransform(key, {
+      type: 'rotation',
+      angles: snapshotAngles,
+      persisted: persist !== false,
+      source: 'reset'
+    })
   }
 
   function resetAllTrackerRotations({ keepEnabled = true, persist = true } = {}) {
@@ -2530,6 +2612,7 @@ export function useVirtualTrackers({
       rotation,
       angles,
       order: state?.order || DEFAULT_ROTATION_ORDER,
+      rotationAxis: state?.rotationAxis || DEFAULT_ROTATION_AXIS,
       enabled: state?.enabled !== false
     }
   }
@@ -2647,6 +2730,7 @@ export function useVirtualTrackers({
     saveCameraStateFromObject,
   getTrackerSnapshot,
   getAllTrackerStates,
+  setTrackerRotationAxis,
   setRotationAxesVisible,
   updateRotationAxesLength,
   setForearmTwistShareRatio,

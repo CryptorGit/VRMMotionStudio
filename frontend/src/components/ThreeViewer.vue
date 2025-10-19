@@ -35,12 +35,12 @@
             :secondary-min-pixels="TIMELINE_MIN_HEIGHT"
           >
             <template #primary>
-              <section class="workspace-panel workspace-panel--viewport" aria-label="ビューポのト領域">
+              <section class="workspace-panel workspace-panel--viewport" :aria-label="viewportTexts.area || 'Viewport area'">
                 <div class="workspace-panel__body workspace-panel__body--viewport">
                   <div class="viewport-frame">
                     <div class="viewport-overlay viewport-overlay--top-left top-left-controls">
-                      <label class="mode-switch" aria-label="ビューモード切替">
-                        <span>モード</span>
+                      <label class="mode-switch" :aria-label="viewportTexts.modeToggle || 'Switch view mode'">
+                        <span>{{ viewportTexts.mode }}</span>
                         <select v-model="viewportMode">
                           <option v-for="mode in viewportModes" :key="mode.value" :value="mode.value">
                             {{ mode.label }}
@@ -48,24 +48,24 @@
                         </select>
                       </label>
                       <div class="round-buttons">
-                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip('元に戻す(Undo)')">⟲</button>
-                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip('やり直し(Redo)')">⟳</button>
+                        <button class="round-btn" :disabled="!history.canUndo" @click="onUndo" :title="tooltip(viewportTexts.undo || '')">⟲</button>
+                        <button class="round-btn" :disabled="!history.canRedo" @click="onRedo" :title="tooltip(viewportTexts.redo || '')">⟳</button>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--top-right">
                       <div class="camera-status">
-                        <span class="camera-status__label">RenderCam</span>
+                        <span class="camera-status__label">{{ viewportTexts.renderCam }}</span>
                         <span class="camera-status__resolution">{{ renderCameraWidth }} ×{{ renderCameraHeight }}</span>
                       </div>
                     </div>
                     <div v-if="isCameraMode" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="camera-hint">
-                        左ドラッグ: 平行移動／右ドラッグ: パン・チルト／ホイール: 前後移動
+                        {{ viewportTexts.cameraHint }}
                       </p>
                     </div>
                     <div v-else-if="virtualTrackersEnabled" class="viewport-overlay viewport-overlay--bottom-left">
                       <p class="tracker-hint">
-                        左ドラッグ: 位置移動／Shift: 微調整
+                        {{ viewportTexts.trackerHint }}
                       </p>
                     </div>
                     <div class="viewport-overlay viewport-overlay--bottom-right">
@@ -77,7 +77,7 @@
                         @contextmenu.prevent
                       >
                         <div class="yaw-ring__indicator" :style="rollIndicatorStyle"></div>
-                        <div class="yaw-ring__label">Roll {{ renderCameraRollDeg.toFixed(0) }}°</div>
+                        <div class="yaw-ring__label">{{ viewportTexts.roll }} {{ renderCameraRollDeg.toFixed(0) }}°</div>
                       </div>
                     </div>
                     <div
@@ -94,7 +94,7 @@
               </section>
             </template>
             <template #secondary>
-              <section class="workspace-panel workspace-panel--timeline" aria-label="タイムライン領域">
+              <section class="workspace-panel workspace-panel--timeline" :aria-label="timelineTexts.area || 'Timeline area'">
                 <div class="workspace-panel__body workspace-panel__body--timeline">
                   <TimelineEditor
                     height="100%"
@@ -136,7 +136,7 @@
           </SplitPane>
         </template>
         <template #secondary>
-          <aside class="workspace-panel workspace-panel--settings" aria-label="設定領域">
+              <aside class="workspace-panel workspace-panel--settings" :aria-label="ariaTexts.settingsArea || 'Settings area'">
             <div class="workspace-panel__body workspace-panel__body--settings">
               <SettingsSidebar
                 :ambient="ambientLight"
@@ -172,6 +172,7 @@
                 :tracker-position="selectedTrackerPosition"
                 :tracker-rotation="selectedTrackerRotation"
                 :tracker-rotation-order="selectedTrackerRotationOrder"
+                :tracker-rotation-axis="selectedTrackerRotationAxis"
                 v-model:show-tracker-axes="showTrackerAxes"
                 v-model:tracker-axes-length="trackerAxesLength"
                 :finger-states="fingerStates"
@@ -181,6 +182,7 @@
                 @update:tracker-position="handleTrackerPositionUpdate"
                 @update:tracker-rotation="handleTrackerRotationUpdate"
                 @update:tracker-rotation-order="handleTrackerRotationOrderUpdate"
+                @update:tracker-rotation-axis="handleTrackerRotationAxisUpdate"
                 @reset-tracker-position="handleResetTrackerPosition"
                 @reset-tracker-rotation="handleResetTrackerRotation"
                 :tracker-states="trackerStatesView"
@@ -270,6 +272,7 @@ import StatusBar from './layout/StatusBar.vue'
 import SplitPane from './layout/SplitPane.vue'
 import * as THREE from 'three'
 import { API_BASE_URL } from '../config.js'
+import { useI18n } from '../locales/index.js'
 import {
   ambientLight,
   directionalLight,
@@ -282,7 +285,7 @@ import {
 import { useFileLoader } from '../composables/useFileLoader.js'
 import { useRenderer } from '../composables/useRenderer.js'
 import { useErrorHandlers } from '../composables/useErrorHandlers.js'
-import { useVirtualTrackers, TRACKER_ROTATION_ORDERS, TRACKER_DEFS } from '../composables/useVirtualTrackers.js'
+import { useVirtualTrackers, TRACKER_ROTATION_ORDERS, TRACKER_ROTATION_AXES, TRACKER_DEFS } from '../composables/useVirtualTrackers.js'
 import { useTimeline } from '../composables/useTimeline.js'
 import { useHistory } from '../composables/useHistory.js'
 import { captionInjectionKey } from '../composables/useCaptions.js'
@@ -294,6 +297,14 @@ const viewer = ref(null)
 const currentMeshRef = ref(null)
 const springBoneEnabled = ref(true)
 const lookAtEnabled = ref(true)
+
+const { t } = useI18n()
+const viewportTexts = computed(() => t.value?.viewport ?? {})
+const notificationsTexts = computed(() => t.value?.notifications ?? {})
+const timelineTexts = computed(() => t.value?.timeline ?? {})
+const ariaTexts = computed(() => t.value?.aria ?? {})
+const commonTexts = computed(() => t.value?.common ?? {})
+const statusTexts = computed(() => t.value?.statusBar ?? {})
 
 const scene = shallowRef(null)
 const camera = shallowRef(null)
@@ -348,6 +359,10 @@ const sanitizeTrackerRotationOrder = order => {
   return TRACKER_ROTATION_ORDERS.includes(normalized) ? normalized : normalized
 }
 const selectedTrackerRotationOrder = ref(sanitizeTrackerRotationOrder('YXZ'))
+
+// トラッカー回転軸の設定
+const selectedTrackerRotationAxis = ref('+Z')
+
 // トラッカー回転軸の表示設定
 const showTrackerAxes = ref(false)
 const trackerAxesLength = ref(0.05)
@@ -455,10 +470,10 @@ const cameraTranslateSensitivity = ref(1.0) // multiplier for left-drag pan
 const cameraRotateSensitivity = ref(1.0) // multiplier for right-drag yaw/pitch
 
 const rollRingRef = ref(null)
-const viewportModes = [
-  { value: 'view', label: 'ビューモード' },
-  { value: 'camera', label: 'カメラモード' }
-]
+const viewportModes = computed(() => [
+  { value: 'view', label: viewportTexts.value.viewMode || 'View Mode' },
+  { value: 'camera', label: viewportTexts.value.cameraMode || 'Camera Mode' }
+])
 
 const cameraInteraction = reactive({
   pointerId: null,
@@ -538,7 +553,7 @@ const fingerStates = reactive({
   right_little: 0
 })
 
-const ALLOWED_FINGER_AXIS_VALUES = new Set(['auto', 'x+', 'x-', 'y+', 'y-', 'z+', 'z-'])
+const ALLOWED_FINGER_AXIS_VALUES = new Set(['x+', 'x-', 'y+', 'y-', 'z+', 'z-'])
 const fingerAxisOverridesByModel = reactive({})
 let pendingFingerAxisOverridesByName = null
 const fallbackFingerAxisOverrides = Object.freeze(createDefaultFingerAxisOverrides())
@@ -546,15 +561,15 @@ const fallbackFingerAxisOverrides = Object.freeze(createDefaultFingerAxisOverrid
 function createDefaultFingerAxisOverrides() {
   const defaults = {}
   for (const key of FINGER_STATE_KEYS) {
-    defaults[key] = 'auto'
+    defaults[key] = 'z+'
   }
   return defaults
 }
 
 function normalizeFingerAxisValue(value) {
-  if (typeof value !== 'string') return 'auto'
+  if (typeof value !== 'string') return 'z+'
   const normalized = value.trim().toLowerCase()
-  return ALLOWED_FINGER_AXIS_VALUES.has(normalized) ? normalized : 'auto'
+  return ALLOWED_FINGER_AXIS_VALUES.has(normalized) ? normalized : 'z+'
 }
 
 function ensureFingerAxisOverridesEntry(modelId) {
@@ -634,6 +649,19 @@ function showNotice(message, duration = 5000) {
       uiNoticeTimer = null
     }, duration)
   }
+}
+
+const notify = (key, fallback, duration = 3200) => {
+  const message = notificationsTexts.value[key] || fallback
+  if (message) showNotice(message, duration)
+}
+
+const notifyWithVars = (key, fallback, vars = {}, duration = 3200) => {
+  const template = notificationsTexts.value[key] || fallback
+  const message = typeof template === 'string'
+    ? template.replace(/\{(\w+)\}/g, (_, token) => (vars[token] != null ? String(vars[token]) : ''))
+    : fallback
+  if (message) showNotice(message, duration)
 }
 
 try {
@@ -1046,14 +1074,14 @@ function handleCachePersisted(event = {}) {
   if (event.ok) {
     const successReasons = ['load', 'restore', 'visibilitychange', 'pagehide', 'remove']
     if (!cacheSavedToastShown && successReasons.includes(event.reason)) {
-      showNotice('キャッシュ: 保存しました', 2800)
+      notify('cacheSaved', 'Cache: Saved', 2800)
       cacheSavedToastShown = true
       try { sessionStorage.setItem(CACHE_SAVED_TOAST_KEY, '1') } catch {}
     }
   } else if (event.ok === false && event.reason !== 'clear') {
     const now = Date.now()
     if (!lastCacheErrorToastAt || now - lastCacheErrorToastAt > 10000) {
-      showNotice('キャッシュ: 保存に失敗しました。ブラウザのストレージ設定をご確認ください。', 5600)
+      notify('cacheFailed', 'Cache: Failed to save. Please check browser storage settings.', 5600)
       lastCacheErrorToastAt = now
     }
   }
@@ -1371,6 +1399,9 @@ function updateSelectedTrackerState(key) {
   if (snapshot.order) {
     selectedTrackerRotationOrder.value = sanitizeTrackerRotationOrder(snapshot.order)
   }
+  
+  // 回転軸（デフォルト）を更新
+  selectedTrackerRotationAxis.value = snapshot.rotationAxis || '+Z'
 }
 
 // トラッカー位置を更新
@@ -1403,6 +1434,16 @@ function handleTrackerRotationOrderUpdate(order) {
   // 現在の回転角度で新しい軸を適用
   if (selectedTrackerKey.value && trackerController) {
     trackerController.setTrackerRotationDegrees(selectedTrackerKey.value, selectedTrackerRotation.value, next)
+  }
+}
+
+// トラッカー回転軸（デフォルト）を更新
+function handleTrackerRotationAxisUpdate(axis) {
+  if (!TRACKER_ROTATION_AXES.includes(axis)) return
+  selectedTrackerRotationAxis.value = axis
+  // trackerControllerに反映（将来のIK実装用）
+  if (selectedTrackerKey.value && trackerController && trackerController.setTrackerRotationAxis) {
+    trackerController.setTrackerRotationAxis(selectedTrackerKey.value, axis)
   }
 }
 
@@ -1835,19 +1876,35 @@ const frameStatus = computed(() => {
   const fps = timelineFrameRate.value || 60
   const currentFrame = Math.round(timelineCurrentTime.value * fps)
   const endFrame = Math.max(Math.round(timelineEndTime.value * fps), 0)
-  return `フレーム ${currentFrame}/${endFrame} (${fps}fps)`
+  const template = statusTexts.value.frame || 'Frame {current}/{end} ({fps}fps)'
+  return template
+    .replace('{current}', String(currentFrame))
+    .replace('{end}', String(endFrame))
+    .replace('{fps}', String(fps))
 })
 
 const storageStatus = computed(() => {
-  if (!storageSupported.value) return 'キャッシュ: 標準保存'
+  if (!storageSupported.value) {
+    return statusTexts.value.cacheStandard || 'Cache: Standard storage'
+  }
   const usageBytes = storageUsage.value || 0
   const quotaBytes = storageQuota.value || 0
-  const guard = storagePersisted.value ? '保護' : '未保護'
+  const guard = storagePersisted.value
+    ? statusTexts.value.cacheGuardPersisted || 'Persisted'
+    : statusTexts.value.cacheGuardVolatile || 'Not persisted'
   if (!quotaBytes) {
-    return `キャッシュ ${formatStorage(usageBytes)} (${guard})`
+    const template = statusTexts.value.cacheUsage || 'Cache {usage} ({guard})'
+    return template
+      .replace('{usage}', formatStorage(usageBytes))
+      .replace('{guard}', guard)
   }
   const percent = quotaBytes > 0 ? Math.min(100, Math.max(0, Math.round((usageBytes / quotaBytes) * 100))) : 0
-  return `キャッシュ ${formatStorage(usageBytes)} / ${formatStorage(quotaBytes)} (${guard} ${percent}%)`
+  const template = statusTexts.value.cacheUsageDetailed || 'Cache {usage} / {quota} ({guard} {percent}%)'
+  return template
+    .replace('{usage}', formatStorage(usageBytes))
+    .replace('{quota}', formatStorage(quotaBytes))
+    .replace('{guard}', guard)
+    .replace('{percent}', String(percent))
 })
 
 const statusMessage = computed(() => {
@@ -2362,8 +2419,15 @@ watch(timelineCurrentTime, (newTime, oldTime) => {
 
 function resetVirtualTrackers() {
   try {
+    // リセット前に初期ポーズをクリアして、現在のボーン位置ではなく本当の初期位置を使用
     trackerController.reset()
-    showNotice('トラッカー: バーチャルトラッカーをリセットしました', 3200)
+    // 初期位置に強制的にレイアウト
+    setTimeout(() => {
+      if (trackerController?.layoutDefaultPositions) {
+        trackerController.layoutDefaultPositions({ force: true, ignoreSaved: true })
+      }
+    }, 50)
+    notify('trackersReset', 'Trackers: Virtual trackers reset.', 3200)
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
   } catch {}
@@ -2382,7 +2446,7 @@ function applyTimelinePoseImmediate() {
 
 function handleTimelineAddKey(payload) {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されていません', 4200)
+    notify('timelineNotReady', 'Timeline: Not initialized.', 4200)
     return
   }
   ensureVirtualTrackers()
@@ -2394,15 +2458,15 @@ function handleTimelineAddKey(payload) {
     if (Number.isFinite(payload?.time)) timelineController.setCurrentTime(payload.time)
     const entry = timelineController.addSnapshotAtTime(targetTime)
     if (!entry) {
-      showNotice('タイムライン: キーの追加に失敗しました', 4200)
+      notify('timelineAddFailed', 'Timeline: Failed to add keyframe.', 4200)
       return
     }
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('add-key')
-    showNotice('タイムライン: 現在のポーズをキーに追加しました', 2200)
+    notify('timelineKeyAdded', 'Timeline: Added current pose as keyframe.', 2200)
   } catch (error) {
-    showNotice('タイムライン: キーの追加に失敗しました', 4200)
+    notify('timelineAddFailed', 'Timeline: Failed to add keyframe.', 4200)
   }
 }
 
@@ -2543,37 +2607,37 @@ function pasteClipboardFallback(clipboard, anchorTime) {
 
 function handleTimelineCopyKeyframes() {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されていません', 4200)
+    notify('timelineNotReady', 'Timeline: Not initialized.', 4200)
     return
   }
   const ids = Array.isArray(timelineSelection.selectedIds) && timelineSelection.selectedIds.length
     ? timelineSelection.selectedIds
     : timelineSelection.frames.map(frame => frame.id)
   if (!ids.length) {
-    showNotice('タイムライン: コピのするキーを選択してください', 3200)
+    notify('timelineCopySelect', 'Timeline: Select keys to copy.', 3200)
     return
   }
   try {
     const clipboardPayload = captureTimelineClipboard(ids)
     if (!clipboardPayload) {
-      showNotice('タイムライン: キーのコピのに失敗しました', 4200)
+      notify('timelineCopyFailed', 'Timeline: Failed to copy keyframes.', 4200)
       return
     }
     timelineClipboard.value = clipboardPayload
-    showNotice(`タイムライン: ${clipboardPayload.frames.length}個のキーをコピのしました`, 2200)
+    notifyWithVars('timelineCopySuccess', 'Timeline: Copied {count} keyframe(s).', { count: clipboardPayload.frames.length }, 2200)
   } catch {
-    showNotice('タイムライン: キーのコピのに失敗しました', 4200)
+    notify('timelineCopyFailed', 'Timeline: Failed to copy keyframes.', 4200)
   }
 }
 
 function handleTimelinePasteKeyframes() {
   if (!timelineController) {
-    showNotice('タイムライン: 初期化されていません', 4200)
+    notify('timelineNotReady', 'Timeline: Not initialized.', 4200)
     return
   }
   const normalizedClipboard = normalizeClipboardPayload(timelineClipboard.value, timelineFrameRate.value || 60)
   if (!normalizedClipboard) {
-    showNotice('タイムライン: 貼り付けるキーがありません', 3200)
+    notify('timelinePasteEmpty', 'Timeline: No keyframes to paste.', 3200)
     return
   }
   timelineClipboard.value = normalizedClipboard
@@ -2585,15 +2649,15 @@ function handleTimelinePasteKeyframes() {
       ? timelineController.pasteKeyframes(normalizedClipboard, { time: anchorTime })
       : pasteClipboardFallback(normalizedClipboard, anchorTime)
     if (!Array.isArray(pasted) || !pasted.length) {
-      showNotice('タイムライン: キーの貼り付けに失敗しました', 4200)
+      notify('timelinePasteFailed', 'Timeline: Failed to paste keyframes.', 4200)
       return
     }
     applyTimelinePoseImmediate()
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('paste-keys')
-    showNotice(`タイムライン: ${pasted.length}個のキーを貼り付けました`, 2200)
+    notifyWithVars('timelinePasteSuccess', 'Timeline: Pasted {count} keyframe(s).', { count: pasted.length }, 2200)
   } catch {
-    showNotice('タイムライン: キーの貼り付けに失敗しました', 4200)
+    notify('timelinePasteFailed', 'Timeline: Failed to paste keyframes.', 4200)
   }
 }
 
@@ -2813,7 +2877,7 @@ function handleTimelineRange({ startFrame, endFrame }) {
 function handleTimelineRequestImport() {
   const input = timelineFileInput.value
   if (!input) {
-    showNotice('タイムライン: 読み込みに失敗しました (入力が見つかりません)', 4200)
+    notify('timelineLoadMissing', 'Timeline: Failed to load (input not found).', 4200)
     return
   }
   input.value = ''
@@ -2830,18 +2894,18 @@ async function handleTimelineImportFile(event) {
     pushHistory('import')
     const ok = timelineController.deserialize(data)
     if (!ok) {
-      showNotice('タイムライン: 読み込みに失敗しました', 4800)
+      notify('timelineLoadFailed', 'Timeline: Failed to load.', 4800)
       return
     }
     ensureVirtualTrackers()
     try { timelineController.pause() } catch {}
     applyTimelinePoseImmediate()
-    showNotice(`タイムライン: ${file.name} を読み込みました`, 3200)
+    notifyWithVars('timelineFileLoaded', 'Timeline: Loaded {name}.', { name: file.name }, 3200)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('import')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    showNotice('タイムライン: JSONの解析に失敗しました', 5200)
+    notify('timelineParseFailed', 'Timeline: Failed to parse JSON.', 5200)
   } finally {
     if (input) input.value = ''
   }
@@ -2860,9 +2924,9 @@ function handleTimelineExport() {
     anchor.click()
     document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
-    showNotice('タイムライン: エクスポのトしました', 2600)
+    notify('timelineExported', 'Timeline: Exported.', 2600)
   } catch {
-    showNotice('タイムライン: エクスポのトに失敗しました', 4800)
+    notify('timelineExportFailed', 'Timeline: Export failed.', 4800)
   }
 }
 
@@ -2873,12 +2937,12 @@ function handleTimelineClear() {
     timelineController.clearAll()
     timelineController.stop()
     timelineClipboard.value = null
-    showNotice('タイムライン: リセットしました', 2600)
+    notify('timelineReset', 'Timeline: Reset.', 2600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
   } catch {
-    showNotice('タイムライン: リセットに失敗しました', 4800)
+    notify('timelineResetFailed', 'Timeline: Reset failed.', 4800)
   }
 }
 
@@ -2891,13 +2955,13 @@ async function captureRenderImageToFile() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('画像書き出し レンダラーが初期化されていません', 3000)
+    notify('imageExportNoRenderer', 'Image export: Renderer not initialized.', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureImage] Capture already in progress')
-    showNotice('画像書き出し 処理中です', 2000)
+    notify('imageExportInProgress', 'Image export: Processing…', 2000)
     return
   }
   
@@ -3039,16 +3103,16 @@ async function captureRenderImageToFile() {
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureImage] User cancelled save dialog')
-        showNotice('画像書き出し キャンセルされました', 2000)
+        notify('imageExportCancelled', 'Image export: Cancelled.', 2000)
       } else {
         console.error('[CaptureImage] Save failed:', saveError)
-        showNotice('画像書き出し 保存に失敗しました', 3000)
+        notify('imageExportSaveFailed', 'Image export: Failed to save.', 3000)
       }
     }
     
   } catch (error) {
     console.error('[CaptureImage] Capture failed:', error)
-    showNotice('画像書き出し 失敗しました', 3000)
+    notify('imageExportFailed', 'Image export: Failed.', 3000)
   } finally {
     // 元の背景色に戻す
     scene.value.background = originalBackground
@@ -3104,7 +3168,7 @@ async function clearAllCache() {
     stopAudio()
     audioBuffer.value = null
     audioDuration.value = 0
-    showNotice('キャッシュ: キャッシュとタイムラインをリセットしました (End=3分', 3600)
+    notify('cacheReset', 'Cache: Reset cache and timeline.', 3600)
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('clear-cache')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
@@ -3124,7 +3188,7 @@ async function onAudioFileChange(event) {
   if (!file) return
   
   try {
-    showNotice('オーディオ: 読み込み中...', 2000)
+    notify('audioLoading', 'Audio: Loading…', 2000)
     
     // Initialize AudioContext if needed
     if (!audioContext.value) {
@@ -3177,7 +3241,7 @@ async function onAudioFileChange(event) {
     showNotice(`オーディオ: ${file.name} を読み込みました （${audioDuration.value.toFixed(2)}秒）`, 3200)
   } catch (error) {
     console.error('Audio load failed:', error)
-    showNotice('オーディオ: 読み込みに失敗しました', 4800)
+    notify('audioLoadFailed', 'Audio: Failed to load.', 4800)
   } finally {
     if (input) input.value = ''
   }
@@ -3191,7 +3255,7 @@ function removeAudio() {
   audioFileName.value = ''
   audioSampleRate.value = 0
   audioChannels.value = 0
-  showNotice('オーディオ: MP3を削除しました', 2600)
+  notify('audioRemoved', 'Audio: Removed MP3.', 2600)
 }
 
 async function captureImage() {
@@ -3203,18 +3267,18 @@ async function captureImage() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('画像書き出し レンダラーが初期化されていません', 3000)
+    notify('imageExportNoRenderer', 'Image export: Renderer not initialized.', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureImage] Capture already in progress')
-    showNotice('画像書き出し 処理中です', 2000)
+    notify('imageExportInProgress', 'Image export: Processing…', 2000)
     return
   }
 
   captureBusy.value = true
-  showNotice('画像書き出し 準備中...', 1000)
+  notify('imageExportPreparing', 'Image export: Preparing…', 1000)
 
   // 現在の背景色を保存
   const originalBackground = scene.value.background
@@ -3332,16 +3396,16 @@ async function captureImage() {
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureImage] User cancelled save dialog')
-        showNotice('画像書き出し キャンセルされました', 2000)
+        notify('imageExportCancelled', 'Image export: Cancelled.', 2000)
       } else {
         console.error('[CaptureImage] Save failed:', saveError)
-        showNotice('画像書き出し 保存に失敗しました', 3000)
+        notify('imageExportSaveFailed', 'Image export: Failed to save.', 3000)
       }
     }
     
   } catch (error) {
     console.error('[CaptureImage] Capture failed:', error)
-    showNotice('画像書き出し 失敗しました', 3000)
+    notify('imageExportFailed', 'Image export: Failed.', 3000)
   } finally {
     // 元の背景色に戻す
     scene.value.background = originalBackground
@@ -3370,19 +3434,19 @@ async function captureVideo() {
       scene: !!scene.value,
       camera: !!renderCamera.value
     })
-    showNotice('動画書き出し レンダラーが初期化されていません', 3000)
+    notify('videoExportNoRenderer', 'Video export: Renderer not initialized.', 3000)
     return
   }
   
   if (!timelineController || !timelineController.getKeyframes || timelineController.getKeyframes().length === 0) {
     console.warn('[CaptureVideo] No keyframes in timeline')
-    showNotice('動画書き出し タイムラインにキーフレームがありません', 3000)
+    notify('videoExportNoKeyframes', 'Video export: Timeline has no keyframes.', 3000)
     return
   }
 
   if (captureBusy.value) {
     console.warn('[CaptureVideo] Capture already in progress')
-    showNotice('動画書き出し 処理中です', 2000)
+    notify('videoExportInProgress', 'Video export: Processing…', 2000)
     return
   }
   
@@ -3434,7 +3498,7 @@ async function captureVideo() {
   }
   
   try {
-    showNotice('動画書き出し 準備中...', 2000)
+    notify('videoExportPreparing', 'Video export: Preparing…', 2000)
     console.log('[CaptureVideo] Preparing frame-by-frame rendering')
     
     // 完全な緑背景（グリーンバック（に設定
@@ -3549,7 +3613,7 @@ async function captureVideo() {
     // 録画停止
     mediaRecorder.stop()
     console.log('[CaptureVideo] All frames rendered, stopping recording')
-    showNotice('動画書き出し 録画完了、保存中...', 2000)
+    notify('videoExportSaving', 'Video export: Recording finished, saving…', 2000)
     
     // 録画完了、待機
     await recordingComplete
@@ -3581,7 +3645,7 @@ async function captureVideo() {
         await writable.write(blob)
         await writable.close()
         console.log('[CaptureVideo] File saved via File System Access API:', handle.name)
-        showNotice(`動画書き出し ${handle.name || suggestedName}`, 3000)
+        notifyWithVars('videoExportSaved', 'Video export: Saved as {name}.', { name: handle.name || suggestedName }, 3000)
       } else {
         console.log('[CaptureVideo] Falling back to download link')
         const url = URL.createObjectURL(blob)
@@ -3591,15 +3655,15 @@ async function captureVideo() {
         link.click()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
         console.log('[CaptureVideo] File downloaded:', suggestedName)
-        showNotice(`動画書き出し ${suggestedName}`, 3000)
+        notifyWithVars('videoExportSaved', 'Video export: Saved as {name}.', { name: suggestedName }, 3000)
       }
     } catch (saveError) {
       if (saveError.name === 'AbortError') {
         console.log('[CaptureVideo] User cancelled save dialog')
-        showNotice('動画書き出し キャンセルされました', 2000)
+        notify('videoExportCancelled', 'Video export: Cancelled.', 2000)
       } else {
         console.error('[CaptureVideo] Save failed:', saveError)
-        showNotice('動画書き出し 保存に失敗しました', 3000)
+        notify('videoExportSaveFailed', 'Video export: Failed to save.', 3000)
       }
     }
     
@@ -3608,7 +3672,7 @@ async function captureVideo() {
     
   } catch (error) {
     console.error('[CaptureVideo] Capture failed:', error)
-    showNotice('動画書き出し 失敗しました', 3000)
+    notify('videoExportFailed', 'Video export: Failed.', 3000)
     restoreVideoState()
   }
 }
@@ -3646,13 +3710,15 @@ function pauseAudio() {
 }
 
 function handleError(e) {
-  const msg = e?.error?.message || e?.message || '不のなエラーが発生しました'
-  showNotice(`エラー: ${msg}`, 5200)
+  const fallback = notificationsTexts.value.errorUnknown || 'Unknown error occurred.'
+  const msg = e?.error?.message || e?.message || fallback
+  notifyWithVars('errorRaised', 'Error: {message}', { message: msg }, 5200)
 }
 
 function handleUnhandledRejection(e) {
-  const msg = e?.reason?.message || e?.reason || '未処理のPromise拒否が発生しました'
-  showNotice(`エラー: ${msg}`, 5200)
+  const fallback = notificationsTexts.value.unhandledRejection || 'Unhandled promise rejection.'
+  const msg = e?.reason?.message || e?.reason || fallback
+  notifyWithVars('errorRaised', 'Error: {message}', { message: msg }, 5200)
 }
 
 const { setup: setupErrorHandlers, cleanup: cleanupErrorHandlers } = useErrorHandlers({
@@ -3719,12 +3785,12 @@ onMounted(async () => {
   if (storageSupported.value) {
     if (persistedGranted) {
       if (storagePersistToastState !== 'granted') {
-        showNotice('キャッシュ: 永続化が有効になりました', 3600)
+        notify('cachePersistenceEnabled', 'Cache: Persistence enabled.', 3600)
         storagePersistToastState = 'granted'
         try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'granted') } catch {}
       }
     } else if (storagePersistToastState !== 'denied') {
-      showNotice('キャッシュ: 永続化を利用できませんでした。ブラウザのストレージ設定をご確認ください。', 5600)
+      notify('cachePersistenceFailed', 'Cache: Persistence unavailable. Please check browser storage settings.', 5600)
       storagePersistToastState = 'denied'
       try { sessionStorage.setItem(STORAGE_PERSIST_TOAST_KEY, 'denied') } catch {}
     }
@@ -3815,7 +3881,7 @@ onMounted(async () => {
     }
   } catch {}
 
-  showNotice('UI: Blender風レイアウトを読み込みました', 2400)
+  notify('uiLayoutLoaded', 'UI: Loaded Blender-style layout.', 2400)
   logToServer({ event: 'init' })
   animate(0)
 })

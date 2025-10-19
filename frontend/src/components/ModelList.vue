@@ -13,15 +13,18 @@
       <button 
         @click="$emit('remove', i)" 
         class="btn-remove"
-        title="削除"
+        :title="commonTexts.delete"
       >
-        削除
+        {{ commonTexts.delete }}
       </button>
     </li>
   </ul>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useI18n } from '../locales/index.js'
+
 const props = defineProps({
   models: { type: Array, required: true }
 })
@@ -32,6 +35,9 @@ const emit = defineEmits([
 function onToggle(index, visible) {
   emit('toggle', index, visible)
 }
+
+const { t } = useI18n()
+const commonTexts = computed(() => t.value?.common ?? {})
 </script>
 
 <style scoped>

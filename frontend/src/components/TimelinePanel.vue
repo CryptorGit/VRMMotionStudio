@@ -6,7 +6,7 @@
   >
     <div class="timeline-header" ref="headerRef">
       <div class="header-left">
-        <span class="title">タイムライン</span>
+        <span class="title">{{ timelinePanel.title }}</span>
         <span class="time-indicator">
           <span>{{ formatTime(currentTime) }}</span>
           <span class="separator">/</span>
@@ -14,16 +14,16 @@
         </span>
       </div>
       <div class="header-controls">
-        <button type="button" @click="handleJumpStart" title="最初に戻る">
+        <button type="button" @click="handleJumpStart" :title="timelinePanel.jumpStart">
           <i class="fa-solid fa-backward-step"></i>
         </button>
-        <button type="button" @click="handlePlayPause" :title="isPlaying ? '一時停止' : '再生'">
+        <button type="button" @click="handlePlayPause" :title="isPlaying ? timelinePanel.pause : timelinePanel.play">
           <i :class="isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play'"></i>
         </button>
-        <button type="button" @click="handleJumpEnd" title="最後に移動">
+        <button type="button" @click="handleJumpEnd" :title="timelinePanel.jumpEnd">
           <i class="fa-solid fa-forward-step"></i>
         </button>
-        <button type="button" @click="handleAddAll" title="全トラッカーのキーを追加">
+        <button type="button" @click="handleAddAll" :title="timelinePanel.addAll">
           <i class="fa-solid fa-circle-plus"></i>
         </button>
         <button
@@ -52,7 +52,7 @@
         class="timeline-grid"
         :style="gridStyle"
       >
-        <div class="name-header">トラッカー</div>
+        <div class="name-header">{{ timelinePanel.trackersHeader }}</div>
         <div class="time-header" @mousedown="startSeek">
           <div class="time-scale" :style="timeScaleStyle">
             <div
@@ -72,7 +72,7 @@
               <button
                 type="button"
                 class="row-add"
-                title="現在時刻にキーを追加"
+                :title="timelinePanel.addKey"
                 @click.stop="emitRowKey(tracker.key)"
               >
                 <i class="fa-solid fa-plus"></i>
@@ -107,6 +107,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useI18n } from '../locales/index.js'
 
 const PIXELS_PER_SECOND = 120
 const NAME_COLUMN_WIDTH = 200
@@ -135,6 +136,9 @@ const emit = defineEmits([
   'add-keyframe',
   'remove-keyframe'
 ])
+
+const { t } = useI18n()
+const timelinePanel = computed(() => t.value?.timelinePanel ?? {})
 
 const headerRef = ref(null)
 const bodyRef = ref(null)

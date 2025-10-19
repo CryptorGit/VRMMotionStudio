@@ -1,11 +1,13 @@
 <template>
   <label class="toggle">
-    <input type="checkbox" v-model="springBoneEnabledLocal" /> SpringBone 有効
+    <input type="checkbox" v-model="springBoneEnabledLocal" />
+    <span>{{ physicsTexts.springBoneEnabled }}</span>
   </label>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   springBoneEnabled: { type: Boolean, required: true }
@@ -16,6 +18,9 @@ const springBoneEnabledLocal = computed({
   get: () => props.springBoneEnabled,
   set: v => emit('update:spring-bone-enabled', v)
 })
+
+const { t } = useI18n()
+const physicsTexts = computed(() => t.value?.physics ?? {})
 </script>
 
 <style scoped>

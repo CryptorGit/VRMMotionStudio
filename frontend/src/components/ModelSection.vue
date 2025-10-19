@@ -1,17 +1,23 @@
 <template>
   <label class="lookat-toggle">
-    <input type="checkbox" v-model="lookAtEnabledLocal" /> LookAt 有効
+    <input type="checkbox" v-model="lookAtEnabledLocal" />
+    <span>{{ modelTexts.lookAtEnabled }}</span>
   </label>
   <ModelList
     :models="models"
     @toggle="(i, v) => emit('toggle-model', i, v)"
     @remove="i => emit('remove-model', i)"
   />
+  
+  <!-- Google AdSense広告 -->
+  <GoogleAdUnit variant="square" ad-slot="model-section" />
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import ModelList from './ModelList.vue'
+import GoogleAdUnit from './GoogleAdUnit.vue'
+import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   models: { type: Array, required: true },
@@ -28,6 +34,9 @@ const lookAtEnabledLocal = computed({
   get: () => props.lookAtEnabled,
   set: v => emit('update:lookAtEnabled', v)
 })
+
+const { t } = useI18n()
+const modelTexts = computed(() => t.value?.model ?? {})
 </script>
 
 <style scoped>

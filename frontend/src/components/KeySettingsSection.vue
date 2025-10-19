@@ -3,10 +3,10 @@
     <header class="key-settings__header">
       <div class="key-settings__title">
         <p v-if="hasSelection" class="key-settings__subtitle">
-          選択中 {{ selectionCount }} 件<span v-if="hasMultiple">（複数選択）</span>
+          {{ keysTexts.selected }} {{ selectionCount }} {{ keysTexts.items }}<span v-if="hasMultiple"> ({{ keysTexts.multiSelect }})</span>
         </p>
         <p v-else class="key-settings__subtitle">
-          タイムラインでキーを選択すると詳細が表示されます。
+          {{ keysTexts.selectPrompt }}
         </p>
       </div>
       <div v-if="hasSelection && rangeLabel" class="key-settings__range">
@@ -21,20 +21,20 @@
       </div>
     </div>
     <div v-else class="key-settings__empty">
-      <p>選択されたキーはありません。</p>
+      <p>{{ keysTexts.noSelection }}</p>
     </div>
 
     <p v-if="hasSelection && !hasMultiple" class="key-settings__hint">
-      複数のキーを選択するとイージングカーブを編集できます。
+      {{ keysTexts.multiSelectHint }}
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
-      <!-- トラッカー選択 -->
+      <!-- トラチE��ー選抁E-->
       <div class="curve-tracker-selector">
         <label class="tracker-label">
-          <span>対象トラッカー</span>
+          <span>{{ keysTexts.targetTracker }}</span>
           <select v-model="selectedTracker" class="tracker-select">
-            <option value="default">まとめて（未設定トラッカー）</option>
+            <option value="default">{{ keysTexts.allDefault }}</option>
             <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
               {{ tracker.label }}
             </option>
@@ -53,6 +53,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from '../locales/index.js'
 import TimelineCurveEditor from './timeline/TimelineCurveEditor.vue'
 
 const props = defineProps({
@@ -75,8 +76,11 @@ const props = defineProps({
 
 const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
 
+const { t } = useI18n()
+const keysTexts = computed(() => t.value?.keys ?? {})
+
 const selectedTracker = ref('default')
-// トラッカーごとのカーブ色を保持（トラッカー色と同期）
+// トラチE��ーごとのカーブ色を保持�E�トラチE��ー色と同期�E�E
 const trackerCurveColors = ref(new Map())
 
 const trackerKeySet = computed(() => {
@@ -104,15 +108,43 @@ watch(trackerKeySet, keys => {
   }
 })
 
+// キーフレーム選択が変更された時にデータを適切に更新
+// 重要: このwatchは、別の設定タブに移動しても実行される可能性があるため、
+// selection自体がnullになった場合も適切に処理する必要がある
+const areIdArraysEqual = (a, b) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 watch(
-  () => (Array.isArray(props.selection?.selectedIds) ? props.selection.selectedIds.join(',') : ''),
   () => {
-    // キーフレーム選択が変わった時、トラッカー選択をリセット
+    // selection が存在し、かつ selectedIds が配列の場合のみ監視
+    if (props.selection && Array.isArray(props.selection.selectedIds)) {
+      return props.selection.selectedIds.slice() // 配列のコピーを返して変更を追跡
+    }
+    return null
+  },
+  (newValue, oldValue) => {
+    // selectionがnullまたは空の場合は何もしない（バグ回避）
+    if (!props.selection || !Array.isArray(newValue) || newValue.length === 0) {
+      return
+    }
+
+    // 配列の内容が同じ場合は処理をスキップ
+    if (areIdArraysEqual(newValue, oldValue)) {
+      return
+    }
+
+    const frames = props.selection?.frames
+    if (!Array.isArray(frames) || frames.length === 0) return
+
+    // 新しい選択が発生した時のみトラッカーをリセット
     selectedTracker.value = 'default'
-    // キャッシュをクリアして、新しい選択からカーブ色を取得し直す
     resetTrackerColorCache()
-    // 現在のフレームから各トラッカーのカーブ色を再収集
-    const frames = Array.isArray(props.selection?.frames) ? props.selection.frames : []
     frames.forEach(frame => {
       const curves = frame?.curves || {}
       Object.keys(curves).forEach(key => {
@@ -124,12 +156,12 @@ watch(
   }
 )
 
-// フレームデータが変わった時もキャッシュを更新
+// フレームチE�Eタが変わった時もキャチE��ュを更新
 watch(
   () => props.selection?.frames,
   (frames) => {
     if (!Array.isArray(frames)) return
-    // 各フレームから各トラッカーのカーブ色を収集してキャッシュを更新
+    // 吁E��レームから吁E��ラチE��ーのカーブ色を収雁E��てキャチE��ュを更新
     frames.forEach(frame => {
       const curves = frame?.curves || {}
       Object.keys(curves).forEach(key => {
@@ -142,7 +174,7 @@ watch(
   { deep: true, immediate: true }
 )
 
-// デフォルトカラー（バーチャルトラッカーの色と一致）
+// チE��ォルトカラー�E�バーチャルトラチE��ーの色と一致�E�E
 const getDefaultColor = (trackerKey) => {
   const defaultColors = {
     default: '#5c8cff',
@@ -172,11 +204,11 @@ const normalizeColor = (color, fallback = '#5c8cff') => {
   return fallback
 }
 
-// 現在選択されているトラッカーのカーブ色（読み取り専用 - トラッカー色と同期）
+// 現在選択されてぁE��トラチE��ーのカーブ色�E�読み取り専用 - トラチE��ー色と同期�E�E
 const curveColor = computed(() => {
   const trackerKey = selectedTracker.value
   
-  // トラッカーごとのカーブ色をキャッシュから取得（優先）
+  // トラチE��ーごとのカーブ色をキャチE��ュから取得（優先！E
   if (trackerCurveColors.value.has(trackerKey)) {
     return trackerCurveColors.value.get(trackerKey)
   }
@@ -202,14 +234,14 @@ const curveColor = computed(() => {
       }
     }
   }
-  // availableTrackersから該当トラッカーの色を取得
+  // availableTrackersから該当トラチE��ーの色を取征E
   const tracker = props.availableTrackers?.find(t => t.key === trackerKey)
   if (tracker?.color) {
     const normalized = normalizeColor(tracker.color, getDefaultColor(trackerKey))
     rememberTrackerColor(trackerKey, normalized)
     return normalized
   }
-  // 見つからない場合はデフォルト色を使用
+  // 見つからなぁE��合�EチE��ォルト色を使用
   const defaultColor = getDefaultColor(trackerKey)
   rememberTrackerColor(trackerKey, defaultColor)
   return defaultColor
@@ -249,7 +281,7 @@ function formatSeconds(seconds) {
 }
 
 function onCurvesUpdate(payload) {
-  // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�トラチE��ー刁E��時�E旧トラチE��ー保存用�E�E
+  // 子コンポ�EネントからtrackerKeyが�E示された場合�Eそれを尊重�E�E�E�トラチE�E��E�ー刁E�E��E�時�E旧トラチE�E��E�ー保存用�E�E�E�E
   const effectiveTrackerKey = payload?.trackerKey || selectedTracker.value
   const providedColor = typeof payload?.curveColor === 'string' ? payload.curveColor : null
   const normalizedProvided = providedColor ? normalizeColor(providedColor, getDefaultColor(effectiveTrackerKey)) : null
@@ -477,6 +509,7 @@ function rememberTrackerColor(key, color) {
   width: 100%;
 }
 </style>
+
 
 
 

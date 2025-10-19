@@ -1,30 +1,30 @@
 <template>
   <section class="audio-section">
     <header class="audio-section__header">
-      <h3>MP3</h3>
+      <h3>{{ audioTexts.title }}</h3>
     </header>
 
     <div v-if="!hasAudio" class="audio-section__empty">
-      <p>MP3ファイルを読み込んでください</p>
+      <p>{{ audioTexts.noDuration }}</p>
     </div>
 
     <div v-else class="audio-section__content">
       <div class="audio-info">
         <div class="info-row">
-          <span class="info-label">ファイル名:</span>
+          <span class="info-label">{{ audioTexts.filename }}</span>
           <span class="info-value info-value--filename" :title="audioFileName">{{ audioFileName }}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">長さ:</span>
+          <span class="info-label">{{ audioTexts.duration }}</span>
           <span class="info-value">{{ formatDuration(audioDuration) }}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">サンプルレート:</span>
+          <span class="info-label">{{ audioTexts.sampleRate }}</span>
           <span class="info-value">{{ audioSampleRate }} Hz</span>
         </div>
         <div class="info-row">
-          <span class="info-label">チャンネル:</span>
-          <span class="info-value">{{ audioChannels === 1 ? 'モノラル' : audioChannels === 2 ? 'ステレオ' : `${audioChannels}ch` }}</span>
+          <span class="info-label">{{ audioTexts.channels }}</span>
+          <span class="info-value">{{ channelLabel }}</span>
         </div>
       </div>
 
@@ -33,18 +33,23 @@
           type="button" 
           class="btn btn--danger"
           @click="$emit('remove-audio')"
-          title="MP3を削除"
+          :title="audioTexts.remove"
         >
           <i class="fa-solid fa-trash"></i>
-          <span>削除</span>
+          <span>{{ audioTexts.remove }}</span>
         </button>
       </div>
     </div>
   </section>
+  
+  <!-- Google AdSense広告（Audioセクションの外） -->
+  <GoogleAdUnit variant="square" ad-slot="audio-section" />
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from '../locales/index.js'
+import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   audioDuration: { type: Number, default: 0 },
@@ -54,9 +59,20 @@ const props = defineProps({
   audioChannels: { type: Number, default: 0 }
 })
 
+
+const { t } = useI18n()
+const audioTexts = computed(() => t.value?.audio ?? {})
+
 const emit = defineEmits(['remove-audio'])
 
 const hasAudio = computed(() => props.audioBuffer !== null && props.audioDuration > 0)
+
+const channelLabel = computed(() => {
+  const count = props.audioChannels
+  if (count === 1) return audioTexts.value.mono || 'Mono'
+  if (count === 2) return audioTexts.value.stereo || 'Stereo'
+  return `${count}ch`
+})
 
 function formatDuration(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0:00'

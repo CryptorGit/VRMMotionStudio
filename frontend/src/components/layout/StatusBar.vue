@@ -7,19 +7,25 @@
     </div>
     <div class="status-bar__right">
       <slot name="shortcuts">
-        <span class="status-bar__placeholder">追加情報はここに表示されます</span>
+        <span class="status-bar__placeholder">{{ statusTexts.placeholder }}</span>
       </slot>
     </div>
   </footer>
 </template>
 
 <script setup>
+import { useI18n } from '../../locales/index.js'
+import { computed } from 'vue'
+
 const props = defineProps({
   message: {
     type: String,
     default: ''
   }
 })
+
+const { t } = useI18n()
+const statusTexts = computed(() => t.value?.statusBar ?? {})
 </script>
 
 <style scoped>

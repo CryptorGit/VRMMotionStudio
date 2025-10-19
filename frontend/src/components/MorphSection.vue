@@ -7,7 +7,7 @@
     </select>
     <button type="button" class="action" @click="reloadMorphs">
       <Icon icon="mdi:refresh" />
-      <span>更新</span>
+      <span>{{ morphTexts.reload }}</span>
     </button>
   </div>
   <MorphEditor :mesh="currentMesh" ref="morphEditorRef" />
@@ -17,6 +17,7 @@
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import MorphEditor from './MorphEditor.vue'
+import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   mesh: Object,
@@ -25,6 +26,8 @@ const props = defineProps({
 
 const morphEditorRef = ref(null)
 const selectedModelIndex = ref(0)
+const { t } = useI18n()
+const morphTexts = computed(() => t.value?.morph ?? {})
 
 const currentMesh = computed(() => {
   if (props.models.length === 0) return props.mesh

@@ -1,9 +1,9 @@
 <template>
   <aside class="properties-panel">
     <div class="properties-body">
-      <nav class="tab-strip" role="tablist" aria-label="設定カテゴリ">
+      <nav class="tab-strip" role="tablist" :aria-label="aria.settingsTabs || 'Settings tabs'">
         <button
-          v-for="tab in SECTION_TABS"
+          v-for="tab in displayTabs"
           :key="tab.id"
           type="button"
           class="tab-button"
@@ -135,11 +135,12 @@
 </template>
 
 <script setup>
-import { ref, toRefs } from 'vue'
+import { ref, toRefs, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import SectionVisibility from './SectionVisibility.vue'
 import { SECTION_TABS } from './settingsTabs.js'
 import { useCaptions } from '../composables/useCaptions.js'
+import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   ambient: Object,
@@ -254,9 +255,25 @@ const emit = defineEmits([
   'remove-audio'
 ])
 
-const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
-
+const { t } = useI18n()
 const { tooltip } = useCaptions()
+const aria = computed(() => t.value?.aria ?? {})
+
+const getNested = (source, path) => {
+  if (!source || typeof path !== 'string') return null
+  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : null), source)
+}
+
+const displayTabs = computed(() => {
+  const locale = t.value || {}
+  return SECTION_TABS.map(tab => ({
+    ...tab,
+    label: getNested(locale, tab.labelKey) || tab.labelKey,
+    description: getNested(locale, tab.descriptionKey) || tab.descriptionKey
+  }))
+})
+
+const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
 
 const {
   ambient,

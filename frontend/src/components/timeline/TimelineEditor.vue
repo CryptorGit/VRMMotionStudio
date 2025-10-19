@@ -8,58 +8,58 @@
             class="toolbar__button"
             :aria-pressed="props.loop"
             @click="emit('toggle-loop')"
-            :title="tooltip('ループ再生を切り替えます')"
+            :title="tooltip(timelineEditorTexts.loopTooltip || '')"
           >
             <Icon icon="mdi:repeat" />
-            <span>Loop</span>
+            <span>{{ timelineEditorTexts.loop }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="fitRange"
-            :title="tooltip('タイムラインの全範囲を表示します')"
+            :title="tooltip(timelineEditorTexts.fitTooltip || '')"
           >
             <Icon icon="mdi:magnify-scan" />
-            <span>全範囲フィット</span>
+            <span>{{ timelineEditorTexts.fit }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="emit('add-keyframe', { time: props.currentTime })"
-            :title="tooltip('現在のフレームにキーを追加します')"
+            :title="tooltip(timelineEditorTexts.addKeyTooltip || '')"
           >
             <Icon icon="mdi:animation" />
-            <span>キー追加</span>
+            <span>{{ timelineEditorTexts.addKey }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--secondary"
             :disabled="!hasSelection"
             @click="emit('copy-keyframes')"
-            :title="tooltip('選択したキーをクリップボードにコピーします')"
+            :title="tooltip(timelineEditorTexts.copyTooltip || '')"
           >
             <Icon icon="mdi:content-copy" />
-            <span>コピー</span>
+            <span>{{ timelineEditorTexts.copy }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--secondary"
             :disabled="!canPaste"
             @click="emit('paste-keyframes')"
-            :title="tooltip('現在位置にキーを貼り付けます')"
+            :title="tooltip(timelineEditorTexts.pasteTooltip || '')"
           >
             <Icon icon="mdi:content-paste" />
-            <span>ペースト</span>
+            <span>{{ timelineEditorTexts.paste }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button toolbar__button--alert"
             @click="removeSelectedKeyframes"
             :disabled="!hasSelection"
-            :title="tooltip('選択したキーを削除します')"
+            :title="tooltip(timelineEditorTexts.deleteTooltip || '')"
           >
             <Icon icon="mdi:delete-forever" />
-            <span>キー削除</span>
+            <span>{{ timelineEditorTexts.delete }}</span>
           </button>
         </div>
 
@@ -68,34 +68,34 @@
             type="button"
             class="toolbar__button"
             @click="emit('jump-start')"
-            :title="tooltip('開始フレームに移動します')"
+            :title="tooltip(timelineEditorTexts.jumpStartTooltip || '')"
           >
             <Icon icon="mdi:skip-backward" />
-            <span>Start</span>
+            <span>{{ timelineEditorTexts.jumpStartLabel }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="togglePlayPause"
-            :title="tooltip(props.isPlaying ? '一時停止します' : '再生します')"
+            :title="tooltip((props.isPlaying ? timelineEditorTexts.pauseTooltip : timelineEditorTexts.playTooltip) || '')"
           >
             <Icon :icon="props.isPlaying ? 'mdi:pause' : 'mdi:play'" />
-            <span>{{ props.isPlaying ? 'Pause' : 'Play' }}</span>
+            <span>{{ props.isPlaying ? timelineEditorTexts.pause : timelineEditorTexts.play }}</span>
           </button>
           <button
             type="button"
             class="toolbar__button"
             @click="emit('jump-end')"
-            :title="tooltip('終了フレームに移動します')"
+            :title="tooltip(timelineEditorTexts.jumpEndTooltip || '')"
           >
             <Icon icon="mdi:skip-forward" />
-            <span>End</span>
+            <span>{{ timelineEditorTexts.jumpEndLabel }}</span>
           </button>
         </div>
 
         <div class="toolbar__group toolbar__group--right">
           <label class="toolbar__field">
-            <span>Start</span>
+            <span>{{ timelineEditorTexts.rangeStartLabel }}</span>
             <input
               type="number"
               v-model.number="startFrameInput"
@@ -104,7 +104,7 @@
             />
           </label>
           <label class="toolbar__field">
-            <span>End</span>
+            <span>{{ timelineEditorTexts.rangeEndLabel }}</span>
             <input
               type="number"
               v-model.number="endFrameInput"
@@ -117,10 +117,10 @@
             class="toolbar__button toolbar__button--alert"
             :disabled="!hasTimelineContent"
             @click="emit('clear-timeline')"
-            :title="tooltip('タイムラインをクリアします')"
+            :title="tooltip(timelineEditorTexts.clearTooltip || '')"
           >
             <Icon icon="mdi:trash-can-outline" />
-            <span>クリア</span>
+            <span>{{ timelineEditorTexts.clear }}</span>
           </button>
         </div>
       </header>
@@ -238,6 +238,7 @@
 import { Icon } from '@iconify/vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCaptions } from '../../composables/useCaptions.js'
+import { useI18n } from '../../locales/index.js'
 
 const MIN_VIEW_DURATION_EPSILON = 1e-6
 const EDGE_MARGIN_RATIO = 0.05
@@ -357,6 +358,8 @@ const emit = defineEmits([
 ])
 
 const { tooltip } = useCaptions()
+const { t } = useI18n()
+const timelineEditorTexts = computed(() => t.value?.timelineEditor ?? {})
 
 const timelineRef = ref(null)
 const tracksWrapperRef = ref(null)

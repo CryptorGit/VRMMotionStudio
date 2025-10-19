@@ -6,28 +6,28 @@
         :checked="virtualTrackersEnabled" 
         :disabled="!hasModelsLoaded"
         @change="onEnabledChange($event.target.checked)"
-        :title="!hasModelsLoaded ? 'モデルを読み込んでください' : ''"
+        :title="!hasModelsLoaded ? trackerTexts.loadModelFirst : ''"
       >
-      <span>トラッカーを有効化</span>
+      <span>{{ trackerTexts.enable }}</span>
     </label>
     <div class="actions">
-      <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">位置リセット</button>
-      <button type="button" class="ghost" @click="$emit('reset-virtual-tracker-rotations')">角度リセット</button>
+      <button type="button" class="ghost" @click="$emit('reset-virtual-trackers')">{{ trackerTexts.resetPosition }}</button>
+      <button type="button" class="ghost" @click="$emit('reset-virtual-tracker-rotations')">{{ trackerTexts.resetRotation }}</button>
     </div>
   </div>
       <div class="row row--toggles">
         <label class="checkbox">
           <input type="checkbox" :checked="virtualTrackerDisplayVisible" @change="onDisplayToggle($event.target.checked)">
-          <span>トラッカー表示</span>
+          <span>{{ trackerTexts.display }}</span>
         </label>
         <label class="checkbox">
           <input type="checkbox" :checked="showVirtualTrackerLabels" @change="emit('update:showVirtualTrackerLabels', $event.target.checked)">
-          <span>ラベル表示</span>
+          <span>{{ trackerTexts.showLabels }}</span>
         </label>
       </div>
       <div class="row">
         <label class="stretch">
-          トラッカー表示サイズ
+          {{ trackerTexts.trackerSize }}
           <input
             type="range"
             min="0.005"
@@ -40,7 +40,7 @@
       </div>
       <div class="row">
         <label class="stretch">
-          ラベル表示サイズ
+          {{ trackerTexts.labelSize }}
           <input
             type="range"
             min="0.05"
@@ -52,16 +52,16 @@
         </label>
       </div>
       
-      <!-- 回転軸表示設定 -->
+      <!-- 回転軸表示設宁E-->
       <div class="row row--toggles">
         <label class="checkbox">
           <input type="checkbox" :checked="showTrackerAxes" @change="emit('update:showTrackerAxes', $event.target.checked)">
-          <span>回転軸表示</span>
+          <span>{{ trackerTexts.showAxes }}</span>
         </label>
       </div>
       <div v-if="showTrackerAxes" class="row">
         <label class="stretch">
-          回転軸の長さ
+          {{ trackerTexts.axesLength }}
           <input
             type="range"
             min="0.01"
@@ -75,7 +75,7 @@
 
       <div class="row">
         <div class="axis-slider twist-slider">
-          <span class="axis-label">前腕ツイスト配分</span>
+          <span class="axis-label">{{ trackerTexts.forearmTwist }}</span>
           <input
             type="range"
             min="0"
@@ -87,14 +87,14 @@
           <span class="axis-value">{{ forearmTwistSharePercent }}%</span>
         </div>
       </div>
-      <!-- トラッカー個別設定 -->
+      <!-- トラチE��ー個別設宁E-->
       <div v-if="virtualTrackersEnabled && selectedTracker" class="tracker-settings">
-        <h4 class="settings-title">{{ selectedTrackerLabel }} 設定</h4>
+        <h4 class="settings-title">{{ trackerSettingsTitle }}</h4>
 
         <div class="tracker-angles">
           <div class="tracker-angles__header">
             <label class="tracker-angles__order">
-              <span class="tracker-angles__label">角度順序</span>
+              <span class="tracker-angles__label">{{ trackerTexts.rotationOrder }}</span>
               <select
                 class="tracker-angles__select"
                 :value="currentRotationOrder"
@@ -109,14 +109,30 @@
                 </option>
               </select>
             </label>
+          <label class="tracker-angles__order tracker-angles__axis">
+            <span class="tracker-angles__label">{{ trackerTexts.rotationAxis }}</span>
+            <select
+              class="tracker-angles__select"
+              :value="rotationAxisValue"
+              @change="onRotationAxisChange($event.target.value)"
+            >
+              <option
+                v-for="option in rotationAxisOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
             <button
               type="button"
               class="btn-reset-small tracker-angles__reset"
               @click="$emit('reset-tracker-rotation')"
-              title="角度リセット"
+              :title="trackerTexts.resetRotation"
             >
               <Icon icon="mdi:restore" />
-              <span>リセット</span>
+              <span>{{ commonTexts.reset }}</span>
             </button>
           </div>
 
@@ -136,7 +152,7 @@
               max="180"
               step="1"
               :value="trackerRotation[axis.key]"
-              @input="updateTrackerRotationAxis(axis.key, $event.target.value)"
+              @input="updateTrackerRotationAngle(axis.key, $event.target.value)"
             >
           </div>
         </div>
@@ -146,6 +162,8 @@
 <script setup>
 import { toRefs, computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useI18n } from '../locales/index.js'
+import { ROTATION_AXIS_OPTIONS } from '../composables/useVirtualTrackers.js'
 
 const props = defineProps({
   virtualTrackersEnabled: { type: Boolean, default: false },
@@ -189,8 +207,18 @@ const {
   virtualTrackerLabelScale,
   forearmTwistShare,
   showTrackerAxes,
-  trackerAxesLength
+  trackerAxesLength,
+  selectedTrackerLabel
 } = toRefs(props)
+
+const { t } = useI18n()
+const trackerTexts = computed(() => t.value?.tracker ?? {})
+const commonTexts = computed(() => t.value?.common ?? {})
+const trackerSettingsTitle = computed(() => {
+  const label = selectedTrackerLabel.value?.trim()
+  const suffix = trackerTexts.value.settings || 'Settings'
+  return label ? `${label} ${suffix}` : suffix
+})
 
 const forearmTwistSharePercent = computed(() => {
   const value = Number(forearmTwistShare.value)
@@ -211,11 +239,16 @@ const onDisplayToggle = value => {
   emit('update:virtualTrackerDisplayVisible', !!value)
 }
 
-const updateTrackerRotationAxis = (axis, value) => {
+const updateTrackerRotationAngle = (axis, value) => {
   const numValue = toNumber(value, props.trackerRotation[axis])
   emit('update:tracker-rotation', { axis, value: numValue })
 }
 
+const onRotationAxisChange = value => {
+  const raw = typeof value === 'string' ? value.trim().toUpperCase() : '+Z'
+  const next = ROTATION_AXIS_OPTIONS.some(option => option.value === raw) ? raw : '+Z'
+  emit('update:tracker-rotation-axis', next)
+}
 const updateForearmTwistShare = value => {
   const numValue = Math.min(1, Math.max(0, toNumber(value, props.forearmTwistShare)))
   emit('update:forearmTwistShare', numValue)
@@ -227,6 +260,21 @@ const angleAxes = [
   { key: 'z', label: 'Z' }
 ]
 
+const rotationAxisOptions = computed(() =>
+  ROTATION_AXIS_OPTIONS.map(option => ({
+    value: option.value,
+    label: option.value === '+Z'
+      ? (trackerTexts.value.rotationAxisAuto || 'Auto (+Z)')
+      : option.label || option.value
+  }))
+)
+
+const rotationAxisValue = computed(() => {
+  const raw = typeof props.trackerRotationAxis === 'string'
+    ? props.trackerRotationAxis.trim().toUpperCase()
+    : '+Z'
+  return ROTATION_AXIS_OPTIONS.some(option => option.value === raw) ? raw : '+Z'
+})
 const sanitizeOrder = value => {
   if (typeof value !== 'string') return 'XYZ'
   const upper = value.toUpperCase().replace(/[^XYZ]/g, '')
@@ -241,7 +289,7 @@ const rotationOrderOptions = computed(() => {
     const value = sanitizeOrder(order)
     return {
       value,
-      label: value.split('').join(' → ')
+      label: value.split('').join(' ↁE')
     }
   })
 })
@@ -262,7 +310,7 @@ const formatAngle = axis => {
 </script>
 
 <style scoped>
-/* ===== レイアウト ===== */
+/* ===== レイアウチE===== */
 .row {
   display: flex;
   align-items: center;
@@ -291,7 +339,7 @@ const formatAngle = axis => {
   gap: 0.5rem;
 }
 
-/* ===== ラベル・テキスト ===== */
+/* ===== ラベル・チE��スチE===== */
 label {
   display: inline-flex;
   align-items: center;
@@ -348,7 +396,7 @@ label.stretch {
   text-shadow: none;
 }
 
-/* ===== リセットボタン ===== */
+/* ===== リセチE��ボタン ===== */
 .btn-reset-small {
   background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
@@ -372,7 +420,7 @@ label.stretch {
   transform: translateY(-1px);
 }
 
-/* ===== 入力フィールド ===== */
+/* ===== 入力フィールチE===== */
 .tracker-settings {
   margin-top: 1.25rem;
   padding: 0;
@@ -566,7 +614,7 @@ label.stretch {
   }
 }
 
-/* ===== 色選択 ===== */
+/* ===== 色選抁E===== */
 .color-control {
   display: flex;
   flex-direction: column;
@@ -616,3 +664,9 @@ label.stretch {
 }
 
 </style>
+
+
+
+
+
+

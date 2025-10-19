@@ -1,100 +1,107 @@
 <template>
   <fieldset class="group">
-    <legend>出力解像度</legend>
-        <div class="resolution">
-          <div class="resolution__field">
-            <label for="camera-resolution-width">幅</label>
-            <input
-              id="camera-resolution-width"
-              type="number"
-              min="64"
-              max="16384"
-              step="1"
-              v-model.number="widthLocal"
-              aria-label="出力幅"
-            />
-          </div>
-          <div class="resolution__field">
-            <label for="camera-resolution-height">高さ</label>
-            <input
-              id="camera-resolution-height"
-              type="number"
-              min="64"
-              max="16384"
-              step="1"
-              v-model.number="heightLocal"
-              aria-label="出力高さ"
-            />
-          </div>
-          <div class="resolution__presets">
-            <label>プリセット</label>
-            <select v-model="presetLocal">
-              <option value="custom">カスタム</option>
-              <option value="1920x1080">1920 × 1080 (FHD)</option>
-              <option value="2560x1440">2560 × 1440 (QHD)</option>
-              <option value="3840x2160">3840 × 2160 (4K UHD)</option>
-              <option value="1080x1080">1080 × 1080 (Square)</option>
-              <option value="1280x720">1280 × 720 (HD)</option>
-            </select>
-          </div>
-        </div>
-      </fieldset>
+    <legend>{{ cameraTexts.resolution }}</legend>
+    <div class="resolution">
+      <div class="resolution__field">
+        <label for="camera-resolution-width">{{ cameraTexts.width }}</label>
+        <input
+          id="camera-resolution-width"
+          type="number"
+          min="64"
+          max="16384"
+          step="1"
+          v-model.number="widthLocal"
+          :aria-label="cameraTexts.width"
+        />
+      </div>
+      <div class="resolution__field">
+        <label for="camera-resolution-height">{{ cameraTexts.height }}</label>
+        <input
+          id="camera-resolution-height"
+          type="number"
+          min="64"
+          max="16384"
+          step="1"
+          v-model.number="heightLocal"
+          :aria-label="cameraTexts.height"
+        />
+      </div>
+      <div class="resolution__presets">
+        <label>{{ cameraTexts.presets }}</label>
+        <select v-model="presetLocal">
+          <option value="custom">{{ cameraTexts.customPreset }}</option>
+          <option
+            v-for="option in presetOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
 
-      <fieldset class="group">
-        <legend>撮影パラメータ</legend>
-        <div class="field">
-          <label class="stretch">
-            視野角 (垂直)
-            <input
-              type="range"
-              min="20"
-              max="120"
-              step="1"
-              v-model.number="fovLocal"
-            />
-          </label>
-          <div class="field__value">{{ fovLocal.toFixed(0) }}°</div>
-        </div>
-        <div class="field">
-          <label>
-            近クリップ
-            <input type="number" min="0.001" max="10" step="0.001" v-model.number="nearLocal" />
-          </label>
-          <label>
-            遠クリップ
-            <input type="number" min="1" max="10000" step="1" v-model.number="farLocal" />
-          </label>
-        </div>
-        <div class="field">
-          <label class="stretch">
-            ホイール移動感度
-            <input type="range" min="0" max="2" step="0.05" v-model.number="wheelSensLocal" />
-          </label>
-          <div class="field__value">× {{ wheelSensLocal.toFixed(1) }}</div>
-        </div>
-        <div class="field">
-          <label class="stretch">
-            左クリック移動感度
-            <input type="range" min="0" max="2" step="0.05" v-model.number="translateSensLocal" />
-          </label>
-          <div class="field__value">× {{ translateSensLocal.toFixed(1) }}</div>
-        </div>
-        <div class="field">
-          <label class="stretch">
-            右クリック回転感度
-            <input type="range" min="0" max="2" step="0.05" v-model.number="rotateSensLocal" />
-          </label>
-          <div class="field__value">× {{ rotateSensLocal.toFixed(1) }}</div>
-        </div>
-        <label class="checkbox">
-          <input type="checkbox" v-model="showHelperLocal" />
-          <span>カメラフラスタムを表示</span>
-        </label>
-      </fieldset>
+  <fieldset class="group">
+    <legend>{{ cameraTexts.parameters }}</legend>
+    <div class="field">
+      <label class="stretch">
+        {{ cameraTexts.fovVertical }}
+        <input
+          type="range"
+          min="20"
+          max="120"
+          step="1"
+          v-model.number="fovLocal"
+        />
+      </label>
+      <div class="field__value">{{ fovLocal.toFixed(0) }}°</div>
+    </div>
+    <div class="field">
+      <label>
+        {{ cameraTexts.near }}
+        <input type="number" min="0.001" max="10" step="0.001" v-model.number="nearLocal" />
+      </label>
+      <label>
+        {{ cameraTexts.far }}
+        <input type="number" min="1" max="10000" step="1" v-model.number="farLocal" />
+      </label>
+    </div>
+    <div class="field">
+      <label class="stretch">
+        {{ cameraTexts.wheelSensitivity }}
+        <input type="range" min="0" max="2" step="0.05" v-model.number="wheelSensLocal" />
+      </label>
+      <div class="field__value">×{{ wheelSensLocal.toFixed(1) }}</div>
+    </div>
+    <div class="field">
+      <label class="stretch">
+        {{ cameraTexts.translateSensitivity }}
+        <input type="range" min="0" max="2" step="0.05" v-model.number="translateSensLocal" />
+      </label>
+      <div class="field__value">×{{ translateSensLocal.toFixed(1) }}</div>
+    </div>
+    <div class="field">
+      <label class="stretch">
+        {{ cameraTexts.rotateSensitivity }}
+        <input type="range" min="0" max="2" step="0.05" v-model.number="rotateSensLocal" />
+      </label>
+      <div class="field__value">×{{ rotateSensLocal.toFixed(1) }}</div>
+    </div>
+    <label class="checkbox">
+      <input type="checkbox" v-model="showHelperLocal" />
+      <span>{{ cameraTexts.showHelper }}</span>
+    </label>
+  </fieldset>
+  
+  <!-- Google AdSense広告 -->
+  <GoogleAdUnit variant="square" ad-slot="camera-section" />
 </template>
 
 <script setup>
 import { computed, watch } from 'vue'
+import { useI18n } from '../locales/index.js'
+import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   cameraFov: { type: Number, required: true },
@@ -118,6 +125,17 @@ const emit = defineEmits([
   'update:cameraWheelSensitivity',
   'update:cameraTranslateSensitivity',
   'update:cameraRotateSensitivity'
+])
+
+const { t } = useI18n()
+const cameraTexts = computed(() => t.value?.camera ?? {})
+
+const presetOptions = computed(() => [
+  { value: '1920x1080', label: cameraTexts.value.presetFhd || '1920 × 1080 (FHD)' },
+  { value: '2560x1440', label: cameraTexts.value.presetQhd || '2560 × 1440 (QHD)' },
+  { value: '3840x2160', label: cameraTexts.value.presetUhd || '3840 × 2160 (4K UHD)' },
+  { value: '1080x1080', label: cameraTexts.value.presetSquare || '1080 × 1080 (Square)' },
+  { value: '1280x720', label: cameraTexts.value.presetHd || '1280 × 720 (HD)' }
 ])
 
 const fovLocal = computed({
@@ -162,7 +180,7 @@ const presetLocal = computed({
   get() {
     const width = widthLocal.value
     const height = heightLocal.value
-    const presets = ['1920x1080', '2560x1440', '3840x2160', '1080x1080', '1280x720']
+    const presets = presetOptions.value.map(option => option.value)
     const key = `${width}x${height}`
     return presets.includes(key) ? key : 'custom'
   },
@@ -176,7 +194,6 @@ const presetLocal = computed({
 })
 
 watch([widthLocal, heightLocal], () => {
-  // clamp computed may not catch NaN on first input of empty string
   if (!Number.isFinite(widthLocal.value)) widthLocal.value = 1920
   if (!Number.isFinite(heightLocal.value)) heightLocal.value = 1080
 })
@@ -306,6 +323,7 @@ function clampNumber(value, min, max) {
   font-size: 0.82rem;
   opacity: 0.75;
   min-width: 3.5rem;
+  text-align: right;
 }
 
 .checkbox {

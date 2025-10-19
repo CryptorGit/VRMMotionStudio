@@ -3,70 +3,72 @@
     <div class="top-menu__brand">
       <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
       <span class="top-menu__title">
-        StellarMotion Studio
-        <span class="top-menu__beta" aria-label="ベータ版">BETA</span>
+        {{ brand.title || 'StellarMotion Studio' }}
+        <span class="top-menu__beta" :aria-label="brand.betaAria || brand.beta || 'Beta version'">
+          {{ brand.beta || 'BETA' }}
+        </span>
       </span>
     </div>
-    <nav class="top-menu__nav" aria-label="メインメニュー">
+    <nav class="top-menu__nav" :aria-label="aria.mainMenu || 'Main menu'">
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('import')"
-        :title="tooltip('モデルを読み込みます')"
+        :title="tooltip(menuTooltips.import)"
       >
         <Icon icon="mdi:file-import" />
-        <span>インポート</span>
+        <span>{{ menu.import }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('import-audio')"
-        :title="tooltip('MP3音声ファイルを読み込みます')"
+        :title="tooltip(menuTooltips.importAudio)"
       >
         <Icon icon="mdi:music" />
-        <span>MP3 読込</span>
+        <span>{{ menu.importAudio }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('export')"
-        :title="tooltip('現在のポーズをエクスポートします')"
+        :title="tooltip(menuTooltips.export)"
       >
         <Icon icon="mdi:file-export" />
-        <span>エクスポート</span>
+        <span>{{ menu.export }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('capture-image')"
-        :title="tooltip('レンダー画像を書き出します')"
+        :title="tooltip(menuTooltips.captureImage)"
       >
         <Icon icon="mdi:image" />
-        <span>画像書き出し</span>
+        <span>{{ menu.captureImage }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('capture-video')"
-        :title="tooltip('レンダー動画を書き出します')"
+        :title="tooltip(menuTooltips.captureVideo)"
       >
         <Icon icon="mdi:video" />
-        <span>動画書き出し</span>
+        <span>{{ menu.captureVideo }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('timeline-import')"
-        :title="tooltip('タイムラインを読み込みます')"
+        :title="tooltip(menuTooltips.timelineImport)"
       >
         <Icon icon="mdi:timeline-clock-outline" />
-        <span>TL 読込</span>
+        <span>{{ menu.timelineImport }}</span>
       </button>
       <button
         type="button"
@@ -75,20 +77,20 @@
         :disabled="!timelineExportEnabled"
         :aria-disabled="!timelineExportEnabled"
         @click="$emit('timeline-export')"
-        :title="tooltip(timelineExportEnabled ? 'タイムラインを保存します' : '保存できるタイムラインがありません')"
+        :title="tooltip(timelineExportEnabled ? menuTooltips.timelineExport : menuTooltips.timelineExportDisabled)"
       >
         <Icon icon="mdi:timeline-text-outline" />
-        <span>TL 保存</span>
+        <span>{{ menu.timelineExport }}</span>
       </button>
       <button
         type="button"
         class="top-menu__item"
         role="menuitem"
         @click="$emit('clear-cache')"
-        :title="tooltip('読み込んだモデルや設定をリセットします')"
+        :title="tooltip(menuTooltips.clearCache)"
       >
         <Icon icon="mdi:trash-can-outline" />
-        <span>キャッシュ削除</span>
+        <span>{{ menu.clearCache }}</span>
       </button>
       <button
         type="button"
@@ -96,17 +98,23 @@
         role="switch"
         :aria-checked="showCaptions"
         @click="$emit('toggle-captions')"
-        :title="tooltip(showCaptions ? 'キャプション表示をOFFにします' : 'キャプション表示をONにします')"
+        :title="tooltip(showCaptions ? menuTooltips.captionsOn : menuTooltips.captionsOff)"
       >
         <Icon :icon="showCaptions ? 'mdi:tooltip-text-outline' : 'mdi:tooltip-outline'" />
-        <span>キャプション {{ showCaptions ? 'ON' : 'OFF' }}</span>
+        <span>{{ menu.captions }} {{ showCaptions ? common.on : common.off }}</span>
       </button>
     </nav>
+    <div class="top-menu__actions">
+      <LanguageSelector />
+    </div>
   </header>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import LanguageSelector from '../LanguageSelector.vue'
+import { useI18n } from '../../locales/index.js'
 
 const props = defineProps({
   showCaptions: {
@@ -119,13 +127,23 @@ const props = defineProps({
   }
 })
 
-const tooltip = message => (props.showCaptions ? message : '')
+const { t } = useI18n()
+const menu = computed(() => t.value?.menu ?? {})
+const menuTooltips = computed(() => t.value?.menuTooltips ?? {})
+const common = computed(() => t.value?.common ?? {})
+const brand = computed(() => t.value?.brand ?? {})
+const aria = computed(() => t.value?.aria ?? {})
+
+const tooltip = message => {
+  if (!props.showCaptions) return ''
+  return message || ''
+}
 </script>
 
 <style scoped>
 .top-menu {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: stretch;
   gap: 0.5rem;
   padding: 0 1rem;
@@ -186,6 +204,14 @@ const tooltip = message => (props.showCaptions ? message : '')
   justify-content: flex-start;
   -webkit-app-region: no-drag;
   gap: 0.35rem;
+}
+
+.top-menu__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  -webkit-app-region: no-drag;
 }
 
 .top-menu__item {
