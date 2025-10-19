@@ -194,4 +194,177 @@ messages.aria = {
   settingsArea: '設定エリア'
 }
 
+// 追加の翻訳
+messages.model = {
+  lookAtEnabled: 'LookAtを有効化',
+  noModels: 'モデルが読み込まれていません'
+}
+
+messages.display = {
+  grid: 'グリッドを表示',
+  lightMarker: 'ライトマーカーを表示',
+  markerColor: 'マーカーの色',
+  bones: 'ボーン',
+  extendedBones: '拡張ボーン',
+  colliderNodes: 'コライダーノード',
+  nonDeformingBones: '非変形ボーン',
+  highlightConstraint: '制約を強調',
+  physicalBones: '物理ボーン',
+  otherBones: 'その他のボーン',
+  boneDotSize: 'ボーンドットサイズ',
+  boneLabelScale: 'ボーンラベルスケール',
+  boneNames: 'ボーン名を表示',
+  outline: 'アウトライン',
+  outlineWidth: 'アウトライン幅',
+  outlineColor: 'アウトラインの色',
+  outlineSettings: 'VRMアウトライン設定',
+  targetModel: '対象モデル',
+  reset: 'リセット',
+  load: '読み込む'
+}
+
+messages.lightingPanel = {
+  ambientColor: '環境光の色',
+  ambientIntensity: '環境光の強度',
+  directionalTitle: 'ディレクショナルライト',
+  directionalDescription: '角度で位置と向きを調整',
+  color: '色',
+  intensity: '強度',
+  positionX: '位置 X',
+  positionY: '位置 Y',
+  positionZ: '位置 Z',
+  azimuth: '方位角 (°)',
+  elevation: '仰角 (°)'
+}
+
+messages.physics = {
+  springBoneEnabled: 'スプリングボーンを有効化'
+}
+
+messages.keys = {
+  selected: '選択中',
+  items: '項目',
+  multiSelect: '複数選択',
+  selectPrompt: 'キーフレームを選択して設定を編集',
+  noSelection: 'キーフレームが選択されていません。タイムラインでキーを選択してください。',
+  multiSelectHint: 'ヒント: Shiftキーを押しながら複数のキーを選択できます。',
+  targetTracker: '対象トラッカー',
+  allDefault: 'すべて (デフォルトカーブ)'
+}
+
+messages.camera = {
+  resolution: '解像度',
+  width: '幅',
+  height: '高さ',
+  presets: 'プリセット',
+  customPreset: 'カスタム',
+  presetFhd: '1920 × 1080 (FHD)',
+  presetQhd: '2560 × 1440 (QHD)',
+  presetUhd: '3840 × 2160 (4K UHD)',
+  presetSquare: '1080 × 1080 (正方形)',
+  presetHd: '1280 × 720 (HD)',
+  parameters: 'パラメータ',
+  fovVertical: '垂直視野角',
+  near: 'ニアクリップ',
+  far: 'ファークリップ',
+  wheelSensitivity: 'ホイール感度',
+  translateSensitivity: 'パン感度',
+  rotateSensitivity: 'オービット感度',
+  showHelper: 'レンダーカメラヘルパーを表示'
+}
+
+messages.morph = {
+  reload: '再読み込み'
+}
+
+messages.timelineEditor = {
+  loop: 'ループ',
+  loopTooltip: 'ループ再生を切り替え',
+  fit: '範囲をフィット',
+  fitTooltip: 'タイムライン全体を表示',
+  addKey: 'キー追加',
+  addKeyTooltip: '現在のフレームにキーフレームを追加',
+  copy: 'コピー',
+  copyTooltip: '選択したキーフレームをコピー',
+  paste: '貼り付け',
+  pasteTooltip: '現在の位置にキーフレームを貼り付け',
+  delete: '削除',
+  deleteTooltip: '選択したキーフレームを削除',
+  jumpStartLabel: '開始',
+  jumpStartTooltip: '開始フレームへジャンプ',
+  play: '再生',
+  playTooltip: '再生',
+  pause: '一時停止',
+  pauseTooltip: '一時停止',
+  jumpEndLabel: '終了',
+  jumpEndTooltip: '終了フレームへジャンプ',
+  rangeStartLabel: '開始',
+  rangeEndLabel: '終了',
+  clear: 'クリア',
+  clearTooltip: 'タイムラインをクリア'
+}
+
+messages.timelineCurveEditor = {
+  title: 'イージングカーブ',
+  reset: 'リセット',
+  empty: '2つ以上のキーを選択してカーブを編集してください。',
+  handleLabel: 'カーブコントロールポイント',
+  inLabel: 'イン',
+  outLabel: 'アウト'
+}
+
+messages.notifications = {
+  cacheSaved: 'キャッシュ: 保存されました。',
+  cacheFailed: 'キャッシュ: 保存に失敗しました。ブラウザのストレージ設定を確認してください。',
+  cacheCleared: 'キャッシュ: クリアされました。',
+  cacheReset: 'キャッシュ: キャッシュとタイムラインをリセットしました。',
+  cachePersistenceEnabled: 'キャッシュ: 永続化が有効になりました。',
+  cachePersistenceFailed: 'キャッシュ: 永続化が利用できません。ブラウザのストレージ設定を確認してください。',
+  modelLoaded: 'モデルが読み込まれました。',
+  modelLoadFailed: 'モデルの読み込みに失敗しました。',
+  audioLoaded: '音声が読み込まれました。',
+  audioLoadFailed: '音声の読み込みに失敗しました。',
+  audioLoading: '音声: 読み込み中…',
+  audioRemoved: '音声: MP3を削除しました。',
+  imageCaptured: '画像をキャプチャしました。',
+  imageExportNoRenderer: '画像エクスポート: レンダラーが初期化されていません。',
+  imageExportInProgress: '画像エクスポート: 処理中…',
+  imageExportPreparing: '画像エクスポート: 準備中…',
+  imageExportCancelled: '画像エクスポート: キャンセルされました。',
+  imageExportSaveFailed: '画像エクスポート: 保存に失敗しました。',
+  imageExportFailed: '画像エクスポート: 失敗しました。',
+  videoCaptured: 'ビデオをキャプチャしました。',
+  videoExportNoRenderer: 'ビデオエクスポート: レンダラーが初期化されていません。',
+  videoExportNoKeyframes: 'ビデオエクスポート: タイムラインにキーフレームがありません。',
+  videoExportInProgress: 'ビデオエクスポート: 処理中…',
+  videoExportPreparing: 'ビデオエクスポート: 準備中…',
+  videoExportSaving: 'ビデオエクスポート: 録画完了、保存中…',
+  videoExportCancelled: 'ビデオエクスポート: キャンセルされました。',
+  videoExportSaveFailed: 'ビデオエクスポート: 保存に失敗しました。',
+  videoExportFailed: 'ビデオエクスポート: 失敗しました。',
+  videoExportSaved: 'ビデオエクスポート: {name}として保存しました。',
+  timelineNotReady: 'タイムライン: 初期化されていません。',
+  timelineAddFailed: 'タイムライン: キーフレームの追加に失敗しました。',
+  timelineKeyAdded: 'タイムライン: 現在のポーズをキーフレームとして追加しました。',
+  timelineCopySelect: 'タイムライン: コピーするキーを選択してください。',
+  timelineCopyFailed: 'タイムライン: キーフレームのコピーに失敗しました。',
+  timelineCopySuccess: 'タイムライン: {count}個のキーフレームをコピーしました。',
+  timelinePasteEmpty: 'タイムライン: 貼り付けるキーフレームがありません。',
+  timelinePasteFailed: 'タイムライン: キーフレームの貼り付けに失敗しました。',
+  timelinePasteSuccess: 'タイムライン: {count}個のキーフレームを貼り付けました。',
+  timelineLoadMissing: 'タイムライン: 読み込みに失敗しました（入力が見つかりません）。',
+  timelineLoadFailed: 'タイムライン: 読み込みに失敗しました。',
+  timelineParseFailed: 'タイムライン: JSONのパースに失敗しました。',
+  timelineExported: 'タイムライン: エクスポートしました。',
+  timelineExportFailed: 'タイムライン: エクスポートに失敗しました。',
+  timelineReset: 'タイムライン: リセットしました。',
+  timelineResetFailed: 'タイムライン: リセットに失敗しました。',
+  timelineFileLoaded: 'タイムライン: {name}を読み込みました。',
+  uiLayoutLoaded: 'UI: Blenderスタイルのレイアウトを読み込みました。',
+  trackersReset: 'トラッカー: バーチャルトラッカーをリセットしました。',
+  errorUnknown: '不明なエラーが発生しました。',
+  errorRaised: 'エラー: {message}',
+  unhandledRejection: '未処理のPromise拒否。'
+}
+
 export default messages

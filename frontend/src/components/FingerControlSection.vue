@@ -1,48 +1,4 @@
 <template>
-  <section class="hand-axis">
-    <h4 class="hand-axis__title">{{ fingerTexts.handAxisTitle }}</h4>
-    <div class="hand-axis__controls">
-      <label class="hand-axis__control">
-        <span>{{ fingerTexts.handAxisLeft }}</span>
-        <select
-          class="axis-select axis-select--hand"
-          :value="handAxis.left"
-          @change="setHandAxis('left', $event.target.value)"
-        >
-          <option value="__mixed" disabled v-if="handAxis.left === '__mixed'">
-            {{ fingerTexts.axisMixed }}
-          </option>
-          <option
-            v-for="option in axisOptions"
-            :key="`left-${option.value}`"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
-      <label class="hand-axis__control">
-        <span>{{ fingerTexts.handAxisRight }}</span>
-        <select
-          class="axis-select axis-select--hand"
-          :value="handAxis.right"
-          @change="setHandAxis('right', $event.target.value)"
-        >
-          <option value="__mixed" disabled v-if="handAxis.right === '__mixed'">
-            {{ fingerTexts.axisMixed }}
-          </option>
-          <option
-            v-for="option in axisOptions"
-            :key="`right-${option.value}`"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
-    </div>
-  </section>
-
   <div class="hand-group">
     <h4>{{ leftHandLabel }}</h4>
     <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
@@ -155,7 +111,6 @@ const thumbAxisOptions = computed(() => [
 ])
 
 const allowedAxisValues = new Set(AXIS_VALUES)
-const HAND_SIDES = ['left', 'right']
 
 const FINGER_KEYS = ['thumb', 'index', 'middle', 'ring', 'little']
 
@@ -173,21 +128,6 @@ const buildFingerList = (prefix) => {
 
 const leftFingers = computed(() => buildFingerList('left'))
 const rightFingers = computed(() => buildFingerList('right'))
-
-const MIXED_AXIS_VALUE = '__mixed'
-
-const handAxis = computed(() => ({
-  left: computeHandAxisValue('left'),
-  right: computeHandAxisValue('right')
-}))
-
-function computeHandAxisValue(hand) {
-  if (!HAND_SIDES.includes(hand)) return 'z+'
-  const keys = FINGER_KEYS.map(finger => getKey(hand, finger))
-  const values = keys.map(key => normalizeAxis(props.axisOverrides?.[key]))
-  const first = values[0] ?? 'z+'
-  return values.every(value => value === first) ? first : MIXED_AXIS_VALUE
-}
 
 const clampDegrees = (value, fallback = 0) => {
   const num = Number(value)
@@ -232,25 +172,6 @@ function setAxisValue(hand, finger, value) {
   if (next === current) return
   const updated = { ...props.axisOverrides, [key]: next }
   console.log(`[FingerControl] Setting axis ${key} -> ${next}`)
-  emit('update:axisOverrides', updated)
-}
-
-function setHandAxis(hand, value) {
-  if (!HAND_SIDES.includes(hand)) return
-  if (value === MIXED_AXIS_VALUE) return
-  const next = normalizeAxis(value)
-  const updated = { ...props.axisOverrides }
-  FINGER_KEYS.forEach(finger => {
-    const key = getKey(hand, finger)
-    const isThumb = finger === 'thumb'
-    // 親指は個別に設定されている場合はそのまま、なければy+
-    if (isThumb && !props.axisOverrides?.[key]) {
-      updated[key] = 'y+'
-    } else {
-      updated[key] = next
-    }
-  })
-  console.log(`[FingerControl] Applying axis ${next} to ${hand} hand`)
   emit('update:axisOverrides', updated)
 }
 
@@ -307,39 +228,6 @@ function resetAllFingers() {
 
 .section__content::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.hand-axis {
-  margin-bottom: 1.5rem;
-  padding: 0.75rem 0.85rem 1rem;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(58, 66, 90, 0.85), rgba(44, 52, 74, 0.85));
-  border: 1px solid rgba(136, 160, 220, 0.25);
-  box-shadow: inset 0 0 0 1px rgba(20, 24, 34, 0.35);
-}
-
-.hand-axis__title {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: rgba(230, 238, 255, 0.92);
-  text-transform: uppercase;
-}
-
-.hand-axis__controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem;
-}
-
-.hand-axis__control {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.82rem;
-  color: rgba(220, 230, 255, 0.82);
-  min-width: 160px;
 }
 
 .hand-group {
@@ -508,10 +396,6 @@ input[type="range"]::-moz-range-thumb:hover {
   .finger-control__header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .axis-select {
-    width: 100%;
   }
 
   .finger-control__slider {

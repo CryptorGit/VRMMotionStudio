@@ -527,6 +527,10 @@ function normalizeCurveColor(color, fallback = DEFAULT_CURVE_COLOR) {
 
 
 // Finger control states
+// Finger control state (cached in localStorage)
+const FINGER_STATES_STORAGE_KEY = 'fingerStates:v1'
+const FINGER_AXIS_OVERRIDES_STORAGE_KEY = 'fingerAxisOverrides:v1'
+
 const FINGER_STATE_KEYS = Object.freeze([
   'left_thumb',
   'left_index',
@@ -539,6 +543,54 @@ const FINGER_STATE_KEYS = Object.freeze([
   'right_ring',
   'right_little'
 ])
+
+// Load finger states from localStorage
+function loadFingerStatesFromCache() {
+  try {
+    const raw = localStorage.getItem(FINGER_STATES_STORAGE_KEY)
+    if (!raw) return null
+    const cached = JSON.parse(raw)
+    if (typeof cached !== 'object') return null
+    return cached
+  } catch {
+    return null
+  }
+}
+
+// Save finger states to localStorage
+function saveFingerStatesToCache(states) {
+  try {
+    if (!states || typeof states !== 'object') {
+      localStorage.removeItem(FINGER_STATES_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(FINGER_STATES_STORAGE_KEY, JSON.stringify(states))
+  } catch {}
+}
+
+// Load finger axis overrides from localStorage
+function loadFingerAxisOverridesFromCache() {
+  try {
+    const raw = localStorage.getItem(FINGER_AXIS_OVERRIDES_STORAGE_KEY)
+    if (!raw) return null
+    const cached = JSON.parse(raw)
+    if (typeof cached !== 'object') return null
+    return cached
+  } catch {
+    return null
+  }
+}
+
+// Save finger axis overrides to localStorage
+function saveFingerAxisOverridesToCache(overrides) {
+  try {
+    if (!overrides || typeof overrides !== 'object') {
+      localStorage.removeItem(FINGER_AXIS_OVERRIDES_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(FINGER_AXIS_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides))
+  } catch {}
+}
 
 const fingerStates = reactive({
   left_thumb: 0,
@@ -553,10 +605,30 @@ const fingerStates = reactive({
   right_little: 0
 })
 
+// Initialize finger states from cache
+const cachedFingerStates = loadFingerStatesFromCache()
+if (cachedFingerStates) {
+  for (const key of FINGER_STATE_KEYS) {
+    if (key in cachedFingerStates && typeof cachedFingerStates[key] === 'number') {
+      fingerStates[key] = cachedFingerStates[key]
+    }
+  }
+}
+
 const ALLOWED_FINGER_AXIS_VALUES = new Set(['x+', 'x-', 'y+', 'y-', 'z+', 'z-'])
 const fingerAxisOverridesByModel = reactive({})
 let pendingFingerAxisOverridesByName = null
 const fallbackFingerAxisOverrides = Object.freeze(createDefaultFingerAxisOverrides())
+
+// Initialize finger axis overrides from cache
+const cachedFingerAxisOverrides = loadFingerAxisOverridesFromCache()
+if (cachedFingerAxisOverrides && typeof cachedFingerAxisOverrides === 'object') {
+  for (const [modelKey, overrides] of Object.entries(cachedFingerAxisOverrides)) {
+    if (typeof overrides === 'object') {
+      fingerAxisOverridesByModel[modelKey] = overrides
+    }
+  }
+}
 
 function createDefaultFingerAxisOverrides() {
   const defaults = {}
@@ -605,6 +677,9 @@ function updateFingerStates(updated) {
     const snapshot = {}
     FINGER_STATE_KEYS.forEach(key => { snapshot[key] = fingerStates[key] })
     console.log('[FingerControl] Updated finger states (deg):', snapshot)
+    
+    // Save to localStorage
+    saveFingerStatesToCache(snapshot)
   }
   
   // 持Eの状態が更新されたら、すぐにポーズを適用
@@ -1168,6 +1243,10 @@ function updateFingerAxisOverrides(updated) {
   if (changed) {
     const label = model.name || `model-${model.id}`
     console.log('[FingerControl] Updated axis overrides for', label, { ...entry })
+    
+    // Save to localStorage
+    saveFingerAxisOverridesToCache(fingerAxisOverridesByModel)
+    
     scheduleApplyFingerPose()
   }
 }
@@ -2420,13 +2499,9 @@ watch(timelineCurrentTime, (newTime, oldTime) => {
 function resetVirtualTrackers() {
   try {
     // リセット前に初期ポーズをクリアして、現在のボーン位置ではなく本当の初期位置を使用
-    trackerController.reset()
-    // 初期位置に強制的にレイアウト
-    setTimeout(() => {
-      if (trackerController?.layoutDefaultPositions) {
-        trackerController.layoutDefaultPositions({ force: true, ignoreSaved: true })
-      }
-    }, 50)
+    if (trackerController?.resetAllTrackerPositions) {
+      trackerController.resetAllTrackerPositions({ persist: true })
+    }
     notify('trackersReset', 'Trackers: Virtual trackers reset.', 3200)
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
@@ -3158,6 +3233,18 @@ async function clearAllCache() {
     showVirtualTrackerLabels.value = true
     virtualTrackerSize.value = 0.08
     virtualTrackerLabelScale.value = 1.0
+    
+    // Clear finger states and axis overrides
+    for (const key of FINGER_STATE_KEYS) {
+      fingerStates[key] = 0
+    }
+    for (const key in fingerAxisOverridesByModel) {
+      delete fingerAxisOverridesByModel[key]
+    }
+    localStorage.removeItem(FINGER_STATES_STORAGE_KEY)
+    localStorage.removeItem(FINGER_AXIS_OVERRIDES_STORAGE_KEY)
+    console.log('[ClearCache] Cleared finger states and axis overrides from localStorage')
+    
     timelineController.clearAll()
     timelineController.stop()
     // タイムラインのEnd＝3分（180秒、60FPS=10800フレーム）に初期設定

@@ -87,7 +87,7 @@
           <span class="axis-value">{{ forearmTwistSharePercent }}%</span>
         </div>
       </div>
-      <!-- トラチE��ー個別設宁E-->
+      <!-- トラチE��ー個別設宁E-->
       <div v-if="virtualTrackersEnabled && selectedTracker" class="tracker-settings">
         <h4 class="settings-title">{{ trackerSettingsTitle }}</h4>
 
@@ -109,22 +109,6 @@
                 </option>
               </select>
             </label>
-          <label class="tracker-angles__order tracker-angles__axis">
-            <span class="tracker-angles__label">{{ trackerTexts.rotationAxis }}</span>
-            <select
-              class="tracker-angles__select"
-              :value="rotationAxisValue"
-              @change="onRotationAxisChange($event.target.value)"
-            >
-              <option
-                v-for="option in rotationAxisOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
             <button
               type="button"
               class="btn-reset-small tracker-angles__reset"
@@ -289,7 +273,7 @@ const rotationOrderOptions = computed(() => {
     const value = sanitizeOrder(order)
     return {
       value,
-      label: value.split('').join(' ↁE')
+      label: value.split('').join(' - ')
     }
   })
 })
@@ -339,7 +323,7 @@ const formatAngle = axis => {
   gap: 0.5rem;
 }
 
-/* ===== ラベル・チE��スチE===== */
+/* ===== ラベル・チE��スチE===== */
 label {
   display: inline-flex;
   align-items: center;
@@ -396,7 +380,7 @@ label.stretch {
   text-shadow: none;
 }
 
-/* ===== リセチE��ボタン ===== */
+/* ===== リセチE��ボタン ===== */
 .btn-reset-small {
   background: var(--control-surface, rgba(48, 54, 70, 0.85));
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));

@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useI18n } from '../locales/index.js'
 import TimelineCurveEditor from './timeline/TimelineCurveEditor.vue'
 
@@ -83,96 +83,9 @@ const selectedTracker = ref('default')
 // トラチE��ーごとのカーブ色を保持�E�トラチE��ー色と同期�E�E
 const trackerCurveColors = ref(new Map())
 
-const trackerKeySet = computed(() => {
-  const keys = new Set(['default'])
-  if (Array.isArray(props.availableTrackers)) {
-    for (const tracker of props.availableTrackers) {
-      if (tracker?.key) keys.add(tracker.key)
-    }
-  }
-  if (Array.isArray(props.selection?.frames)) {
-    for (const frame of props.selection.frames) {
-      if (frame?.curves && typeof frame.curves === 'object') {
-        Object.keys(frame.curves).forEach(key => {
-          if (key) keys.add(key)
-        })
-      }
-    }
-  }
-  return keys
-})
-
-watch(trackerKeySet, keys => {
-  if (!keys.has(selectedTracker.value)) {
-    selectedTracker.value = 'default'
-  }
-})
-
-// キーフレーム選択が変更された時にデータを適切に更新
-// 重要: このwatchは、別の設定タブに移動しても実行される可能性があるため、
-// selection自体がnullになった場合も適切に処理する必要がある
-const areIdArraysEqual = (a, b) => {
-  if (!Array.isArray(a) || !Array.isArray(b)) return false
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false
-  }
-  return true
-}
-
-watch(
-  () => {
-    // selection が存在し、かつ selectedIds が配列の場合のみ監視
-    if (props.selection && Array.isArray(props.selection.selectedIds)) {
-      return props.selection.selectedIds.slice() // 配列のコピーを返して変更を追跡
-    }
-    return null
-  },
-  (newValue, oldValue) => {
-    // selectionがnullまたは空の場合は何もしない（バグ回避）
-    if (!props.selection || !Array.isArray(newValue) || newValue.length === 0) {
-      return
-    }
-
-    // 配列の内容が同じ場合は処理をスキップ
-    if (areIdArraysEqual(newValue, oldValue)) {
-      return
-    }
-
-    const frames = props.selection?.frames
-    if (!Array.isArray(frames) || frames.length === 0) return
-
-    // 新しい選択が発生した時のみトラッカーをリセット
-    selectedTracker.value = 'default'
-    resetTrackerColorCache()
-    frames.forEach(frame => {
-      const curves = frame?.curves || {}
-      Object.keys(curves).forEach(key => {
-        if (curves[key]?.color) {
-          rememberTrackerColor(key, curves[key].color)
-        }
-      })
-    })
-  }
-)
-
-// フレームチE�Eタが変わった時もキャチE��ュを更新
-watch(
-  () => props.selection?.frames,
-  (frames) => {
-    if (!Array.isArray(frames)) return
-    // 吁E��レームから吁E��ラチE��ーのカーブ色を収雁E��てキャチE��ュを更新
-    frames.forEach(frame => {
-      const curves = frame?.curves || {}
-      Object.keys(curves).forEach(key => {
-        if (curves[key]?.color) {
-          rememberTrackerColor(key, curves[key].color)
-        }
-      })
-    })
-  },
-  { deep: true, immediate: true }
-)
+// ========================================
+// Utility functions (must be defined before use)
+// ========================================
 
 // チE��ォルトカラー�E�バーチャルトラチE��ーの色と一致�E�E
 const getDefaultColor = (trackerKey) => {
@@ -203,6 +116,140 @@ const normalizeColor = (color, fallback = '#5c8cff') => {
   }
   return fallback
 }
+
+const areIdArraysEqual = (a, b) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+function resetTrackerColorCache() {
+  if (trackerCurveColors.value.size === 0) return
+  trackerCurveColors.value = new Map()
+}
+
+function rememberTrackerColor(key, color) {
+  if (!key) return
+  const normalized = normalizeColor(color, getDefaultColor(key))
+  const current = trackerCurveColors.value.get(key)
+  if (current === normalized) return
+  const next = new Map(trackerCurveColors.value)
+  next.set(key, normalized)
+  trackerCurveColors.value = next
+}
+
+// Helper function to update tracker color cache from frames
+function updateTrackerColorCache() {
+  const frames = props.selection?.frames
+  selectedTracker.value = 'default'
+  resetTrackerColorCache()
+  
+  if (Array.isArray(frames) && frames.length > 0) {
+    frames.forEach(frame => {
+      const curves = frame?.curves || {}
+      Object.keys(curves).forEach(key => {
+        if (curves[key]?.color) {
+          rememberTrackerColor(key, curves[key].color)
+        }
+      })
+    })
+  }
+}
+
+// ========================================
+// Computed properties and watches
+// ========================================
+
+const trackerKeySet = computed(() => {
+  const keys = new Set(['default'])
+  if (Array.isArray(props.availableTrackers)) {
+    for (const tracker of props.availableTrackers) {
+      if (tracker?.key) keys.add(tracker.key)
+    }
+  }
+  if (Array.isArray(props.selection?.frames)) {
+    for (const frame of props.selection.frames) {
+      if (frame?.curves && typeof frame.curves === 'object') {
+        Object.keys(frame.curves).forEach(key => {
+          if (key) keys.add(key)
+        })
+      }
+    }
+  }
+  return keys
+})
+
+watch(trackerKeySet, keys => {
+  if (!keys.has(selectedTracker.value)) {
+    selectedTracker.value = 'default'
+  }
+})
+
+// キーフレーム選択が変更された時にデータを適切に更新
+// 重要: このwatchは、別の設定タブに移動しても実行される可能性があるため、
+// selection自体がnullになった場合も適切に処理する必要がある
+watch(
+  () => {
+    // selection が存在し、かつ selectedIds が配列の場合のみ監視
+    if (props.selection && Array.isArray(props.selection.selectedIds)) {
+      return props.selection.selectedIds.slice() // 配列のコピーを返して変更を追跡
+    }
+    return null
+  },
+  (newValue, oldValue) => {
+    // selectionがnullの場合はデフォルトにリセット
+    if (!props.selection) {
+      selectedTracker.value = 'default'
+      resetTrackerColorCache()
+      return
+    }
+
+    // 配列が空の場合もデフォルトにリセット
+    if (!Array.isArray(newValue) || newValue.length === 0) {
+      selectedTracker.value = 'default'
+      resetTrackerColorCache()
+      return
+    }
+
+    // 配列の内容が同じ場合は処理をスキップ
+    if (areIdArraysEqual(newValue, oldValue)) {
+      return
+    }
+
+    // フレームデータを収集してカラーキャッシュを更新
+    updateTrackerColorCache()
+  }
+)
+
+// コンポーネントマウント時に初期化
+onMounted(() => {
+  // マウント時にselectionが存在する場合、カラーキャッシュを初期化
+  if (props.selection && Array.isArray(props.selection.selectedIds) && props.selection.selectedIds.length > 0) {
+    selectedTracker.value = 'default'
+    updateTrackerColorCache()
+  }
+})
+
+// フレームチE�Eタが変わった時もキャチE��ュを更新
+watch(
+  () => props.selection?.frames,
+  (frames) => {
+    if (!Array.isArray(frames)) return
+    // 吁E��レームから吁E��ラチE��ーのカーブ色を収雁E��てキャチE��ュを更新
+    frames.forEach(frame => {
+      const curves = frame?.curves || {}
+      Object.keys(curves).forEach(key => {
+        if (curves[key]?.color) {
+          rememberTrackerColor(key, curves[key].color)
+        }
+      })
+    })
+  },
+  { deep: true, immediate: true }
+)
 
 // 現在選択されてぁE��トラチE��ーのカーブ色�E�読み取り専用 - トラチE��ー色と同期�E�E
 const curveColor = computed(() => {
@@ -292,21 +339,6 @@ function onCurvesUpdate(payload) {
     trackerKey: effectiveTrackerKey,
     curveColor: finalColor
   })
-}
-
-function resetTrackerColorCache() {
-  if (trackerCurveColors.value.size === 0) return
-  trackerCurveColors.value = new Map()
-}
-
-function rememberTrackerColor(key, color) {
-  if (!key) return
-  const normalized = normalizeColor(color, getDefaultColor(key))
-  const current = trackerCurveColors.value.get(key)
-  if (current === normalized) return
-  const next = new Map(trackerCurveColors.value)
-  next.set(key, normalized)
-  trackerCurveColors.value = next
 }
 </script>
 

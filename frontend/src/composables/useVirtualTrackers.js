@@ -106,9 +106,13 @@ function trackerModelIndex(key) {
   return parseTrackerKey(key).modelIndex
 }
 
-function formatTrackerLabel(baseLabel, modelIndex) {
+function formatTrackerLabel(baseLabel, modelIndex, modelCount) {
   const idx = Number(modelIndex) || 1
-  // 常に番号を表示（1, 2, 3, ...）
+  const count = Number(modelCount) || 1
+  // モデルが1体だけの場合は番号なし、複数の場合は番号を表示
+  if (count <= 1) {
+    return baseLabel
+  }
   return `${baseLabel} ${idx}`
 }
 
@@ -387,11 +391,12 @@ export function useVirtualTrackers({
       const { baseKey, modelIndex } = parseTrackerKey(key)
       const def = TRACKER_DEFS.find(d => d.key === baseKey)
       if (!def) return null
+      const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
       const defaults = createDefaultTrackerState(def)
       state = {
         ...defaults,
         key,
-        label: formatTrackerLabel(def.label, modelIndex)
+        label: formatTrackerLabel(def.label, modelIndex, modelCount)
       }
       trackerStates[key] = state
     } else {
@@ -399,7 +404,8 @@ export function useVirtualTrackers({
       if (typeof state.label !== 'string') {
         const { baseKey, modelIndex } = parseTrackerKey(key)
         const def = TRACKER_DEFS.find(d => d.key === baseKey)
-        state.label = formatTrackerLabel(def?.label || baseKey, modelIndex)
+        const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+        state.label = formatTrackerLabel(def?.label || baseKey, modelIndex, modelCount)
       }
     }
     if (!state.angles) state.angles = { x: 0, y: 0, z: 0 }
@@ -410,7 +416,8 @@ export function useVirtualTrackers({
 
   for (const def of TRACKER_DEFS) {
     const defaults = createDefaultTrackerState(def)
-    defaults.label = formatTrackerLabel(def.label, 1)
+    const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+    defaults.label = formatTrackerLabel(def.label, 1, modelCount)
     trackerStates[def.key] = defaults
   }
 
@@ -422,6 +429,16 @@ export function useVirtualTrackers({
   watch(models, (newModels, oldModels) => {
     const currentCount = Array.isArray(newModels) ? newModels.length : 0
     const previousCount = Array.isArray(oldModels) ? oldModels.length : 0
+    
+    console.log(`[watch(models)] Model count changed: ${previousCount} -> ${currentCount}, enabled=${enabled.value}`)
+    console.log(`[watch(models)] Models state:`, {
+      currentCount,
+      previousCount,
+      enabled: enabled.value,
+      trackersCount: trackers.value.length,
+      hasGroup: !!group.value,
+      hasScene: !!scene.value
+    })
     
     // Models were removed (went to 0)
     if (currentCount === 0 && previousCount > 0) {
@@ -443,19 +460,27 @@ export function useVirtualTrackers({
     else if (currentCount !== previousCount) {
       // 2つ目以降のモデルが追加された場合、トラッカーを再作成
       if (enabled.value && currentCount > previousCount) {
+        console.log(`[watch(models)] Model added (${previousCount} -> ${currentCount}), recreating trackers...`)
+        console.log(`[watch(models)] Before createGizmos: trackers.value.length=${trackers.value.length}`)
         // モデルが追加されたので、トラッカーを再作成
         createGizmos()
+        console.log(`[watch(models)] After createGizmos: trackers.value.length=${trackers.value.length}`)
         // force: false を使用して保存された位置を優先
         setTimeout(() => {
           layoutDefaultPositions({ force: false })
+          console.log(`[watch(models)] After layoutDefaultPositions: trackers.value.length=${trackers.value.length}`)
         }, 100)
       } else if (enabled.value && currentCount > 0) {
+        console.log(`[watch(models)] Model count changed (${previousCount} -> ${currentCount}), updating positions...`)
         // Just update tracker positions, don't change enabled state
         // Reinitialize tracker positions for new models
         // force: false を使用して保存された位置を優先
         setTimeout(() => {
           layoutDefaultPositions({ force: false })
         }, 100)
+      } else if (!enabled.value) {
+        console.log(`[watch(models)] Model count changed but trackers are disabled. enabled=${enabled.value}`)
+        console.log(`[watch(models)] User needs to manually enable trackers for multi-model support`)
       }
     }
     
@@ -763,6 +788,8 @@ export function useVirtualTrackers({
   }
 
   function createGizmos() {
+    console.log(`[createGizmos] START - models.value:`, models?.value?.length, 'enabled:', enabled.value, 'scene:', !!scene.value)
+    
     // If a group exists but isn't in the scene or trackers list is incomplete, rebuild
     if (group.value) {
       const inScene = !!scene.value && scene.value.children.includes(group.value)
@@ -770,10 +797,21 @@ export function useVirtualTrackers({
       const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
       const expectedTrackerCount = TRACKER_DEFS.length * modelCount
       const complete = trackers.value.length === expectedTrackerCount
-      if (inScene && complete) return
+      console.log(`[createGizmos] Check: models.value.length=${models?.value?.length}, modelCount=${modelCount}, expectedTrackerCount=${expectedTrackerCount}, actual=${trackers.value.length}, complete=${complete}, inScene=${inScene}`)
+      if (inScene && complete) {
+        console.log(`[createGizmos] Already complete and in scene, skipping`)
+        return
+      }
       // stale or incomplete -> dispose and recreate
+      console.log(`[createGizmos] Disposing existing trackers - inScene:${inScene}, complete:${complete}`)
       disposeGizmos()
     }
+    
+    if (!scene.value) {
+      console.error(`[createGizmos] ERROR: scene is not available`)
+      return
+    }
+    
     group.value = markRaw(new THREE.Group())
     group.value.name = 'VirtualTrackers'
     scene.value.add(group.value)
@@ -781,12 +819,17 @@ export function useVirtualTrackers({
     
     // モデル数に応じてトラッカーを作成
     const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+    console.log(`[createGizmos] Creating trackers: models.value=${Array.isArray(models?.value) ? models.value.length : 'not-array'}, modelCount=${modelCount}, TRACKER_DEFS.length=${TRACKER_DEFS.length}`)
+    console.log(`[createGizmos] Will create ${modelCount * TRACKER_DEFS.length} trackers (${modelCount} models × ${TRACKER_DEFS.length} tracker types)`)
     
     for (let modelIdx = 1; modelIdx <= modelCount; modelIdx++) {
+      console.log(`[createGizmos] Creating trackers for model ${modelIdx}/${modelCount}...`)
       for (const def of TRACKER_DEFS) {
         const isCamera = def.key === CAMERA_TRACKER_KEY
         const trackerKey = makeTrackerKey(def.key, modelIdx)
-        const trackerLabel = formatTrackerLabel(def.label, modelIdx)
+        const trackerLabel = formatTrackerLabel(def.label, modelIdx, modelCount)
+        
+        console.log(`[createGizmos] Model ${modelIdx}/${modelCount}: Creating tracker "${trackerKey}" with label "${trackerLabel}"`)
         
         const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
         // Always draw on top of the model
@@ -842,6 +885,9 @@ export function useVirtualTrackers({
         applyTrackerStateToMesh(trackerKey)
       }
     }
+    
+    console.log(`[createGizmos] COMPLETE - Created ${trackers.value.length} trackers`)
+    console.log(`[createGizmos] Tracker keys:`, trackers.value.map(t => t.key))
   }
 
   function disposeGizmos() {
@@ -864,10 +910,22 @@ export function useVirtualTrackers({
   }
 
   function setEnabled(v) {
-    enabled.value = !!v
+    const newValue = !!v
+    console.log(`[setEnabled] Setting enabled from ${enabled.value} to ${newValue}`)
+    console.log(`[setEnabled] Current state:`, {
+      modelsCount: Array.isArray(models?.value) ? models.value.length : 0,
+      trackersCount: trackers.value.length,
+      hasGroup: !!group.value,
+      hasScene: !!scene.value
+    })
+    
+    enabled.value = newValue
     if (enabled.value) {
+      console.log(`[setEnabled] Enabling trackers - calling createGizmos()`)
       createGizmos()
+      console.log(`[setEnabled] After createGizmos: trackers.value.length=${trackers.value.length}`)
       layoutDefaultPositions()
+      console.log(`[setEnabled] After layoutDefaultPositions: trackers.value.length=${trackers.value.length}`)
     }
     setVisibility(enabled.value)
   }
@@ -894,12 +952,18 @@ export function useVirtualTrackers({
         setSavedPositions(model, null)
         // トラッカー回転オフセットもクリア
         trackerRotationOffsets.delete(model)
-        // 初期ポーズキャッシュもクリアして、現在のボーン位置ではなく初期位置を使用
-        initialWorldPose.delete(model)
+        // 初期ポーズキャッシュは保持して、初期位置に戻れるようにする
+        // initialWorldPose.delete(model) は削除しない
       }
     } catch {}
     setSavedCameraTransform(null)
     for (const def of TRACKER_DEFS) resetTrackerStateToDefault(def.key)
+    // 初期ポーズを再キャプチャしてから、初期位置にレイアウト
+    const model = getActiveModel()
+    if (model) {
+      initialWorldPose.delete(model)
+      captureInitialWorldPose(model)
+    }
     layoutDefaultPositions({ force: true, ignoreSaved: true })
   }
 
@@ -1646,6 +1710,39 @@ function setTrackerRotationAxis(key, axis) {
     })
   }
 
+  function resetTrackerPosition(key, { persist = true } = {}) {
+    if (key === CAMERA_TRACKER_KEY) return
+    const tracker = trackers.value.find(t => t.key === key)
+    if (!tracker?.mesh) return
+    
+    // 初期位置を取得（初期ポーズから）
+    const model = getActiveModel()
+    const initMap = initialWorldPose.get(model)
+    const { baseKey } = parseTrackerKey(key)
+    
+    // 初期ポーズが記録されている場合のみ、その位置に戻る
+    if (initMap && initMap.has(baseKey)) {
+      const entry = initMap.get(baseKey)
+      if (entry?.position) {
+        // 初期位置を適用
+        tracker.mesh.position.copy(entry.position)
+        tracker.mesh.updateMatrixWorld(true)
+        syncTrackerStateFromMesh(key)
+        
+        markActiveKey(key)
+        if (persist) persistTrackerTransforms()
+        notifyTrackerTransform(key, {
+          type: 'position',
+          position: [tracker.mesh.position.x, tracker.mesh.position.y, tracker.mesh.position.z],
+          persisted: persist !== false,
+          source: 'reset'
+        })
+      }
+    } else {
+      console.warn(`[resetTrackerPosition] No initial pose recorded for tracker "${key}". Reset skipped.`)
+    }
+  }
+
   function resetTrackerRotation(key, { keepEnabled = true, persist = true } = {}) {
     if (key === CAMERA_TRACKER_KEY) return
     const tracker = trackers.value.find(t => t.key === key)
@@ -1657,11 +1754,13 @@ function setTrackerRotationAxis(key, axis) {
     const initMap = initialWorldPose.get(model)
     const { baseKey } = parseTrackerKey(key)
     
+    // 初期ポーズが記録されている場合のみ、その回転に戻る
     if (initMap && initMap.has(baseKey)) {
       const entry = initMap.get(baseKey)
       if (entry?.quaternion) {
         // 初期回転を適用
         tracker.mesh.quaternion.copy(entry.quaternion)
+        tracker.mesh.updateMatrixWorld(true)
         syncTrackerStateFromMesh(key)
       } else {
         // フォールバック: ゼロ回転
@@ -1669,6 +1768,7 @@ function setTrackerRotationAxis(key, axis) {
       }
     } else {
       // 初期ポーズがない場合はゼロ回転
+      console.warn(`[resetTrackerRotation] No initial pose recorded for tracker "${key}". Using zero rotation.`)
       resetTrackerStateToDefault(key, { keepEnabled })
     }
     
@@ -1688,8 +1788,9 @@ function setTrackerRotationAxis(key, axis) {
   }
 
   function resetAllTrackerRotations({ keepEnabled = true, persist = true } = {}) {
+    // すべてのトラッカーを初期回転に戻す（初期ポーズは再キャプチャしない）
     for (const def of TRACKER_DEFS) {
-      resetTrackerStateToDefault(def.key, { keepEnabled })
+      resetTrackerRotation(def.key, { keepEnabled, persist: false })
       notifyTrackerTransform(def.key, { type: 'reset', bulk: true, persisted: false })
     }
     if (persist) {
@@ -2704,6 +2805,17 @@ function setTrackerRotationAxis(key, axis) {
     forearmTwistShareRatio = ratio
   }
 
+  function resetAllTrackerPositions({ persist = true } = {}) {
+    // すべてのトラッカーを初期位置に戻す（初期ポーズは再キャプチャしない）
+    for (const def of TRACKER_DEFS) {
+      resetTrackerPosition(def.key, { persist: false })
+    }
+    if (persist) {
+      persistTrackerTransforms()
+      notifyTrackerTransform('all', { type: 'resetAllPositions', persisted: true })
+    }
+  }
+
   return {
     enabled,
     displayVisible,
@@ -2721,7 +2833,9 @@ function setTrackerRotationAxis(key, axis) {
     setTrackerAxisScale,
     setTrackerPosition,
     syncTrackerStateFromMesh,
+    resetTrackerPosition,
     resetTrackerRotation,
+    resetAllTrackerPositions,
     resetAllTrackerRotations,
     reset,
     update,
