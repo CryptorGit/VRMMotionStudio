@@ -51,15 +51,23 @@ function reloadMorphs() {
 
 .model-select {
   flex: 1;
-  padding: 0.35rem 0.65rem;
+  appearance: none;
+  padding: 0.45rem 2.25rem 0.45rem 0.75rem;
   border-radius: 6px;
   border: 1px solid rgba(140, 168, 235, 0.35);
   background: var(--control-surface, rgba(48, 54, 70, 0.9));
   color: rgba(240, 244, 255, 0.9);
   font-size: 0.85rem;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
+.model-select:hover,
 .model-select:focus {
   outline: none;
   border-color: rgba(140, 168, 235, 0.65);

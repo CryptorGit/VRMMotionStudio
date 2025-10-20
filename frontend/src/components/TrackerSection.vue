@@ -1,4 +1,24 @@
 <template>
+  <!-- モデル選択（一番上） -->
+  <div v-if="models && models.length > 0" class="row">
+    <label class="stretch">
+      <span>{{ trackerTexts.selectModel || 'Select Model' }}</span>
+      <select
+        :value="selectedModelIndex"
+        @change="emit('update:selectedModelIndex', Number($event.target.value))"
+      >
+        <option :value="-1">{{ trackerTexts.allModels || 'All Models' }}</option>
+        <option
+          v-for="(model, idx) in models"
+          :key="idx"
+          :value="idx"
+        >
+          {{ model?.name || `${trackerTexts.modelLabel || 'Model'} ${idx + 1}` }}
+        </option>
+      </select>
+    </label>
+  </div>
+
   <div class="row row--header">
     <label class="checkbox" :class="{ disabled: !hasModelsLoaded }">
       <input 
@@ -87,6 +107,7 @@
           <span class="axis-value">{{ forearmTwistSharePercent }}%</span>
         </div>
       </div>
+      
       <!-- トラチE��ー個別設宁E-->
       <div v-if="virtualTrackersEnabled && selectedTracker" class="tracker-settings">
         <h4 class="settings-title">{{ trackerSettingsTitle }}</h4>
@@ -164,7 +185,9 @@ const props = defineProps({
   trackerRotationOrder: { type: String, default: 'YXZ' },
   trackerRotationOrders: { type: Array, default: () => [] },
   showTrackerAxes: { type: Boolean, default: false },
-  trackerAxesLength: { type: Number, default: 0.05 }
+  trackerAxesLength: { type: Number, default: 0.05 },
+  models: { type: Array, default: () => [] },
+  selectedModelIndex: { type: Number, default: -1 }
 })
 
 const emit = defineEmits([
@@ -180,7 +203,8 @@ const emit = defineEmits([
   'reset-virtual-trackers',
   'reset-virtual-tracker-rotations',
   'update:tracker-rotation',
-  'reset-tracker-rotation'
+  'reset-tracker-rotation',
+  'update:selectedModelIndex'
 ])
 
 const {
@@ -483,10 +507,10 @@ label.stretch {
 
 .tracker-angles__select {
   appearance: none;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(32, 36, 48, 0.85);
-  color: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
   padding: 0.35rem 2.25rem 0.35rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 600;
@@ -494,8 +518,8 @@ label.stretch {
   font-family: 'Consolas', 'Monaco', monospace;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
-  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.75) 50%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.75) 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
   background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
@@ -504,8 +528,8 @@ label.stretch {
 .tracker-angles__select:hover,
 .tracker-angles__select:focus-visible {
   outline: none;
-  border-color: rgba(92, 140, 255, 0.7);
-  background: rgba(36, 42, 58, 0.92);
+  border-color: rgba(140, 168, 235, 0.65);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 .tracker-angles__reset {
@@ -645,6 +669,32 @@ label.stretch {
 .color-label input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 3px;
+}
+
+/* ===== セレクトボックス統一スタイル ===== */
+select {
+  appearance: none;
+  width: 100%;
+  padding: 0.45rem 2.25rem 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+select:hover,
+select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background-color: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 </style>

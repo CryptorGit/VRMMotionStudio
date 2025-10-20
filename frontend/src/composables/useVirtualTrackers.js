@@ -1,10 +1,11 @@
 import { ref, watch, markRaw, reactive } from 'vue'
 import * as THREE from 'three'
 
-// VRChat-like trackers + upper arms and gaze
-// head, chest, hips, L/R upperArm, L/R hand, L/R elbow, L/R foot, L/R knee, gaze
+// VRChat-like trackers + upper arms and gaze + root
+// root, head, chest, hips, L/R upperArm, L/R hand, L/R elbow, L/R foot, L/R knee, gaze
 // すべて異なる色に変更し、四足は似た色グループに
 export const TRACKER_DEFS = [
+  { key: 'root', label: 'Root', color: 0xffffff, isRoot: true },  // 白色の四角形
   { key: 'head', label: 'Head', color: 0x3aa6ff },           // 青
   { key: 'chest', label: 'Chest', color: 0x00c853 },         // 緑
   { key: 'hips', label: 'Hips', color: 0xff7043 },           // オレンジ
@@ -286,7 +287,79 @@ export function useVirtualTrackers({
   const selectedTrackerKey = ref(null)
   let draggingKey = null
 
+  // ルートトラッカーの初期状態を保存（子トラッカーの相対位置計算用）
+  const rootTrackerInitialState = {
+    position: new THREE.Vector3(0, 0, 0),
+    quaternion: new THREE.Quaternion()
+  }
   
+  // 各トラッカーの初期位置を保存（ルートトラッカーからの相対位置）
+  const trackerInitialStates = new Map() // key -> { position: Vector3, quaternion: Quaternion }
+
+  /**
+   * ルートトラッカーの変換をすべての子トラッカーに適用
+   */
+  function applyRootTransformToChildren(specificRootKey = null) {
+    // 各モデルのルートトラッカーに対して処理
+    const allModels = models.value
+    allModels.forEach((model, idx) => {
+      const modelIndex = idx + 1
+      const rootKey = makeTrackerKey('root', modelIndex)
+      
+      // specificRootKeyが指定されている場合は、そのルートトラッカーのみを処理
+      if (specificRootKey && rootKey !== specificRootKey) return
+      
+      const rootTracker = trackers.value.find(t => t.key === rootKey)
+      
+      if (!rootTracker?.mesh) return
+      
+      rootTracker.mesh.updateMatrixWorld(true)
+      const rootPos = rootTracker.mesh.position.clone()
+      const rootQuat = rootTracker.mesh.quaternion.clone()
+      
+      // このモデルのルートトラッカーの初期状態を取得
+      const rootInitialKey = `__rootInitial_${rootKey}`
+      let rootInitialState = trackerInitialStates.get(rootInitialKey)
+      if (!rootInitialState) {
+        rootInitialState = {
+          position: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion()
+        }
+        trackerInitialStates.set(rootInitialKey, rootInitialState)
+      }
+      
+      // このモデルの子トラッカー（ルート以外）に変換を適用
+      trackers.value.forEach(t => {
+        // このモデルのトラッカーかチェック
+        const parsed = parseTrackerKey(t.key)
+        if (parsed.modelIndex !== modelIndex) return
+        if (t.isRoot || t.key === CAMERA_TRACKER_KEY || !t.mesh) return
+        
+        // 初期状態を取得（まだ保存されていなければ現在の状態を保存）
+        let initialState = trackerInitialStates.get(t.key)
+        if (!initialState) {
+          initialState = {
+            position: t.mesh.position.clone().sub(rootInitialState.position),
+            quaternion: rootInitialState.quaternion.clone().invert().multiply(t.mesh.quaternion.clone())
+          }
+          trackerInitialStates.set(t.key, initialState)
+        }
+        
+        // ルートトラッカーの変換を適用
+        // 位置 = ルート位置 + (初期相対位置を回転)
+        const rotatedOffset = initialState.position.clone().applyQuaternion(rootQuat)
+        t.mesh.position.copy(rootPos.clone().add(rotatedOffset))
+        
+        // 回転 = ルート回転 × 初期相対回転
+        t.mesh.quaternion.copy(rootQuat.clone().multiply(initialState.quaternion))
+        
+        t.mesh.updateMatrixWorld(true)
+        
+        // トラッカー状態を同期
+        syncTrackerStateFromMesh(t.key)
+      })
+    })
+  }
 
   function handLockForKey(trackerKey) {
     if (trackerKey === 'leftHand') return handTranslationLocks.leftHand
@@ -456,13 +529,13 @@ export function useVirtualTrackers({
         userWantsTrackers = false
       }
     }
-    // Model reload (count changed but not to/from 0)
-    else if (currentCount !== previousCount) {
-      // 2つ目以降のモデルが追加された場合、トラッカーを再作成
-      if (enabled.value && currentCount > previousCount) {
-        console.log(`[watch(models)] Model added (${previousCount} -> ${currentCount}), recreating trackers...`)
+    // Model added or removed (count changed but not to/from 0)
+    else if (currentCount !== previousCount && currentCount > 0) {
+      // トラッカーが有効な場合、自動的に再作成
+      if (enabled.value) {
+        console.log(`[watch(models)] Model count changed (${previousCount} -> ${currentCount}), recreating trackers automatically...`)
         console.log(`[watch(models)] Before createGizmos: trackers.value.length=${trackers.value.length}`)
-        // モデルが追加されたので、トラッカーを再作成
+        // トラッカーを再作成（モデル数に応じて）
         createGizmos()
         console.log(`[watch(models)] After createGizmos: trackers.value.length=${trackers.value.length}`)
         // force: false を使用して保存された位置を優先
@@ -470,17 +543,6 @@ export function useVirtualTrackers({
           layoutDefaultPositions({ force: false })
           console.log(`[watch(models)] After layoutDefaultPositions: trackers.value.length=${trackers.value.length}`)
         }, 100)
-      } else if (enabled.value && currentCount > 0) {
-        console.log(`[watch(models)] Model count changed (${previousCount} -> ${currentCount}), updating positions...`)
-        // Just update tracker positions, don't change enabled state
-        // Reinitialize tracker positions for new models
-        // force: false を使用して保存された位置を優先
-        setTimeout(() => {
-          layoutDefaultPositions({ force: false })
-        }, 100)
-      } else if (!enabled.value) {
-        console.log(`[watch(models)] Model count changed but trackers are disabled. enabled=${enabled.value}`)
-        console.log(`[watch(models)] User needs to manually enable trackers for multi-model support`)
       }
     }
     
@@ -795,6 +857,7 @@ export function useVirtualTrackers({
       const inScene = !!scene.value && scene.value.children.includes(group.value)
       // モデル数に応じてトラッカー数を計算
       const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
+      // 各モデルにすべてのトラッカー（ルート含む）が必要
       const expectedTrackerCount = TRACKER_DEFS.length * modelCount
       const complete = trackers.value.length === expectedTrackerCount
       console.log(`[createGizmos] Check: models.value.length=${models?.value?.length}, modelCount=${modelCount}, expectedTrackerCount=${expectedTrackerCount}, actual=${trackers.value.length}, complete=${complete}, inScene=${inScene}`)
@@ -803,8 +866,27 @@ export function useVirtualTrackers({
         return
       }
       // stale or incomplete -> dispose and recreate
+      // トラッカーを削除する前に、現在の位置を一時保存
+      console.log(`[createGizmos] Saving current tracker positions before dispose...`)
+      const savedPositions = new Map()
+      trackers.value.forEach(t => {
+        if (t.mesh) {
+          savedPositions.set(t.key, {
+            position: t.mesh.position.clone(),
+            quaternion: t.mesh.quaternion.clone(),
+            enabled: t.enabled
+          })
+        }
+      })
+      
       console.log(`[createGizmos] Disposing existing trackers - inScene:${inScene}, complete:${complete}`)
       disposeGizmos()
+      
+      // 一時保存した位置を復元用に保持
+      if (savedPositions.size > 0) {
+        console.log(`[createGizmos] Will restore ${savedPositions.size} tracker positions after recreation`)
+        window.__tempTrackerPositions = savedPositions
+      }
     }
     
     if (!scene.value) {
@@ -819,36 +901,62 @@ export function useVirtualTrackers({
     
     // モデル数に応じてトラッカーを作成
     const modelCount = Math.max(1, Array.isArray(models?.value) ? models.value.length : 1)
-    console.log(`[createGizmos] Creating trackers: models.value=${Array.isArray(models?.value) ? models.value.length : 'not-array'}, modelCount=${modelCount}, TRACKER_DEFS.length=${TRACKER_DEFS.length}`)
-    console.log(`[createGizmos] Will create ${modelCount * TRACKER_DEFS.length} trackers (${modelCount} models × ${TRACKER_DEFS.length} tracker types)`)
     
+    // 各トラッカーはモデルごとに作成（ルートも含む）
+    const totalTrackerCount = TRACKER_DEFS.length * modelCount
+    
+    console.log(`[createGizmos] Creating trackers: models.value=${Array.isArray(models?.value) ? models.value.length : 'not-array'}, modelCount=${modelCount}, TRACKER_DEFS.length=${TRACKER_DEFS.length}`)
+    console.log(`[createGizmos] Will create ${totalTrackerCount} trackers (${modelCount} models × ${TRACKER_DEFS.length} tracker types each)`)
+    
+    // すべてのトラッカーをモデルごとに作成
     for (let modelIdx = 1; modelIdx <= modelCount; modelIdx++) {
       console.log(`[createGizmos] Creating trackers for model ${modelIdx}/${modelCount}...`)
       for (const def of TRACKER_DEFS) {
+        
         const isCamera = def.key === CAMERA_TRACKER_KEY
+        const isRoot = def.isRoot === true
         const trackerKey = makeTrackerKey(def.key, modelIdx)
         const trackerLabel = formatTrackerLabel(def.label, modelIdx, modelCount)
         
-        console.log(`[createGizmos] Model ${modelIdx}/${modelCount}: Creating tracker "${trackerKey}" with label "${trackerLabel}"`)
+        console.log(`[createGizmos] Model ${modelIdx}/${modelCount}: Creating tracker "${trackerKey}" (key="${def.key}") with label "${trackerLabel}" (isRoot: ${isRoot}, def.isRoot: ${def.isRoot})`)
         
-        const mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
-        // Always draw on top of the model
-        mat.depthTest = false
-        mat.depthWrite = false
         let geometry
-        if (isCamera) {
-          const baseSize = currentDotSize()
-          geometry = markRaw(new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24))
-          geometry.rotateX(Math.PI / 2)
+        let mat
+        
+        if (isRoot) {
+          // ルートトラッカーは四角形のワイヤーフレーム（白色）
+          console.log(`[createGizmos] Creating ROOT tracker with BoxGeometry wireframe for "${trackerKey}"`)
+          const size = currentDotSize() * 2
+          geometry = markRaw(new THREE.BoxGeometry(size, size, size))
+          mat = markRaw(new THREE.MeshBasicMaterial({ 
+            color: def.color,
+            wireframe: true,
+            depthTest: false,
+            depthWrite: false
+          }))
+          console.log(`[createGizmos] ROOT tracker geometry:`, geometry.type, 'wireframe:', mat.wireframe)
         } else {
-          // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
-          geometry = markRaw(sphere.clone())
+          // 通常のトラッカー
+          mat = markRaw(new THREE.MeshBasicMaterial({ color: def.color }))
+          mat.depthTest = false
+          mat.depthWrite = false
+          
+          if (isCamera) {
+            const baseSize = currentDotSize()
+            geometry = markRaw(new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24))
+            geometry.rotateX(Math.PI / 2)
+          } else {
+            // Don't reuse geometry across meshes because we rebuild on size change and dispose safely
+            geometry = markRaw(sphere.clone())
+          }
         }
+        
         const mesh = markRaw(new THREE.Mesh(geometry, mat))
         mesh.renderOrder = 998 // labels use 999
         mesh.name = `vt:${trackerKey}`
         mesh.userData.__vt = true
         mesh.userData.isCamera = isCamera
+        mesh.userData.isRoot = isRoot
         // start hidden
         mesh.visible = false
         const sprite = markRaw(createLabelSprite(trackerLabel))
@@ -879,7 +987,9 @@ export function useVirtualTrackers({
           labelSprite: sprite,
           rotationRing,
           rotationAxes,
-          color: initialColor
+          color: initialColor,
+          isRoot: isRoot,
+          modelIndex: modelIdx
         })
         ensureTrackerState(trackerKey)
         applyTrackerStateToMesh(trackerKey)
@@ -888,6 +998,26 @@ export function useVirtualTrackers({
     
     console.log(`[createGizmos] COMPLETE - Created ${trackers.value.length} trackers`)
     console.log(`[createGizmos] Tracker keys:`, trackers.value.map(t => t.key))
+    
+    // 一時保存した位置を復元
+    if (window.__tempTrackerPositions) {
+      const savedPositions = window.__tempTrackerPositions
+      console.log(`[createGizmos] Restoring ${savedPositions.size} tracker positions...`)
+      trackers.value.forEach(t => {
+        const saved = savedPositions.get(t.key)
+        if (saved && t.mesh) {
+          t.mesh.position.copy(saved.position)
+          t.mesh.quaternion.copy(saved.quaternion)
+          t.mesh.updateMatrixWorld(true)
+          if (saved.enabled !== undefined) {
+            const state = ensureTrackerState(t.key)
+            if (state) state.enabled = saved.enabled
+          }
+          console.log(`[createGizmos] Restored position for tracker "${t.key}":`, saved.position.toArray())
+        }
+      })
+      delete window.__tempTrackerPositions
+    }
   }
 
   function disposeGizmos() {
@@ -978,6 +1108,8 @@ export function useVirtualTrackers({
     head: ['head', 'neck'],
     chest: ['chest', 'upperChest', 'spine'],
     hips: ['hips'],
+    leftUpperArm: ['leftUpperArm', 'leftShoulder'],
+    rightUpperArm: ['rightUpperArm', 'rightShoulder'],
     leftHand: ['leftHand'],
     rightHand: ['rightHand'],
     leftElbow: ['leftLowerArm', 'leftUpperArm'],
@@ -985,7 +1117,8 @@ export function useVirtualTrackers({
     leftFoot: ['leftFoot', 'leftLowerLeg'],
     rightFoot: ['rightFoot', 'rightLowerLeg'],
     leftKnee: ['leftLowerLeg', 'leftUpperLeg'],
-    rightKnee: ['rightLowerLeg', 'rightUpperLeg']
+    rightKnee: ['rightLowerLeg', 'rightUpperLeg'],
+    gaze: ['head', 'neck']
   }
 
   function captureInitialWorldPose(model) {
@@ -1020,19 +1153,34 @@ export function useVirtualTrackers({
     const force = normalized.force === true
     const ignoreSaved = normalized.ignoreSaved === true
     if (!group.value) return
-    const model = getActiveModel()
-    const vrm = model?.vrm || null
-    const rawSavedAll = (!ignoreSaved && vrm) ? getSavedPositions(model) : null
-    const hasSavedEntries = rawSavedAll && Object.keys(rawSavedAll).length > 0
-    const saved = hasSavedEntries ? rawSavedAll : null
+    
+    // 各モデルに対してトラッカーを配置
+    const allModels = models.value
+    allModels.forEach((model, idx) => {
+      const modelIndex = idx + 1
+      
+      // このモデルのトラッカーが既に配置されているかチェック
+      // 初期ポーズが記録されているかで判断
+      const alreadyPositioned = initialWorldPose.has(model)
+      
+      // 既に配置済みでforceフラグがない場合はスキップ
+      if (!force && alreadyPositioned) {
+        console.log(`[layoutDefaultPositions] Model ${modelIndex} already positioned (has initial pose), skipping`)
+        return
+      }
+      
+      const vrm = model?.vrm || null
+      const rawSavedAll = (!ignoreSaved && vrm) ? getSavedPositions(model) : null
+      const hasSavedEntries = rawSavedAll && Object.keys(rawSavedAll).length > 0
+      const saved = hasSavedEntries ? rawSavedAll : null
 
-    if (vrm) {
-      const root = vrm.scene || scene.value
-      const basis = new THREE.Matrix4()
-      root.updateWorldMatrix(true, false)
-      basis.copy(root.matrixWorld)
-      // Capture once per model so initial virtual trackers follow the imported pose, not current deformed state
-      captureInitialWorldPose(model)
+      if (vrm) {
+        const root = vrm.scene || scene.value
+        const basis = new THREE.Matrix4()
+        root.updateWorldMatrix(true, false)
+        basis.copy(root.matrixWorld)
+        // Capture once per model so initial virtual trackers follow the imported pose, not current deformed state
+        captureInitialWorldPose(model)
       const hips = getBone(vrm, 'hips')
       const head = getBone(vrm, 'head') || getBone(vrm, 'neck')
       const chest = getBone(vrm, 'chest') || getBone(vrm, 'spine')
@@ -1050,10 +1198,11 @@ export function useVirtualTrackers({
       const initMap = initialWorldPose.get(model)
 
       const setFrom = (key, obj, off = new THREE.Vector3()) => {
-        const t = trackers.value.find(x => x.key === key)
+        const trackerKey = makeTrackerKey(key, modelIndex)
+        const t = trackers.value.find(x => x.key === trackerKey)
         if (!t) return
         const savedEntry = saved?.[key]
-        const state = ensureTrackerState(key)
+        const state = ensureTrackerState(trackerKey)
         let usedSaved = false
         if (savedEntry && vrm) {
           if (Array.isArray(savedEntry) && savedEntry.length === 3) {
@@ -1102,7 +1251,7 @@ export function useVirtualTrackers({
               state.angles.x = sanitizeAngleInput(savedEntry.angles.x)
               state.angles.y = sanitizeAngleInput(savedEntry.angles.y)
               state.angles.z = sanitizeAngleInput(savedEntry.angles.z)
-              applyTrackerStateToMesh(key)
+              applyTrackerStateToMesh(trackerKey)
             } else {
               t.mesh.quaternion.identity()
             }
@@ -1111,6 +1260,17 @@ export function useVirtualTrackers({
         }
 
         if (!usedSaved) {
+          // createGizmosで既に復元された位置があるかチェック
+          const hasRestoredPosition = t.mesh.position.lengthSq() > 0.001 || 
+                                      (t.isRoot && t.mesh.position.lengthSq() === 0) // ルートは(0,0,0)が正常
+          
+          if (!force && hasRestoredPosition && !alreadyPositioned) {
+            // 既に復元された位置がある場合（createGizmosからの復元）、その位置を保持
+            console.log(`[layoutDefaultPositions] Tracker "${trackerKey}" has restored position, keeping it`)
+            syncTrackerStateFromMesh(trackerKey)
+            return
+          }
+          
           if (initMap && initMap.has(key)) {
             const entry = initMap.get(key)
             if (entry?.position) m.copy(entry.position)
@@ -1127,7 +1287,7 @@ export function useVirtualTrackers({
 
         m.add(off)
         if (force || !usedSaved) t.mesh.position.copy(m)
-        syncTrackerStateFromMesh(key)
+        syncTrackerStateFromMesh(trackerKey)
       }
       
       // ボーンの回転オフセットを復元
@@ -1158,8 +1318,10 @@ export function useVirtualTrackers({
       setFrom('rightKnee', rKnee)
       setFrom('leftFoot', lFoot)
       setFrom('rightFoot', rFoot)
+      
       // Gaze target: positioned in front of the head
-      const gazeTracker = trackers.value.find(x => x.key === 'gaze')
+      const gazeKey = makeTrackerKey('gaze', modelIndex)
+      const gazeTracker = trackers.value.find(x => x.key === gazeKey)
       if (gazeTracker && head) {
         const savedGaze = saved?.['gaze']
         if (!savedGaze || force) {
@@ -1168,18 +1330,81 @@ export function useVirtualTrackers({
           head.getWorldPosition(gazePos)
           gazePos.z -= 2.0 // 2 meters in front of head
           gazeTracker.mesh.position.copy(gazePos)
-          syncTrackerStateFromMesh('gaze')
+          syncTrackerStateFromMesh(gazeKey)
+          
+          // Save gaze initial position to initialWorldPose
+          const initMap = initialWorldPose.get(model)
+          if (initMap) {
+            initMap.set('gaze', { 
+              position: gazePos.clone(), 
+              quaternion: new THREE.Quaternion() 
+            })
+          }
         }
       }
+      
+      // トラッカー位置が変更された場合、回転オフセットをクリア
+      if (force && model) {
+        trackerRotationOffsets.delete(model)
+      }
+      
+      // このモデルのルートトラッカーの初期位置を(0,0,0)に設定
+      const rootKey = makeTrackerKey('root', modelIndex)
+      const rootTracker = trackers.value.find(x => x.key === rootKey)
+      
+      if (rootTracker) {
+        const savedRoot = saved?.['root']
+        
+        if (!savedRoot || force) {
+          rootTracker.mesh.position.set(0, 0, 0)
+          rootTracker.mesh.quaternion.identity()
+          syncTrackerStateFromMesh(rootKey)
+        } else {
+          // 保存されたルートトラッカーの位置を復元
+          if (Array.isArray(savedRoot) && savedRoot.length === 3) {
+            rootTracker.mesh.position.fromArray(savedRoot)
+          } else if (typeof savedRoot === 'object' && Array.isArray(savedRoot.position)) {
+            rootTracker.mesh.position.fromArray(savedRoot.position)
+            if (Array.isArray(savedRoot.rotation) && savedRoot.rotation.length === 4) {
+              rootTracker.mesh.quaternion.fromArray(savedRoot.rotation)
+            }
+          }
+          syncTrackerStateFromMesh(rootKey)
+        }
+        
+        // このモデルのルートトラッカーの初期状態を保存
+        const rootInitialKey = `__rootInitial_${rootKey}`
+        trackerInitialStates.set(rootInitialKey, {
+          position: rootTracker.mesh.position.clone(),
+          quaternion: rootTracker.mesh.quaternion.clone()
+        })
+        
+        // このモデルのすべての子トラッカーの初期位置を保存（ルートトラッカーからの相対位置）
+        trackers.value.forEach(t => {
+          const parsed = parseTrackerKey(t.key)
+          if (parsed.modelIndex !== modelIndex) return
+          if (t.isRoot || t.key === CAMERA_TRACKER_KEY || !t.mesh) return
+          
+          const relativePos = t.mesh.position.clone().sub(rootTracker.mesh.position)
+          const relativeQuat = rootTracker.mesh.quaternion.clone().invert().multiply(t.mesh.quaternion.clone())
+          
+          trackerInitialStates.set(t.key, {
+            position: relativePos,
+            quaternion: relativeQuat
+          })
+        })
+      }
     }
+    }) // モデルループを閉じる
 
-    layoutCameraTracker({ savedAll: saved, force })
-    if (vrm && !didInitialLayout) didInitialLayout = true
+    // カメラトラッカーの配置（最初のモデルのsavedデータを使用）
+    const firstModel = allModels[0]
+    const firstVrm = firstModel?.vrm
+    const firstSaved = (!ignoreSaved && firstVrm) ? getSavedPositions(firstModel) : null
+    layoutCameraTracker({ savedAll: firstSaved, force })
     
-    // トラッカー位置が変更された場合、回転オフセットをクリア
-    if (force && model) {
-      trackerRotationOffsets.delete(model)
-    }
+    const didInit = allModels.some(m => m?.vrm)
+    if (didInit && !didInitialLayout) didInitialLayout = true
   }
 
   function layoutCameraTracker({ savedAll, force = false }) {
@@ -1309,6 +1534,26 @@ export function useVirtualTrackers({
       dragState.didMove = false
       draggingKey = trackerKey
       
+      // ルートトラッカーをドラッグする場合、初期状態を保存
+      if (hit.userData?.isRoot) {
+        rootTrackerInitialState.position.copy(hit.position)
+        rootTrackerInitialState.quaternion.copy(hit.quaternion)
+        
+        // すべての子トラッカーの相対位置を保存
+        trackerInitialStates.clear()
+        trackers.value.forEach(t => {
+          if (t.isRoot || t.key === CAMERA_TRACKER_KEY || !t.mesh) return
+          
+          const relativePos = t.mesh.position.clone().sub(rootTrackerInitialState.position)
+          const relativeQuat = rootTrackerInitialState.quaternion.clone().invert().multiply(t.mesh.quaternion.clone())
+          
+          trackerInitialStates.set(t.key, {
+            position: relativePos,
+            quaternion: relativeQuat
+          })
+        })
+      }
+      
       if (trackerKey) {
         markActiveKey(trackerKey)
         notifyTrackerTransform(trackerKey, { type: 'select', source: 'drag-start', persisted: false })
@@ -1423,6 +1668,12 @@ export function useVirtualTrackers({
         .add(moveUp.multiplyScalar(-deltaY * scale))
       dragState.target.position.copy(dragState.startPosition.clone().add(movement))
       dragState.didMove = true
+      
+      // ルートトラッカーが移動された場合、そのモデルの子トラッカーのみ移動
+      if (dragState.target.userData?.isRoot && dragState.trackerKey) {
+        applyRootTransformToChildren(dragState.trackerKey)
+      }
+      
       if (dragState.target.userData?.isCamera && camera?.value) {
         try {
           camera.value.position.copy(dragState.target.position)
@@ -1452,6 +1703,11 @@ export function useVirtualTrackers({
       dragState.target.quaternion.copy(newQuat)
       dragState.target.updateMatrixWorld(true)
       
+      // ルートトラッカーが回転された場合、そのモデルの子トラッカーのみ回転
+      if (dragState.target.userData?.isRoot && dragState.trackerKey) {
+        applyRootTransformToChildren(dragState.trackerKey)
+      }
+      
       // 状態を同期
       if (dragState.trackerKey) {
         syncTrackerStateFromMesh(dragState.trackerKey)
@@ -1471,6 +1727,11 @@ export function useVirtualTrackers({
       const newQuat = dragState.startQuaternion.clone().premultiply(rollQuat)
       dragState.target.quaternion.copy(newQuat)
       dragState.target.updateMatrixWorld(true)
+      
+      // ルートトラッカーが回転された場合、そのモデルの子トラッカーのみ回転
+      if (dragState.target.userData?.isRoot && dragState.trackerKey) {
+        applyRootTransformToChildren(dragState.trackerKey)
+      }
       
       // 状態を同期
       if (dragState.trackerKey) {
@@ -1509,6 +1770,25 @@ export function useVirtualTrackers({
             } catch {}
           }
         }
+        
+        // ルートトラッカーが移動された場合、すべてのトラッカーの初期位置を更新
+        if (releasedKey === 'root' && moved) {
+          const rootTracker = trackers.value.find(t => t.isRoot)
+          if (rootTracker) {
+            // すべてのトラッカーの初期位置を更新（ルートトラッカーの変換を適用）
+            trackers.value.forEach(t => {
+              if (!t.isRoot && t.key !== CAMERA_TRACKER_KEY) {
+                const state = trackerStates[t.key]
+                if (state?.initialPosition) {
+                  // 現在の位置を新しい初期位置として保存
+                  state.initialPosition = t.mesh.position.clone()
+                  state.initialQuaternion = t.mesh.quaternion.clone()
+                }
+              }
+            })
+          }
+        }
+        
         persistTrackerTransforms({ includeCamera: true })
         if (releasedKey && moved) {
           const pos = releasedTarget?.position
@@ -1715,10 +1995,58 @@ function setTrackerRotationAxis(key, axis) {
     const tracker = trackers.value.find(t => t.key === key)
     if (!tracker?.mesh) return
     
+    const { baseKey, modelIndex } = parseTrackerKey(key)
+    
+    // ルートトラッカーの場合は(0,0,0)にリセット
+    if (tracker.isRoot) {
+      tracker.mesh.position.set(0, 0, 0)
+      tracker.mesh.quaternion.identity()
+      tracker.mesh.updateMatrixWorld(true)
+      syncTrackerStateFromMesh(key)
+      
+      // ルートトラッカーの初期状態も更新
+      const rootInitialKey = `__rootInitial_${key}`
+      trackerInitialStates.set(rootInitialKey, {
+        position: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion()
+      })
+      
+      // すべての子トラッカーの相対位置を再計算
+      trackers.value.forEach(t => {
+        const parsed = parseTrackerKey(t.key)
+        if (parsed.modelIndex !== modelIndex) return
+        if (t.isRoot || t.key === CAMERA_TRACKER_KEY || !t.mesh) return
+        
+        const relativePos = t.mesh.position.clone().sub(tracker.mesh.position)
+        const relativeQuat = tracker.mesh.quaternion.clone().invert().multiply(t.mesh.quaternion.clone())
+        
+        trackerInitialStates.set(t.key, {
+          position: relativePos,
+          quaternion: relativeQuat
+        })
+      })
+      
+      markActiveKey(key)
+      if (persist) persistTrackerTransforms()
+      notifyTrackerTransform(key, {
+        type: 'position',
+        position: [0, 0, 0],
+        persisted: persist !== false,
+        source: 'reset'
+      })
+      return
+    }
+    
+    // 通常のトラッカー：対応するモデルを取得
+    const allModels = models.value
+    const model = allModels[modelIndex - 1]
+    if (!model) {
+      console.warn(`[resetTrackerPosition] Model at index ${modelIndex} not found for tracker "${key}".`)
+      return
+    }
+    
     // 初期位置を取得（初期ポーズから）
-    const model = getActiveModel()
     const initMap = initialWorldPose.get(model)
-    const { baseKey } = parseTrackerKey(key)
     
     // 初期ポーズが記録されている場合のみ、その位置に戻る
     if (initMap && initMap.has(baseKey)) {
@@ -1728,6 +2056,19 @@ function setTrackerRotationAxis(key, axis) {
         tracker.mesh.position.copy(entry.position)
         tracker.mesh.updateMatrixWorld(true)
         syncTrackerStateFromMesh(key)
+        
+        // このトラッカーの相対位置を更新（ルートトラッカーに対する相対位置）
+        const rootKey = makeTrackerKey('root', modelIndex)
+        const rootTracker = trackers.value.find(t => t.key === rootKey)
+        if (rootTracker?.mesh) {
+          const relativePos = tracker.mesh.position.clone().sub(rootTracker.mesh.position)
+          const relativeQuat = rootTracker.mesh.quaternion.clone().invert().multiply(tracker.mesh.quaternion.clone())
+          
+          trackerInitialStates.set(key, {
+            position: relativePos,
+            quaternion: relativeQuat
+          })
+        }
         
         markActiveKey(key)
         if (persist) persistTrackerTransforms()
@@ -1739,7 +2080,7 @@ function setTrackerRotationAxis(key, axis) {
         })
       }
     } else {
-      console.warn(`[resetTrackerPosition] No initial pose recorded for tracker "${key}". Reset skipped.`)
+      console.warn(`[resetTrackerPosition] No initial pose recorded for tracker "${key}" (baseKey: "${baseKey}"). Reset skipped.`)
     }
   }
 
@@ -1749,10 +2090,43 @@ function setTrackerRotationAxis(key, axis) {
     const state = ensureTrackerState(key)
     if (!tracker?.mesh || !state) return
     
+    const { baseKey, modelIndex } = parseTrackerKey(key)
+    
+    // ルートトラッカーの場合は単位回転にリセット
+    if (tracker.isRoot) {
+      tracker.mesh.quaternion.identity()
+      tracker.mesh.updateMatrixWorld(true)
+      syncTrackerStateFromMesh(key)
+      
+      // ルートトラッカーの初期状態も更新
+      const rootInitialKey = `__rootInitial_${key}`
+      const existingState = trackerInitialStates.get(rootInitialKey)
+      if (existingState) {
+        existingState.quaternion.identity()
+      }
+      
+      markActiveKey(key)
+      if (persist) persistTrackerTransforms()
+      notifyTrackerTransform(key, {
+        type: 'rotation',
+        angles: { x: 0, y: 0, z: 0 },
+        persisted: persist !== false,
+        source: 'reset'
+      })
+      return
+    }
+    
+    // 通常のトラッカー：対応するモデルを取得
+    const allModels = models.value
+    const model = allModels[modelIndex - 1]
+    if (!model) {
+      console.warn(`[resetTrackerRotation] Model at index ${modelIndex} not found for tracker "${key}".`)
+      resetTrackerStateToDefault(key, { keepEnabled })
+      return
+    }
+    
     // 初期回転を取得（初期ポーズから）
-    const model = getActiveModel()
     const initMap = initialWorldPose.get(model)
-    const { baseKey } = parseTrackerKey(key)
     
     // 初期ポーズが記録されている場合のみ、その回転に戻る
     if (initMap && initMap.has(baseKey)) {
@@ -1762,13 +2136,24 @@ function setTrackerRotationAxis(key, axis) {
         tracker.mesh.quaternion.copy(entry.quaternion)
         tracker.mesh.updateMatrixWorld(true)
         syncTrackerStateFromMesh(key)
+        
+        // このトラッカーの相対回転を更新（ルートトラッカーに対する相対回転）
+        const rootKey = makeTrackerKey('root', modelIndex)
+        const rootTracker = trackers.value.find(t => t.key === rootKey)
+        if (rootTracker?.mesh) {
+          const relativeQuat = rootTracker.mesh.quaternion.clone().invert().multiply(tracker.mesh.quaternion.clone())
+          const existingState = trackerInitialStates.get(key)
+          if (existingState) {
+            existingState.quaternion.copy(relativeQuat)
+          }
+        }
       } else {
         // フォールバック: ゼロ回転
         resetTrackerStateToDefault(key, { keepEnabled })
       }
     } else {
       // 初期ポーズがない場合はゼロ回転
-      console.warn(`[resetTrackerRotation] No initial pose recorded for tracker "${key}". Using zero rotation.`)
+      console.warn(`[resetTrackerRotation] No initial pose recorded for tracker "${key}" (baseKey: "${baseKey}"). Using zero rotation.`)
       resetTrackerStateToDefault(key, { keepEnabled })
     }
     
@@ -1789,10 +2174,12 @@ function setTrackerRotationAxis(key, axis) {
 
   function resetAllTrackerRotations({ keepEnabled = true, persist = true } = {}) {
     // すべてのトラッカーを初期回転に戻す（初期ポーズは再キャプチャしない）
-    for (const def of TRACKER_DEFS) {
-      resetTrackerRotation(def.key, { keepEnabled, persist: false })
-      notifyTrackerTransform(def.key, { type: 'reset', bulk: true, persisted: false })
-    }
+    // 現在存在するすべてのトラッカーに対して実行
+    trackers.value.forEach(tracker => {
+      if (tracker.key === CAMERA_TRACKER_KEY) return
+      resetTrackerRotation(tracker.key, { keepEnabled, persist: false })
+      notifyTrackerTransform(tracker.key, { type: 'reset', bulk: true, persisted: false })
+    })
     if (persist) {
       persistTrackerTransforms()
       notifyTrackerTransform('all', { type: 'resetAll', persisted: true })
@@ -2253,21 +2640,47 @@ function setTrackerRotationAxis(key, axis) {
 
   function update() {
     if (!enabled.value) return
-    const model = getActiveModel()
-    if (!model?.vrm) return
+    
+    // すべてのモデルが存在するかチェック
+    const allModels = models?.value || []
+    if (!allModels.length) return
+    
     if (camera?.value) {
       trackers.value.forEach(entry => {
         if (entry.key !== CAMERA_TRACKER_KEY) updateViewAlignedIndicators(entry)
       })
     }
+    
+    // ルートトラッカーの変換を取得
+    const rootTracker = trackers.value.find(t => t.isRoot)
+    const rootTransform = rootTracker?.mesh ? {
+      position: rootTracker.mesh.position.clone(),
+      quaternion: rootTracker.mesh.quaternion.clone()
+    } : null
+    
+    // 各モデルにトラッカーを適用
+    for (let modelIdx = 0; modelIdx < allModels.length; modelIdx++) {
+      const model = allModels[modelIdx]
+      if (!model?.vrm || !model.visible) continue
+      
+      const modelNumber = modelIdx + 1
+      updateModelWithTrackers(model, modelNumber, rootTransform)
+    }
+  }
+  
+  function updateModelWithTrackers(model, modelNumber, rootTransform) {
     const bones = ensureBoneMap(model)
     const vrmRoot = model.vrm.scene
     vrmRoot.updateWorldMatrix(true, true)
+    
+    // モデルに対応するトラッカーキーを取得
+    const getTrackerKey = (baseKey) => makeTrackerKey(baseKey, modelNumber)
 
     // Move root so hips aligns with hips tracker
     try {
       if (bones.hips) {
-        const hipsTracker = trackers.value.find(t => t.key === 'hips')
+        const hipsTrackerKey = getTrackerKey('hips')
+        const hipsTracker = trackers.value.find(t => t.key === hipsTrackerKey)
         const tHips = hipsTracker?.mesh?.position
         if (tHips) {
           const worldHips = bones.hips.getWorldPosition(new THREE.Vector3())
@@ -2281,21 +2694,23 @@ function setTrackerRotationAxis(key, axis) {
     // Apply hips tracker rotation directly to hips bone (drives whole body orientation)
     try {
       if (bones.hips) {
-        applyTrackerRotationToBone(bones.hips, 'hips', { weight: 0.9 })
+        applyTrackerRotationToBone(bones.hips, getTrackerKey('hips'), { weight: 0.9 })
       }
     } catch {}
 
     // Chest/Head aim
     try {
-      const chestTrackerEnabled = trackerIsIndividuallyEnabled('chest')
-      const chestT = chestTrackerEnabled ? trackers.value.find(t => t.key === 'chest')?.mesh.position : null
+      const chestTrackerKey = getTrackerKey('chest')
+      const chestTrackerEnabled = trackerIsIndividuallyEnabled(chestTrackerKey)
+      const chestT = chestTrackerEnabled ? trackers.value.find(t => t.key === chestTrackerKey)?.mesh.position : null
       if (bones.spine && chestT) {
         const p = bones.spine.getWorldPosition(new THREE.Vector3())
         const dir = chestT.clone().sub(p)
         rotateBoneToward(bones.spine, dir, 0.5)
       }
-      const headTrackerEnabled = trackerIsIndividuallyEnabled('head')
-      const headT = headTrackerEnabled ? trackers.value.find(t => t.key === 'head')?.mesh.position : null
+      const headTrackerKey = getTrackerKey('head')
+      const headTrackerEnabled = trackerIsIndividuallyEnabled(headTrackerKey)
+      const headT = headTrackerEnabled ? trackers.value.find(t => t.key === headTrackerKey)?.mesh.position : null
       const neckBase = bones.neck || bones.head || bones.spine
       if (neckBase && headT) {
         const p = neckBase.getWorldPosition(new THREE.Vector3())
@@ -2306,20 +2721,22 @@ function setTrackerRotationAxis(key, axis) {
 
     try {
       if (bones.spine) {
-        applyTrackerRotationToBone(bones.spine, 'chest', { weight: 0.6 })
+        applyTrackerRotationToBone(bones.spine, getTrackerKey('chest'), { weight: 0.6 })
       }
       const headBone = bones.head || bones.neck
       if (headBone) {
-        if (trackerIsIndividuallyEnabled('head')) {
-          applyTrackerRotationToBone(headBone, 'head', { weight: 0.85 })
+        const headTrackerKey = getTrackerKey('head')
+        if (trackerIsIndividuallyEnabled(headTrackerKey)) {
+          applyTrackerRotationToBone(headBone, headTrackerKey, { weight: 0.85 })
         }
         
         // ===== UpperArm位置反映（回転は反映しない） =====
         // UpperArmトラッカーの位置をボーンに反映（ボーンの制約に従って）
         // 肩ボーンの角度を変更してUpperArmボーンの位置を変更する
         if (bones.leftShoulder && bones.leftUpperArm) {
-          const leftUpperArmTracker = trackers.value.find(t => t.key === 'leftUpperArm')
-          if (leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('leftUpperArm')) {
+          const leftUpperArmTrackerKey = getTrackerKey('leftUpperArm')
+          const leftUpperArmTracker = trackers.value.find(t => t.key === leftUpperArmTrackerKey)
+          if (leftUpperArmTracker?.mesh && trackerIsIndividuallyEnabled(leftUpperArmTrackerKey)) {
             try {
               // UpperArmボーンの現在位置を取得
               bones.leftUpperArm.updateWorldMatrix(true, false)
@@ -2350,8 +2767,9 @@ function setTrackerRotationAxis(key, axis) {
         }
         
         if (bones.rightShoulder && bones.rightUpperArm) {
-          const rightUpperArmTracker = trackers.value.find(t => t.key === 'rightUpperArm')
-          if (rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled('rightUpperArm')) {
+          const rightUpperArmTrackerKey = getTrackerKey('rightUpperArm')
+          const rightUpperArmTracker = trackers.value.find(t => t.key === rightUpperArmTrackerKey)
+          if (rightUpperArmTracker?.mesh && trackerIsIndividuallyEnabled(rightUpperArmTrackerKey)) {
             try {
               // UpperArmボーンの現在位置を取得
               bones.rightUpperArm.updateWorldMatrix(true, false)
@@ -2391,8 +2809,8 @@ function setTrackerRotationAxis(key, axis) {
           bones.leftUpperArm,
           bones.leftLowerArm,
           bones.leftHand,
-          'leftHand',
-          'leftElbow'
+          getTrackerKey('leftHand'),
+          getTrackerKey('leftElbow')
         )
         
         // 右腕
@@ -2401,8 +2819,8 @@ function setTrackerRotationAxis(key, axis) {
           bones.rightUpperArm,
           bones.rightLowerArm,
           bones.rightHand,
-          'rightHand',
-          'rightElbow'
+          getTrackerKey('rightHand'),
+          getTrackerKey('rightElbow')
         )
       }
     } catch (err) {
@@ -2410,21 +2828,22 @@ function setTrackerRotationAxis(key, axis) {
     }
     // Legs IK
     try {
-      solveLimb(bones.leftUpperLeg, bones.leftLowerLeg, bones.leftFoot, 'leftFoot', 'leftKnee')
-      solveLimb(bones.rightUpperLeg, bones.rightLowerLeg, bones.rightFoot, 'rightFoot', 'rightKnee')
+      solveLimb(bones.leftUpperLeg, bones.leftLowerLeg, bones.leftFoot, getTrackerKey('leftFoot'), getTrackerKey('leftKnee'))
+      solveLimb(bones.rightUpperLeg, bones.rightLowerLeg, bones.rightFoot, getTrackerKey('rightFoot'), getTrackerKey('rightKnee'))
       // 足首の回転を適用
       if (bones.leftFoot) {
-        applyTrackerRotationToBone(bones.leftFoot, 'leftFoot', { weight: 0.85 })
+        applyTrackerRotationToBone(bones.leftFoot, getTrackerKey('leftFoot'), { weight: 0.85 })
       }
       if (bones.rightFoot) {
-        applyTrackerRotationToBone(bones.rightFoot, 'rightFoot', { weight: 0.85 })
+        applyTrackerRotationToBone(bones.rightFoot, getTrackerKey('rightFoot'), { weight: 0.85 })
       }
 
     } catch {}
     // Gaze tracking: make eyes look at gaze tracker
     try {
-      const gazeTracker = trackers.value.find(t => t.key === 'gaze')
-      if (gazeTracker?.mesh && trackerIsIndividuallyEnabled('gaze')) {
+      const gazeTrackerKey = getTrackerKey('gaze')
+      const gazeTracker = trackers.value.find(t => t.key === gazeTrackerKey)
+      if (gazeTracker?.mesh && trackerIsIndividuallyEnabled(gazeTrackerKey)) {
         const gazePos = gazeTracker.mesh.position
         
         // まず VRM lookAt を使いターゲット設定 (一部モデルでまぶたコントロールを含むため)
@@ -2460,7 +2879,7 @@ function setTrackerRotationAxis(key, axis) {
     }
 
     vrmRoot.updateMatrixWorld(true, true)
-  } // end update()
+  } // end updateModelWithTrackers()
 
   function solveLimb(upper, lower, eff, effKey, poleKey) {
     if (!upper || !lower || !eff) return
@@ -2658,20 +3077,43 @@ function setTrackerRotationAxis(key, axis) {
     trackers.value.forEach(t => {
       const mesh = t.mesh
       if (!mesh) return
-      if (mesh.userData?.isCamera) {
-        try { mesh.geometry?.dispose?.() } catch {}
+      const isCamera = mesh.userData?.isCamera
+      const isRoot = t.isRoot || mesh.userData?.isRoot
+      const colorHex = toColorHex(t.color, '#ffffff')
+      try { mesh.geometry?.dispose?.() } catch {}
+      if (isCamera) {
         const baseSize = s
         const cone = new THREE.ConeGeometry(baseSize * 1.6, baseSize * 3.2, 24)
         cone.rotateX(Math.PI / 2)
         mesh.geometry = markRaw(cone)
+      } else if (isRoot) {
+        const size = s * 2
+        mesh.geometry = markRaw(new THREE.BoxGeometry(size, size, size))
+        mesh.renderOrder = 998
+        if (!mesh.material) {
+          mesh.material = markRaw(new THREE.MeshBasicMaterial({
+            color: colorHex,
+            wireframe: true,
+            depthTest: false,
+            depthWrite: false
+          }))
+        } else {
+          if (mesh.material.color) {
+            mesh.material.color.set(colorHex)
+          }
+          mesh.material.wireframe = true
+        }
       } else {
-        try { mesh.geometry?.dispose?.() } catch {}
         mesh.geometry = markRaw(new THREE.SphereGeometry(s, 16, 16))
         mesh.renderOrder = 998
+        if (mesh.material) {
+          mesh.material.wireframe = false
+        }
       }
       if (mesh.material) {
         mesh.material.depthTest = false
         mesh.material.depthWrite = false
+        mesh.material.needsUpdate = true
       }
       if (t.rotationRing) {
         updateRotationRingGeometry(t.rotationRing)
@@ -2806,13 +3248,43 @@ function setTrackerRotationAxis(key, axis) {
   }
 
   function resetAllTrackerPositions({ persist = true } = {}) {
-    // すべてのトラッカーを初期位置に戻す（初期ポーズは再キャプチャしない）
-    for (const def of TRACKER_DEFS) {
-      resetTrackerPosition(def.key, { persist: false })
-    }
+    // すべてのモデルのすべてのトラッカーを初期位置に戻す
+    const allModels = models.value
+    
+    // 各モデルのトラッカーをリセット
+    allModels.forEach((model, idx) => {
+      const modelIndex = idx + 1
+      for (const def of TRACKER_DEFS) {
+        const trackerKey = makeTrackerKey(def.key, modelIndex)
+        const tracker = trackers.value.find(t => t.key === trackerKey)
+        if (tracker) {
+          resetTrackerPosition(trackerKey, { persist: false })
+        }
+      }
+    })
+    
     if (persist) {
       persistTrackerTransforms()
       notifyTrackerTransform('all', { type: 'resetAllPositions', persisted: true })
+    }
+  }
+
+  function resetTrackerPositionsForModel(modelIndex, { persist = true } = {}) {
+    // 特定のモデルのトラッカーのみ初期位置に戻す
+    for (const def of TRACKER_DEFS) {
+      const trackerKey = makeTrackerKey(def.key, modelIndex)
+      const tracker = trackers.value.find(t => t.key === trackerKey)
+      if (tracker) {
+        resetTrackerPosition(trackerKey, { persist: false })
+      }
+    }
+    if (persist) {
+      persistTrackerTransforms()
+      notifyTrackerTransform(`model_${modelIndex}`, { 
+        type: 'resetModelPositions', 
+        modelIndex, 
+        persisted: true 
+      })
     }
   }
 
@@ -2836,6 +3308,7 @@ function setTrackerRotationAxis(key, axis) {
     resetTrackerPosition,
     resetTrackerRotation,
     resetAllTrackerPositions,
+    resetTrackerPositionsForModel,
     resetAllTrackerRotations,
     reset,
     update,

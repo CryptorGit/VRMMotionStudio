@@ -221,9 +221,16 @@ const DEFAULT_TRACKER_COLORS = Object.freeze({
   gaze: '#ffeb3b'
 })
 
+const baseTrackerKey = key => {
+  if (typeof key !== 'string') return key
+  const at = key.lastIndexOf('@')
+  return at > 0 ? key.slice(0, at) : key
+}
+
 const fallbackColorForTracker = trackerKey => {
   if (!trackerKey) return FALLBACK_CURVE_COLOR
-  return DEFAULT_TRACKER_COLORS[trackerKey] || FALLBACK_CURVE_COLOR
+  const baseKey = baseTrackerKey(trackerKey)
+  return DEFAULT_TRACKER_COLORS[baseKey] || FALLBACK_CURVE_COLOR
 }
 
 const normalizeColor = (color, fallback = FALLBACK_CURVE_COLOR) => {
@@ -645,9 +652,6 @@ function resetCurves() {
     const curve = cloneCurve(DEFAULT_CURVE)
     next.set(frame.id, curve)
     updates.push({ keyframeId: frame.id, curve: cloneCurve(curve) })
-    // リセチE��時�E永続ストレージもクリア
-    const storageKey = `${frame.id}-${props.trackerKey}`
-    persistentCurveStorage.delete(storageKey)
   })
   curvesState.value = next
   if (updates.length) {

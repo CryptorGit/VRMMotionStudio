@@ -124,6 +124,7 @@ messages.tracker = {
 }
 
 messages.finger = {
+  selectModel: 'モデルを選択',
   leftHand: '左手',
   rightHand: '右手',
   resetAll: 'すべてリセット',
@@ -248,6 +249,9 @@ messages.keys = {
   selectPrompt: 'キーフレームを選択して設定を編集',
   noSelection: 'キーフレームが選択されていません。タイムラインでキーを選択してください。',
   multiSelectHint: 'ヒント: Shiftキーを押しながら複数のキーを選択できます。',
+  selectModel: 'モデルを選択',
+  allModels: 'すべてのモデル',
+  selectModelHint: 'モデルを選択するとトラッカー別のカーブを編集できます。',
   targetTracker: '対象トラッカー',
   allDefault: 'すべて (デフォルトカーブ)'
 }

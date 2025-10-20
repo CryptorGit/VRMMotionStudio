@@ -226,6 +226,7 @@
                 @load-model-outline="handleLoadModelOutline"
                 @capture-render="captureRenderImageToFile"
                 @remove-audio="removeAudio"
+                @update:selected-tracker-model-index="selectedTrackerModelIndex = $event"
               />
             </div>
           </aside>
@@ -346,6 +347,7 @@ const virtualTrackerDisplayVisible = ref(true)
 const showVirtualTrackerLabels = ref(true)
 const virtualTrackerSize = ref(0.08)
 const virtualTrackerLabelScale = ref(1.0)
+const selectedTrackerModelIndex = ref(-1) // -1 means "All Models"
 
 // 選択されたトラッカーの状態
 const selectedTrackerKey = ref(null)
@@ -370,9 +372,15 @@ const forearmTwistShare = ref(0.7)
 
 // 選択されたトラッカーのラベル
 const selectedTrackerLabel = computed(() => {
-  if (!selectedTrackerKey.value) return ''
-  const def = TRACKER_DEFS.find(d => d.key === selectedTrackerKey.value)
-  return def?.label || selectedTrackerKey.value
+  const key = selectedTrackerKey.value
+  if (!key) return ''
+  if (key === 'default') return 'Default'
+  const match = availableTrackers.value.find(tracker => tracker.key === key)
+  if (match?.label) return match.label
+  const { baseKey, modelIndex } = parseTrackerKeyModelInfo(key)
+  const def = TRACKER_DEFS.find(d => d.key === baseKey)
+  if (!def) return key
+  return modelIndex > 0 ? `${def.label} ${modelIndex + 1}` : def.label
 })
 
 // Check if models are loaded (for disabling tracker toggle)
@@ -394,34 +402,69 @@ function toHexColor(value, fallback = DEFAULT_TRACKER_COLOR) {
   return fallback
 }
 
-const availableTrackers = computed(() => {
-  const trackerList = trackerController?.trackers?.value || []
-  const colorMap = new Map()
-  trackerList.forEach(tracker => {
-    if (!tracker?.key) return
-    let resolved = null
-    try {
-      const matColor = tracker.mesh?.material?.color
-      if (matColor && typeof matColor.getHexString === 'function') {
-        resolved = `#${matColor.getHexString()}`
-      } else if (typeof tracker.color === 'string' || Number.isFinite(tracker.color)) {
-        resolved = toHexColor(tracker.color, null)
-      }
-    } catch {}
-    if (resolved) {
-      colorMap.set(tracker.key, resolved)
+function parseTrackerKeyModelInfo(key) {
+  if (typeof key !== 'string') {
+    return { baseKey: key, modelIndex: 0 }
+  }
+  const sepIndex = key.lastIndexOf('@')
+  if (sepIndex > 0) {
+    const baseKey = key.slice(0, sepIndex)
+    const suffix = Number(key.slice(sepIndex + 1))
+    if (Number.isFinite(suffix) && suffix >= 1) {
+      return { baseKey, modelIndex: suffix - 1 }
     }
-  })
+  }
+  return { baseKey: key, modelIndex: 0 }
+}
 
-  return TRACKER_DEFS.map(def => {
-    const fallback = toHexColor(def.color, DEFAULT_TRACKER_COLOR)
-    const color = colorMap.get(def.key) || fallback
-    return {
-      key: def.key,
-      label: def.label,
-      color
-    }
-  })
+const availableTrackers = computed(() => {
+  const trackerList = trackerController?.trackers?.value
+  const orderedKeys = new Map(TRACKER_DEFS.map((def, index) => [def.key, index]))
+  const entries = []
+
+  if (Array.isArray(trackerList) && trackerList.length) {
+    trackerList.forEach(tracker => {
+      const key = tracker?.key
+      if (!key) return
+      const { baseKey, modelIndex } = parseTrackerKeyModelInfo(key)
+      const def = TRACKER_DEFS.find(d => d.key === baseKey)
+      const fallbackColor = def ? toHexColor(def.color, DEFAULT_TRACKER_COLOR) : DEFAULT_TRACKER_COLOR
+      let resolved = fallbackColor
+      try {
+        const matColor = tracker.mesh?.material?.color
+        if (matColor && typeof matColor.getHexString === 'function') {
+          resolved = `#${matColor.getHexString()}`
+        } else if (typeof tracker.color === 'string' || Number.isFinite(tracker.color)) {
+          resolved = toHexColor(tracker.color, fallbackColor)
+        }
+      } catch {}
+      entries.push({
+        key,
+        baseKey,
+        modelIndex,
+        label: tracker.name || def?.label || key,
+        color: resolved
+      })
+    })
+
+    entries.sort((a, b) => {
+      if (a.modelIndex !== b.modelIndex) return a.modelIndex - b.modelIndex
+      const orderA = orderedKeys.get(a.baseKey) ?? Number.MAX_SAFE_INTEGER
+      const orderB = orderedKeys.get(b.baseKey) ?? Number.MAX_SAFE_INTEGER
+      if (orderA !== orderB) return orderA - orderB
+      return a.label.localeCompare(b.label)
+    })
+
+    return entries
+  }
+
+  return TRACKER_DEFS.map(def => ({
+    key: def.key,
+    baseKey: def.key,
+    modelIndex: 0,
+    label: def.label,
+    color: toHexColor(def.color, DEFAULT_TRACKER_COLOR)
+  }))
 })
 
 const trackerAxes = ['x', 'y', 'z']
@@ -633,7 +676,8 @@ if (cachedFingerAxisOverrides && typeof cachedFingerAxisOverrides === 'object') 
 function createDefaultFingerAxisOverrides() {
   const defaults = {}
   for (const key of FINGER_STATE_KEYS) {
-    defaults[key] = 'z+'
+    // Thumbはy+、それ以外はz+
+    defaults[key] = key.includes('thumb') ? 'y+' : 'z+'
   }
   return defaults
 }
@@ -2498,14 +2542,28 @@ watch(timelineCurrentTime, (newTime, oldTime) => {
 
 function resetVirtualTrackers() {
   try {
-    // リセット前に初期ポーズをクリアして、現在のボーン位置ではなく本当の初期位置を使用
-    if (trackerController?.resetAllTrackerPositions) {
-      trackerController.resetAllTrackerPositions({ persist: true })
+    const modelIdx = selectedTrackerModelIndex.value
+    
+    // -1 (All Models) の場合はすべてリセット
+    if (modelIdx === -1) {
+      if (trackerController?.resetAllTrackerPositions) {
+        trackerController.resetAllTrackerPositions({ persist: true })
+      }
+      notify('trackersReset', 'Trackers: All virtual trackers reset.', 3200)
+    } else {
+      // 特定のモデルのトラッカーのみリセット
+      if (trackerController?.resetTrackerPositionsForModel) {
+        trackerController.resetTrackerPositionsForModel(modelIdx + 1, { persist: true })
+      }
+      const modelName = models.value[modelIdx]?.name || `Model ${modelIdx + 1}`
+      notify('trackersReset', `Trackers: ${modelName} trackers reset.`, 3200)
     }
-    notify('trackersReset', 'Trackers: Virtual trackers reset.', 3200)
+    
     refreshTrackerAdjustState()
     scheduleDisplaySettingsSave()
-  } catch {}
+  } catch (err) {
+    console.error('[resetVirtualTrackers]', err)
+  }
 }
 
 function ensureVirtualTrackers() {
@@ -3837,9 +3895,21 @@ watch([
   try { applyBoneSettingsAll?.() } catch {}
 })
 
-watch(models, () => {
-  if (virtualTrackersEnabled.value) {
-    // 既存の保存データを尊重し、完全リセットは行わない
+watch(models, (newModels, oldModels) => {
+  const newCount = Array.isArray(newModels) ? newModels.length : 0
+  const oldCount = Array.isArray(oldModels) ? oldModels.length : 0
+  
+  // モデルが追加された場合、トラッカーが有効なら自動で再構築
+  if (virtualTrackersEnabled.value && newCount > oldCount) {
+    console.log(`[ThreeViewer] Models increased from ${oldCount} to ${newCount}, rebuilding trackers`)
+    try { 
+      trackerController.rebuild?.() 
+      applyTimelinePoseImmediate()
+    } catch (err) {
+      console.error('[ThreeViewer] Failed to rebuild trackers:', err)
+    }
+  } else if (virtualTrackersEnabled.value && newCount !== oldCount) {
+    // モデル数が変化した場合は再構築
     try { trackerController.rebuild?.() } catch {}
     applyTimelinePoseImmediate()
   }
@@ -4598,12 +4668,27 @@ onUnmounted(() => {
 }
 
 .tracker-adjust__section--order select {
-  padding: 0.25rem 0.45rem;
+  appearance: none;
+  padding: 0.35rem 1.75rem 0.35rem 0.6rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(12, 16, 24, 0.92);
-  color: inherit;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
   font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.tracker-adjust__section--order select:hover,
+.tracker-adjust__section--order select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background-color: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 .tracker-adjust__reset {
@@ -4646,12 +4731,27 @@ onUnmounted(() => {
 }
 
 .mode-switch select {
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  appearance: none;
+  border: 1px solid rgba(140, 168, 235, 0.35);
   border-radius: 14px;
-  padding: 0.35rem 0.8rem;
-  background: rgba(24, 28, 38, 0.85);
-  color: inherit;
+  padding: 0.35rem 2rem 0.35rem 0.8rem;
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
   font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.mode-switch select:hover,
+.mode-switch select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background-color: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
 }
 
 .camera-status {

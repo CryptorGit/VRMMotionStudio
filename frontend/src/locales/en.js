@@ -176,6 +176,7 @@ export default {
   },
 
   finger: {
+    selectModel: 'Select Model',
     leftHand: 'Left Hand',
     rightHand: 'Right Hand',
     resetAll: 'Reset All Fingers',
@@ -210,6 +211,9 @@ export default {
     selectPrompt: 'Select keyframes to edit their settings',
     noSelection: 'No keyframes selected. Choose keys in the timeline.',
     multiSelectHint: 'Tip: Hold Shift to select multiple keys.',
+    selectModel: 'Select Model',
+    allModels: 'All Models',
+    selectModelHint: 'Select a model to edit tracker-specific curves.',
     targetTracker: 'Target Tracker',
     allDefault: 'All (default curves)'
   },

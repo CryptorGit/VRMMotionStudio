@@ -29,16 +29,39 @@
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
+      <!-- モデル選択 -->
+      <div v-if="models && models.length > 0" class="curve-model-selector">
+        <label class="model-label">
+          <span>{{ keysTexts.selectModel || 'Select Model' }}</span>
+          <select 
+            :value="selectedModelIndex" 
+            @change="handleModelChange($event.target.value)"
+            class="model-select"
+          >
+            <option :value="-1">{{ keysTexts.allModels || 'All Models' }}</option>
+            <option v-for="(model, idx) in models" :key="idx" :value="idx">
+              {{ model?.name || `${keysTexts.modelLabel || 'Model'} ${idx + 1}` }}
+            </option>
+          </select>
+        </label>
+      </div>
+      
       <!-- トラチE��ー選抁E-->
       <div class="curve-tracker-selector">
         <label class="tracker-label">
           <span>{{ keysTexts.targetTracker }}</span>
-          <select v-model="selectedTracker" class="tracker-select">
+          <select
+            v-model="selectedTracker"
+            class="tracker-select"
+          >
             <option value="default">{{ keysTexts.allDefault }}</option>
-            <option v-for="tracker in availableTrackers" :key="tracker.key" :value="tracker.key">
+            <option v-for="tracker in modelTrackers" :key="tracker.key" :value="tracker.key">
               {{ tracker.label }}
             </option>
           </select>
+          <p v-if="!isModelScopeActive" class="tracker-select__hint">
+            {{ keysTexts.selectModelHint || 'Select a model to edit tracker-specific curves.' }}
+          </p>
         </label>
       </div>
       <TimelineCurveEditor 
@@ -71,42 +94,169 @@ const props = defineProps({
   },
   snap: { type: Boolean, default: true },
   loop: { type: Boolean, default: false },
-  availableTrackers: { type: Array, default: () => [] }
+  availableTrackers: { type: Array, default: () => [] },
+  models: { type: Array, default: () => [] },
+  selectedModelIndex: { type: Number, default: -1 }
 })
 
-const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves'])
+const emit = defineEmits(['update:snap', 'update:loop', 'remove-selected', 'update-curves', 'update:selectedModelIndex'])
 
 const { t } = useI18n()
 const keysTexts = computed(() => t.value?.keys ?? {})
 
 const selectedTracker = ref('default')
-// トラチE��ーごとのカーブ色を保持�E�トラチE��ー色と同期�E�E
+// Cache curve colors per tracker (aligned with tracker palette)
 const trackerCurveColors = ref(new Map())
 
+// Remember the last tracker selection per model so we can restore it on tab switches
+const trackerSelectionsByModel = ref(new Map())
+
+function toModelIndex(value) {
+  if (Number.isInteger(value)) return value
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : -1
+}
+
+function getTrackersForModel(modelIdx) {
+  if (!Array.isArray(props.availableTrackers)) return []
+  if (!Number.isInteger(modelIdx) || modelIdx < 0) return []
+  return props.availableTrackers.filter(tracker => {
+    const idx = Number.isInteger(tracker?.modelIndex) ? tracker.modelIndex : 0
+    return idx === modelIdx
+  })
+}
+
+const modelTrackers = computed(() => getTrackersForModel(props.selectedModelIndex))
+const isModelScopeActive = computed(() => Number.isInteger(props.selectedModelIndex) && props.selectedModelIndex >= 0)
+
+// Keep tracker options in sync when the model selector changes
+const handleModelChange = (value) => {
+  const newModelIndex = toModelIndex(Number(value))
+  if (newModelIndex === props.selectedModelIndex) return
+
+  const currentModelIdx = props.selectedModelIndex
+  if (Number.isInteger(currentModelIdx) && currentModelIdx >= 0 && selectedTracker.value && selectedTracker.value !== 'default') {
+    const next = new Map(trackerSelectionsByModel.value)
+    next.set(currentModelIdx, selectedTracker.value)
+    trackerSelectionsByModel.value = next
+  }
+
+  emit('update:selectedModelIndex', newModelIndex)
+}
+
+watch(
+  () => props.selectedModelIndex,
+  (newModelIdx, oldModelIdx) => {
+    const prevIdx = toModelIndex(oldModelIdx)
+    if (Number.isInteger(prevIdx) && prevIdx >= 0 && selectedTracker.value && selectedTracker.value !== 'default') {
+      const next = new Map(trackerSelectionsByModel.value)
+      next.set(prevIdx, selectedTracker.value)
+      trackerSelectionsByModel.value = next
+    }
+
+    const normalizedIdx = toModelIndex(newModelIdx)
+    if (!Number.isInteger(normalizedIdx) || normalizedIdx < 0) {
+      if (selectedTracker.value !== 'default') selectedTracker.value = 'default'
+      return
+    }
+
+    const scopedTrackers = getTrackersForModel(normalizedIdx)
+    const remembered = trackerSelectionsByModel.value.get(normalizedIdx)
+    if (remembered && scopedTrackers.some(tracker => tracker.key === remembered)) {
+      if (selectedTracker.value !== remembered) selectedTracker.value = remembered
+      return
+    }
+
+    if (scopedTrackers.some(tracker => tracker.key === selectedTracker.value)) {
+      return
+    }
+
+    if (scopedTrackers.length > 0) {
+      selectedTracker.value = scopedTrackers[0].key
+    } else {
+      selectedTracker.value = 'default'
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.availableTrackers,
+  (next) => {
+    const trackers = Array.isArray(next) ? next : []
+    const validKeys = new Set(trackers.map(tracker => tracker?.key).filter(Boolean))
+
+    if (trackerSelectionsByModel.value.size > 0) {
+      const pruned = new Map()
+      trackerSelectionsByModel.value.forEach((key, modelIdx) => {
+        if (key && validKeys.has(key)) {
+          pruned.set(modelIdx, key)
+        }
+      })
+      trackerSelectionsByModel.value = pruned
+    }
+
+    const modelIdx = props.selectedModelIndex
+    if (!Number.isInteger(modelIdx) || modelIdx < 0) {
+      if (selectedTracker.value !== 'default') selectedTracker.value = 'default'
+      return
+    }
+
+    const scopedTrackers = getTrackersForModel(modelIdx)
+    if (selectedTracker.value !== 'default' && !scopedTrackers.some(tracker => tracker.key === selectedTracker.value)) {
+      const remembered = trackerSelectionsByModel.value.get(modelIdx)
+      if (remembered && scopedTrackers.some(tracker => tracker.key === remembered)) {
+        selectedTracker.value = remembered
+      } else if (scopedTrackers.length > 0) {
+        selectedTracker.value = scopedTrackers[0].key
+      } else {
+        selectedTracker.value = 'default'
+      }
+    }
+  },
+  { deep: true }
+)
+
+watch(selectedTracker, (newTracker, oldTracker) => {
+  if (newTracker === oldTracker) return
+  const modelIdx = props.selectedModelIndex
+  if (!Number.isInteger(modelIdx) || modelIdx < 0) return
+  if (!newTracker || newTracker === 'default') return
+  const next = new Map(trackerSelectionsByModel.value)
+  next.set(modelIdx, newTracker)
+  trackerSelectionsByModel.value = next
+})
 // ========================================
 // Utility functions (must be defined before use)
 // ========================================
 
 // チE��ォルトカラー�E�バーチャルトラチE��ーの色と一致�E�E
+const baseTrackerKey = (key) => {
+  if (typeof key !== 'string') return key
+  const at = key.lastIndexOf('@')
+  return at > 0 ? key.slice(0, at) : key
+}
+
 const getDefaultColor = (trackerKey) => {
   const defaultColors = {
     default: '#5c8cff',
-    'head': '#3aa6ff',
-    'chest': '#00c853',
-    'hips': '#ff7043',
-    'leftUpperArm': '#1e88e5',
-    'rightUpperArm': '#e53935',
-    'leftHand': '#2979ff',
-    'rightHand': '#ff1744',
-    'leftElbow': '#1565c0',
-    'rightElbow': '#d50000',
-    'leftFoot': '#009688',
-    'rightFoot': '#00796b',
-    'leftKnee': '#26a69a',
-    'rightKnee': '#004d40',
-    'gaze': '#ffeb3b'
+    head: '#3aa6ff',
+    chest: '#00c853',
+    hips: '#ff7043',
+    leftUpperArm: '#1e88e5',
+    rightUpperArm: '#e53935',
+    leftHand: '#2979ff',
+    rightHand: '#ff1744',
+    leftElbow: '#1565c0',
+    rightElbow: '#d50000',
+    leftFoot: '#009688',
+    rightFoot: '#00796b',
+    leftKnee: '#26a69a',
+    rightKnee: '#004d40',
+    gaze: '#ffeb3b'
   }
-  return defaultColors[trackerKey] || '#5c8cff'
+  const baseKey = baseTrackerKey(trackerKey)
+  return defaultColors[baseKey] || '#5c8cff'
 }
 
 const normalizeColor = (color, fallback = '#5c8cff') => {
@@ -144,7 +294,6 @@ function rememberTrackerColor(key, color) {
 // Helper function to update tracker color cache from frames
 function updateTrackerColorCache() {
   const frames = props.selection?.frames
-  selectedTracker.value = 'default'
   resetTrackerColorCache()
   
   if (Array.isArray(frames) && frames.length > 0) {
@@ -501,6 +650,48 @@ function onCurvesUpdate(payload) {
   box-shadow: none;
 }
 
+.curve-model-selector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(140, 168, 235, 0.2);
+  align-items: flex-end;
+}
+
+.model-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(240, 244, 255, 0.85);
+  flex: 1;
+}
+
+.model-select {
+  appearance: none;
+  padding: 0.45rem 2.25rem 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.model-select:hover,
+.model-select:focus {
+  outline: none;
+  border-color: rgba(140, 168, 235, 0.65);
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+}
+
 .curve-tracker-selector {
   display: flex;
   gap: 1rem;
@@ -522,19 +713,33 @@ function onCurvesUpdate(payload) {
 }
 
 .tracker-select {
-  padding: 0.5rem 0.65rem;
-  border-radius: 8px;
+  appearance: none;
+  padding: 0.45rem 2.25rem 0.45rem 0.75rem;
+  border-radius: 6px;
   border: 1px solid rgba(140, 168, 235, 0.35);
-  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
   color: rgba(240, 244, 255, 0.9);
   font-size: 0.85rem;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
+.tracker-select:hover,
 .tracker-select:focus {
   outline: none;
   border-color: rgba(140, 168, 235, 0.65);
-  background: var(--panel-surface-alt, rgba(52, 58, 72, 0.85));
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+}
+
+.tracker-select__hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .key-settings__curve-editor :deep(.curve-editor) {

@@ -65,6 +65,8 @@
     :tracker-rotation-orders="trackerRotationOrders"
     :show-tracker-axes="showTrackerAxes"
     :tracker-axes-length="trackerAxesLength"
+    :models="models"
+    :selected-model-index="selectedModelIndex"
     @update:virtualTrackersEnabled="v => emit('update:virtualTrackersEnabled', v)"
     @update:virtualTrackerDisplayVisible="v => emit('update:virtualTrackerDisplayVisible', v)"
     @update:showVirtualTrackerLabels="v => emit('update:showVirtualTrackerLabels', v)"
@@ -81,11 +83,13 @@
     @reset-tracker-position="() => emit('reset-tracker-position')"
     @reset-tracker-rotation="() => emit('reset-tracker-rotation')"
     @reset-outline="() => emit('reset-outline')"
+    @update:selectedModelIndex="v => emit('update:selectedModelIndex', v)"
   />
   <FingerControlSection
     v-else-if="active === 'bones'"
     :finger-states="fingerStates"
     :axis-overrides="fingerAxisOverrides"
+    :models="models"
     @update:fingerStates="handleFingerUpdate"
     @update:axisOverrides="v => emit('update:fingerAxisOverrides', v)"
   />
@@ -95,8 +99,11 @@
     :snap="timelineSnap"
     :loop="timelineLoop"
     :available-trackers="availableTrackers"
+    :models="models"
+    :selected-model-index="selectedModelIndex"
     @update:snap="v => emit('update:timelineSnap', v)"
     @update:loop="v => emit('update:timelineLoop', v)"
+    @update:selectedModelIndex="v => emit('update:selectedModelIndex', v)"
     @remove-selected="() => emit('remove-selected-keyframes')"
     @update-curves="payload => emit('update-keyframe-curves', payload)"
   />
@@ -196,7 +203,8 @@ const props = defineProps({
   timelineLoop: { type: Boolean, default: false },
   availableTrackers: { type: Array, default: () => [] },
   audioDuration: { type: Number, default: 0 },
-  audioBuffer: { type: Object, default: null }
+  audioBuffer: { type: Object, default: null },
+  selectedModelIndex: { type: Number, default: -1 }
 })
 
 const emit = defineEmits([
@@ -254,7 +262,8 @@ const emit = defineEmits([
   'remove-selected-keyframes',
   'update-keyframe-curves',
   'load-model-outline',
-  'remove-audio'
+  'remove-audio',
+  'update:selectedModelIndex'
 ])
 
 function handleFingerUpdate(updated) {

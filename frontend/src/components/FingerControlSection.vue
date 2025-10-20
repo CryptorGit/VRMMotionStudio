@@ -1,4 +1,15 @@
 <template>
+  <div class="model-selector-group">
+    <label class="model-selector-label">
+      <span>{{ modelSelectLabel }}</span>
+      <select v-model="selectedModelIndex" class="model-select">
+        <option v-for="(model, index) in modelOptions" :key="index" :value="index">
+          {{ model.label }}
+        </option>
+      </select>
+    </label>
+  </div>
+  
   <div class="hand-group">
     <h4>{{ leftHandLabel }}</h4>
     <div class="finger-control" v-for="finger in leftFingers" :key="finger.key">
@@ -73,12 +84,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from '../locales/index.js'
 
 const props = defineProps({
   fingerStates: { type: Object, default: () => ({}) },
-  axisOverrides: { type: Object, default: () => ({}) }
+  axisOverrides: { type: Object, default: () => ({}) },
+  models: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['update:fingerStates', 'update:axisOverrides'])
@@ -89,6 +101,21 @@ const fingerTexts = computed(() => t.value?.finger ?? {})
 const leftHandLabel = computed(() => fingerTexts.value.leftHand || 'Left Hand')
 const rightHandLabel = computed(() => fingerTexts.value.rightHand || 'Right Hand')
 const resetAllLabel = computed(() => fingerTexts.value.resetAll || 'Reset All')
+const modelSelectLabel = computed(() => fingerTexts.value.selectModel || 'Select Model')
+
+// モデル選択用の状態
+const selectedModelIndex = ref(0)
+
+// モデルリストの作成
+const modelOptions = computed(() => {
+  if (!Array.isArray(props.models) || props.models.length === 0) {
+    return [{ label: 'No Model', value: 0 }]
+  }
+  return props.models.map((model, index) => ({
+    label: model?.name || `Model ${index + 1}`,
+    value: index
+  }))
+})
 
 const AXIS_VALUES = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-']
 
@@ -270,20 +297,26 @@ function resetAllFingers() {
 
 .axis-select {
   flex: 0 0 6rem;
-  padding: 0.3rem 0.6rem;
-  background: linear-gradient(180deg, rgba(80, 104, 146, 0.92), rgba(58, 72, 102, 0.92));
-  color: rgba(235, 240, 255, 0.92);
-  border: 1px solid rgba(140, 170, 240, 0.35);
+  appearance: none;
+  padding: 0.35rem 1.5rem 0.35rem 0.6rem;
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
+  border: 1px solid rgba(140, 168, 235, 0.35);
   border-radius: 6px;
   font-size: 0.8rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
-  box-shadow: inset 0 0 0 1px rgba(18, 22, 34, 0.35);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 12px) calc(50% - 2px), calc(100% - 8px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
 
 .axis-select:hover,
 .axis-select:focus-visible {
-  border-color: rgba(160, 190, 255, 0.6);
-  box-shadow: 0 0 0 2px rgba(92, 140, 255, 0.2);
+  border-color: rgba(140, 168, 235, 0.65);
+  background-color: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
   outline: none;
 }
 
@@ -357,6 +390,49 @@ input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.15);
   border-color: rgba(255, 255, 255, 0.8);
   box-shadow: none;
+}
+
+.model-selector-group {
+  margin-bottom: 1.2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.model-selector-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.model-selector-label span {
+  opacity: 0.9;
+}
+
+.model-select {
+  appearance: none;
+  padding: 0.45rem 2.25rem 0.45rem 0.75rem;
+  background: var(--control-surface, rgba(48, 54, 70, 0.9));
+  color: rgba(240, 244, 255, 0.9);
+  border: 1px solid rgba(140, 168, 235, 0.35);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  outline: none;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(140, 168, 235, 0.9) 50%),
+    linear-gradient(135deg, rgba(140, 168, 235, 0.9) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.model-select:hover,
+.model-select:focus {
+  background: var(--control-surface-hover, rgba(58, 64, 81, 0.95));
+  border-color: rgba(140, 168, 235, 0.65);
 }
 
 .actions {

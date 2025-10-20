@@ -73,6 +73,7 @@
           :available-trackers="availableTrackers"
           :audio-duration="audioDuration"
           :audio-buffer="audioBuffer"
+          :selected-model-index="selectedModelIndex"
           @update:showGrid="v => emit('update:showGrid', v)"
           @update:showLightMarker="v => emit('update:showLightMarker', v)"
           @update:markerColor="v => emit('update:markerColor', v)"
@@ -128,6 +129,7 @@
           @update:fingerStates="v => emit('update:fingerStates', v)"
           @update:fingerAxisOverrides="v => emit('update:fingerAxisOverrides', v)"
           @remove-audio="() => emit('remove-audio')"
+          @update:selectedModelIndex="v => { selectedModelIndex = v; emit('update:selected-tracker-model-index', v) }"
         />
       </div>
     </div>
@@ -252,7 +254,8 @@ const emit = defineEmits([
   'update-timeline-loop',
   'remove-selected-keyframes',
   'update-keyframe-curves',
-  'remove-audio'
+  'remove-audio',
+  'update:selected-tracker-model-index'
 ])
 
 const { t } = useI18n()
@@ -274,6 +277,7 @@ const displayTabs = computed(() => {
 })
 
 const activeTab = ref(SECTION_TABS[0]?.id ?? 'lighting')
+const selectedModelIndex = ref(-1)
 
 const {
   ambient,
