@@ -363,6 +363,7 @@ export default {
     timelineReset: 'Timeline: Reset.',
     timelineResetFailed: 'Timeline: Reset failed.',
     timelineFileLoaded: 'Timeline: Loaded {name}.',
+    timelineTrackerMismatch: 'Timeline: Cannot import. Tracker count does not match.',
     uiLayoutLoaded: 'UI: Loaded Blender-style layout.',
     trackersReset: 'Trackers: Virtual trackers reset.',
     errorUnknown: 'Unknown error occurred.',

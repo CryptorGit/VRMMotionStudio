@@ -364,6 +364,7 @@ messages.notifications = {
   timelineReset: 'タイムライン: リセットしました。',
   timelineResetFailed: 'タイムライン: リセットに失敗しました。',
   timelineFileLoaded: 'タイムライン: {name}を読み込みました。',
+  timelineTrackerMismatch: 'タイムライン: インポートできません。トラッカーの数が一致しません。',
   uiLayoutLoaded: 'UI: Blenderスタイルのレイアウトを読み込みました。',
   trackersReset: 'トラッカー: バーチャルトラッカーをリセットしました。',
   errorUnknown: '不明なエラーが発生しました。',

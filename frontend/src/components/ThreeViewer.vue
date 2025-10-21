@@ -3024,6 +3024,39 @@ async function handleTimelineImportFile(event) {
   try {
     const text = await file.text()
     const data = JSON.parse(text)
+    
+    // Check if virtualTrackers data exists and validate tracker count
+    if (data.virtualTrackers && Array.isArray(data.virtualTrackers)) {
+      const currentTrackers = trackerController?.getAllTrackerStates?.() || []
+      const importTrackerCount = data.trackerCount || data.virtualTrackers.length
+      
+      if (currentTrackers.length !== importTrackerCount) {
+        notify(
+          'timelineTrackerMismatch',
+          `Timeline: Cannot import. Tracker count mismatch (current: ${currentTrackers.length}, file: ${importTrackerCount}).`,
+          5200
+        )
+        if (input) input.value = ''
+        return
+      }
+      
+      // Apply virtual tracker states
+      try {
+        data.virtualTrackers.forEach((tracker, index) => {
+          if (trackerController?.updateTrackerState) {
+            trackerController.updateTrackerState(tracker.key, {
+              position: tracker.position,
+              rotation: tracker.rotation,
+              rotationOrder: tracker.rotationOrder,
+              rotationAxis: tracker.rotationAxis
+            })
+          }
+        })
+      } catch (error) {
+        console.warn('[Timeline Import] Failed to apply tracker states:', error)
+      }
+    }
+    
     pushHistory('import')
     const ok = timelineController.deserialize(data)
     if (!ok) {
@@ -3037,7 +3070,8 @@ async function handleTimelineImportFile(event) {
     if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
     markTimelineDirty('import')
     Promise.resolve(updateStorageEstimate()).catch(() => {})
-  } catch {
+  } catch (error) {
+    console.error('[Timeline Import] Failed:', error)
     notify('timelineParseFailed', 'Timeline: Failed to parse JSON.', 5200)
   } finally {
     if (input) input.value = ''
@@ -3047,7 +3081,23 @@ async function handleTimelineImportFile(event) {
 function handleTimelineExport() {
   try {
     const snapshot = timelineController.serialize()
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' })
+    
+    // Add virtual tracker data to the export
+    const trackerData = trackerController?.getAllTrackerStates?.() || []
+    const exportData = {
+      ...snapshot,
+      virtualTrackers: trackerData.map(tracker => ({
+        key: tracker.key,
+        label: tracker.label,
+        position: tracker.position,
+        rotation: tracker.rotation,
+        rotationOrder: tracker.rotationOrder,
+        rotationAxis: tracker.rotationAxis
+      })),
+      trackerCount: trackerData.length
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const filename = `timeline-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
     const anchor = document.createElement('a')

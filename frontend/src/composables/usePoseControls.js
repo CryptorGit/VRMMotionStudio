@@ -100,8 +100,7 @@ function pushFrame(store, name, frameIndex, time, transform) {
   store[name].push(entry)
 }
 
-function buildMotionPayload({ timelineData, trackerData, modelList, fps, fingerSnapshot }) {
-  const bones = {}
+function buildMotionPayload({ timelineData, modelList, fps, fingerSnapshot }) {
   const cameraFrames = []
   const lookAtFrames = []
   const curveFrames = []
@@ -116,6 +115,7 @@ function buildMotionPayload({ timelineData, trackerData, modelList, fps, fingerS
     : startTime + Math.max(0, Number.isFinite(durationRaw) ? durationRaw : 0)
   const endTime = Number.isFinite(inferredEnd) ? inferredEnd : startTime
 
+  // Process keyframes for camera and gaze
   keyframes.forEach(keyframe => {
     const time = Number(keyframe?.time)
     if (!Number.isFinite(time)) return
@@ -145,10 +145,6 @@ function buildMotionPayload({ timelineData, trackerData, modelList, fps, fingerS
         }
         continue
       }
-
-      const boneName = TRACKER_TO_BONE[key]
-      if (!boneName) continue
-      pushFrame(bones, boneName, frameIndex, time, value)
     }
 
     const trackerCurves = {}
@@ -179,6 +175,18 @@ function buildMotionPayload({ timelineData, trackerData, modelList, fps, fingerS
     }
   })
 
+  // Extract bone data per model as time series
+  const modelsData = modelList.map((model, index) => {
+    const boneTimeSeries = extractModelBoneTimeSeries(model, keyframes, fps)
+    return {
+      index,
+      name: model?.name || `Model ${index + 1}`,
+      visible: model?.visible !== false,
+      url: model?.url || null,
+      bones: boneTimeSeries
+    }
+  })
+
   return {
     version: '1.0',
     type: 'vrm-motion',
@@ -189,14 +197,98 @@ function buildMotionPayload({ timelineData, trackerData, modelList, fps, fingerS
     startTime,
     endTime,
     duration: Math.max(0, endTime - startTime),
-    bones,
     camera: cameraFrames,
     lookAt: lookAtFrames,
     curves: curveFrames,
-    trackers: trackerData || [],
-    models: collectModelMetadata(modelList),
+    models: modelsData,
     fingers: fingerSnapshot
   }
+}
+
+function extractModelBoneTimeSeries(model, keyframes, fps) {
+  const boneTimeSeries = {}
+  
+  try {
+    const vrm = model?.userData?.vrm || model?.vrm
+    if (!vrm?.humanoid?.humanBones) return boneTimeSeries
+
+    const humanBones = vrm.humanoid.humanBones
+    
+    // For each keyframe, capture bone states
+    keyframes.forEach(keyframe => {
+      const time = Number(keyframe?.time)
+      if (!Number.isFinite(time)) return
+      const frameIndex = Math.round(time * fps)
+
+      for (const [boneName, boneData] of Object.entries(humanBones)) {
+        const bone = boneData?.node || boneData?.bone
+        if (!bone) continue
+
+        if (!boneTimeSeries[boneName]) {
+          boneTimeSeries[boneName] = []
+        }
+
+        const position = bone.position ? [
+          Number(bone.position.x) || 0,
+          Number(bone.position.y) || 0,
+          Number(bone.position.z) || 0
+        ] : null
+
+        const quaternion = bone.quaternion ? [
+          Number(bone.quaternion.x) || 0,
+          Number(bone.quaternion.y) || 0,
+          Number(bone.quaternion.z) || 0,
+          Number(bone.quaternion.w) || 1
+        ] : null
+
+        let euler = null
+        if (bone.rotation) {
+          euler = [
+            Number(bone.rotation.x) * (180 / Math.PI) || 0,
+            Number(bone.rotation.y) * (180 / Math.PI) || 0,
+            Number(bone.rotation.z) * (180 / Math.PI) || 0
+          ]
+        } else if (quaternion) {
+          euler = quaternionToEuler(quaternion)
+        }
+
+        boneTimeSeries[boneName].push({
+          frame: frameIndex,
+          time,
+          position,
+          rotation: quaternion,
+          euler
+        })
+      }
+    })
+  } catch (error) {
+    console.error('[Export] Failed to extract bone time series:', error)
+  }
+
+  return boneTimeSeries
+}
+
+function quaternionToEuler(q) {
+  const [x, y, z, w] = q
+  
+  const sinr_cosp = 2 * (w * x + y * z)
+  const cosr_cosp = 1 - 2 * (x * x + y * y)
+  const roll = Math.atan2(sinr_cosp, cosr_cosp)
+  
+  const sinp = 2 * (w * y - z * x)
+  const pitch = Math.abs(sinp) >= 1
+    ? Math.sign(sinp) * Math.PI / 2
+    : Math.asin(sinp)
+  
+  const siny_cosp = 2 * (w * z + x * y)
+  const cosy_cosp = 1 - 2 * (y * y + z * z)
+  const yaw = Math.atan2(siny_cosp, cosy_cosp)
+  
+  return [
+    roll * (180 / Math.PI),
+    pitch * (180 / Math.PI),
+    yaw * (180 / Math.PI)
+  ]
 }
 
 async function saveFileBlob(blob, { suggestedName, description, extension, mimeType }) {
@@ -299,13 +391,13 @@ export function usePoseControls({
       }
 
       const fingerSnapshot = captureFingerSnapshot()
-      const trackerData = tracker?.getAllTrackerStates ? tracker.getAllTrackerStates() : null
       const timelineData = timeline.serialize ? timeline.serialize() : null
       const fpsSource = timelineData?.frameRate ?? timeline?.frameRate?.value
       const fps = Math.max(1, Number(fpsSource) || 60)
 
       if (!timelineData || !Array.isArray(timelineData.keyframes) || timelineData.keyframes.length === 0) {
-        const posePayload = exportCurrentPose(modelList, trackerData, fingerSnapshot)
+        // Export current pose with bone data
+        const posePayload = exportCurrentPose(modelList, fingerSnapshot)
         const json = JSON.stringify(posePayload, null, 2)
         const blob = new Blob([json], { type: 'application/json' })
         await saveFileBlob(blob, {
@@ -320,9 +412,9 @@ export function usePoseControls({
         return
       }
 
+      // Export motion with bone time series data
       const motionPayload = buildMotionPayload({
         timelineData,
-        trackerData,
         modelList,
         fps,
         fingerSnapshot
@@ -330,9 +422,9 @@ export function usePoseControls({
       const json = JSON.stringify(motionPayload, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
       await saveFileBlob(blob, {
-        suggestedName: `vrm-motion-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.vmc`,
-        description: 'VRM Motion (VMC)',
-        extension: '.vmc',
+        suggestedName: `vrm-motion-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`,
+        description: 'VRM Motion (JSON)',
+        extension: '.json',
         mimeType: 'application/json'
       })
       if (typeof showNotice === 'function') {
@@ -346,17 +438,82 @@ export function usePoseControls({
     }
   }
 
-  function exportCurrentPose(modelList, trackerData, fingerSnapshot) {
+  function exportCurrentPose(modelList, fingerSnapshot) {
+    const modelsData = modelList.map((model, index) => {
+      const bones = extractModelBones(model)
+      return {
+        index,
+        name: model?.name || `Model ${index + 1}`,
+        visible: model?.visible !== false,
+        url: model?.url || null,
+        bones
+      }
+    })
+
     return {
       version: '1.0',
       type: 'vrm-pose',
       format: 'mmd-web',
       exporter: 'StellarMotion Studio',
       exportDate: new Date().toISOString(),
-      trackers: trackerData || [],
-      models: collectModelMetadata(modelList),
+      models: modelsData,
       fingers: fingerSnapshot
     }
+  }
+
+  function extractModelBones(model) {
+    const bones = {}
+    
+    try {
+      const vrm = model?.userData?.vrm || model?.vrm
+      if (!vrm?.humanoid?.humanBones) return bones
+
+      const humanBones = vrm.humanoid.humanBones
+      
+      // Iterate through all human bones
+      for (const [boneName, boneData] of Object.entries(humanBones)) {
+        const bone = boneData?.node || boneData?.bone
+        if (!bone) continue
+
+        // Extract position and rotation
+        const position = bone.position ? [
+          Number(bone.position.x) || 0,
+          Number(bone.position.y) || 0,
+          Number(bone.position.z) || 0
+        ] : null
+
+        const quaternion = bone.quaternion ? [
+          Number(bone.quaternion.x) || 0,
+          Number(bone.quaternion.y) || 0,
+          Number(bone.quaternion.z) || 0,
+          Number(bone.quaternion.w) || 1
+        ] : null
+
+        // Convert quaternion to Euler angles (in degrees)
+        let euler = null
+        if (bone.rotation) {
+          // If Euler angles are directly available
+          euler = [
+            Number(bone.rotation.x) * (180 / Math.PI) || 0,
+            Number(bone.rotation.y) * (180 / Math.PI) || 0,
+            Number(bone.rotation.z) * (180 / Math.PI) || 0
+          ]
+        } else if (quaternion) {
+          // Convert quaternion to Euler (approximation)
+          euler = quaternionToEuler(quaternion)
+        }
+
+        bones[boneName] = {
+          position,
+          rotation: quaternion,
+          euler
+        }
+      }
+    } catch (error) {
+      console.error('[Export] Failed to extract bone data:', error)
+    }
+
+    return bones
   }
 
   // IK 連動の変換イベントは VRM 最適化のため削除
