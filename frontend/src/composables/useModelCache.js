@@ -353,5 +353,158 @@ export function useModelCache() {
     }
   }
 
-  return { cacheFiles, loadCachedFiles, deleteCachedFiles, getDB }
+  async function exportProjectToFile() {
+    try {
+      await getDB()
+      let dataLists = []
+      
+      if (useLocal) {
+        const raw = localStorage.getItem(LOCAL_KEY)
+        if (!raw) {
+          throw new Error('No cached data to export')
+        }
+        const parsed = JSON.parse(raw)
+        dataLists = parsed
+      } else {
+        const db = await getDB()
+        const tx = db.transaction(DB_STORE)
+        const store = tx.objectStore(DB_STORE)
+        const result = []
+        const req = store.openCursor()
+        await promisifyRequest(req, resolve => {
+          const cursor = req.result
+          if (cursor) {
+            result.push(cursor.value)
+            cursor.continue()
+          } else {
+            resolve()
+          }
+        })
+        
+        // Convert ArrayBuffer to base64 for JSON serialization
+        dataLists = await Promise.all(
+          result.map(async list => {
+            return Promise.all(
+              (Array.isArray(list) ? list : []).map(async item => ({
+                ...item,
+                data: await arrayBufferToBase64(await ensureArrayBuffer(item.data))
+              }))
+            )
+          })
+        )
+      }
+      
+      const projectData = {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        app: 'StellarMotion Studio',
+        cacheVersion: CACHE_RECORD_VERSION,
+        models: dataLists
+      }
+      
+      const jsonString = JSON.stringify(projectData, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `project_${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      devLog({ event: 'export:ok', groups: dataLists.length })
+      return true
+    } catch (e) {
+      console.error('Failed to export project:', e)
+      devLog({ event: 'export:error', message: String(e && e.message) })
+      return false
+    }
+  }
+
+  async function importProjectFromFile(file) {
+    try {
+      const text = await file.text()
+      const projectData = JSON.parse(text)
+      
+      if (!projectData.models || !Array.isArray(projectData.models)) {
+        throw new Error('Invalid project file format')
+      }
+      
+      // Convert base64 data back to ArrayBuffer and normalize
+      const dataLists = await Promise.all(
+        projectData.models.map(async list => {
+          const normalizedList = await Promise.all(
+            (Array.isArray(list) ? list : []).map(async item => {
+              const buffer = await base64ToArrayBuffer(item.data)
+              return {
+                version: item.version || CACHE_RECORD_VERSION,
+                name: item.name,
+                path: item.path || item.name,
+                type: item.type,
+                size: buffer.byteLength,
+                data: buffer,
+                lastModified: item.lastModified
+              }
+            })
+          )
+          return normalizedList.filter(Boolean)
+        })
+      )
+      
+      devLog({
+        event: 'import:prepare',
+        groups: dataLists.length,
+        counts: dataLists.map(l => l.length),
+        sizes: dataLists.map(l => l.map(x => x.size)),
+        samples: dataLists.map(l => l.slice(0, 5).map(x => x.name))
+      })
+      
+      await getDB()
+      
+      if (useLocal) {
+        const serializedLists = await serializeListsForLocalStorage(dataLists)
+        try {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(serializedLists))
+          devLog({ event: 'import:local:ok' })
+          return dataLists
+        } catch (lsErr) {
+          console.error('Failed to import project to localStorage:', lsErr)
+          devLog({ event: 'import:local:error', message: String(lsErr && lsErr.message) })
+          throw lsErr
+        }
+      }
+      
+      try {
+        const db = await getDB()
+        const tx = db.transaction(DB_STORE, 'readwrite')
+        const store = tx.objectStore(DB_STORE)
+        await promisifyRequest(store.clear())
+        for (let i = 0; i < dataLists.length; i++) {
+          await promisifyRequest(store.put(dataLists[i], i))
+        }
+        await promisifyRequest(tx)
+        devLog({ event: 'import:idb:ok' })
+        return dataLists
+      } catch (dbErr) {
+        useLocal = true
+        const serializedLists = await serializeListsForLocalStorage(dataLists)
+        try {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(serializedLists))
+          devLog({ event: 'import:idb:fallback-local:ok' })
+          return dataLists
+        } catch (lsErr) {
+          console.error('Failed to import project to localStorage:', lsErr)
+          devLog({ event: 'import:idb:fallback-local:error', message: String(lsErr && lsErr.message) })
+          throw lsErr
+        }
+      }
+    } catch (e) {
+      console.error('Failed to import project:', e)
+      devLog({ event: 'import:error', message: String(e && e.message) })
+      throw e
+    }
+  }
+
+  return { cacheFiles, loadCachedFiles, deleteCachedFiles, getDB, exportProjectToFile, importProjectFromFile }
 }

@@ -722,9 +722,6 @@ function endHandleDrag() {
   flushLiveUpdates()
   const curve = curvesState.value.get(state.frameId)
   if (curve) {
-    // 永続ストレージに保孁E
-    saveCurveToStorage(state.frameId, props.trackerKey, curve, props.curveColor)
-
     emit('update', {
       updates: [
         {

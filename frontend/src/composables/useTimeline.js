@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+﻿import { computed, reactive, ref, watch } from 'vue'
 import { TRACKER_DEFS } from './useVirtualTrackers.js'
 import * as THREE from 'three'
 
@@ -285,7 +285,7 @@ function sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamer
     })
   }
 
-  // Ensure camera track is normalized if present in source but not in trackers
+  // Ensure camera track is normalized if present in source but not in trackers        
   if (source?.camera && !result.camera) {
     const cam = renderCamera?.value
     const fallbackPos = cam?.position
@@ -296,10 +296,19 @@ function sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamer
     })
   }
 
-  return result
-}
+  // モーフ、シェイプキー、指の状態をそのまま保持
+  if (source.morphs) {
+    result.morphs = source.morphs
+  }
+  if (source.shapeKeys) {
+    result.shapeKeys = source.shapeKeys
+  }
+  if (source.fingers) {
+    result.fingers = source.fingers
+  }
 
-function interpolateSnapshots(aValues, bValues, t, trackers) {
+  return result
+}function interpolateSnapshots(aValues, bValues, t, trackers) {
   const result = {}
   const trackerList = trackers?.value || []
   const keys = new Set([
@@ -378,7 +387,7 @@ function convertLegacySnapshot(snapshot, trackers, lastAppliedValues, renderCame
   })
 }
 
-export function useTimeline({ trackers, renderCamera }) {
+export function useTimeline({ trackers, renderCamera, models, fingerStates }) {
   const startTime = ref(0)
   const endTime = ref(30)
   const currentTime = ref(0)
@@ -494,10 +503,112 @@ export function useTimeline({ trackers, renderCamera }) {
         }
       }
     } catch {}
-  return sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
-  }
+    
+    // モーフ（VRM表情）とシェイプキー（morphTargets）をキャプチャ
+    const morphs = {}
+    const shapeKeys = {}
+    try {
+      if (models?.value && Array.isArray(models.value)) {
+        for (const model of models.value) {
+          if (!model?.id) continue
+          
+          const modelMorphs = {}
+          const modelShapeKeys = {}
+          
+          // VRMの表情システム
+          if (model.vrm) {
+            // VRM 1.0: expressionManager
+            if (model.vrm.expressionManager) {
+              const expressionManager = model.vrm.expressionManager
+              for (const [name, expression] of Object.entries(expressionManager._expressionMap || {})) {
+                if (expression && typeof expression.weight === 'number' && expression.weight !== 0) {
+                  modelMorphs[name] = expression.weight
+                }
+              }
+            }
+            // VRM 0.0: blendShapeProxy
+            else if (model.vrm.blendShapeProxy) {
+              const blendShapeProxy = model.vrm.blendShapeProxy
+              const blendShapeGroups = blendShapeProxy._blendShapeGroups || {}
+              for (const [name, group] of Object.entries(blendShapeGroups)) {
+                if (group && typeof group.weight === 'number' && group.weight !== 0) {
+                  modelMorphs[name] = group.weight
+                }
+              }
+            }
+          }
+          
+          // Three.jsのmorphTargets（シェイプキー）をキャプチャ
+          const root = model.vrm?.scene || model.mesh
+          if (root) {
+            root.traverse(obj => {
+              if (!obj.isMesh || !obj.morphTargetInfluences || !obj.morphTargetDictionary) return
+              
+              const dict = obj.morphTargetDictionary
+              const influences = obj.morphTargetInfluences
+              
+              for (const [name, index] of Object.entries(dict)) {
+                if (index >= 0 && index < influences.length) {
+                  const value = influences[index]
+                  if (typeof value === 'number' && value !== 0) {
+                    modelShapeKeys[name] = value
+                  }
+                }
+              }
+            })
+          }
+          
+          if (Object.keys(modelMorphs).length > 0) {
+            morphs[model.id] = modelMorphs
+          }
+          if (Object.keys(modelShapeKeys).length > 0) {
+            shapeKeys[model.id] = modelShapeKeys
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Timeline] Failed to capture morphs/shapeKeys:', e)
+    }
+    
+    // 指の状態をキャプチャ
+    const fingers = {}
+    try {
+      if (fingerStates) {
+        for (const [key, value] of Object.entries(fingerStates)) {
+          if (typeof value === 'number' && value !== 0) {
+            fingers[key] = value
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Timeline] Failed to capture finger states:', e)
+    }
+    
+    const snapshot = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
+    
+    // モーフ、シェイプキー、指の状態を追加
+    if (Object.keys(morphs).length > 0) {
+      snapshot.morphs = morphs
+      console.log('[Timeline] ✅ Captured morphs:', morphs)
+    }
+    if (Object.keys(shapeKeys).length > 0) {
+      snapshot.shapeKeys = shapeKeys
+      console.log('[Timeline] ✅ Captured shapeKeys:', shapeKeys)
+    }
+    if (Object.keys(fingers).length > 0) {
+      snapshot.fingers = fingers
+      console.log('[Timeline] ✅ Captured fingers:', fingers)
+    }
 
-  function storeLastApplied(values) {
+    console.log('[Timeline] 📸 Snapshot captured:', {
+      trackerCount: Object.keys(values).length,
+      morphCount: Object.keys(morphs).length,
+      shapeKeyCount: Object.keys(shapeKeys).length,
+      fingerCount: Object.keys(fingers).length
+    })
+
+    return snapshot
+  }function storeLastApplied(values) {
     for (const [key, transform] of Object.entries(values || {})) {
       const normalized = normalizeTransform(transform)
       lastAppliedValues[key] = {
@@ -515,8 +626,20 @@ export function useTimeline({ trackers, renderCamera }) {
   function addKeyframe({ time, values, curve, curves, trackerKey, curveColor }) {
     const clampedTime = clampTime(time)
     const targetFrame = timeToFrame(clampedTime)
-    const sanitizedValues = sanitizeSnapshotValues(values, trackers, lastAppliedValues, renderCamera)
-
+    // values縺後縺ｴ蜷医迴ｾ蝨ｨ縺ｮ繧ｹ繝翫ャ繝励す繝ｧ繝ヨ繧偵く繝｣繝励メ繝｣
+    const capturedValues = values || captureCurrentSnapshot()
+    const sanitizedValues = sanitizeSnapshotValues(capturedValues, trackers, lastAppliedValues, renderCamera)
+    
+    // 繝｢繝ｼ繝輔繧ｷ繧ｧ繧､繝励く繝ｼ縲悽縺ｮ迥ｶ諷九ｒ菫晄戟
+    if (capturedValues.morphs) {
+      sanitizedValues.morphs = capturedValues.morphs
+    }
+    if (capturedValues.shapeKeys) {
+      sanitizedValues.shapeKeys = capturedValues.shapeKeys
+    }
+    if (capturedValues.fingers) {
+      sanitizedValues.fingers = capturedValues.fingers
+    }
     let updatedEntry = null
     const nextFrames = keyframes.value.map(frame => {
       if (timeToFrame(frame.time) !== targetFrame) return frame
@@ -562,9 +685,22 @@ export function useTimeline({ trackers, renderCamera }) {
       } else {
         nextCurves = cloneCurves(frame.curves || {})
       }
-      
+
       const baseCurve = sanitizeCurve(nextCurves.default?.curve || nextCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
-      updatedEntry = { ...frame, time: clampedTime, values: sanitizedValues, curves: nextCurves, curve: baseCurve }
+      
+      // valuesをマージして、モーフと指の状態を保持
+      const mergedValues = { ...sanitizedValues }
+      if (sanitizedValues.morphs) {
+        mergedValues.morphs = sanitizedValues.morphs
+      }
+      if (sanitizedValues.shapeKeys) {
+        mergedValues.shapeKeys = sanitizedValues.shapeKeys
+      }
+      if (sanitizedValues.fingers) {
+        mergedValues.fingers = sanitizedValues.fingers
+      }
+      
+      updatedEntry = { ...frame, time: clampedTime, values: mergedValues, curves: nextCurves, curve: baseCurve }
       return updatedEntry
     })
 
@@ -595,10 +731,22 @@ export function useTimeline({ trackers, renderCamera }) {
         })()
     const baseCurve = sanitizeCurve(sanitizedCurves.default?.curve || sanitizedCurves.all?.curve || DEFAULT_CURVE, DEFAULT_CURVE)
 
+    // valuesにモーフと指の状態を含める
+    const finalValues = { ...sanitizedValues }
+    if (sanitizedValues.morphs) {
+      finalValues.morphs = sanitizedValues.morphs
+    }
+    if (sanitizedValues.shapeKeys) {
+      finalValues.shapeKeys = sanitizedValues.shapeKeys
+    }
+    if (sanitizedValues.fingers) {
+      finalValues.fingers = sanitizedValues.fingers
+    }
+
     const entry = {
       id: nextKeyframeId++,
       time: clampedTime,
-      values: sanitizedValues,
+      values: finalValues,
       curves: sanitizedCurves,
       curve: baseCurve
     }
@@ -910,7 +1058,13 @@ export function useTimeline({ trackers, renderCamera }) {
   function cloneSnapshot(values) {
     const result = {}
     for (const [key, value] of Object.entries(values || {})) {
-      result[key] = normalizeTransform(value)
+      // morphs, shapeKeys, fingersは特別処理
+      if (key === 'morphs' || key === 'shapeKeys' || key === 'fingers') {
+        result[key] = JSON.parse(JSON.stringify(value))
+      } else {
+        // トラッカーの位置・回転情報
+        result[key] = normalizeTransform(value)
+      }
     }
     return result
   }
@@ -921,9 +1075,19 @@ export function useTimeline({ trackers, renderCamera }) {
     const { previous, next } = findFrameRange(time)
     if (!previous && !next) return null
     if (!previous) return cloneSnapshot(next.values)
-    if (!next) return cloneSnapshot(previous.values)
+    if (!next) {
+      const snapshot = cloneSnapshot(previous.values)
+      if (previous.values?.morphs) snapshot.morphs = JSON.parse(JSON.stringify(previous.values.morphs))
+      if (previous.values?.shapeKeys) snapshot.shapeKeys = JSON.parse(JSON.stringify(previous.values.shapeKeys))
+      if (previous.values?.fingers) snapshot.fingers = { ...previous.values.fingers }
+      return snapshot
+    }
     if (previous === next || Math.abs(next.time - previous.time) < 1e-6) {
-      return cloneSnapshot(previous.values)
+      const snapshot = cloneSnapshot(previous.values)
+      if (previous.values?.morphs) snapshot.morphs = JSON.parse(JSON.stringify(previous.values.morphs))
+      if (previous.values?.shapeKeys) snapshot.shapeKeys = JSON.parse(JSON.stringify(previous.values.shapeKeys))
+      if (previous.values?.fingers) snapshot.fingers = { ...previous.values.fingers }
+      return snapshot
     }
     const span = next.time - previous.time || 1
     const rawAlpha = (clampTime(time) - previous.time) / span
@@ -961,14 +1125,74 @@ export function useTimeline({ trackers, renderCamera }) {
       
       result[trackerKey] = {
         position: lerpVector(startT.position, endT.position, easedAlpha),
-        rotation: slerpQuaternionArrays(startT.rotation, endT.rotation, easedAlpha)
+        rotation: slerpQuaternionArrays(startT.rotation, endT.rotation, easedAlpha)    
       }
     }
-    
-    return result
-  }
 
-  function getTrackAtTime(trackerKey, time) {
+    // モーフの補間（VRM表情）
+    if (previous.values?.morphs || next.values?.morphs) {
+      const interpolatedMorphs = {}
+      const allModelIds = new Set([
+        ...Object.keys(previous.values?.morphs || {}),
+        ...Object.keys(next.values?.morphs || {})
+      ])
+      
+      for (const modelId of allModelIds) {
+        const startMorphs = previous.values?.morphs?.[modelId] || {}
+        const endMorphs = next.values?.morphs?.[modelId] || {}
+        const allMorphNames = new Set([...Object.keys(startMorphs), ...Object.keys(endMorphs)])
+        
+        interpolatedMorphs[modelId] = {}
+        for (const morphName of allMorphNames) {
+          const startWeight = startMorphs[morphName] ?? 0
+          const endWeight = endMorphs[morphName] ?? 0
+          interpolatedMorphs[modelId][morphName] = startWeight + (endWeight - startWeight) * rawAlpha
+        }
+      }
+      result.morphs = interpolatedMorphs
+    }
+
+    // シェイプキーの補間（THREE.js morphTargets）
+    if (previous.values?.shapeKeys || next.values?.shapeKeys) {
+      const interpolatedShapeKeys = {}
+      const allModelIds = new Set([
+        ...Object.keys(previous.values?.shapeKeys || {}),
+        ...Object.keys(next.values?.shapeKeys || {})
+      ])
+      
+      for (const modelId of allModelIds) {
+        const startKeys = previous.values?.shapeKeys?.[modelId] || {}
+        const endKeys = next.values?.shapeKeys?.[modelId] || {}
+        const allKeyNames = new Set([...Object.keys(startKeys), ...Object.keys(endKeys)])
+        
+        interpolatedShapeKeys[modelId] = {}
+        for (const keyName of allKeyNames) {
+          const startValue = startKeys[keyName] ?? 0
+          const endValue = endKeys[keyName] ?? 0
+          interpolatedShapeKeys[modelId][keyName] = startValue + (endValue - startValue) * rawAlpha
+        }
+      }
+      result.shapeKeys = interpolatedShapeKeys
+    }
+
+    // 指の補間
+    if (previous.values?.fingers || next.values?.fingers) {
+      const interpolatedFingers = {}
+      const allFingerKeys = new Set([
+        ...Object.keys(previous.values?.fingers || {}),
+        ...Object.keys(next.values?.fingers || {})
+      ])
+      
+      for (const fingerKey of allFingerKeys) {
+        const startAngle = previous.values?.fingers?.[fingerKey] ?? 0
+        const endAngle = next.values?.fingers?.[fingerKey] ?? 0
+        interpolatedFingers[fingerKey] = startAngle + (endAngle - startAngle) * rawAlpha
+      }
+      result.fingers = interpolatedFingers
+    }
+
+    return result
+  }  function getTrackAtTime(trackerKey, time) {
     const snapshot = getSnapshotAtTime(time)
     const value = snapshot?.[trackerKey]
     if (!value) return null
@@ -1024,6 +1248,117 @@ export function useTimeline({ trackers, renderCamera }) {
         }
       }
     } catch {}
+    
+    // モーフ（表情）を適用
+    try {
+      if (snapshot.morphs && models?.value && Array.isArray(models.value)) {
+        for (const model of models.value) {
+          if (!model?.id || !model?.vrm) continue
+          const modelMorphs = snapshot.morphs[model.id]
+          if (!modelMorphs) continue
+          
+          // VRM 1.0: expressionManager
+          if (model.vrm.expressionManager) {
+            const expressionManager = model.vrm.expressionManager
+            
+            // すべての表情を0にリセット
+            for (const expression of Object.values(expressionManager._expressionMap || {})) {
+              if (expression && typeof expression.weight === 'number') {
+                expression.weight = 0
+              }
+            }
+            
+            // スナップショットの表情を適用
+            for (const [name, weight] of Object.entries(modelMorphs)) {
+              const expression = expressionManager._expressionMap?.[name]
+              if (expression && typeof weight === 'number') {
+                expression.weight = weight
+              }
+            }
+          }
+          // VRM 0.0: blendShapeProxy
+          else if (model.vrm.blendShapeProxy) {
+            const blendShapeProxy = model.vrm.blendShapeProxy
+            const blendShapeGroups = blendShapeProxy._blendShapeGroups || {}
+            
+            // すべてのBlendShapeを0にリセット
+            for (const group of Object.values(blendShapeGroups)) {
+              if (group && typeof group.weight === 'number') {
+                group.weight = 0
+              }
+            }
+            
+            // スナップショットの表情を適用
+            for (const [name, weight] of Object.entries(modelMorphs)) {
+              const group = blendShapeGroups[name]
+              if (group && typeof weight === 'number') {
+                group.weight = weight
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Timeline] Failed to apply morphs:', e)
+    }
+    
+    // シェイプキーを適用
+    try {
+      if (snapshot.shapeKeys && models?.value && Array.isArray(models.value)) {
+        for (const model of models.value) {
+          if (!model?.id) continue
+          const modelShapeKeys = snapshot.shapeKeys[model.id]
+          if (!modelShapeKeys) continue
+          
+          const root = model.vrm?.scene || model.mesh
+          if (!root) continue
+          
+          // すべてのmorphTargetsを0にリセット
+          root.traverse(obj => {
+            if (!obj.isMesh || !obj.morphTargetInfluences) return
+            for (let i = 0; i < obj.morphTargetInfluences.length; i++) {
+              obj.morphTargetInfluences[i] = 0
+            }
+          })
+          
+          // スナップショットのシェイプキーを適用
+          root.traverse(obj => {
+            if (!obj.isMesh || !obj.morphTargetInfluences || !obj.morphTargetDictionary) return
+            
+            const dict = obj.morphTargetDictionary
+            const influences = obj.morphTargetInfluences
+            
+            for (const [name, value] of Object.entries(modelShapeKeys)) {
+              const index = dict[name]
+              if (typeof index === 'number' && index >= 0 && index < influences.length) {
+                influences[index] = value
+              }
+            }
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('[Timeline] Failed to apply shapeKeys:', e)
+    }
+    
+    // 指の状態を適用
+    try {
+      if (snapshot.fingers && fingerStates) {
+        // すべての指を0にリセット
+        for (const key in fingerStates) {
+          fingerStates[key] = 0
+        }
+        
+        // スナップショットの指の状態を適用
+        for (const [key, value] of Object.entries(snapshot.fingers)) {
+          if (typeof value === 'number') {
+            fingerStates[key] = value
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Timeline] Failed to apply fingers:', e)
+    }
   }
 
   function applyCurrentPose() {

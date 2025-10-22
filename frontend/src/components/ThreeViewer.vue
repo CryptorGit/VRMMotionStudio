@@ -9,6 +9,8 @@
       @capture-image="captureImage"
       @capture-video="captureVideo"
       @clear-cache="clearAllCache"
+      @export-project="exportProject"
+      @import-project="importProject"
       @toggle-captions="toggleCaptions"
       @timeline-import="handleTimelineRequestImport"
       @timeline-export="handleTimelineExport"
@@ -293,6 +295,7 @@ import { captionInjectionKey } from '../composables/useCaptions.js'
 import { useStoragePersistence } from '../composables/useStoragePersistence.js'
 import { useFingerControl } from '../composables/useFingerControl.js'
 import { usePoseControls } from '../composables/usePoseControls.js'
+import { useModelCache } from '../composables/useModelCache.js'
 
 const viewer = ref(null)
 const currentMeshRef = ref(null)
@@ -812,6 +815,12 @@ let pendingTimelineSnapshotSerialized = ''
 let lastPersistedTimelineSerialized = ''
 
 function getDisplaySettingsSnapshot() {
+  // reactiveオブジェクトをプレーンなオブジェクトに変換（循環参照を避けるため）
+  const plainFingerStates = {}
+  for (const key in fingerStates) {
+    plainFingerStates[key] = fingerStates[key]
+  }
+  
   return {
     showGrid: showGrid.value,
     showLightMarker: showLightMarker.value,
@@ -848,7 +857,7 @@ function getDisplaySettingsSnapshot() {
     cameraWheelSensitivity: cameraWheelSensitivity.value,
     cameraTranslateSensitivity: cameraTranslateSensitivity.value,
     cameraRotateSensitivity: cameraRotateSensitivity.value,
-    fingerStates: { ...fingerStates },
+    fingerStates: plainFingerStates,
     fingerAxisOverrides: exportFingerAxisOverridesByName()
   }
 }
@@ -870,8 +879,17 @@ function serializeTrackerStates() {
     const tracker = trackerController?.trackers?.value?.find(t => t.key === key)
     if (tracker?.mesh) {
       try { tracker.mesh.updateMatrixWorld(true) } catch {}
-      snapshot[key].position = tracker.mesh.position.toArray([])
-      snapshot[key].rotation = tracker.mesh.quaternion.toArray([])
+      snapshot[key].position = [
+        tracker.mesh.position.x,
+        tracker.mesh.position.y,
+        tracker.mesh.position.z
+      ]
+      snapshot[key].rotation = [
+        tracker.mesh.quaternion.x,
+        tracker.mesh.quaternion.y,
+        tracker.mesh.quaternion.z,
+        tracker.mesh.quaternion.w
+      ]
     }
   }
   return snapshot
@@ -1324,9 +1342,17 @@ function exportFingerAxisOverridesByName() {
     if (!model?.id || !model?.name) continue
     const entry = fingerAxisOverridesByModel[String(model.id)]
     if (!entry) continue
-    snapshot[model.name] = { ...entry }
+    // reactiveオブジェクトをプレーンなオブジェクトに完全に変換
+    snapshot[model.name] = JSON.parse(JSON.stringify(entry))
   }
   return snapshot
+}
+
+function importFingerAxisOverridesByName(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return
+  pendingFingerAxisOverridesByName = { ...snapshot }
+  applyPendingFingerAxisOverrides()
+  saveFingerAxisOverridesToCache()
 }
 
 function applyPendingFingerAxisOverrides() {
@@ -2201,7 +2227,12 @@ watch(() => trackerController?.selectedTrackerKey?.value, (newKey) => {
   }
 })
 
-timelineController = useTimeline({ trackers: trackerController.trackers, renderCamera })
+timelineController = useTimeline({ 
+  trackers: trackerController.trackers, 
+  renderCamera,
+  models,
+  fingerStates
+})
 let syncTimelineRefs = () => {}
 const DEFAULT_TIMELINE_CURVE = Object.freeze({
   in: { x: 2 / 3, y: 2 / 3 },
@@ -3370,6 +3401,532 @@ async function clearAllCache() {
   } catch {}
 }
 
+async function exportProject() {
+  console.log('[ExportProject] Export project started')
+  
+  // デバッグ用：関数が呼ばれたことを確実に確認
+  try {
+    notify('projectExporting', 'プロジェクトのエクスポートを開始しています...', 0)
+  } catch (e) {
+    console.error('[ExportProject] Failed to show notification:', e)
+  }
+  
+  try {
+    // キャッシュされたモデルデータを取得
+    console.log('[ExportProject] Loading cached files...')
+    const modelCache = useModelCache()
+    const cachedModels = await modelCache.loadCachedFiles()
+    console.log('[ExportProject] Cached models loaded:', cachedModels.length, 'groups')
+    
+    if (!cachedModels || cachedModels.length === 0) {
+      console.warn('[ExportProject] No cached models found')
+      notify('projectExportNoModels', 'エクスポートするモデルがありません。', 3000)
+      return
+    }
+    
+    // モデルデータをbase64に変換
+    console.log('[ExportProject] Converting models to base64...')
+    const modelsData = await Promise.all(
+      cachedModels.map(async (group, groupIndex) => {
+        console.log(`[ExportProject] Processing group ${groupIndex + 1}/${cachedModels.length}, files: ${group.length}`)
+        return Promise.all(
+          group.map(async (record, recordIndex) => {
+            console.log(`[ExportProject] Converting file ${recordIndex + 1}/${group.length}: ${record.name}`)
+            const arrayBufferToBase64 = (buffer) => {
+              return new Promise((resolve, reject) => {
+                const blob = new Blob([buffer])
+                const reader = new FileReader()
+                reader.onloadend = () => {
+                  const result = reader.result
+                  if (typeof result === 'string') {
+                    resolve(result.split(',')[1])
+                  } else {
+                    reject(new Error('Failed to convert arrayBuffer to base64'))
+                  }
+                }
+                reader.onerror = () => reject(reader.error)
+                reader.readAsDataURL(blob)
+              })
+            }
+            
+            return {
+              version: record.version,
+              name: record.name,
+              path: record.path,
+              type: record.type,
+              size: record.size,
+              data: await arrayBufferToBase64(record.data),
+              lastModified: record.lastModified
+            }
+          })
+        )
+      })
+    )
+    
+    // タイムラインデータを取得
+    let timelineData = null
+    try {
+      console.log('[ExportProject] timelineController:', timelineController)
+      console.log('[ExportProject] timelineController.serialize:', timelineController?.serialize)
+      
+      if (timelineController?.serialize) {
+        // timelineController.serialize()を使用して完全なタイムラインデータを取得
+        timelineData = timelineController.serialize()
+        console.log('[ExportProject] Timeline serialized successfully')
+        console.log('[ExportProject] Timeline data:', JSON.stringify(timelineData, null, 2).substring(0, 500))
+      } else {
+        console.warn('[ExportProject] timelineController.serialize not available')
+      }
+    } catch (e) {
+      console.error('[ExportProject] Failed to export timeline data:', e)
+    }
+    
+    // 音声データを取得
+    let audioData = null
+    try {
+      if (audioBuffer.value) {
+        audioData = {
+          duration: audioDuration.value,
+          sampleRate: audioBuffer.value.sampleRate,
+          numberOfChannels: audioBuffer.value.numberOfChannels
+        }
+        
+        // オーディオの実データもエクスポート（オプション）
+        // 注意: これによりファイルサイズが大幅に増加します
+        // 将来的には、ユーザーがオーディオを含めるか選択できるようにする
+        try {
+          if (audioFileName.value) {
+            audioData.fileName = audioFileName.value
+          }
+          // audioData.data = await arrayBufferToBase64(audioBuffer.value)
+        } catch (e) {
+          console.warn('[ExportProject] Failed to export audio data:', e)
+        }
+      }
+    } catch (e) {
+      console.warn('[ExportProject] Failed to export audio metadata:', e)
+    }
+    
+    // すべての設定をエクスポート
+    console.log('[ExportProject] Creating project data structure...')
+    console.log('[ExportProject] - Models count:', modelsData.length)
+    console.log('[ExportProject] - Timeline data:', timelineData ? 'present' : 'null')
+    if (timelineData) {
+      console.log('[ExportProject] - Timeline keyframes:', timelineData.keyframes?.length || 0)
+    }
+    console.log('[ExportProject] - Audio data:', audioData ? 'present' : 'null')
+    
+    // モデルの状態を取得（可視性、表情など）
+    const modelsState = []
+    try {
+      if (Array.isArray(models?.value)) {
+        for (const model of models.value) {
+          const state = {
+            id: model.id,
+            name: model.name,
+            visible: model.visible,
+            boneVisible: model.boneVisible,
+            boneNameVisible: model.boneNameVisible
+          }
+          
+          // 表情（モーフターゲット/ExpressionManager）を取得
+          if (model.vrm?.expressionManager) {
+            const expressions = {}
+            const expressionManager = model.vrm.expressionManager
+            
+            // すべての表情の現在値を保存
+            for (const [name, expression] of Object.entries(expressionManager._expressionMap || {})) {
+              if (expression && typeof expression.weight === 'number') {
+                expressions[name] = expression.weight
+              }
+            }
+            
+            if (Object.keys(expressions).length > 0) {
+              state.expressions = expressions
+            }
+          }
+          
+          modelsState.push(state)
+        }
+      }
+    } catch (e) {
+      console.warn('[ExportProject] Failed to export models state:', e)
+    }
+    
+    console.log('[ExportProject] ===== EXPORT SUMMARY =====')
+    console.log('[ExportProject] - Models (files):', modelsData.length, 'groups')
+    console.log('[ExportProject] - Models (state):', modelsState.length, 'models')
+    if (modelsState.length > 0) {
+      modelsState.forEach((s, i) => {
+        console.log(`[ExportProject]   Model ${i + 1}: ${s.name}, visible: ${s.visible}, expressions: ${Object.keys(s.expressions || {}).length}`)
+      })
+    }
+    console.log('[ExportProject] - Timeline:', timelineData ? 'present' : 'null')
+    if (timelineData) {
+      console.log('[ExportProject]   - Keyframes:', timelineData.keyframes?.length || 0)
+      console.log('[ExportProject]   - Frame rate:', timelineData.frameRate || 60, 'fps')
+      console.log('[ExportProject]   - Range:', timelineData.startTime, '-', timelineData.endTime)
+      console.log('[ExportProject]   - Loop:', timelineData.loop)
+    }
+    console.log('[ExportProject] - Audio:', audioData ? 'present' : 'null')
+    if (audioData) {
+      console.log('[ExportProject]   - Duration:', audioData.duration, 's')
+      console.log('[ExportProject]   - File name:', audioData.fileName || 'N/A')
+    }
+    console.log('[ExportProject] - Display settings: included')
+    console.log('[ExportProject] - Lighting: included')
+    console.log('[ExportProject] - Camera: included')
+    console.log('[ExportProject] - Viewport: included')
+    console.log('[ExportProject] ===========================')
+    
+    const projectData = {
+      version: '1.1.0',
+      timestamp: new Date().toISOString(),
+      app: 'StellarMotion Studio',
+      models: modelsData,
+      modelsState: modelsState,
+      timeline: timelineData,
+      audio: audioData,
+      settings: {
+        display: getDisplaySettingsSnapshot(),
+        lighting: {
+          ambientColor: ambientLight?.color?.getHex() || 0xffffff,
+          ambientIntensity: ambientLight?.intensity ?? 1.0,
+          directionalColor: directionalLight?.color?.getHex() || 0xffffff,
+          directionalIntensity: directionalIntensity.value,
+          directionalPosition: directionalLight?.position?.toArray() || [0, 1, 0],
+          showLightMarker: showLightMarker.value,
+          lightMarkerColor: lightMarkerColor.value
+        },
+        camera: {
+          fov: renderCameraFov.value,
+          near: renderCameraNear.value,
+          far: renderCameraFar.value,
+          width: renderCameraWidth.value,
+          height: renderCameraHeight.value,
+          roll: renderCameraRollDeg.value,
+          position: renderCamera.value?.position?.toArray?.() || [0, 0, 0],
+          quaternion: renderCamera.value?.quaternion?.toArray?.() || [0, 0, 0, 1],
+          showHelper: showRenderCameraHelper.value,
+          wheelSensitivity: cameraWheelSensitivity.value,
+          translateSensitivity: cameraTranslateSensitivity.value,
+          rotateSensitivity: cameraRotateSensitivity.value
+        },
+        viewport: {
+          mode: viewportMode.value,
+          showCaptions: showCaptions.value,
+          showGrid: showGrid.value
+        }
+      }
+    }
+    
+    // JSONファイルとしてダウンロード（File System Access APIを優先的に使用）
+    console.log('[ExportProject] Serializing to JSON...')
+    
+    // 循環参照を防ぐためのreplacer関数
+    const seen = new WeakSet()
+    const jsonString = JSON.stringify(projectData, (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          console.warn('[ExportProject] Circular reference detected at key:', key)
+          return undefined
+        }
+        seen.add(value)
+      }
+      return value
+    }, 2)
+    
+    console.log('[ExportProject] JSON size:', (jsonString.length / 1024 / 1024).toFixed(2), 'MB')
+    
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    console.log('[ExportProject] Blob created, size:', (blob.size / 1024 / 1024).toFixed(2), 'MB')
+    
+    // デフォルトのファイル名を生成
+    const defaultFileName = `project_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.json`
+    console.log('[ExportProject] Default filename:', defaultFileName)
+    
+    // File System Access APIが利用可能な場合はそれを使用
+    const hasFileSystemAccess = typeof window !== 'undefined' && 'showSaveFilePicker' in window
+    console.log('[ExportProject] File System Access API available:', hasFileSystemAccess)
+    
+    if (hasFileSystemAccess) {
+      try {
+        console.log('[ExportProject] Opening save file picker...')
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [{
+            description: 'StellarMotion Project',
+            accept: { 'application/json': ['.json'] }
+          }]
+        })
+        console.log('[ExportProject] File handle obtained, writing...')
+        const writable = await fileHandle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        console.log('[ExportProject] File written successfully via File System Access API')
+        notify('projectExported', notificationsTexts.value?.projectExported || 'プロジェクトをエクスポートしました。', 3000)
+        return
+      } catch (err) {
+        // ユーザーがキャンセルした場合やエラーの場合は、フォールバックメソッドを使用
+        if (err.name === 'AbortError') {
+          console.log('[ExportProject] User cancelled file save')
+          return
+        }
+        console.warn('[ExportProject] File System Access API failed, falling back to download method:', err)
+      }
+    }
+    
+    // フォールバック: 従来のダウンロード方法
+    console.log('[ExportProject] Using fallback download method...')
+    try {
+      const url = URL.createObjectURL(blob)
+      console.log('[ExportProject] Blob URL created:', url)
+      
+      const a = document.createElement('a')
+      a.href = url
+      a.download = defaultFileName
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      console.log('[ExportProject] Download link created and appended')
+      
+      a.click()
+      console.log('[ExportProject] Download link clicked')
+      
+      // クリーンアップを少し遅延させる
+      setTimeout(() => {
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        console.log('[ExportProject] Cleanup completed')
+      }, 100)
+      
+      notify('projectExported', notificationsTexts.value?.projectExported || 'プロジェクトをエクスポートしました。', 3000)
+    } catch (downloadErr) {
+      console.error('[ExportProject] Download fallback failed:', downloadErr)
+      throw downloadErr
+    }
+  } catch (error) {
+    console.error('[ExportProject] Failed to export project:', error)
+    notify('projectExportFailed', notificationsTexts.value?.projectExportFailed || 'Project export failed: ' + error.message, 5000)
+  }
+  console.log('[ExportProject] Export project completed')
+}
+
+async function importProject() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json,application/json'
+  input.onchange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    try {
+      notify('projectImporting', notificationsTexts.value?.projectImporting || 'Importing project...', 0)
+      
+      const text = await file.text()
+      const projectData = JSON.parse(text)
+      
+      if (!projectData.models || !Array.isArray(projectData.models)) {
+        throw new Error('Invalid project file format')
+      }
+      
+      // 現在の状態をクリア
+      await clearAllCache()
+      
+      // モデルデータをインポート
+      const modelCache = useModelCache()
+      const restoredData = await modelCache.importProjectFromFile(file)
+      
+      // モデルを読み込み
+      if (restoredData && restoredData.length > 0) {
+        const fileGroups = restoredData.map(group => 
+          group.map(record => {
+            const modelFile = new File([record.data], record.name, { type: record.type })
+            if (record.path && record.path !== record.name) {
+              Object.defineProperty(modelFile, 'restoredPath', {
+                value: record.path,
+                writable: false
+              })
+            }
+            return modelFile
+          })
+        )
+        
+        if (fileGroups[0]) {
+          await onFileChange({ target: { files: fileGroups[0] } })
+        }
+      }
+      
+      // 設定を復元（モデル読み込み後）
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // モデルの状態を復元（可視性、表情など）
+      if (projectData.modelsState && Array.isArray(projectData.modelsState)) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        console.log('[ImportProject] Restoring models state...')
+        
+        try {
+          for (const state of projectData.modelsState) {
+            const model = models.value?.find(m => m.name === state.name || m.id === state.id)
+            if (!model) continue
+            
+            // 可視性を復元
+            if (state.visible !== undefined) model.visible = state.visible
+            if (state.boneVisible !== undefined) model.boneVisible = state.boneVisible
+            if (state.boneNameVisible !== undefined) model.boneNameVisible = state.boneNameVisible
+            
+            // 表情（モーフターゲット）を復元
+            if (state.expressions && model.vrm?.expressionManager) {
+              const expressionManager = model.vrm.expressionManager
+              for (const [name, weight] of Object.entries(state.expressions)) {
+                try {
+                  const expression = expressionManager._expressionMap?.[name]
+                  if (expression && typeof weight === 'number') {
+                    expression.weight = weight
+                  }
+                } catch (e) {
+                  console.warn(`[ImportProject] Failed to restore expression ${name}:`, e)
+                }
+              }
+            }
+          }
+          console.log('[ImportProject] Models state restored')
+        } catch (e) {
+          console.warn('[ImportProject] Failed to restore models state:', e)
+        }
+      }
+      
+      if (projectData.settings) {
+        // 表示設定を復元
+        if (projectData.settings.display) {
+          const d = projectData.settings.display
+          if (d.showGrid !== undefined) showGrid.value = d.showGrid
+          if (d.showLightMarker !== undefined) showLightMarker.value = d.showLightMarker
+          if (d.lightMarkerColor !== undefined) lightMarkerColor.value = d.lightMarkerColor
+          if (d.directionalIntensity !== undefined) directionalIntensity.value = d.directionalIntensity
+          if (d.springBoneEnabled !== undefined) springBoneEnabled.value = d.springBoneEnabled
+          if (d.lookAtEnabled !== undefined) lookAtEnabled.value = d.lookAtEnabled
+          if (d.showExtendedBones !== undefined) showExtendedBones.value = d.showExtendedBones
+          if (d.showColliderNodes !== undefined) showColliderNodes.value = d.showColliderNodes
+          if (d.showNonDeformingBones !== undefined) showNonDeformingBones.value = d.showNonDeformingBones
+          if (d.highlightConstraint !== undefined) highlightConstraint.value = d.highlightConstraint
+          if (d.showPhysicalBones !== undefined) showPhysicalBones.value = d.showPhysicalBones
+          if (d.showOtherBones !== undefined) showOtherBones.value = d.showOtherBones
+          if (d.boneDotSize !== undefined) boneDotSize.value = d.boneDotSize
+          if (d.boneLabelScale !== undefined) boneLabelScale.value = d.boneLabelScale
+          if (d.outlineWidth !== undefined) outlineWidth.value = d.outlineWidth
+          if (d.outlineColor !== undefined) outlineColor.value = d.outlineColor
+          if (d.virtualTrackersEnabled !== undefined) virtualTrackersEnabled.value = d.virtualTrackersEnabled
+          if (d.virtualTrackerDisplayVisible !== undefined) virtualTrackerDisplayVisible.value = d.virtualTrackerDisplayVisible
+          if (d.showVirtualTrackerLabels !== undefined) showVirtualTrackerLabels.value = d.showVirtualTrackerLabels
+          if (d.virtualTrackerSize !== undefined) virtualTrackerSize.value = d.virtualTrackerSize
+          if (d.virtualTrackerLabelScale !== undefined) virtualTrackerLabelScale.value = d.virtualTrackerLabelScale
+          if (d.showTrackerAxes !== undefined) showTrackerAxes.value = d.showTrackerAxes
+          if (d.trackerAxesLength !== undefined) trackerAxesLength.value = d.trackerAxesLength
+          if (d.forearmTwistShare !== undefined) forearmTwistShare.value = d.forearmTwistShare
+          
+          // トラッカー状態を復元
+          if (d.virtualTrackerStates) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+            restoreTrackerStateSnapshot(d.virtualTrackerStates)
+          }
+          
+          // 指の状態を復元
+          if (d.fingerStates) {
+            for (const key in d.fingerStates) {
+              if (key in fingerStates) {
+                fingerStates[key] = d.fingerStates[key]
+              }
+            }
+            saveFingerStatesToCache(d.fingerStates)
+          }
+          
+          // 指の軸オーバーライドを復元
+          if (d.fingerAxisOverrides) {
+            importFingerAxisOverridesByName(d.fingerAxisOverrides)
+          }
+        }
+        
+        // ライティング設定を復元
+        if (projectData.settings.lighting) {
+          const l = projectData.settings.lighting
+          if (l.ambientColor !== undefined && ambientLight?.color) {
+            ambientLight.color.setHex(l.ambientColor)
+          }
+          if (l.ambientIntensity !== undefined && ambientLight) {
+            ambientLight.intensity = l.ambientIntensity
+          }
+          if (l.directionalColor !== undefined && directionalLight?.color) {
+            directionalLight.color.setHex(l.directionalColor)
+          }
+          if (l.directionalIntensity !== undefined) directionalIntensity.value = l.directionalIntensity
+          if (l.directionalPosition && directionalLight?.position) {
+            directionalLight.position.fromArray(l.directionalPosition)
+          }
+          if (l.showLightMarker !== undefined) showLightMarker.value = l.showLightMarker
+          if (l.lightMarkerColor !== undefined) lightMarkerColor.value = l.lightMarkerColor
+        }
+        
+        // カメラ設定を復元
+        if (projectData.settings.camera) {
+          const c = projectData.settings.camera
+          if (c.fov !== undefined) renderCameraFov.value = c.fov
+          if (c.near !== undefined) renderCameraNear.value = c.near
+          if (c.far !== undefined) renderCameraFar.value = c.far
+          if (c.width !== undefined) renderCameraWidth.value = c.width
+          if (c.height !== undefined) renderCameraHeight.value = c.height
+          if (c.roll !== undefined) renderCameraRollDeg.value = c.roll
+          if (c.showHelper !== undefined) showRenderCameraHelper.value = c.showHelper
+          if (c.wheelSensitivity !== undefined) cameraWheelSensitivity.value = c.wheelSensitivity
+          if (c.translateSensitivity !== undefined) cameraTranslateSensitivity.value = c.translateSensitivity
+          if (c.rotateSensitivity !== undefined) cameraRotateSensitivity.value = c.rotateSensitivity
+          
+          if (renderCamera.value) {
+            if (c.position) renderCamera.value.position.fromArray(c.position)
+            if (c.quaternion) renderCamera.value.quaternion.fromArray(c.quaternion)
+            renderCamera.value.updateMatrixWorld(true)
+          }
+        }
+        
+        // ビューポート設定を復元
+        if (projectData.settings.viewport) {
+          const v = projectData.settings.viewport
+          if (v.mode !== undefined) viewportMode.value = v.mode
+          if (v.showCaptions !== undefined) showCaptions.value = v.showCaptions
+          if (v.showGrid !== undefined) showGrid.value = v.showGrid
+        }
+      }
+      
+      // タイムラインを復元
+      if (projectData.timeline && timelineController?.deserialize) {
+        await new Promise(resolve => setTimeout(resolve, 200))
+        console.log('[ImportProject] Restoring timeline...')
+        console.log('[ImportProject] Timeline data:', projectData.timeline)
+        
+        try {
+          // deserialize()メソッドを使用して完全なタイムラインを復元
+          const success = timelineController.deserialize(projectData.timeline)
+          console.log('[ImportProject] Timeline deserialized:', success)
+          
+          // ループとスナップ設定を復元
+          if (projectData.timeline.loop !== undefined) timelineLoop.value = projectData.timeline.loop
+          if (projectData.timeline.snap !== undefined) timelineSnap.value = projectData.timeline.snap
+          
+          markTimelineDirty('import-project')
+          if (typeof syncTimelineRefs === 'function') syncTimelineRefs()
+        } catch (e) {
+          console.error('[ImportProject] Failed to restore timeline:', e)
+        }
+      }
+      
+      notify('projectImported', notificationsTexts.value?.projectImported || 'Project imported successfully.', 3000)
+    } catch (error) {
+      console.error('Failed to import project:', error)
+      notify('projectImportFailed', notificationsTexts.value?.projectImportFailed || 'Project import failed: ' + error.message, 5000)
+    }
+  }
+  input.click()
+}
+
 function openAudioFile() {
   const input = audioFileInput.value
   if (!input) return
@@ -4013,6 +4570,11 @@ onMounted(async () => {
   loadLightingSettings({})
   loadDisplaySettings()
   setupErrorHandlers()
+  
+  // デバッグ: exportProject関数が定義されているか確認
+  console.log('[ThreeViewer] exportProject function defined:', typeof exportProject)
+  console.log('[ThreeViewer] importProject function defined:', typeof importProject)
+  
   const raw = localStorage.getItem('importedModels')
   initRenderer()
   viewCamera.value = camera.value

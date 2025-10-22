@@ -95,6 +95,26 @@
       <button
         type="button"
         class="top-menu__item"
+        role="menuitem"
+        @click="handleExportProject"
+        :title="tooltip(menuTooltips.exportProject)"
+      >
+        <Icon icon="mdi:package-down" />
+        <span>{{ menu.exportProject || 'Export Project' }}</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
+        role="menuitem"
+        @click="handleImportProject"
+        :title="tooltip(menuTooltips.importProject)"
+      >
+        <Icon icon="mdi:package-up" />
+        <span>{{ menu.importProject || 'Import Project' }}</span>
+      </button>
+      <button
+        type="button"
+        class="top-menu__item"
         role="switch"
         :aria-checked="showCaptions"
         @click="$emit('toggle-captions')"
@@ -127,6 +147,20 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits([
+  'import',
+  'import-audio',
+  'export',
+  'capture-image',
+  'capture-video',
+  'clear-cache',
+  'export-project',
+  'import-project',
+  'toggle-captions',
+  'timeline-import',
+  'timeline-export'
+])
+
 const { t } = useI18n()
 const menu = computed(() => t.value?.menu ?? {})
 const menuTooltips = computed(() => t.value?.menuTooltips ?? {})
@@ -137,6 +171,28 @@ const aria = computed(() => t.value?.aria ?? {})
 const tooltip = message => {
   if (!props.showCaptions) return ''
   return message || ''
+}
+
+const handleExportProject = () => {
+  console.log('[TopMenuBar] Export project button clicked')
+  console.log('[TopMenuBar] Emitting export-project event')
+  try {
+    emit('export-project')
+    console.log('[TopMenuBar] Event emitted successfully')
+  } catch (error) {
+    console.error('[TopMenuBar] Failed to emit event:', error)
+  }
+}
+
+const handleImportProject = () => {
+  console.log('[TopMenuBar] Import project button clicked')
+  console.log('[TopMenuBar] Emitting import-project event')
+  try {
+    emit('import-project')
+    console.log('[TopMenuBar] Event emitted successfully')
+  } catch (error) {
+    console.error('[TopMenuBar] Failed to emit event:', error)
+  }
 }
 </script>
 
