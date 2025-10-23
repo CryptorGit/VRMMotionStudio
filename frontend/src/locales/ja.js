@@ -330,6 +330,7 @@ messages.notifications = {
   cachePersistenceFailed: 'キャッシュ: 永続化が利用できません。ブラウザのストレージ設定を確認してください。',
   projectExported: 'プロジェクト: エクスポートしました。',
   projectExportFailed: 'プロジェクト: エクスポートに失敗しました。',
+  projectUploadedToServer: 'プロジェクト: サーバーにアップロードしました。',
   projectImporting: 'プロジェクト: インポート中…',
   projectImported: 'プロジェクト: インポートしました。',
   projectImportFailed: 'プロジェクト: インポートに失敗しました。',

@@ -329,6 +329,7 @@ export default {
     cachePersistenceFailed: 'Cache: Persistenz nicht verfügbar. Prüfen Sie die Browser-Speichereinstellungen.',
     projectExported: 'Projekt: Erfolgreich exportiert.',
     projectExportFailed: 'Projekt: Export fehlgeschlagen.',
+    projectUploadedToServer: 'Projekt: Auf Server hochgeladen.',
     projectImporting: 'Projekt: Wird importiert…',
     projectImported: 'Projekt: Erfolgreich importiert.',
     projectImportFailed: 'Projekt: Import fehlgeschlagen.',

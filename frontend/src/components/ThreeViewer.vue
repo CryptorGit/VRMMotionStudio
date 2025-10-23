@@ -296,6 +296,7 @@ import { useStoragePersistence } from '../composables/useStoragePersistence.js'
 import { useFingerControl } from '../composables/useFingerControl.js'
 import { usePoseControls } from '../composables/usePoseControls.js'
 import { useModelCache } from '../composables/useModelCache.js'
+import { uploadProjectToBackend, checkBackendConnection } from '../api/projectApi.js'
 
 const viewer = ref(null)
 const currentMeshRef = ref(null)
@@ -3704,6 +3705,30 @@ async function exportProject() {
       console.error('[ExportProject] Download fallback failed:', downloadErr)
       throw downloadErr
     }
+
+    // バックエンドにアップロード
+    try {
+      console.log('[ExportProject] Checking backend connection...')
+      const isBackendAvailable = await checkBackendConnection()
+      
+      if (isBackendAvailable) {
+        console.log('[ExportProject] Uploading to backend...')
+        const uploadResult = await uploadProjectToBackend(blob, defaultFileName, projectData.app || 'StellarMotion Studio')
+        
+        if (uploadResult.success) {
+          console.log('[ExportProject] Successfully uploaded to backend:', uploadResult.filename)
+          notify('projectUploadedToServer', 'プロジェクトをサーバーにもアップロードしました。', 2500)
+        } else {
+          console.warn('[ExportProject] Backend upload failed:', uploadResult.error)
+        }
+      } else {
+        console.log('[ExportProject] Backend is not available, skipping upload')
+      }
+    } catch (uploadErr) {
+      // バックエンドへのアップロードが失敗してもエラーにはしない（オプション機能）
+      console.warn('[ExportProject] Failed to upload to backend (non-critical):', uploadErr)
+    }
+
   } catch (error) {
     console.error('[ExportProject] Failed to export project:', error)
     notify('projectExportFailed', notificationsTexts.value?.projectExportFailed || 'Project export failed: ' + error.message, 5000)
