@@ -1,7 +1,6 @@
 <template>
   <header class="top-menu" role="menubar">
     <div class="top-menu__brand">
-      <Icon icon="mdi:arm-flex" class="top-menu__logo" aria-hidden="true" />
       <span class="top-menu__title">
         {{ brand.title || 'StellarMotion Studio' }}
         <span class="top-menu__beta" :aria-label="brand.betaAria || brand.beta || 'Beta version'">
