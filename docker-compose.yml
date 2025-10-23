@@ -33,6 +33,8 @@ services:
     container_name: mokumoku-backend
     ports:
       - "1311:8081"  # ホストポート:コンテナポート
+    volumes:
+      - ./public:/public  # ファイルサーバと共有
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - SERVER_PORT=8081

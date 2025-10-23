@@ -19,10 +19,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/projects")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = "*", allowCredentials = "false")
 public class ProjectController {
 
-    private static final String UPLOAD_DIR = "uploads/projects";
+    private static final String UPLOAD_DIR = "/public/projects";
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
     public ProjectController() {
