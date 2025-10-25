@@ -26,6 +26,8 @@ export default {
     captureImage: '捕获图像',
     captureVideo: '捕获视频',
     clearCache: '清除缓存',
+    exportProject: '导出项目',
+    importProject: '导入项目',
     captions: '字幕',
     timelineImport: '导入时间线',
     timelineExport: '导出时间线'
@@ -38,6 +40,8 @@ export default {
     captureImage: '渲染并保存图像',
     captureVideo: '渲染并保存视频',
     clearCache: '重置已加载的模型和设置',
+    exportProject: '将缓存保存为项目文件',
+    importProject: '从项目文件恢复缓存',
     captionsOn: '关闭字幕',
     captionsOff: '打开字幕',
     timelineImport: '导入已保存的时间线',

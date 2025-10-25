@@ -26,6 +26,8 @@ export default {
     captureImage: 'Capturer image',
     captureVideo: 'Capturer vidéo',
     clearCache: 'Vider le cache',
+    exportProject: 'Exporter projet',
+    importProject: 'Importer projet',
     captions: 'Légendes',
     timelineImport: 'Importer timeline',
     timelineExport: 'Exporter timeline'
@@ -38,6 +40,8 @@ export default {
     captureImage: 'Rendre et sauvegarder une image',
     captureVideo: 'Rendre et sauvegarder une vidéo',
     clearCache: 'Réinitialiser les modèles et paramètres chargés',
+    exportProject: 'Sauvegarder le cache comme fichier projet',
+    importProject: 'Restaurer le cache depuis un fichier projet',
     captionsOn: 'Désactiver les légendes',
     captionsOff: 'Activer les légendes',
     timelineImport: 'Importer une timeline sauvegardée',

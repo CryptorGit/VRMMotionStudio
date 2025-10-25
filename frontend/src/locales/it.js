@@ -26,6 +26,8 @@
     captureImage: 'Cattura immagine',
     captureVideo: 'Cattura video',
     clearCache: 'Cancella cache',
+    exportProject: 'Esporta progetto',
+    importProject: 'Importa progetto',
     captions: 'Sottotitoli',
     timelineImport: 'Importa timeline',
     timelineExport: 'Esporta timeline'
@@ -38,6 +40,8 @@
     captureImage: 'Renderizza e salva un immagine',
     captureVideo: 'Renderizza e salva un video',
     clearCache: 'Reimposta modelli e impostazioni caricati',
+    exportProject: 'Salva cache come file progetto',
+    importProject: 'Ripristina cache da file progetto',
     captionsOn: 'Disattiva sottotitoli',
     captionsOff: 'Attiva sottotitoli',
     timelineImport: 'Importa una timeline salvata',

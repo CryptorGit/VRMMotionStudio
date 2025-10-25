@@ -26,6 +26,8 @@ export default {
     captureImage: '이미지 캡처',
     captureVideo: '비디오 캡처',
     clearCache: '캐시 지우기',
+    exportProject: '프로젝트 내보내기',
+    importProject: '프로젝트 가져오기',
     captions: '자막',
     timelineImport: '타임라인 가져오기',
     timelineExport: '타임라인 내보내기'
@@ -38,6 +40,8 @@ export default {
     captureImage: '이미지 렌더링 및 저장',
     captureVideo: '비디오 렌더링 및 저장',
     clearCache: '로드된 모델 및 설정 재설정',
+    exportProject: '캐시를 프로젝트 파일로 저장',
+    importProject: '프로젝트 파일에서 캐시 복원',
     captionsOn: '자막 끄기',
     captionsOff: '자막 켜기',
     timelineImport: '저장된 타임라인 가져오기',

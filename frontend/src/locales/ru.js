@@ -26,6 +26,8 @@ export default {
     captureImage: 'Захват изображения',
     captureVideo: 'Захват видео',
     clearCache: 'Очистить кэш',
+    exportProject: 'Экспорт проекта',
+    importProject: 'Импорт проекта',
     captions: 'Субтитры',
     timelineImport: 'Импорт временной шкалы',
     timelineExport: 'Экспорт временной шкалы'
@@ -38,6 +40,8 @@ export default {
     captureImage: 'Рендерить и сохранить изображение',
     captureVideo: 'Рендерить и сохранить видео',
     clearCache: 'Сбросить загруженные модели и настройки',
+    exportProject: 'Сохранить кэш как файл проекта',
+    importProject: 'Восстановить кэш из файла проекта',
     captionsOn: 'Отключить субтитры',
     captionsOff: 'Включить субтитры',
     timelineImport: 'Импортировать сохранённую временную шкалу',

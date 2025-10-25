@@ -26,6 +26,8 @@ export default {
     captureImage: 'Capturar imagen',
     captureVideo: 'Capturar vídeo',
     clearCache: 'Limpiar caché',
+    exportProject: 'Exportar proyecto',
+    importProject: 'Importar proyecto',
     captions: 'Subtítulos',
     timelineImport: 'Importar línea de tiempo',
     timelineExport: 'Exportar línea de tiempo'
@@ -38,6 +40,8 @@ export default {
     captureImage: 'Renderizar y guardar una imagen',
     captureVideo: 'Renderizar y guardar un vídeo',
     clearCache: 'Restablecer modelos y configuraciones cargadas',
+    exportProject: 'Guardar caché como archivo de proyecto',
+    importProject: 'Restaurar caché desde archivo de proyecto',
     captionsOn: 'Desactivar subtítulos',
     captionsOff: 'Activar subtítulos',
     timelineImport: 'Importar una línea de tiempo guardada',
