@@ -2,18 +2,19 @@
   <div class="ad-container" :class="{ 'ad-container--square': variant === 'square' }">
     <div class="ad-placeholder">
       <span class="ad-label">Advertisement</span>
-      <!-- 実際のGoogle AdSenseコードはここに挿入します -->
-      <!-- 開発中はプレースホルダーを表示 -->
-      <div class="ad-mock" v-if="isDevelopment">
-        <p>AdSense {{ variant }}</p>
-        <p class="ad-mock-size">{{ adSize }}</p>
-      </div>
+      <!-- Google AdSense広告ユニット -->
+      <ins class="adsbygoogle"
+           :style="adStyle"
+           data-ad-client="ca-pub-5056897746119361"
+           :data-ad-slot="adSlot || ''"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const props = defineProps({
   variant: {
@@ -27,20 +28,24 @@ const props = defineProps({
   }
 })
 
-const isDevelopment = computed(() => {
-  return import.meta.env.MODE === 'development' || !props.adSlot
-})
-
-const adSize = computed(() => {
+const adStyle = computed(() => {
   switch (props.variant) {
     case 'square':
-      return '250x250'
+      return 'display:block; width:250px; height:250px;'
     case 'banner':
-      return '728x90'
+      return 'display:inline-block; width:728px; height:90px;'
     case 'vertical':
-      return '120x600'
+      return 'display:inline-block; width:120px; height:600px;'
     default:
-      return '250x250'
+      return 'display:block; width:250px; height:250px;'
+  }
+})
+
+onMounted(() => {
+  try {
+    (window.adsbygoogle = window.adsbygoogle || []).push({})
+  } catch (err) {
+    console.error('AdSense error:', err)
   }
 })
 </script>
@@ -73,6 +78,7 @@ const adSize = computed(() => {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  padding-top: 1.5rem;
 }
 
 .ad-label {
@@ -85,28 +91,6 @@ const adSize = computed(() => {
   letter-spacing: 0.05em;
   font-weight: 500;
   z-index: 1;
-}
-
-.ad-mock {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 250px;
-  padding: 2rem;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.ad-mock p {
-  margin: 0.3rem 0;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.ad-mock-size {
-  font-size: 0.7rem !important;
-  color: rgba(255, 255, 255, 0.25) !important;
-  font-family: 'Consolas', 'Monaco', monospace;
 }
 
 /* レスポンシブ対応 */
