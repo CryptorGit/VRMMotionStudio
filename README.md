@@ -3,18 +3,21 @@
 ## リポジトリ構成
 - `frontend/` … Vite + Vue 3 クライアント
   - `src/`, `components/`, `composables/`, `utils/`
-  - `vite.config.js`（VRM アセット登録、/api プロキシ 8080）
+  - `vite.config.js`（VRM アセット登録、/api プロキシ）
 - `backend/`
   - `java/` … Spring Boot（H2 メモリ DB、JPA）
   - `python/` … Flask サンプル（任意）
+- `nginx.conf` … リバースプロキシ設定（本番環境用）
+- `docker-compose.yml` … 本番想定のコンテナ構成
 
 VRM ビューアを中心としたフロントエンド（Vite + Vue 3）と、簡易な Java バックエンド（Spring Boot）を含むモノレポです。
 
 ## ディレクトリ
 - `frontend/` Vite + Vue 3 アプリ。`/src` にコンポーネントやユーティリティ。
 - `backend/` サーバサイド。`java/` が Spring Boot 本体。`python/` は任意の補助 API サンプル。
+- `public/` 静的ファイル配信用（VRMモデル、プロジェクトファイル等）
 
-## 開発手順
+## 開発手順（ローカル開発）
 1. Java バックエンドを起動
   ```powershell
   cd backend/java
@@ -27,6 +30,49 @@ VRM ビューアを中心としたフロントエンド（Vite + Vue 3）と、�
   npm run dev
   ```
   ブラウザで http://localhost:5173 を開きます。フロントから `/api` へのリクエストは `http://localhost:8081` へプロキシされます。
+
+## 本番環境起動（Docker Compose）
+
+**AWS等の本番環境では、すべてのリクエストをNginx経由でルーティングします。**
+
+### 前提条件
+- Docker及びDocker Composeがインストールされていること
+- 外部公開ポート: 80番（HTTP）、443番（HTTPS）のみ
+- 内部サービスは全てコンテナネットワーク経由で通信
+
+### 起動方法
+```powershell
+# 起動
+docker-compose up -d
+
+# ログ確認
+docker-compose logs -f
+
+# 停止
+docker-compose down
+```
+
+### アクセス方法
+- フロントエンド: http://localhost/ （ポート80経由）
+- バックエンドAPI: http://localhost/api/ （Nginx経由で内部のbackend:8081にルーティング）
+- 静的ファイル: http://localhost/public/ （Nginx経由で配信）
+
+### ポート構成
+| サービス | 外部ポート | 内部ポート | アクセス方法 |
+|---------|----------|----------|------------|
+| Nginx | 80, 443 | 80, 443 | 直接アクセス可能 |
+| Frontend | - | 5174 | Nginx経由のみ |
+| Backend | - | 8081 | Nginx経由のみ |
+| Database | - | 8083 | バックエンドから内部接続のみ |
+
+### セキュリティ設計
+- ✅ 外部公開ポートは80/443のみ
+- ✅ すべてのアプリケーションサービスは内部ネットワークのみ
+- ✅ Nginxがリバースプロキシとして全リクエストを制御
+- ✅ データベースは完全に内部ネットワークに隔離
+
+### HTTPS対応（将来）
+SSL証明書を取得後、`nginx.conf`内のHTTPSサーバーブロックのコメントを解除し、証明書を配置してください。
 
 ## 環境変数
 `.env.example` を参考に環境変数を設定します。PowerShell 例:
