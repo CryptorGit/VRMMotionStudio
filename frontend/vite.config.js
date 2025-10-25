@@ -70,6 +70,12 @@ export default defineConfig({
   assetsInclude: ['**/*.vrm'],
   server: {
     port: 5173,
+    host: '0.0.0.0',  // Docker環境で外部アクセスを許可
+    allowedHosts: [
+      'localhost',
+      'vrm-motion-studio.com',
+      '.vrm-motion-studio.com'  // サブドメインも許可
+    ],
     proxy: {
       '/api': 'http://localhost:8081'
     }
