@@ -1,4 +1,4 @@
-# MokuMokuDanceWeb
+# VRM Motion Studio
 
 ## リポジトリ構成
 - `frontend/` … Vite + Vue 3 クライアント

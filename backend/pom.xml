@@ -9,7 +9,7 @@
     <version>0.1.0</version>
     <packaging>pom</packaging>
 
-    <name>MokuMokuDanceWeb Backend</name>
+    <name>VRM Motion Studio Backend</name>
 
     <modules>
         <module>java</module>

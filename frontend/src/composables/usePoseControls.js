@@ -190,8 +190,8 @@ function buildMotionPayload({ timelineData, modelList, fps, fingerSnapshot }) {
   return {
     version: '1.0',
     type: 'vrm-motion',
-    format: 'mmd-web',
-    exporter: 'StellarMotion Studio',
+    format: 'vrm-motion-studio',
+    exporter: 'VRM Motion Studio',
     exportDate: new Date().toISOString(),
     frameRate: fps,
     startTime,
@@ -453,8 +453,8 @@ export function usePoseControls({
     return {
       version: '1.0',
       type: 'vrm-pose',
-      format: 'mmd-web',
-      exporter: 'StellarMotion Studio',
+      format: 'vrm-motion-studio',
+      exporter: 'VRM Motion Studio',
       exportDate: new Date().toISOString(),
       models: modelsData,
       fingers: fingerSnapshot

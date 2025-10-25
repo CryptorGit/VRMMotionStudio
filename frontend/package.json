@@ -1,8 +1,8 @@
 {
-  "name": "mmd-web-frontend",
+  "name": "vrm-motion-studio-frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "MokuMokuDanceWeb frontend (Vite + Vue 3) with VRM viewer.",
+  "description": "VRM Motion Studio frontend (Vite + Vue 3) with VRM viewer.",
   "type": "module",
   "engines": {
     "node": ">=20.19 <21 || >=22.12"
@@ -10,7 +10,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CryptorGit/MokuMokuDanceWeb"
+    "url": "https://github.com/CryptorGit/VRMMotionStudio"
   },
   "scripts": {
     "dev": "vite",

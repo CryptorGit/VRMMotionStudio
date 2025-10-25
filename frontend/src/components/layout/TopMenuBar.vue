@@ -2,7 +2,7 @@
   <header class="top-menu" role="menubar">
     <div class="top-menu__brand">
       <span class="top-menu__title">
-        {{ brand.title || 'StellarMotion Studio' }}
+        {{ brand.title || 'VRM Motion Studio' }}
         <span class="top-menu__beta" :aria-label="brand.betaAria || brand.beta || 'Beta version'">
           {{ brand.beta || 'BETA' }}
         </span>

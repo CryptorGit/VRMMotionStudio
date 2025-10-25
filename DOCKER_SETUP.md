@@ -123,7 +123,7 @@ docker-compose up -d --build
 docker-compose ps db
 
 # データベースに接続してテスト
-docker-compose exec db psql -U mokumoku -d mokumoku
+docker-compose exec database psql -U vrm_studio_user -d vrm_motion_studio
 ```
 
 ## 環境変数のカスタマイズ

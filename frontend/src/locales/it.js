@@ -14,7 +14,7 @@
   },
 
   brand: {
-    title: 'StellarMotion Studio',
+    title: 'VRM Motion Studio',
     beta: 'BETA',
     betaAria: 'Versione beta'
   },

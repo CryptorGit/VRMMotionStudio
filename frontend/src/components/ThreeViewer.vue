@@ -3583,7 +3583,7 @@ async function exportProject() {
     const projectData = {
       version: '1.1.0',
       timestamp: new Date().toISOString(),
-      app: 'StellarMotion Studio',
+      app: 'VRM Motion Studio',
       models: modelsData,
       modelsState: modelsState,
       timeline: timelineData,
@@ -3656,7 +3656,7 @@ async function exportProject() {
         const fileHandle = await window.showSaveFilePicker({
           suggestedName: defaultFileName,
           types: [{
-            description: 'StellarMotion Project',
+            description: 'VRM Motion Studio Project',
             accept: { 'application/json': ['.json'] }
           }]
         })
@@ -3713,7 +3713,7 @@ async function exportProject() {
       
       if (isBackendAvailable) {
         console.log('[ExportProject] Uploading to backend...')
-        const uploadResult = await uploadProjectToBackend(blob, defaultFileName, projectData.app || 'StellarMotion Studio')
+        const uploadResult = await uploadProjectToBackend(blob, defaultFileName, projectData.app || 'VRM Motion Studio')
         
         if (uploadResult.success) {
           console.log('[ExportProject] Successfully uploaded to backend:', uploadResult.filename)

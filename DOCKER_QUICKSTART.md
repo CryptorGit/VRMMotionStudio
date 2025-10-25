@@ -1,4 +1,4 @@
-# 🎭 MokuMoku Dance Web - Docker環境
+# 🎭 VRM Motion Studio - Docker環境
 
 ## ✅ 起動成功！
 
@@ -83,7 +83,7 @@ docker-compose up -d --build --force-recreate
 ## 📁 ディレクトリ構成
 
 ```
-MokuMokuDanceWeb/
+VRMMotionStudio/
 ├── docker-compose.yml      # Docker Compose設定
 ├── start.ps1               # 起動スクリプト
 ├── stop.ps1                # 停止スクリプト

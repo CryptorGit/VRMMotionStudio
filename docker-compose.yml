@@ -6,7 +6,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: mokumoku-frontend
+    container_name: vrm-motion-studio-frontend
     ports:
       - "1301:5174"  # ホストポート:コンテナポート
     volumes:
@@ -16,7 +16,7 @@ services:
       - NODE_ENV=development
       - VITE_API_BASE_URL=http://localhost:1311
     networks:
-      - mokumoku-network
+      - vrm-motion-studio-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5174"]
@@ -30,7 +30,7 @@ services:
     build:
       context: ./backend/java
       dockerfile: Dockerfile
-    container_name: mokumoku-backend
+    container_name: vrm-motion-studio-backend
     ports:
       - "1311:8081"  # ホストポート:コンテナポート
     volumes:
@@ -39,7 +39,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SERVER_PORT=8081
     networks:
-      - mokumoku-network
+      - vrm-motion-studio-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
@@ -51,21 +51,21 @@ services:
   # データベース (PostgreSQL)
   database:
     image: postgres:15-alpine
-    container_name: mokumoku-database
+    container_name: vrm-motion-studio-database
     ports:
       - "1313:8083"  # ホストポート:コンテナポート (PostgreSQLはコンテナ内で8083で起動)
     environment:
-      - POSTGRES_DB=mokumoku
-      - POSTGRES_USER=mokumoku_user
-      - POSTGRES_PASSWORD=mokumoku_pass
+      - POSTGRES_DB=vrm_motion_studio
+      - POSTGRES_USER=vrm_studio_user
+      - POSTGRES_PASSWORD=vrm_studio_pass
       - PGPORT=8083
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - mokumoku-network
+      - vrm-motion-studio-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mokumoku_user -p 8083"]
+      test: ["CMD-SHELL", "pg_isready -U vrm_studio_user -p 8083"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,14 +73,14 @@ services:
   # ファイルサーバ (静的ファイル配信)
   fileserver:
     image: nginx:alpine
-    container_name: mokumoku-fileserver
+    container_name: vrm-motion-studio-fileserver
     ports:
       - "1314:8084"  # ホストポート:コンテナポート
     volumes:
       - ./public:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - mokumoku-network
+      - vrm-motion-studio-network
     restart: unless-stopped
 
 volumes:
@@ -88,5 +88,5 @@ volumes:
     driver: local
 
 networks:
-  mokumoku-network:
+  vrm-motion-studio-network:
     driver: bridge

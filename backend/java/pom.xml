@@ -14,7 +14,7 @@
     <groupId>com.mmd</groupId>
     <artifactId>java</artifactId>
     <version>0.1.0</version>
-    <name>MokuMokuDanceWeb Java Backend</name>
+    <name>VRM Motion Studio Java Backend</name>
     <packaging>jar</packaging>
 
     <properties>

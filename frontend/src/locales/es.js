@@ -14,7 +14,7 @@ export default {
   },
 
   brand: {
-    title: 'StellarMotion Studio',
+    title: 'VRM Motion Studio',
     beta: 'BETA',
     betaAria: 'Versión beta'
   },

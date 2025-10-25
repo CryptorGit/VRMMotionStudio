@@ -1,6 +1,6 @@
 # Docker Compose クイックスタート
 
-Write-Host "=== MokuMoku Dance Web Docker 環境 ===" -ForegroundColor Cyan
+Write-Host "=== VRM Motion Studio Docker 環境 ===" -ForegroundColor Cyan
 Write-Host ""
 
 # 既存のコンテナを停止・削除

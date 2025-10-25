@@ -17,7 +17,7 @@ messages.languages = {
 
 // 日本語固有の翻訳
 messages.brand = {
-  title: 'StellarMotion Studio',
+  title: 'VRM Motion Studio',
   beta: 'ベータ',
   betaAria: 'ベータ版'
 }

@@ -397,7 +397,7 @@ export function useModelCache() {
       const projectData = {
         version: '1.0.0',
         timestamp: new Date().toISOString(),
-        app: 'StellarMotion Studio',
+        app: 'VRM Motion Studio',
         cacheVersion: CACHE_RECORD_VERSION,
         models: dataLists
       }

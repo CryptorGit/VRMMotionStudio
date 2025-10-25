@@ -1,6 +1,6 @@
 # Docker Compose 停止スクリプト
 
-Write-Host "=== MokuMoku Dance Web Docker 環境を停止 ===" -ForegroundColor Cyan
+Write-Host "=== VRM Motion Studio Docker 環境を停止 ===" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "コンテナを停止中..." -ForegroundColor Yellow
