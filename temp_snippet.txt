@@ -1,6 +1,0 @@
-﻿ER_PIXEL_SIZE = 16
-export const showIkMarkers = ref(true)
-export const ikWarning = ref('')
-export const selectedIK = ref(null)
-export let ikTargets = []
-// Runtime arm IK trackers (IKトラッカー) per m
