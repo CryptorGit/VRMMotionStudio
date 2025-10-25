@@ -6,9 +6,7 @@
       <ins class="adsbygoogle"
            :style="adStyle"
            data-ad-client="ca-pub-5056897746119361"
-           :data-ad-slot="adSlot || ''"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
+           :data-ad-slot="adSlot || ''"></ins>
     </div>
   </div>
 </template>
