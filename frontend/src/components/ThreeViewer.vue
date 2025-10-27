@@ -266,7 +266,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, onUnmounted, onBeforeUnmount, watch, watchEffect, provide, reactive } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, onBeforeUnmount, watch, watchEffect, provide, reactive, nextTick } from 'vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import TimelineEditor from './timeline/TimelineEditor.vue'
 import TopMenuBar from './layout/TopMenuBar.vue'
@@ -346,11 +346,11 @@ const modelOutlineCache = new WeakMap()
 const modelDefaultsCache = new WeakMap()
 const currentOutlineModelIndex = ref(0)
 
-const virtualTrackersEnabled = ref(false)
+const virtualTrackersEnabled = ref(true) // デフォルトでON
 const virtualTrackerDisplayVisible = ref(true)
-const showVirtualTrackerLabels = ref(true)
-const virtualTrackerSize = ref(0.08)
-const virtualTrackerLabelScale = ref(1.0)
+const showVirtualTrackerLabels = ref(false) // デフォルトでOFF
+const virtualTrackerSize = ref(0.0325) // デフォルトで中央値 (0.005 + 0.06) / 2
+const virtualTrackerLabelScale = ref(0.05) // デフォルトで最小値
 const selectedTrackerModelIndex = ref(-1) // -1 means "All Models"
 
 // 選択されたトラッカーの状態
@@ -1255,6 +1255,7 @@ const {
   selectedPose: _selectedPose,
   models,
   onFileChange,
+  handleFiles,
   toggleModelVisibility,
   toggleBoneVisibility,
   toggleBoneNameVisibility,
@@ -3369,10 +3370,10 @@ async function clearAllCache() {
     highlightConstraint.value = false
     boneDotSize.value = 0.02
     boneLabelScale.value = 1.0
-    virtualTrackersEnabled.value = false
-    showVirtualTrackerLabels.value = true
-    virtualTrackerSize.value = 0.08
-    virtualTrackerLabelScale.value = 1.0
+    virtualTrackersEnabled.value = true
+    showVirtualTrackerLabels.value = false
+    virtualTrackerSize.value = 0.0325
+    virtualTrackerLabelScale.value = 0.05
     
     // Clear finger states and axis overrides
     for (const key of FINGER_STATE_KEYS) {
@@ -4661,6 +4662,55 @@ onMounted(async () => {
     try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
   } else {
     try { await logToServer({ event: 'restore:skipped' }) } catch {}
+  }
+
+  // VueのレンダリングサイクルとrestoreCachedModelの完了を待つ
+  await nextTick()
+
+  // デフォルトVRMモデルのロード（モデルが存在しない場合）
+  console.log('[ThreeViewer] Checking if default model should be loaded...')
+  console.log('[ThreeViewer] models.value:', models.value)
+  console.log('[ThreeViewer] models.value.length:', models.value?.length)
+  
+  if (!models.value || models.value.length === 0) {
+    try {
+      console.log('[ThreeViewer] No models found, loading default VRM model...')
+      const defaultModelPath = '/vrm/AliciaSolid.vrm'
+      console.log('[ThreeViewer] Fetching:', defaultModelPath)
+      
+      const response = await fetch(defaultModelPath)
+      console.log('[ThreeViewer] Fetch response:', response.status, response.ok)
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        console.log('[ThreeViewer] Blob size:', blob.size)
+        
+        const file = new File([blob], 'AliciaSolid.vrm', { type: 'application/octet-stream' })
+        console.log('[ThreeViewer] File created:', file.name, file.size)
+        
+        // handleFiles を直接呼び出す
+        if (typeof handleFiles === 'function') {
+          console.log('[ThreeViewer] Calling handleFiles...')
+          await handleFiles([file])
+          
+          // モデル読み込み後の処理
+          try { ensureVirtualTrackers() } catch {}
+          try { trackerController.rebuild?.() } catch {}
+          try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
+          
+          console.log('[ThreeViewer] Default VRM model loaded successfully')
+          notify('defaultModelLoaded', 'Default model loaded', 2500)
+        } else {
+          console.error('[ThreeViewer] handleFiles is not a function')
+        }
+      } else {
+        console.error('[ThreeViewer] Failed to fetch default model:', response.status)
+      }
+    } catch (error) {
+      console.error('[ThreeViewer] Failed to load default VRM model:', error)
+    }
+  } else {
+    console.log('[ThreeViewer] Models already exist, skipping default model load:', models.value.length, 'model(s)')
   }
 
   try {

@@ -337,6 +337,7 @@ messages.notifications = {
   projectImportEmpty: 'プロジェクト: モデルが見つかりませんでした。',
   modelLoaded: 'モデルが読み込まれました。',
   modelLoadFailed: 'モデルの読み込みに失敗しました。',
+  defaultModelLoaded: 'デフォルトモデルを読み込みました',
   audioLoaded: '音声が読み込まれました。',
   audioLoadFailed: '音声の読み込みに失敗しました。',
   audioLoading: '音声: 読み込み中…',

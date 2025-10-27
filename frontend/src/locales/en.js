@@ -336,6 +336,7 @@ export default {
     projectImportEmpty: 'Project: No models found in project file.',
     modelLoaded: 'Model loaded.',
     modelLoadFailed: 'Failed to load model.',
+    defaultModelLoaded: 'Default model loaded',
     audioLoaded: 'Audio loaded.',
     audioLoadFailed: 'Failed to load audio.',
     audioLoading: 'Audio: Loading…',
