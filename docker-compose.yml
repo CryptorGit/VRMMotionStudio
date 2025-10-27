@@ -11,6 +11,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./public:/usr/share/nginx/html:ro  # 静的ファイル配信用
+      - ./frontend/public:/usr/share/nginx/html/frontend-static:ro  # VRMファイル等の静的ファイル
     networks:
       - vrm-motion-studio-network
     restart: unless-stopped
