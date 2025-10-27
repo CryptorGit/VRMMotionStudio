@@ -4677,13 +4677,29 @@ onMounted(async () => {
       console.log('[ThreeViewer] No models found, loading default VRM model...')
       const defaultModelPath = '/vrm/AliciaSolid.vrm'
       console.log('[ThreeViewer] Fetching:', defaultModelPath)
+      console.log('[ThreeViewer] Current URL:', window.location.href)
       
       const response = await fetch(defaultModelPath)
       console.log('[ThreeViewer] Fetch response:', response.status, response.ok)
+      console.log('[ThreeViewer] Response headers:', Object.fromEntries(response.headers.entries()))
+      console.log('[ThreeViewer] Content-Type:', response.headers.get('content-type'))
+      
+      // レスポンスの最初の100文字を確認
+      const clonedResponse = response.clone()
+      const text = await clonedResponse.text()
+      console.log('[ThreeViewer] Response preview (first 200 chars):', text.substring(0, 200))
+      console.log('[ThreeViewer] Response length:', text.length)
       
       if (response.ok) {
         const blob = await response.blob()
-        console.log('[ThreeViewer] Blob size:', blob.size)
+        console.log('[ThreeViewer] Blob size:', blob.size, 'type:', blob.type)
+        
+        // HTMLが返されている場合はエラー
+        if (blob.type.includes('text/html')) {
+          console.error('[ThreeViewer] Server returned HTML instead of VRM file!')
+          console.error('[ThreeViewer] This usually means the file was not found (404)')
+          return
+        }
         
         const file = new File([blob], 'AliciaSolid.vrm', { type: 'application/octet-stream' })
         console.log('[ThreeViewer] File created:', file.name, file.size)
@@ -4704,7 +4720,7 @@ onMounted(async () => {
           console.error('[ThreeViewer] handleFiles is not a function')
         }
       } else {
-        console.error('[ThreeViewer] Failed to fetch default model:', response.status)
+        console.error('[ThreeViewer] Failed to fetch default model:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('[ThreeViewer] Failed to load default VRM model:', error)

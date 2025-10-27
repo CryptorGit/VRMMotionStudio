@@ -1,1 +1,2 @@
-*.vrm filter=lfs diff=lfs merge=lfs -text
+# VRM files are now tracked directly (not via LFS) for easier deployment
+# *.vrm filter=lfs diff=lfs merge=lfs -text
