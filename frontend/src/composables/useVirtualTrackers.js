@@ -1083,17 +1083,13 @@ export function useVirtualTrackers({
         // トラッカー回転オフセットもクリア
         trackerRotationOffsets.delete(model)
         // 初期ポーズキャッシュは保持して、初期位置に戻れるようにする
-        // initialWorldPose.delete(model) は削除しない
+        // initialWorldPose.delete(model) は削除しない - 元のインポート時の姿勢に戻るため
       }
     } catch {}
     setSavedCameraTransform(null)
     for (const def of TRACKER_DEFS) resetTrackerStateToDefault(def.key)
-    // 初期ポーズを再キャプチャしてから、初期位置にレイアウト
-    const model = getActiveModel()
-    if (model) {
-      initialWorldPose.delete(model)
-      captureInitialWorldPose(model)
-    }
+    // 初期ポーズは保持したまま、トラッカーを初期位置に配置
+    // 注: 初期ポーズを再キャプチャしない - 元のインポート時の姿勢を保持
     layoutDefaultPositions({ force: true, ignoreSaved: true })
   }
 
