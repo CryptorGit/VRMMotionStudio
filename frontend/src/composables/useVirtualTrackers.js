@@ -1126,7 +1126,6 @@ export function useVirtualTrackers({
     if (initialWorldPose.has(model)) return
     const vrm = model.vrm
     const poseMap = new Map()
-    const offsetMap = new Map()
     for (const t of TRACKER_DEFS) {
       const names = trackerToBones[t.key] || []
       let b = null
@@ -1136,16 +1135,10 @@ export function useVirtualTrackers({
       const position = b.getWorldPosition(new THREE.Vector3())
       const rotation = b.getWorldQuaternion(new THREE.Quaternion())
       poseMap.set(t.key, { position: position.clone(), quaternion: rotation.clone() })
-      const trackerEntry = trackers.value.find(x => x.key === t.key)
-      if (trackerEntry?.mesh) {
-        try { trackerEntry.mesh.updateMatrixWorld(true) } catch {}
-        const trackerWorldQ = trackerEntry.mesh.getWorldQuaternion(new THREE.Quaternion())
-        const offset = rotation.clone().multiply(trackerWorldQ.clone().invert())
-        offsetMap.set(t.key, offset)
-      }
     }
     initialWorldPose.set(model, poseMap)
-    trackerRotationOffsets.set(model, offsetMap)
+    // Don't calculate rotation offsets here - they will be calculated on first use
+    // in applyTrackerRotationToBone() after trackers are positioned correctly
   }
 
   function layoutDefaultPositions(options = {}) {
@@ -1275,13 +1268,22 @@ export function useVirtualTrackers({
             const entry = initMap.get(key)
             if (entry?.position) m.copy(entry.position)
             else if (entry) m.copy(entry)
+            // トラッカーの初期回転もボーンから取得（IK問題の修正）
+            if (entry?.quaternion) {
+              t.mesh.quaternion.copy(entry.quaternion)
+            } else {
+              t.mesh.quaternion.identity()
+            }
           } else if (obj) {
             obj.updateWorldMatrix(true, false)
             obj.getWorldPosition(m)
+            // ボーンが存在する場合は、その回転も取得
+            const objQuat = obj.getWorldQuaternion(new THREE.Quaternion())
+            t.mesh.quaternion.copy(objQuat)
           } else {
             m.set(0, 1, 0).applyMatrix4(basis)
+            t.mesh.quaternion.identity()
           }
-          t.mesh.quaternion.identity()
           if (state) state.enabled = true
         }
 
