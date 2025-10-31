@@ -1,40 +1,36 @@
-# バックエンド
+# Backend / バックエンド
 
-Web アプリのサーバサイド。Java (Spring Boot) がメイン、`python/` は任意の補助サービスです。
+Backend services for VRM Motion Studio.
 
-## 構成
-- `java/` … Spring Boot 3（Web, JPA, H2）
-  - `controller/`, `service/`, `security/`, `repository/`, `model/entity/`, `resources/`
-- `python/` … Flask サンプル API（`app.py`）
+## Structure
 
-## 環境変数（共通）
-`.env.example` を参考に設定してください。
+- **`java/`**: Spring Boot 3 (main backend service)
+- **`python/`**: Flask service (optional, for logging/debugging)
 
-- `ALLOWED_ORIGINS`: CORS 許可オリジン（例: `http://localhost:5173`）
-- `JWT_SECRET`: JWT 署名用シークレット
-- `API_KEY`: 固定 API キー（Bearer でない場合はヘッダ値と比較）
+## Quick Start
 
-PowerShell 例:
-```powershell
-$env:ALLOWED_ORIGINS="http://localhost:5173"; $env:JWT_SECRET="dev-secret"; $env:API_KEY="dev-api-key"
-```
+See the [main README](../README.md) for complete setup instructions.
 
-## 実行方法
 ### Java (Spring Boot)
-```powershell
+
+```bash
 cd java
 mvn spring-boot:run
-# JAR
-mvn package; java -jar target/java-0.1.0.jar
 ```
 
-### Python (Flask)
-```powershell
+Runs at `http://localhost:8081`
+
+### Python (Flask) - Optional
+
+```bash
 cd python
 pip install -r requirements.txt
-python .\app.py --port 8000
+python app.py --port 8000
 ```
 
-## メモ
-- 開発時、フロントは Vite 開発サーバが `/api` を `http://localhost:8081` にプロキシします。
-- H2 はメモリ DB。`schema.sql` / `data.sql` を `resources/` に配置済み。
+Runs at `http://localhost:8000`
+
+## Documentation
+
+- [API Reference](../docs/API.md) - API endpoint documentation
+- [Architecture](../docs/ARCHITECTURE.md) - System architecture overview

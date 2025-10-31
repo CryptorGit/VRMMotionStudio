@@ -1,21 +1,22 @@
-# Python 補助サービス (Flask)
+# Python Service (Flask) - Optional
 
-簡易な API を提供する任意コンポーネントです。開発用途やログ受け取りに利用できます。
+Optional Flask service for logging and debugging.
 
-## セットアップ
-```powershell
+## Install
+
+```bash
 pip install -r requirements.txt
 ```
 
-## 起動
-```powershell
-# 必要に応じて環境変数を設定
-$env:ALLOWED_ORIGINS="http://localhost:5173"
-python .\app.py --port 8000
+## Run
+
+```bash
+python app.py --port 8000
 ```
 
-エンドポイント:
-- `GET /api/hello` … 確認用
-- `POST /api/log` … JSON ログを受け取り出力
+## Endpoints
 
-CORS は `ALLOWED_ORIGINS` に従います。
+- `GET /api/hello` - Health check
+- `POST /api/log` - Receive log messages from frontend
+
+See [API Documentation](../../docs/API.md) for details.

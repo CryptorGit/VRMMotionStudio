@@ -1,17 +1,37 @@
-# Java バックエンド (Spring Boot / Maven)
+# Java Backend (Spring Boot)
 
-標準的な Maven 構成です。Spring Boot 3、JPA、H2（メモリ）を使用しています。
+Spring Boot 3 backend service for VRM Motion Studio.
 
-主なパッケージ:
-- `com.mmd.controller`
-- `com.mmd.service`
-- `com.mmd.security`
-- `com.mmd.repository`
-- `com.mmd.model.entity`
+## Technology
 
-## 実行
-```powershell
+- Spring Boot 3.3.2
+- Java 17
+- Maven 3.9+
+- H2 Database (development)
+- PostgreSQL (production)
+
+## Run
+
+```bash
 mvn spring-boot:run
-# または
-mvn package; java -jar target/java-0.1.0.jar
 ```
+
+## Build
+
+```bash
+mvn clean package
+java -jar target/java-0.1.0.jar
+```
+
+## Package Structure
+
+```
+com.mmd/
+├── controller/    # REST API endpoints
+├── service/       # Business logic
+├── security/      # JWT & API key authentication
+├── repository/    # JPA data access
+└── model/entity/  # Database entities
+```
+
+See [API Documentation](../../docs/API.md) for endpoint details.

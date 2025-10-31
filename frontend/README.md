@@ -1,29 +1,51 @@
-# フロントエンド
+# Frontend (Vue 3 + Vite)
 
-[Vite](https://vite.dev/) + [Vue 3](https://vuejs.org/) 製。
+Web-based VRM viewer and motion editor built with Vue 3 and Three.js.
 
-## 開発
-```powershell
+## Technology
+
+- Vue 3.5 (Composition API)
+- Vite 7.1
+- Three.js 0.164
+- @pixiv/three-vrm 2.0
+
+## Development
+
+```bash
 npm install
 npm run dev
 ```
-ブラウザで http://localhost:5173 を開いてください。
 
-バックエンド API は Vite 開発サーバが `http://localhost:8081` にプロキシします（`vite.config.js`）。
+Open `http://localhost:5173` in your browser.
 
-## ビルド/プレビュー
-```powershell
+API requests to `/api` are proxied to `http://localhost:8081` (see `vite.config.js`).
+
+## Build
+
+```bash
 npm run build
-npm run preview
 ```
-出力は `dist/` に生成されます。
 
-## テスト
-```powershell
+Output: `dist/`
+
+## Test
+
+```bash
 npm test
 ```
 
-## 使い方（VRM）
-- 画面左上のメニューから「インポート」で `.vrm` を読み込み（ドラッグ&ドロップ可）。
-- 「設定」でライト、SpringBone、LookAt、骨可視（SkeletonHelper）を切替。
-- 「モーフ編集」で Expressions（A/I/U/E/O, Joy 等）や検出されたカスタム表情を調整。
+## Project Structure
+
+```
+src/
+├── components/     # Vue components
+├── composables/    # Composition API functions
+├── utils/          # Utility functions
+├── locales/        # i18n translations
+└── api/            # API clients
+```
+
+## Documentation
+
+- [Virtual Trackers](../docs/VIRTUAL_TRACKERS.md) - 11-point tracker system
+- [Architecture](../docs/ARCHITECTURE.md) - System design overview
