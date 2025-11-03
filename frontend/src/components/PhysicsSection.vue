@@ -3,15 +3,11 @@
     <input type="checkbox" v-model="springBoneEnabledLocal" />
     <span>{{ physicsTexts.springBoneEnabled }}</span>
   </label>
-
-  <!-- Google AdSense広告 -->
-  <GoogleAdUnit variant="square" ad-slot="physics-section" />
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from '../locales/index.js'
-import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   springBoneEnabled: { type: Boolean, required: true }

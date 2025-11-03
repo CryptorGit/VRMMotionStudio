@@ -29,9 +29,6 @@
     </p>
 
     <div v-if="hasMultiple" class="key-settings__curve-editor">
-      <!-- Google AdSense広告 -->
-      <GoogleAdUnit variant="square" ad-slot="key-settings-section" />
-      
       <!-- モデル選択 -->
       <div v-if="models && models.length > 0" class="curve-model-selector">
         <label class="model-label">
@@ -81,7 +78,6 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useI18n } from '../locales/index.js'
 import TimelineCurveEditor from './timeline/TimelineCurveEditor.vue'
-import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   selection: {

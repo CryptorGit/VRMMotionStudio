@@ -81,15 +81,11 @@
       {{ resetAllLabel }}
     </button>
   </div>
-
-  <!-- Google AdSense広告 -->
-  <GoogleAdUnit variant="square" ad-slot="finger-section" />
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from '../locales/index.js'
-import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   fingerStates: { type: Object, default: () => ({}) },

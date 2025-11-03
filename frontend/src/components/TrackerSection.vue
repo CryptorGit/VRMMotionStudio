@@ -162,9 +162,6 @@
           </div>
         </div>
       </div>
-
-  <!-- Google AdSense広告 -->
-  <GoogleAdUnit variant="square" ad-slot="tracker-section" />
 </template>
 
 <script setup>
@@ -172,7 +169,6 @@ import { toRefs, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from '../locales/index.js'
 import { ROTATION_AXIS_OPTIONS } from '../composables/useVirtualTrackers.js'
-import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   virtualTrackersEnabled: { type: Boolean, default: false },

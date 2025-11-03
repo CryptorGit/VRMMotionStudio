@@ -11,16 +11,12 @@
     </button>
   </div>
   <MorphEditor :mesh="currentMesh" ref="morphEditorRef" />
-
-  <!-- Google AdSense広告 -->
-  <GoogleAdUnit variant="square" ad-slot="morph-section" />
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import MorphEditor from './MorphEditor.vue'
-import GoogleAdUnit from './GoogleAdUnit.vue'
 import { useI18n } from '../locales/index.js'
 
 const props = defineProps({

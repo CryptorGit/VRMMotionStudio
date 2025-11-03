@@ -6,15 +6,13 @@
       <ins class="adsbygoogle"
            :style="adStyle"
            data-ad-client="ca-pub-5056897746119361"
-           :data-ad-slot="adSlot"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
+           :data-ad-slot="adSlot"></ins>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, nextTick } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const props = defineProps({
   variant: {
@@ -42,16 +40,11 @@ const adStyle = computed(() => {
 })
 
 onMounted(() => {
-  nextTick(() => {
-    try {
-      // AdSenseスクリプトが読み込まれているか確認
-      if (window.adsbygoogle) {
-        (window.adsbygoogle = window.adsbygoogle || []).push({})
-      }
-    } catch (err) {
-      console.error('AdSense error:', err)
-    }
-  })
+  try {
+    (window.adsbygoogle = window.adsbygoogle || []).push({})
+  } catch (err) {
+    console.error('AdSense error:', err)
+  }
 })
 </script>
 
