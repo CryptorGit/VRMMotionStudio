@@ -123,11 +123,15 @@
       {{ displayTexts.reset }}
     </button>
   </div>
+
+  <!-- Google AdSense広告 -->
+  <GoogleAdUnit variant="square" ad-slot="display-section" />
 </template>
 
 <script setup>
 import { computed, watch } from 'vue'
 import { useI18n } from '../locales/index.js'
+import GoogleAdUnit from './GoogleAdUnit.vue'
 
 const props = defineProps({
   models: { type: Array, required: true },
