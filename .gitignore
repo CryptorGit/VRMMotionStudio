@@ -10,3 +10,27 @@
 temp_*.txt
 temp_extract.txt
 temp_snippet.txt
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.old
+*_backup.*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files (optional)
+*.iml
+
+# Test data
+public/projects/*.json
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~

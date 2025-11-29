@@ -78,9 +78,9 @@ services:
     expose:
       - "8083"  # 内部ネットワークのみ
     environment:
-      - POSTGRES_DB=vrm_motion_studio
-      - POSTGRES_USER=vrm_studio_user
-      - POSTGRES_PASSWORD=vrm_studio_pass
+      - POSTGRES_DB=${POSTGRES_DB:-vrm_motion_studio}
+      - POSTGRES_USER=${POSTGRES_USER:-vrm_studio_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
       - PGPORT=8083
     volumes:
       - postgres-data:/var/lib/postgresql/data
