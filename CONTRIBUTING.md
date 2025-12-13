@@ -23,7 +23,8 @@ npm run dev
 ## Documentation
 
 - Main entry: `README.md`
-- Technical docs: `docs/INDEX.md`
+
+This repository keeps documentation intentionally minimal for public release.
 
 When changing behavior or configuration (ports, URLs, env vars), update the related docs in the same PR.
 

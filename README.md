@@ -183,26 +183,13 @@ Output: `backend/java/target/java-0.1.0.jar`
 
 ---
 
-## 🌐 Production Deployment (AWS)
-
-For detailed production deployment instructions including:
-- AWS EC2/ECS/EKS setup
-- HTTPS/SSL configuration (Let's Encrypt, ACM)
-- Load balancer configuration
-- Database migration to RDS
-- Security group settings
-- Monitoring and logging
-
-See: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
-
----
-
 ## 📖 Documentation
 
-- [Architecture Overview](docs/ARCHITECTURE.md) - System architecture and design
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment instructions
-- [Virtual Trackers](docs/VIRTUAL_TRACKERS.md) - 11-point tracker system documentation
-- [API Reference](docs/API.md) - Backend API documentation
+This repository intentionally keeps documentation minimal for public release.
+
+- Setup and usage: this `README.md`
+- Contributing: `CONTRIBUTING.md`
+- Security policy: `SECURITY.md`
 
 ---
 
@@ -248,7 +235,6 @@ MokuMokuDanceWeb/
 │   │   ├── src/main/java/com/mmd/
 │   │   └── Dockerfile
 │   └── python/            # Optional Flask service
-├── docs/                  # Documentation
 ├── public/                # Static files
 ├── nginx.conf             # Nginx configuration
 ├── docker-compose.yml     # Docker Compose configuration
@@ -451,26 +437,13 @@ mvn clean package -DskipTests
 
 ---
 
-## 🌐 本番環境デプロイ（AWS）
-
-以下の詳細な本番環境デプロイ手順については、別ドキュメントを参照してください：
-- AWS EC2/ECS/EKSセットアップ
-- HTTPS/SSL設定（Let's Encrypt、ACM）
-- ロードバランサー設定
-- RDSへのデータベース移行
-- セキュリティグループ設定
-- モニタリングとログ
-
-詳細: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
-
----
-
 ## 📖 ドキュメント
 
-- [アーキテクチャ概要](docs/ARCHITECTURE.md) - システムアーキテクチャと設計
-- [デプロイガイド](docs/DEPLOYMENT.md) - 本番環境デプロイ手順
-- [バーチャルトラッカー](docs/VIRTUAL_TRACKERS.md) - 11点トラッカーシステムの説明
-- [API リファレンス](docs/API.md) - バックエンドAPI仕様
+公開用にドキュメントは最小構成に整理しています。
+
+- セットアップと使い方：この `README.md`
+- 貢献：`CONTRIBUTING.md`
+- セキュリティ：`SECURITY.md`
 
 ---
 
@@ -516,7 +489,6 @@ MokuMokuDanceWeb/
 │   │   ├── src/main/java/com/mmd/
 │   │   └── Dockerfile
 │   └── python/            # オプションのFlaskサービス
-├── docs/                  # ドキュメント
 ├── public/                # 静的ファイル
 ├── nginx.conf             # Nginx設定
 ├── docker-compose.yml     # Docker Compose設定
