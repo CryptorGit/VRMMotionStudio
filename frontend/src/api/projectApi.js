@@ -2,7 +2,10 @@
  * プロジェクトファイルのバックエンドアップロード用API
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1311'
+// Base path for backend API.
+// - Local dev: Vite proxies `/api/*` to `http://localhost:8081`.
+// - Docker: Nginx exposes backend under `/api/*`.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 /**
  * プロジェクトファイルをバックエンドにアップロード
@@ -19,7 +22,7 @@ export async function uploadProjectToBackend(blob, filename, projectName = '') {
       formData.append('projectName', projectName)
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/upload`, {
+    const response = await fetch(`${API_BASE_URL}/projects/upload`, {
       method: 'POST',
       body: formData,
       // Content-Typeヘッダーは自動的に設定される（multipart/form-data）
@@ -44,7 +47,7 @@ export async function uploadProjectToBackend(blob, filename, projectName = '') {
  */
 export async function listProjectsFromBackend() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/projects/list`)
+    const response = await fetch(`${API_BASE_URL}/projects/list`)
 
     if (!response.ok) {
       throw new Error(`プロジェクト一覧の取得に失敗しました (Status: ${response.status})`)
@@ -67,7 +70,7 @@ export async function checkBackendConnection() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 3000) // 3秒タイムアウト
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/list`, {
+    const response = await fetch(`${API_BASE_URL}/projects/list`, {
       signal: controller.signal
     })
     clearTimeout(timeoutId)

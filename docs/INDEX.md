@@ -48,6 +48,13 @@
 
 ---
 
+## 🧩 Repository Meta / リポジトリ運用
+
+- **[LICENSE](../LICENSE)** - Project license
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guide
+- **[SECURITY.md](../SECURITY.md)** - Security policy
+- **[public/README.md](../public/README.md)** - Public static files directory
+
 ## 📁 Component-specific Documentation / コンポーネント別ドキュメント
 
 ### Frontend
@@ -117,8 +124,9 @@ MokuMokuDanceWeb/
 ## 📝 Document Conventions / ドキュメント規約
 
 ### Language / 言語
-- All main documentation is **bilingual** (English/Japanese)
-- Use `[English](#english)` and `[日本語](#japanese)` anchors for easy navigation
+- Main technical docs in `docs/` are **bilingual** (English/Japanese)
+- Repo meta docs (e.g. `LICENSE`, `SECURITY.md`) may be **English-first**
+- Use `[English](#english)` and `[日本語](#japanese)` anchors where applicable
 
 ### Format / フォーマット
 - **Markdown (.md)** for all documentation
@@ -133,6 +141,11 @@ MokuMokuDanceWeb/
 ---
 
 ## 🔄 Change Log / 変更履歴
+
+### 2025-12-13
+- **Public repo readiness refresh**
+  - Fixed `/api/*` reverse-proxy behavior and clarified health-check URLs
+  - Added `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, and `public/README.md`
 
 ### 2025-10-31
 - **Reorganized documentation structure**
@@ -161,4 +174,4 @@ When adding new documentation:
 
 ---
 
-**Last Updated**: October 31, 2025
+**Last Updated**: December 13, 2025

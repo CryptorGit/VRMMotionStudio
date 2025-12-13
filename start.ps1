@@ -17,9 +17,11 @@ Write-Host ""
 Write-Host "=== 起動完了 ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "サービスURL:" -ForegroundColor Cyan
-Write-Host "  フロントエンド: http://localhost:1301" -ForegroundColor White
-Write-Host "  バックエンド:   http://localhost:1311" -ForegroundColor White
-Write-Host "  ファイルサーバ: http://localhost:1314" -ForegroundColor White
+Write-Host "  フロントエンド: http://localhost/" -ForegroundColor White
+Write-Host "  バックエンドAPI: http://localhost/api/" -ForegroundColor White
+Write-Host "  ヘルスチェック: http://localhost/actuator/health" -ForegroundColor White
+Write-Host "  ファイル一覧:   http://localhost/public/" -ForegroundColor White
+Write-Host "  VRMサンプル:    http://localhost/vrm/" -ForegroundColor White
 Write-Host ""
 Write-Host "ログを確認:" -ForegroundColor Cyan
 Write-Host "  docker-compose logs -f" -ForegroundColor Gray

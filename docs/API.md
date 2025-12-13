@@ -9,8 +9,12 @@
 
 ### Base URL
 
-- **Development**: `http://localhost:8081/api`
-- **Production**: `https://yourdomain.com/api`
+- **Development (direct backend)**: `http://localhost:8081/api`
+- **Production (via Nginx)**: `https://yourdomain.com/api`
+
+For health checks (Actuator):
+- **Development (direct backend)**: `http://localhost:8081/actuator/health`
+- **Production (via Nginx)**: `https://yourdomain.com/actuator/health`
 
 ### Authentication
 
@@ -55,7 +59,7 @@ Check the health status of the backend service.
 
 **Example:**
 ```bash
-curl http://localhost:8081/api/actuator/health
+curl http://localhost:8081/actuator/health
 ```
 
 ---
@@ -115,7 +119,7 @@ Receive log messages from the frontend for debugging purposes.
   "message": "User loaded VRM model",
   "timestamp": "2025-10-31T12:34:56.789Z",
   "context": {
-    "modelName": "AliciaSolid.vrm",
+    "modelName": "model.vrm",
     "fileSize": 1234567
   }
 }
@@ -327,7 +331,7 @@ const logData = {
   level: 'info',
   message: 'VRM model loaded successfully',
   timestamp: new Date().toISOString(),
-  context: { modelName: 'AliciaSolid.vrm' }
+  context: { modelName: 'model.vrm' }
 };
 
 await fetch('http://localhost:8000/api/log', {
@@ -401,7 +405,7 @@ Authorization: <API_KEY>
 
 **例:**
 ```bash
-curl http://localhost:8081/api/actuator/health
+curl http://localhost:8081/actuator/health
 ```
 
 ---
@@ -461,7 +465,7 @@ curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
   "message": "User loaded VRM model",
   "timestamp": "2025-10-31T12:34:56.789Z",
   "context": {
-    "modelName": "AliciaSolid.vrm",
+    "modelName": "model.vrm",
     "fileSize": 1234567
   }
 }
@@ -673,7 +677,7 @@ const logData = {
   level: 'info',
   message: 'VRM model loaded successfully',
   timestamp: new Date().toISOString(),
-  context: { modelName: 'AliciaSolid.vrm' }
+  context: { modelName: 'model.vrm' }
 };
 
 await fetch('http://localhost:8000/api/log', {

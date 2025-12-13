@@ -60,10 +60,13 @@ $env:JWT_SECRET="<strong-random-secret>"
 $env:API_KEY="<strong-api-key>"
 
 # Build and start
+docker compose up -d --build
+
+# (legacy)
 docker-compose up -d --build
 
 # Check logs
-docker-compose logs -f
+docker compose logs -f
 
 # Test
 # Open http://localhost in browser
@@ -110,7 +113,7 @@ Log out and log back in for group changes to take effect.
 ### 3. Clone Repository
 
 ```bash
-git clone https://github.com/YourOrg/MokuMokuDanceWeb.git
+git clone https://github.com/CryptorGit/MokuMokuDanceWeb.git
 cd MokuMokuDanceWeb
 ```
 
@@ -149,21 +152,21 @@ openssl rand -base64 32
 ### 5. Start Services
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 6. Verify Deployment
 
 ```bash
 # Check container status
-docker-compose ps
+docker compose ps
 
 # Check logs
-docker-compose logs -f
+docker compose logs -f
 
 # Test health endpoints
 curl http://localhost/
-curl http://localhost/api/actuator/health
+curl http://localhost/actuator/health
 ```
 
 ---
@@ -398,7 +401,7 @@ services:
 
 Configure ALB health checks:
 - Protocol: HTTP
-- Path: `/api/actuator/health`
+- Path: `/health`
 - Healthy threshold: 2
 - Unhealthy threshold: 3
 - Timeout: 5 seconds
@@ -576,10 +579,13 @@ $env:JWT_SECRET="<強力なランダムシークレット>"
 $env:API_KEY="<強力なAPIキー>"
 
 # ビルドと起動
+docker compose up -d --build
+
+# （旧表記）
 docker-compose up -d --build
 
 # ログ確認
-docker-compose logs -f
+docker compose logs -f
 
 # テスト
 # ブラウザでhttp://localhostを開く
@@ -626,7 +632,7 @@ sudo usermod -aG docker ubuntu
 ### 3. リポジトリのクローン
 
 ```bash
-git clone https://github.com/YourOrg/MokuMokuDanceWeb.git
+git clone https://github.com/CryptorGit/MokuMokuDanceWeb.git
 cd MokuMokuDanceWeb
 ```
 
@@ -665,21 +671,21 @@ openssl rand -base64 32
 ### 5. サービスの起動
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### 6. デプロイの確認
 
 ```bash
 # コンテナ状態確認
-docker-compose ps
+docker compose ps
 
 # ログ確認
-docker-compose logs -f
+docker compose logs -f
 
 # ヘルスエンドポイントテスト
 curl http://localhost/
-curl http://localhost/api/actuator/health
+curl http://localhost/actuator/health
 ```
 
 ---
@@ -775,7 +781,7 @@ ALBでSSL終端する場合、Nginxへの変更は不要です。
 **2. Application Load Balancerの作成:**
 - ターゲット: EC2インスタンスのポート80
 - リスナー: ACM証明書付きHTTPS（443）
-- ヘルスチェック: ポート80のHTTP、パス `/`
+- ヘルスチェック: ポート80のHTTP、パス `/health`
 
 **3. セキュリティグループの更新:**
 - ALBセキュリティグループ: 0.0.0.0/0から443を許可

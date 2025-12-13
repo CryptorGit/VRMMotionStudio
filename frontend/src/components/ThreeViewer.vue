@@ -4667,68 +4667,6 @@ onMounted(async () => {
   // VueのレンダリングサイクルとrestoreCachedModelの完了を待つ
   await nextTick()
 
-  // デフォルトVRMモデルのロード（モデルが存在しない場合）
-  console.log('[ThreeViewer] Checking if default model should be loaded...')
-  console.log('[ThreeViewer] models.value:', models.value)
-  console.log('[ThreeViewer] models.value.length:', models.value?.length)
-  
-  if (!models.value || models.value.length === 0) {
-    try {
-      console.log('[ThreeViewer] No models found, loading default VRM model...')
-      const defaultModelPath = '/vrm/AliciaSolid.vrm'
-      console.log('[ThreeViewer] Fetching:', defaultModelPath)
-      console.log('[ThreeViewer] Current URL:', window.location.href)
-      
-      const response = await fetch(defaultModelPath)
-      console.log('[ThreeViewer] Fetch response:', response.status, response.ok)
-      console.log('[ThreeViewer] Response headers:', Object.fromEntries(response.headers.entries()))
-      console.log('[ThreeViewer] Content-Type:', response.headers.get('content-type'))
-      
-      // レスポンスの最初の100文字を確認
-      const clonedResponse = response.clone()
-      const text = await clonedResponse.text()
-      console.log('[ThreeViewer] Response preview (first 200 chars):', text.substring(0, 200))
-      console.log('[ThreeViewer] Response length:', text.length)
-      
-      if (response.ok) {
-        const blob = await response.blob()
-        console.log('[ThreeViewer] Blob size:', blob.size, 'type:', blob.type)
-        
-        // HTMLが返されている場合はエラー
-        if (blob.type.includes('text/html')) {
-          console.error('[ThreeViewer] Server returned HTML instead of VRM file!')
-          console.error('[ThreeViewer] This usually means the file was not found (404)')
-          return
-        }
-        
-        const file = new File([blob], 'AliciaSolid.vrm', { type: 'application/octet-stream' })
-        console.log('[ThreeViewer] File created:', file.name, file.size)
-        
-        // handleFiles を直接呼び出す
-        if (typeof handleFiles === 'function') {
-          console.log('[ThreeViewer] Calling handleFiles...')
-          await handleFiles([file])
-          
-          // モデル読み込み後の処理
-          try { ensureVirtualTrackers() } catch {}
-          try { trackerController.rebuild?.() } catch {}
-          try { frameRenderCameraToAvatarFront({ respectTimeline: true }) } catch {}
-          
-          console.log('[ThreeViewer] Default VRM model loaded successfully')
-          notify('defaultModelLoaded', 'Default model loaded', 2500)
-        } else {
-          console.error('[ThreeViewer] handleFiles is not a function')
-        }
-      } else {
-        console.error('[ThreeViewer] Failed to fetch default model:', response.status, response.statusText)
-      }
-    } catch (error) {
-      console.error('[ThreeViewer] Failed to load default VRM model:', error)
-    }
-  } else {
-    console.log('[ThreeViewer] Models already exist, skipping default model load:', models.value.length, 'model(s)')
-  }
-
   try {
     const list = (models?.value || []).map(m => m.vrm).filter(Boolean)
     list.forEach(vrm => {

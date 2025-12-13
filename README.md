@@ -30,7 +30,7 @@
 - @pixiv/three-vrm 2.0
 
 **Backend**
-- Spring Boot 3.3 (Java 17)
+- Spring Boot 3.3.2 (Java 17)
 - H2 Database (in-memory)
 - JWT Authentication
 - Spring Data JPA
@@ -105,14 +105,17 @@ python app.py --port 8000
 ### Development with Docker Compose
 
 ```powershell
-# Start all services
+# Start all services (Compose v2 recommended)
+docker compose up -d
+
+# (legacy)
 docker-compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop all services
-docker-compose down
+docker compose down
 ```
 
 ### Access URLs
@@ -121,7 +124,7 @@ docker-compose down
 |---------|-----|-------------|
 | Frontend | http://localhost/ | Vue.js application (via Nginx) |
 | Backend API | http://localhost/api/ | Spring Boot API (via Nginx) |
-| Health Check | http://localhost/api/actuator/health | Backend health status |
+| Health Check | http://localhost/actuator/health | Backend health status (Actuator) |
 
 ### Port Configuration
 
@@ -256,7 +259,12 @@ MokuMokuDanceWeb/
 
 ## 📜 License
 
-MIT
+MIT (see `LICENSE`)
+
+## 🤝 Contributing / Security
+
+- Contributing: `CONTRIBUTING.md`
+- Security: `SECURITY.md`
 
 ---
 
@@ -384,7 +392,7 @@ docker-compose down
 |---------|-----|------|
 | フロントエンド | http://localhost/ | Vue.jsアプリケーション（Nginx経由） |
 | バックエンドAPI | http://localhost/api/ | Spring Boot API（Nginx経由） |
-| ヘルスチェック | http://localhost/api/actuator/health | バックエンドの状態確認 |
+| ヘルスチェック | http://localhost/actuator/health | バックエンドの状態確認（Actuator） |
 
 ### ポート構成
 
@@ -532,6 +540,6 @@ MIT
 
 ## 💡 備考
 
-- VRMサンプルモデルは容量の都合で同梱していません。各自のライセンスに従い取得してください。
-- Git LFSは`.vrm`ファイルを対象に設定済みです（`.gitattributes`）。
+- サンプルVRMモデルは同梱していません。VRMを `frontend/public/vrm/` に配置すると `http://localhost/vrm/` で配信できます。
+- `.vrm` は現状Git LFSではなく通常のGit追跡です（`.gitattributes` 参照）。大容量VRMを含める場合はGit LFS運用を検討してください。
 - 旧MMD依存の実装方針は廃止済みです（VRM専用）。

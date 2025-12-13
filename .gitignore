@@ -2,11 +2,31 @@
 **/dist/
 **/build/
 **/target/
+**/.vite/
+**/.cache/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
 **/gradle-wrapper.jar
 **/.gradle/
 /.env
 **/.env
 **/.logs/
+**/logs/
+*.log
+
+# Docker / local overrides
+docker-compose.override.yml
+
+# Certificates / keys (never commit)
+**/*.pem
+**/*.key
+**/*.crt
+**/*.pfx
+**/*.p12
+
+# Local SSL material
+ssl/
 temp_*.txt
 temp_extract.txt
 temp_snippet.txt
@@ -25,6 +45,15 @@ Desktop.ini
 
 # IDE files (optional)
 *.iml
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+
+# macOS / Windows noise
+ehthumbs.db
+$RECYCLE.BIN/
 
 # Test data
 public/projects/*.json
